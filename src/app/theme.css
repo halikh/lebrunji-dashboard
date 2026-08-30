@@ -1,0 +1,221 @@
+/**
+ * The palette, transcribed from the app.
+ *
+ * `lebrunji/src/theme/colors.ts` is *"the single source of truth for colour"*,
+ * and this file is its web dialect — the same ramp, the same role names, the
+ * same reasons. The dashboard is the tool that runs the app, and it should not
+ * be the second opinion on what the brand looks like.
+ *
+ * ## The rule, restated because it is easy to lose
+ *
+ * A component never names a colour. It names a **role**: `--color-primary`,
+ * not `#0055ff`. A role says what a colour is *for*, so a component styled once
+ * keeps meaning the same thing when the value behind the role changes. A hex
+ * literal in a component, or a bare Tailwind palette class like `bg-blue-500`,
+ * is a lint error rather than a style choice.
+ *
+ * ## Blue acts, coral is chosen, red is the mark
+ *
+ * Three things that look like they compete and do not:
+ *
+ * - **Blue** is what can be acted on — buttons that navigate, links, prices,
+ *   an order code you can open. There are many on a screen.
+ * - **Coral** is what is *chosen*, or what to press next — the selected tab, the
+ *   focused field's ring, the primary button. There is usually one.
+ * - **Red `#e01f28`** is the mascot's cap and the wordmark's tile, and nothing
+ *   else. Nothing you click is painted in it. It is not a role here for exactly
+ *   that reason; it lives inside the brand components.
+ *
+ * ## One mode
+ *
+ * There is no dark pair, and that is a decision rather than an omission —
+ * `colors.ts` explains it: *"A dark counterpart would be a second design rather
+ * than a derivation of this one."* The blue/sun/mint relationships that carry
+ * the meaning do not survive inversion, and there are no dark values in the
+ * handoff to invert them to. The app dropped its theme column in migration
+ * 0040. The dashboard follows.
+ *
+ * The seam is still open: everything below is a token, so a second palette
+ * would be a second block and no component would move.
+ */
+
+@theme {
+  /* ---- The raw ramp ----------------------------------------------------
+   * Hexes verbatim from the app. Named in the design's own vocabulary so a
+   * token can be traced back to the spec that set it. Components do not use
+   * these; they use the roles below.
+   */
+  --color-cream: #fff8f0;
+  --color-warm-white: #fff4e9;
+  --color-sand: #f0eae1;
+  --color-hairline: #ece4d9;
+
+  --color-ink: #1e1b18;
+  --color-ink-deep: #171310;
+  --color-muted: #5c554e;
+  --color-faint: #8a8279;
+
+  --color-blue: #0055ff;
+  --color-blue-pressed: #0044cc;
+  --color-blue-tint: #dce8ff;
+
+  --color-coral: #ff5a3c;
+  --color-coral-tint: #ffd9d0;
+
+  --color-sun: #ffc634;
+  --color-sun-deep: #ffd85c;
+  --color-sun-tint: #fff0c6;
+
+  --color-mint: #14b87f;
+  --color-mint-tint: #cdeee0;
+  --color-mint-deep: #0d6f4c;
+
+  --color-grape: #6c4bf5;
+  --color-grape-tint: #ddd6ff;
+
+  --color-red-danger: #a5121a;
+  --color-red-danger-tint: #fdeeeb;
+  --color-red-danger-bright: #d63a26;
+
+  /** The brand mark's red. Used by the mascot and the wordmark, by nothing
+   *  else, and never by anything interactive. */
+  --color-brand-mark: #e01f28;
+
+  /* ---- Surfaces --------------------------------------------------------
+   * Warm cream ground, white cards raised on it. Every grey below carries
+   * yellow-red: a neutral grey beside this much blue and sun reads faintly
+   * blue, because the eye takes the saturated hues as its reference. The
+   * neutrals sit on the same warm hue and simply run out of saturation.
+   */
+  --color-background: var(--color-cream);
+  --color-surface: #ffffff;
+  --color-border: var(--color-hairline);
+
+  /* ---- Text ---- */
+  --color-text: var(--color-ink);
+  --color-text-soft: var(--color-muted);
+  --color-text-faint: var(--color-faint);
+
+  /* ---- Actions ---------------------------------------------------------
+   * `primary` and `primary-fill` hold the same hex today and are separate
+   * roles anyway. As **ink** — a link, a price — blue must read against the
+   * surface behind it. As a **fill** it carries white type, which must clear
+   * 4.5:1. On white both hold (white on blue is 5.6:1). The split costs
+   * nothing now and is the seam that stops a future lightening of the ink
+   * silently taking every filled button's label below 3:1 with it.
+   *
+   * Use `--color-primary-fill` for any surface carrying `--color-on-primary`.
+   */
+  --color-primary: var(--color-blue);
+  --color-primary-fill: var(--color-blue);
+  --color-primary-deep: var(--color-blue-pressed);
+  --color-primary-wash: var(--color-blue-tint);
+  --color-on-primary: #ffffff;
+
+  /* ---- Chosen ----------------------------------------------------------
+   * Three roles, one hex, for the same reason as above: `active-fill` is a
+   * ground, `active-ink` is type, `active` is a graphic (a ring, an icon).
+   *
+   * The measured cost, recorded here as the app records it rather than
+   * discovered later: white on coral is **3.1:1**. That is the design's call,
+   * taken with the number in hand — comfortable for a 2pt ring or an icon,
+   * where the bar is 3:1, and under the 4.5 a label would want. Deepening it
+   * was tried and stopped looking like coral.
+   */
+  --color-active: var(--color-coral);
+  --color-active-fill: var(--color-coral);
+  --color-active-ink: var(--color-coral);
+  --color-active-wash: var(--color-coral-tint);
+  --color-on-active: #ffffff;
+
+  /* ---- Going well ---- */
+  --color-accent: var(--color-mint);
+  --color-accent-wash: var(--color-mint-tint);
+  --color-accent-deep: var(--color-mint-deep);
+  --color-on-accent: #ffffff;
+
+  /* ---- Warmth. Always dark type on it, never white. ---- */
+  --color-yellow: var(--color-sun);
+  --color-yellow-wash: var(--color-sun-tint);
+  --color-on-yellow: var(--color-ink);
+
+  /* ---- Chrome ---- */
+  --color-info: var(--color-grape);
+  --color-info-wash: var(--color-grape-tint);
+  --color-on-info: #ffffff;
+
+  /* A fill for inactive chips and secondary buttons. Warmer than `border`,
+   * which is a line rather than a surface. */
+  --color-neutral-fill: var(--color-sand);
+  /* What a field's ground becomes while it is being typed into: barely a
+   * change, which is the point — "this one is live", not "this one is
+   * highlighted". Paired with the coral ring. */
+  --color-field-focus: var(--color-warm-white);
+
+  /* ---- Danger ----------------------------------------------------------
+   * `danger` is tuned for **text** on cream, where 7.4:1 is the point of it.
+   * Poured across a whole button it reads as near-black and lands heavier
+   * than a confirmation deserves, so filled destructive buttons use
+   * `danger-action` — one step brighter, still over 4.5:1 against white.
+   */
+  --color-danger: var(--color-red-danger);
+  --color-danger-wash: var(--color-red-danger-tint);
+  --color-danger-action: var(--color-red-danger-bright);
+
+  /* ---- Order status ----------------------------------------------------
+   * Defined once, here, so a status is the same colour in the queue, in the
+   * detail panel and in a chart. Mapped onto the roles above rather than
+   * given values of their own: "delivered" is the app's "going well", and
+   * saying so in the token is what keeps them in step.
+   *
+   * The slugs are `order_statuses.slug` — reference data, not an enum, so a
+   * merchant may add a step. An unknown slug falls back to `--color-status-
+   * unknown` rather than rendering colourless.
+   */
+  --color-status-ordered: var(--color-yellow);
+  --color-status-confirmed: var(--color-primary);
+  --color-status-driver-sent: var(--color-info);
+  --color-status-delivered: var(--color-accent);
+  --color-status-cancelled: var(--color-danger);
+  --color-status-unknown: var(--color-faint);
+
+  /* ---- Type ------------------------------------------------------------
+   * Barlow for body, Barlow Condensed for headings, Cairo for Arabic — the
+   * app's three faces, all on Google Fonts.
+   *
+   * The app registers one **family per weight**, because React Native cannot
+   * synthesise `fontWeight` on a custom family. That workaround does not
+   * belong here: on the web a weight is a weight, so these are one family
+   * each and `font-weight` does what it says.
+   */
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-barlow-condensed), var(--font-barlow), ui-sans-serif, sans-serif;
+  --font-arabic: var(--font-cairo), var(--font-barlow), ui-sans-serif, sans-serif;
+
+  /* ---- Spacing and radius ---------------------------------------------
+   * The app's scales, in px, so a card's corner and a row's padding are the
+   * values the customer already sees. Tailwind's own `p-4`/`rounded-lg` are
+   * *not* used — they are a different scale, and mixing two is how a design
+   * system stops being one.
+   */
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-xxl: 24px;
+  --spacing-xxxl: 32px;
+  --spacing-huge: 40px;
+
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 22px;
+  --radius-xl: 24px;
+  --radius-xxl: 30px;
+
+  /* ---- Motion ---- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+}
