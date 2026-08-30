@@ -89,6 +89,59 @@ If you find yourself wanting a service-role key to make something work, the
 thing to add is a policy or an `api_v1_*` function in the app repo's
 `supabase/migrations/`, not a key here.
 
+## Sessions, tokens, and what this app does not implement
+
+Nearly all of it is Supabase Auth. That is the point — a hand-rolled session
+layer is a large amount of security-critical code to get subtly wrong, and there
+is nothing about this product that needs its own.
+
+What is actually in play on a signed-in request:
+
+| | |
+| --- | --- |
+| **Access token** | A short-lived JWT signed by the project, carrying `sub` (the user id). This is what RLS reads through `auth.uid()`, so it is the thing every policy in migrations 0062–0068 is deciding about. Default lifetime one hour, set in the Supabase dashboard. |
+| **Refresh token** | Long-lived, rotating, single-use. Exchanged for a new access token when the old one expires. Reuse of a spent one revokes the family. |
+| **Where they live** | Cookies, written by `@supabase/ssr`, chunked across `…auth-token.0`, `.1` when a token is too long for one cookie. `SameSite=Lax`, and `Secure` on https. |
+| **Refresh** | `src/proxy.ts` calls `getUser()` on every matched request. That revalidates the token against the auth server — not merely decoding the cookie — and writes back a refreshed one when it has rotated. |
+| **Reset** | Supabase's recovery flow: `resetPasswordForEmail` sends a single-use, time-limited link over Resend SMTP; `/reset-password` waits for the resulting `PASSWORD_RECOVERY` session before showing the form. No token table here, and nothing in this repo mints or validates one. |
+| **Sign-out** | `signOut({ scope: 'local' })` — revokes this browser's refresh token and deletes the cookies, leaving other devices signed in. |
+| **Remember me** | A cookie *lifetime*, not a token lifetime. Ticked, the session cookies get a 30-day `Max-Age`; cleared, they get none and die with the window. It does not shorten the refresh token, which has its own server-side life. |
+
+### `getUser()`, never `getSession()`
+
+`getSession` reads the cookie and decodes it. `getUser` asks the auth server.
+Anything deciding what to render or whether to redirect uses the second one,
+because the first proves only that a cookie exists — and a cookie outlives the
+session behind it after a revocation, a password change, or an expiry.
+
+### The real limitation: these cookies are not `HttpOnly`
+
+`createBrowserClient` writes them with `document.cookie`, and JavaScript cannot
+set `HttpOnly`. So a successful XSS in this app could read the access token.
+
+That is inherent to a browser-side Supabase client, not an oversight, and the
+alternative is worth naming so the trade is visible: routing every authenticated
+call through server actions or route handlers, which would give `HttpOnly`
+cookies and cost the two things this dashboard is built on — Realtime
+subscriptions for the order queue, and direct-to-Storage uploads.
+
+What limits the damage: the access token is short-lived and carries no more
+authority than the operator has, every write it can make is still gated by RLS
+and `is_admin()`, and the refresh token rotates. What would *not* limit it is a
+service-role key, which is one more reason there is not one here.
+
+### Not implemented here, on purpose
+
+- **Login rate limiting and lockout.** Supabase Auth applies its own, configured
+  per project under Authentication → Rate Limits. Doing it a second time in this
+  app would be bypassable — the auth endpoint is reachable without going through
+  this app at all.
+- **Password strength rules.** The reset form asks for twelve characters, but
+  the enforcing copy of that rule belongs in the project's password policy, for
+  the same reason.
+- **A sign-in audit trail.** Supabase records auth events; if this ever needs to
+  be visible to the operator it should read those rather than keep its own.
+
 ## Scripts
 
 | Script | What it does |

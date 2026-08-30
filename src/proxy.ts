@@ -54,7 +54,11 @@ export async function proxy(request: NextRequest) {
         }
         response = NextResponse.next({ request });
         for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, withRememberMe((options ?? {}) as CookieOptions, remember));
+          response.cookies.set(
+            name,
+            value,
+            withRememberMe((options ?? {}) as CookieOptions, remember, value),
+          );
         }
       },
     },

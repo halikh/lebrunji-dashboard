@@ -53,7 +53,7 @@ function create() {
           (cookie) => cookie.name === REMEMBER_COOKIE && cookie.value === '1',
         );
         for (const { name, value, options } of cookies) {
-          writeCookie(name, value, withRememberMe((options ?? {}) as CookieOptions, remember));
+          writeCookie(name, value, withRememberMe((options ?? {}) as CookieOptions, remember, value));
         }
       },
     },
