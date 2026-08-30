@@ -43,17 +43,74 @@ h4 {
 }
 
 /**
+ * What moves when something is focused or hovered.
+ *
+ * Declared on the elements themselves rather than inside `:focus-visible`, and
+ * that is the difference between a ring that fades in and one that fades in and
+ * then *snaps* out: a transition written only in the focus rule applies while
+ * entering the state, and on blur the element falls back to a base rule that
+ * has none.
+ *
+ * Short — 120ms — because this follows the caret. Anything slower and the ring
+ * is still arriving at the field you have already started typing in.
+ *
+ * `filter` is in the list for the buttons' hover, so that no component has to
+ * declare a transition of its own. One that did would *replace* this rather
+ * than add to it — a Tailwind `transition-[...]` utility outranks an element
+ * selector — and the property it forgot would be the one that snapped.
+ */
+a,
+button,
+input,
+select,
+textarea,
+summary,
+[tabindex] {
+  transition:
+    box-shadow var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    filter var(--duration-fast) var(--ease-standard);
+}
+
+/**
  * The focus ring, once.
  *
  * Coral, because coral is where the app's attention is — the same thing it
  * means on a focused field in the app. Never removed: an operator working the
  * queue from the keyboard needs to see where they are, and that is the whole
  * point of the keyboard flow on the order screen.
+ *
+ * ## Why a box-shadow rather than an outline
+ *
+ * Two reasons, and the first was a bug this rule used to have.
+ *
+ * An `outline` needs a `border-radius` to curve around, so the rule set one —
+ * and setting `border-radius` here changes **the element's own corners**, not
+ * the ring's. Focusing a 20px-radius input snapped it to 4px. A box-shadow
+ * takes the element's real radius with no help, so the ring is always the shape
+ * of the thing it is around.
+ *
+ * Second, `box-shadow` transitions cleanly. `outline-width` does not animate
+ * reliably across browsers, so an outline-based ring appears instantly however
+ * the transition above is written.
+ *
+ * Two layers: a crisp 1px coral edge, and a 3px wash outside it. The wash is
+ * what makes it read as a ring rather than a border thickening, and it does the
+ * job `outline-offset` used to — without needing to know what colour is behind
+ * the element, which changes between the cream page and a white card.
+ *
+ * The transparent outline is not decoration. Windows High Contrast Mode
+ * discards box-shadows entirely; it does not discard outlines, and it forces
+ * their colour — so this is invisible normally and is the whole focus indicator
+ * there.
  */
 :focus-visible {
-  outline: 2px solid var(--color-active);
+  outline: 2px solid transparent;
   outline-offset: 2px;
-  border-radius: 4px;
+  box-shadow:
+    0 0 0 1px var(--color-active),
+    0 0 0 4px var(--color-active-wash);
 }
 
 /**

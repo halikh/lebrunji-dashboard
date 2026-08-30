@@ -1,6 +1,11 @@
 /**
  * The primitives. Everything visible is made of these.
  *
+ * None of them declares a `transition`. Focus, hover and colour changes are
+ * animated once, in `globals.css`, for every interactive element — a component
+ * that declared its own would *replace* that list rather than extend it, and
+ * whichever property it left out would be the one that snapped.
+ *
  * ## Why they are written here rather than installed
  *
  * The app already has a considered design system — `src/theme/colors.ts`,
@@ -36,7 +41,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // Coral: the one to press to go on. White on it is 3.1:1 — the design's call,
   // recorded in `colors.ts` with the number in hand rather than around it.
   primary: 'bg-active-fill text-on-active hover:brightness-95',
-  secondary: 'bg-neutral-fill text-text hover:brightness-97',
+  secondary: 'bg-neutral-fill text-text hover:brightness-[0.97]',
   quiet: 'bg-transparent text-primary hover:bg-primary-wash',
   // `danger-action`, not `danger`: the darker red is tuned for text on cream and
   // reads as near-black poured across a whole button.
@@ -63,7 +68,7 @@ export function Button({
       aria-busy={pending || undefined}
       className={cx(
         'inline-flex items-center justify-center gap-sm rounded-md px-lg py-md',
-        'text-[15px] font-semibold transition-[filter,background-color]',
+        'text-[15px] font-semibold',
         'disabled:cursor-not-allowed disabled:opacity-60',
         BUTTON_VARIANTS[variant],
         className,
@@ -140,7 +145,12 @@ export function Input({
         'placeholder:text-text-faint',
         // A shade warmer while it is being typed into — "this one is live",
         // not "this one is highlighted". The app does the same.
-        'focus:bg-field-focus focus:outline-none focus:ring-2 focus:ring-active',
+        //
+        // No ring of its own: the focus ring is one rule in `globals.css`, and
+        // it applies here. A second one declared on the input was both a
+        // duplicate and a divergence waiting to happen — the button next to it
+        // would have focused differently.
+        'focus:bg-field-focus',
         invalid ? 'border-danger' : 'border-border',
         className,
       )}
