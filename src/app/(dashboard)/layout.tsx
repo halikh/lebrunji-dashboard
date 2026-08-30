@@ -70,8 +70,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           smaller than my content" — so this would grow to fit the whole queue
           instead of bounding it, the scrolling would happen on the page, and
           the screen chrome would slide away with it.
+
+          `overflow-hidden`, not `overflow-y-auto`, and that is a rule for every
+          screen: **the shell bounds the area, and each screen decides where the
+          scrolling happens inside it.** Every one of them pins a header and
+          scrolls a list under it, so a scroll region here as well was a second
+          one wrapped around the first — two scrollbars side by side, the outer
+          one moving the pinned header it exists to keep still.
+
+          A screen that wants the whole thing to scroll says so itself, with an
+          `overflow-y-auto` of its own. That is one line in the screen that
+          wants it, rather than a shell that half-scrolls for everybody.
         */}
-        <main id="main" className="min-h-0 flex-1 overflow-y-auto">
+        <main id="main" className="min-h-0 flex-1 overflow-hidden">
           {children}
         </main>
       </div>
