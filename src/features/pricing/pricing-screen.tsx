@@ -466,6 +466,10 @@ function Ladder() {
             return (
               <div
                 key={index}
+                // What the reveal effect looks the new row up by. A `key` is
+                // React's, not the DOM's — there is nothing to query for
+                // without this.
+                data-band={index}
                 className={cx(
                   // `items-start`, not `items-end`. One field carries a hint and
                   // the other does not, so aligning the bottoms pushed the
