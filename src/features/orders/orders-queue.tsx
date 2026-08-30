@@ -124,6 +124,16 @@ export function OrdersQueue() {
         searchRef.current?.focus();
         return;
       }
+      if (event.key === "o") {
+        // `o` for open, not Enter or Space. Enter already advances — the action
+        // done hundreds of times a day earns the most reachable key — and Space
+        // scrolls the list, which is not a gesture worth taking away.
+        const order = rows[active];
+        if (!order) return;
+        event.preventDefault();
+        setOpenOrderId(order.id);
+        return;
+      }
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault();
         setFocused((current) => Math.min(current + 1, rows.length - 1));

@@ -89,6 +89,7 @@ const en = {
     live: "Live",
     keyboardMove: "move",
     keyboardAdvance: "advance",
+    keyboardOpen: "receipt",
     keyboardSearch: "search",
     loadMore: "Load older orders",
     panelLabel: "Order detail",
@@ -152,6 +153,35 @@ const en = {
     truncated:
       "Showing the first 200 shops. Reordering and search still work, but the list is not complete.",
     openMenu: "Menu",
+  },
+
+  menu: {
+    title: "Menu",
+    back: "All shops",
+    addItem: "Add an item to {section}",
+    name: "Name",
+    description: "Description",
+    slug: "Slug",
+    price: "Price",
+    live: "Live",
+    hidden: "Hidden",
+    save: "Save",
+    saveAndAnother: "Save and add another",
+    added: "Item added",
+    archived: "Item archived",
+    archiveTitle: "Archive this item?",
+    archiveBody:
+      "It disappears from the app immediately. Past orders keep it, and it can be brought back.",
+    archiveConfirm: "Archive",
+    archive: "Archive",
+    itemCount: "{count} items",
+    emptyTitle: "No menu yet",
+    emptyBody: "Sections hold the items. This shop has none.",
+    failedTitle: "Could not load the menu",
+    failedBody: "The connection may have dropped. Nothing has been changed.",
+    // The slug is derived from the English name until somebody edits it. Saying
+    // so stops it looking like a field that ignores what you type.
+    slugHint: "Used by imports. Filled in from the name.",
   },
 
   map: {

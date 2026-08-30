@@ -86,6 +86,22 @@ export async function fetchStores(
   };
 }
 
+/** One store, for a screen that is about that store. */
+export async function fetchStore(id: string): Promise<Store> {
+  const { data, error } = await getClient()
+    .from("stores")
+    .select(
+      `id, slug, name, image_url, category_id, currency_code, is_active, is_featured,
+       sort_order, latitude, longitude, prep_min_minutes, prep_max_minutes,
+       categories ( name )`,
+    )
+    .eq("id", id)
+    .single();
+
+  if (error) throw new Error(`Could not read the shop: ${error.message}`);
+  return toStore(data);
+}
+
 export type StorePatch = {
   name?: Localized;
   isActive?: boolean;

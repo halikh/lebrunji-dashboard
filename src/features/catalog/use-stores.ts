@@ -7,6 +7,7 @@ import { t } from "@/i18n/translations";
 
 import {
   archiveStore,
+  fetchStore,
   fetchStores,
   updateStore,
   type Store,
@@ -16,7 +17,15 @@ import {
 export const storeKeys = {
   all: ["stores"] as const,
   list: (search: string) => ["stores", "list", search] as const,
+  detail: (id: string) => ["stores", "detail", id] as const,
 };
+
+export function useStore(id: string) {
+  return useQuery({
+    queryKey: storeKeys.detail(id),
+    queryFn: () => fetchStore(id),
+  });
+}
 
 export function useStores(search: string) {
   return useQuery({

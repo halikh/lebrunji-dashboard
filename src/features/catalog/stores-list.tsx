@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { cx, Input } from "@/components/ui";
@@ -201,6 +202,15 @@ function StoreRow({
       <Button variant="secondary" size="sm" onClick={onToggleFeatured}>
         {t("catalogue.featured")}
       </Button>
+
+      {/* The menu is what an operator comes to a shop for. A link rather than a
+          button: it is a place, so it should be openable in a new tab. */}
+      <Link
+        href={`/catalogue/${store.id}`}
+        className="shrink-0 rounded-md px-md py-sm text-[13px] font-semibold text-primary hover:bg-primary-wash"
+      >
+        {t("catalogue.openMenu")}
+      </Link>
 
       <ConfirmButton
         onConfirm={onArchive}
