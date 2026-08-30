@@ -580,6 +580,68 @@ const en = {
       "Pricing the ladder as you have edited it. Save to make it real.",
   },
 
+  /**
+   * The cards on the app's home screen.
+   *
+   * Called banners rather than discounts, deliberately. The rows live in
+   * `discounts` and that table carries a whole discount engine's vocabulary,
+   * but `place_order` hardcodes a discount of zero and no coupon column exists.
+   * A screen that offered a percentage would be offering a decision with no
+   * consequence, and the operator would find out from a customer's bill.
+   */
+  promotions: {
+    tab: "Promotions",
+    // Said once, at the top, rather than left to be discovered.
+    artworkOnly:
+      "A promotion is the artwork alone — any wording belongs in the image. These cards do not change what anything costs.",
+    add: "New promotion",
+    name: "Reference",
+    nameHint:
+      "Your own label for it, never shown to a customer. Cannot be changed later.",
+    nameRequired: "Give it a name so you can find it again.",
+    imageHint: "The card as it appears on the home screen. Wide, not square.",
+    startsAt: "Starts",
+    startsHint: "Leave empty to start as soon as it is switched on.",
+    endsAt: "Ends",
+    endsHint: "Leave empty to run until you switch it off.",
+    windowBackwards: "The end has to come after the start.",
+    noDate: "No date",
+    inZone: "{zone}",
+    visibility: "Visibility",
+    visibilityHint:
+      "A promotion shows only when it is on and inside its dates.",
+    live: "Live",
+    hidden: "Hidden",
+    noArtwork: "No artwork",
+    save: "Save promotion",
+    added: "{name} added",
+    saved: "{name} saved",
+    archived: "{name} archived",
+    archive: "Archive",
+    archiveTitle: "Archive {name}?",
+    archiveBody:
+      "The card disappears from the app immediately. It can be brought back.",
+    archiveConfirm: "Archive",
+    thisBanner: "this promotion",
+
+    // The window in words. A banner can be switched on and invisible, which is
+    // the state worth naming: nothing else on screen would say so.
+    always: "Runs until you switch it off",
+    between: "{from} to {to}",
+    until: "Until {to}",
+    from: "From {from}",
+    startsOn: "Switched on, but does not start until {when}",
+    ended: "Switched on, but its dates have passed",
+
+    showTitle: "Show {name} on the home screen?",
+    showBody: "It appears straight away, as long as today is inside its dates.",
+    showConfirm: "Show it",
+    hideTitle: "Hide {name}?",
+    hideBody: "The card disappears from the home screen straight away.",
+    hideConfirm: "Hide it",
+    formLabel: "Promotion details",
+  },
+
   reorder: {
     handle: "Reorder {name}",
     instructions:

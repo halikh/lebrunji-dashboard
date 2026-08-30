@@ -6,6 +6,7 @@ import { cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
 
 import { CategoriesList } from "./categories-list";
+import { PromotionsList } from "./promotions-list";
 import { StoresList } from "./stores-list";
 
 /**
@@ -20,7 +21,8 @@ import { StoresList } from "./stores-list";
  * to add a shop to it.
  *
  * Shops lead because that is what the catalogue is for. Categories change a
- * handful of times a year.
+ * handful of times a year, and promotions are the third thing the home screen
+ * is made of — a card, a tile, a shop — so all three belong on one errand.
  *
  * ## The tab lives in the URL
  *
@@ -33,6 +35,7 @@ import { StoresList } from "./stores-list";
 const TABS = [
   { key: "shops", labelKey: "catalogue.stores" },
   { key: "categories", labelKey: "categories.tab" },
+  { key: "promotions", labelKey: "promotions.tab" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -43,7 +46,9 @@ export function CatalogueScreen() {
   const params = useSearchParams();
 
   const requested = params.get("tab");
-  const tab: TabKey = requested === "categories" ? "categories" : "shops";
+  const tab: TabKey = TABS.some((one) => one.key === requested)
+    ? (requested as TabKey)
+    : "shops";
 
   function show(next: TabKey) {
     const query = new URLSearchParams(params);
@@ -110,6 +115,9 @@ export function CatalogueScreen() {
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "categories" && "hidden")}>
         <CategoriesList />
+      </div>
+      <div className={cx("min-h-0 flex-1", tab !== "promotions" && "hidden")}>
+        <PromotionsList />
       </div>
     </div>
   );
