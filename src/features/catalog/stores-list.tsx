@@ -208,6 +208,9 @@ function StoreRow({
         bodyKey="catalogue.archiveBody"
         confirmKey="catalogue.archiveConfirm"
         variant="danger"
+        // Red type, not a red fill: this repeats on every row, and a column of
+        // filled red buttons stops reading as a warning by the fourth one.
+        triggerVariant="danger-quiet"
         size="sm"
       >
         {t("catalogue.archive")}

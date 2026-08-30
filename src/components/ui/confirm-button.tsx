@@ -79,14 +79,17 @@ export function ConfirmButton({
   /**
    * The trigger's own look, when the default is the wrong weight.
    *
-   * By default a destructive action gets a *quiet* trigger — the dialog is
-   * where the weight belongs, and a page of red buttons is a page nobody reads.
-   * But a filled one is right where the action is a real, expected choice
-   * sitting beside another filled button: a text link there reads as a
-   * footnote, which is the wrong weight for the one thing that cannot be
-   * undone.
+   * The default is `quiet` — the dialog is where the weight belongs. The two
+   * reasons to override it:
+   *
+   * - **`danger`** (filled) where the action sits beside another filled button
+   *   and is a real, expected choice. A text link there reads as a footnote,
+   *   which is the wrong weight for the one thing that cannot be undone.
+   * - **`danger-quiet`** where it repeats down a list: red type says
+   *   destructive without a column of filled red buttons, which stops meaning
+   *   anything by the fourth row.
    */
-  triggerVariant?: "quiet" | "secondary" | "danger";
+  triggerVariant?: "quiet" | "secondary" | "danger" | "danger-quiet";
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);

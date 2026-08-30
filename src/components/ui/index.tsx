@@ -40,7 +40,8 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 // Button
 // ---------------------------------------------------------------------------
 
-type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
+type ButtonVariant =
+  "primary" | "secondary" | "quiet" | "danger" | "danger-quiet";
 type ButtonSize = "md" | "sm";
 
 /**
@@ -68,6 +69,17 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // `danger-action`, not `danger`: the darker red is tuned for text on cream and
   // reads as near-black poured across a whole button.
   danger: "bg-danger-action text-on-active hover:brightness-95",
+  /**
+   * Destructive, without the fill.
+   *
+   * For a destructive action that repeats down a list. `danger` filled is right
+   * for the one action on a screen; a column of filled red buttons is a page
+   * nobody reads, and the warning stops meaning anything by the fourth row.
+   *
+   * `danger`, not `danger-action`, because this is **type**: the darker red is
+   * the one tuned for text on cream, where it clears 7.4:1.
+   */
+  "danger-quiet": "bg-transparent text-danger hover:bg-danger-wash",
 };
 
 export function Button({
