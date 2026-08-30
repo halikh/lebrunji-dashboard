@@ -1,7 +1,7 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from "next/server";
 
-import { REMEMBER_COOKIE, REMEMBER_MAX_AGE } from '@/lib/auth/cookies';
-import { anonymousClient, toPair, writeSession } from '@/lib/auth/session';
+import { REMEMBER_COOKIE, REMEMBER_MAX_AGE } from "@/lib/auth/cookies";
+import { anonymousClient, toPair, writeSession } from "@/lib/auth/session";
 
 /**
  * Signing in, on the server, so the refresh token never reaches JavaScript.
@@ -25,30 +25,34 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'invalid' }, { status: 400 });
+    return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
 
-  const email = typeof body.email === 'string' ? body.email.trim() : '';
-  const password = typeof body.password === 'string' ? body.password : '';
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const password = typeof body.password === "string" ? body.password : "";
   const remember = body.remember === true;
 
   if (!email || !password) {
-    return NextResponse.json({ error: 'invalid' }, { status: 400 });
+    return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
 
   const supabase = anonymousClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
   if (error || !data.session) {
-    const rateLimited = error?.status === 429 || error?.code === 'over_request_rate_limit';
+    const rateLimited =
+      error?.status === 429 || error?.code === "over_request_rate_limit";
     return NextResponse.json(
-      { error: rateLimited ? 'rate_limited' : 'invalid' },
+      { error: rateLimited ? "rate_limited" : "invalid" },
       { status: rateLimited ? 429 : 401 },
     );
   }
 
   const pair = toPair(data.session);
-  const isSecure = request.nextUrl.protocol === 'https:';
+  const isSecure = request.nextUrl.protocol === "https:";
 
   const response = NextResponse.json({
     accessToken: pair.accessToken,
@@ -58,13 +62,13 @@ export async function POST(request: NextRequest) {
 
   // The preference is written here rather than by the form, so that the cookie
   // attributes and the choice they came from are decided in one place.
-  response.cookies.set(REMEMBER_COOKIE, remember ? '1' : '0', {
+  response.cookies.set(REMEMBER_COOKIE, remember ? "1" : "0", {
     // Not HttpOnly and not a credential: it records how this machine wants to
     // be treated, and knowing it grants nothing.
     httpOnly: false,
-    sameSite: 'lax',
+    sameSite: "lax",
     secure: isSecure,
-    path: '/',
+    path: "/",
     maxAge: REMEMBER_MAX_AGE,
   });
 

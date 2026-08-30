@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from "react";
 
-import { cx } from './index';
+import { cx } from "./index";
 
 /**
  * A modal dialog, built on the native `<dialog>` element.
@@ -86,8 +86,8 @@ export function Modal({
         // The open/close transition and the backdrop's colour are in
         // `globals.css`, on `dialog` — so every overlay added later gets them
         // without having to remember, and there is one place they are tuned.
-        'm-auto w-[min(420px,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-xxl',
-        'text-text',
+        "m-auto w-[min(420px,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-xxl",
+        "text-text",
         className,
       )}
     >

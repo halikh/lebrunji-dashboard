@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 
-import { Icon } from '@/components/shell/icons';
-import { railItemClass } from '@/components/shell/rail-item';
-import { ConfirmButton } from '@/components/ui/confirm-button';
-import { t } from '@/i18n/translations';
-import { forgetAccessToken } from '@/lib/supabase/client';
+import { Icon } from "@/components/shell/icons";
+import { railItemClass } from "@/components/shell/rail-item";
+import { ConfirmButton } from "@/components/ui/confirm-button";
+import { t } from "@/i18n/translations";
+import { forgetAccessToken } from "@/lib/supabase/client";
 
 /**
  * Signs the operator out of **this browser**.
@@ -47,7 +47,6 @@ export function SignOutButton() {
   const router = useRouter();
 
   async function signOut() {
-
     // A route handler, because the refresh token it has to revoke is in an
     // `HttpOnly` cookie this code cannot read. `supabase.auth.*` would throw
     // here anyway — the browser client is built with `accessToken`, which turns
@@ -57,14 +56,14 @@ export function SignOutButton() {
     // dialog and navigated anyway would be the worst outcome available — the
     // session cookie would still be valid, so the operator would believe they
     // had signed out of a machine they had not.
-    const response = await fetch('/auth/sign-out', { method: 'POST' });
-    if (!response.ok) throw new Error('sign-out failed');
+    const response = await fetch("/auth/sign-out", { method: "POST" });
+    if (!response.ok) throw new Error("sign-out failed");
 
     // The in-memory access token outlives the cookies otherwise, and a
     // component querying on its way out would use one that was just revoked.
     forgetAccessToken();
 
-    router.replace('/login');
+    router.replace("/login");
     // The session is read on the server too, so the cached render has to go
     // with it — otherwise the back button shows the signed-in page.
     router.refresh();
@@ -83,13 +82,17 @@ export function SignOutButton() {
       // shape with overrides would drift the first time the rail's padding
       // changed.
       renderTrigger={({ onClick }) => (
-        <button type="button" onClick={onClick} className={railItemClass({ tone: 'danger' })}>
+        <button
+          type="button"
+          onClick={onClick}
+          className={railItemClass({ tone: "danger" })}
+        >
           <Icon name="sign-out" />
-          {t('common.signOut')}
+          {t("common.signOut")}
         </button>
       )}
     >
-      {t('common.signOut')}
+      {t("common.signOut")}
     </ConfirmButton>
   );
 }

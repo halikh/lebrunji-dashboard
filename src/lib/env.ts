@@ -40,20 +40,20 @@ const raw = {
 };
 
 const LABELS: Record<keyof Env, string> = {
-  supabaseUrl: 'NEXT_PUBLIC_SUPABASE_URL',
-  supabaseAnonKey: 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  supabaseUrl: "NEXT_PUBLIC_SUPABASE_URL",
+  supabaseAnonKey: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
 };
 
 export function readEnv(): Env {
   const missing = (Object.keys(LABELS) as (keyof Env)[]).filter(
-    (key) => (raw[key] ?? '').length === 0,
+    (key) => (raw[key] ?? "").length === 0,
   );
 
   if (missing.length > 0) {
     throw new Error(
-      `Missing environment ${missing.length === 1 ? 'variable' : 'variables'}: ` +
-        `${missing.map((key) => LABELS[key]).join(', ')}. ` +
-        'Copy .env.example to .env.local and fill them in.',
+      `Missing environment ${missing.length === 1 ? "variable" : "variables"}: ` +
+        `${missing.map((key) => LABELS[key]).join(", ")}. ` +
+        "Copy .env.example to .env.local and fill them in.",
     );
   }
 

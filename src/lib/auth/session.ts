@@ -1,8 +1,8 @@
-import 'server-only';
+import "server-only";
 
-import { createClient, type Session } from '@supabase/supabase-js';
+import { createClient, type Session } from "@supabase/supabase-js";
 
-import { readEnv } from '../env';
+import { readEnv } from "../env";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -10,7 +10,7 @@ import {
   authCookieAttributes,
   clearedCookieAttributes,
   isExpiring,
-} from './cookies';
+} from "./cookies";
 
 /**
  * The server side of authentication. Nothing here ever reaches the browser.
@@ -42,11 +42,19 @@ export type CookieWriter = {
 export function anonymousClient() {
   const { supabaseUrl, supabaseAnonKey } = readEnv();
   return createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
   });
 }
 
-export type TokenPair = { accessToken: string; refreshToken: string; expiresAt: number };
+export type TokenPair = {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+};
 
 function toPair(session: Session): TokenPair {
   return {
@@ -71,12 +79,12 @@ export function writeSession(
 
 export function clearSession(cookies: CookieWriter, isSecure: boolean) {
   const cleared = clearedCookieAttributes(isSecure);
-  cookies.set(ACCESS_COOKIE, '', cleared);
-  cookies.set(REFRESH_COOKIE, '', cleared);
+  cookies.set(ACCESS_COOKIE, "", cleared);
+  cookies.set(REFRESH_COOKIE, "", cleared);
 }
 
 export function readRemember(cookies: CookieWriter): boolean {
-  return cookies.get(REMEMBER_COOKIE)?.value === '1';
+  return cookies.get(REMEMBER_COOKIE)?.value === "1";
 }
 
 /**
@@ -115,7 +123,9 @@ export async function currentAccessToken(
   }
 
   const supabase = anonymousClient();
-  const { data, error } = await supabase.auth.refreshSession({ refresh_token: refresh });
+  const { data, error } = await supabase.auth.refreshSession({
+    refresh_token: refresh,
+  });
 
   if (error || !data.session) {
     if (options.write) clearSession(cookies, options.isSecure);
@@ -147,13 +157,14 @@ export async function currentAccessToken(
  */
 export function expiryOf(jwt: string): number | null {
   try {
-    const payload = jwt.split('.')[1];
+    const payload = jwt.split(".")[1];
     if (!payload) return null;
-    const json = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(
-      'utf8',
-    );
+    const json = Buffer.from(
+      payload.replace(/-/g, "+").replace(/_/g, "/"),
+      "base64",
+    ).toString("utf8");
     const exp: unknown = JSON.parse(json).exp;
-    return typeof exp === 'number' ? exp : null;
+    return typeof exp === "number" ? exp : null;
   } catch {
     return null;
   }

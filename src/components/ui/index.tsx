@@ -24,19 +24,24 @@
  * - **No component names a colour.** Roles only.
  */
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  Ref,
+} from "react";
 
 /** Joins class names, dropping the falsey ones. */
 export function cx(...parts: (string | false | null | undefined)[]): string {
-  return parts.filter(Boolean).join(' ');
+  return parts.filter(Boolean).join(" ");
 }
 
 // ---------------------------------------------------------------------------
 // Button
 // ---------------------------------------------------------------------------
 
-type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
-type ButtonSize = 'md' | 'sm';
+type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
+type ButtonSize = "md" | "sm";
 
 /**
  * Size is a prop, not something a caller patches on with a class.
@@ -50,24 +55,24 @@ type ButtonSize = 'md' | 'sm';
  * Enumerating the sizes here means there is nothing to override.
  */
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  md: 'px-lg py-md text-[15px]',
-  sm: 'px-md py-sm text-[13px]',
+  md: "px-lg py-md text-[15px]",
+  sm: "px-md py-sm text-[13px]",
 };
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // Coral: the one to press to go on. White on it is 3.1:1 — the design's call,
   // recorded in `colors.ts` with the number in hand rather than around it.
-  primary: 'bg-active-fill text-on-active hover:brightness-95',
-  secondary: 'bg-neutral-fill text-text hover:brightness-[0.97]',
-  quiet: 'bg-transparent text-primary hover:bg-primary-wash',
+  primary: "bg-active-fill text-on-active hover:brightness-95",
+  secondary: "bg-neutral-fill text-text hover:brightness-[0.97]",
+  quiet: "bg-transparent text-primary hover:bg-primary-wash",
   // `danger-action`, not `danger`: the darker red is tuned for text on cream and
   // reads as near-black poured across a whole button.
-  danger: 'bg-danger-action text-on-active hover:brightness-95',
+  danger: "bg-danger-action text-on-active hover:brightness-95",
 };
 
 export function Button({
-  variant = 'primary',
-  size = 'md',
+  variant = "primary",
+  size = "md",
   fullWidth = false,
   pending = false,
   children,
@@ -92,9 +97,9 @@ export function Button({
         // `items-center justify-center` centres the icon against the label and
         // the pair against the button. Both matter: a button wide enough to
         // have spare room will show the difference.
-        'items-center justify-center gap-sm rounded-md font-semibold',
-        'disabled:cursor-not-allowed disabled:opacity-60',
-        fullWidth ? 'flex w-full' : 'inline-flex',
+        "items-center justify-center gap-sm rounded-md font-semibold",
+        "disabled:cursor-not-allowed disabled:opacity-60",
+        fullWidth ? "flex w-full" : "inline-flex",
         BUTTON_SIZES[size],
         BUTTON_VARIANTS[variant],
         className,
@@ -148,7 +153,11 @@ export function Field({
       {children}
       {hint && !error && <p className="text-[13px] text-text-faint">{hint}</p>}
       {error && (
-        <p id={`${id}-error`} role="alert" className="text-[13px] font-medium text-danger">
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="text-[13px] font-medium text-danger"
+        >
           {error}
         </p>
       )}
@@ -159,16 +168,25 @@ export function Field({
 export function Input({
   invalid = false,
   className,
+  ref,
   ...rest
-}: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
+}: InputHTMLAttributes<HTMLInputElement> & {
+  invalid?: boolean;
+  // React 19 passes `ref` as an ordinary prop to function components, so no
+  // `forwardRef` wrapper is needed — but the type has to say so.
+  ref?: Ref<HTMLInputElement>;
+}) {
   return (
     <input
       {...rest}
+      ref={ref}
       aria-invalid={invalid || undefined}
-      aria-describedby={invalid && rest.id ? `${rest.id}-error` : rest['aria-describedby']}
+      aria-describedby={
+        invalid && rest.id ? `${rest.id}-error` : rest["aria-describedby"]
+      }
       className={cx(
-        'w-full rounded-md border bg-surface px-md py-md text-[15px] text-text',
-        'placeholder:text-text-faint',
+        "w-full rounded-md border bg-surface px-md py-md text-[15px] text-text",
+        "placeholder:text-text-faint",
         // A shade warmer while it is being typed into — "this one is live",
         // not "this one is highlighted". The app does the same.
         //
@@ -176,8 +194,8 @@ export function Input({
         // it applies here. A second one declared on the input was both a
         // duplicate and a divergence waiting to happen — the button next to it
         // would have focused differently.
-        'focus:bg-field-focus',
-        invalid ? 'border-danger' : 'border-border',
+        "focus:bg-field-focus",
+        invalid ? "border-danger" : "border-border",
         className,
       )}
     />
@@ -188,9 +206,20 @@ export function Input({
 // Card
 // ---------------------------------------------------------------------------
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={cx('rounded-xl border border-border bg-surface p-xxl', className)}>
+    <div
+      className={cx(
+        "rounded-xl border border-border bg-surface p-xxl",
+        className,
+      )}
+    >
       {children}
     </div>
   );

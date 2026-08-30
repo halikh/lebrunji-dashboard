@@ -1,8 +1,8 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from "next/server";
 
-import { REFRESH_COOKIE } from './lib/auth/cookies';
-import { bridgeCookies } from './lib/auth/request-cookies';
-import { currentAccessToken } from './lib/auth/session';
+import { REFRESH_COOKIE } from "./lib/auth/cookies";
+import { bridgeCookies } from "./lib/auth/request-cookies";
+import { currentAccessToken } from "./lib/auth/session";
 
 /**
  * Next 16 renamed this convention from `middleware.ts` to `proxy.ts`. The new
@@ -42,7 +42,9 @@ import { currentAccessToken } from './lib/auth/session';
  */
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
+  const isPublic = PUBLIC_PATHS.some(
+    (p) => path === p || path.startsWith(`${p}/`),
+  );
 
   const response = NextResponse.next({ request });
 
@@ -51,7 +53,7 @@ export async function proxy(request: NextRequest) {
     // untouched, so this is not a round trip on every request.
     await currentAccessToken(bridgeCookies(request, response), {
       write: true,
-      isSecure: request.nextUrl.protocol === 'https:',
+      isSecure: request.nextUrl.protocol === "https:",
     });
   }
 
@@ -62,9 +64,9 @@ export async function proxy(request: NextRequest) {
 
   if (!signedIn && !isPublic) {
     const login = request.nextUrl.clone();
-    login.pathname = '/login';
+    login.pathname = "/login";
     // So signing in lands where they were going, rather than on the queue.
-    login.searchParams.set('next', path + request.nextUrl.search);
+    login.searchParams.set("next", path + request.nextUrl.search);
 
     const redirect = NextResponse.redirect(login);
     // Carry the clearing across, or the dead cookies survive the redirect and
@@ -83,7 +85,7 @@ export async function proxy(request: NextRequest) {
  * how somebody *becomes* signed in — gating them behind being signed in would
  * be a loop.
  */
-const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password', '/auth'];
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password", "/auth"];
 
 export const config = {
   matcher: [
@@ -92,6 +94,6 @@ export const config = {
      * session, and running this on each of them would multiply the refresh
      * checks a single page load makes.
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)",
   ],
 };

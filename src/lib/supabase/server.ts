@@ -1,10 +1,10 @@
-import 'server-only';
+import "server-only";
 
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
+import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
-import { currentAccessToken, type CookieWriter } from '../auth/session';
-import { readEnv } from '../env';
+import { currentAccessToken, type CookieWriter } from "../auth/session";
+import { readEnv } from "../env";
 
 /**
  * The server client, for rendering.
@@ -46,7 +46,11 @@ export async function getSignedInUser() {
 
   const { supabaseUrl, supabaseAnonKey } = readEnv();
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
   });
 
   // `getUser(jwt)` asks the auth server rather than decoding the token here.
@@ -70,6 +74,9 @@ async function readAccessToken(): Promise<string | null> {
     set() {},
   };
 
-  const { accessToken } = await currentAccessToken(reader, { write: false, isSecure: true });
+  const { accessToken } = await currentAccessToken(reader, {
+    write: false,
+    isSecure: true,
+  });
   return accessToken;
 }

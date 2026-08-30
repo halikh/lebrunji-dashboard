@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
-import { readEnv } from '../env';
+import { readEnv } from "../env";
 
 /**
  * The browser client. Anon key, and an access token held in memory only.
@@ -80,11 +80,11 @@ async function getAccessToken(): Promise<string | null> {
 
 async function fetchAccessToken(): Promise<string | null> {
   try {
-    const response = await fetch('/auth/token', {
+    const response = await fetch("/auth/token", {
       // Same-origin so the HttpOnly cookies go with it, and `no-store` so a
       // token is never served from a cache.
-      credentials: 'same-origin',
-      cache: 'no-store',
+      credentials: "same-origin",
+      cache: "no-store",
     });
 
     if (!response.ok) {

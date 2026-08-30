@@ -1,8 +1,8 @@
-import { Wordmark } from '@/components/brand/wordmark';
+import { Wordmark } from "@/components/brand/wordmark";
 
-import { ForgotPasswordForm } from './forgot-password-form';
+import { ForgotPasswordForm } from "./forgot-password-form";
 
-export const metadata = { title: 'Reset your password — Lebrunji' };
+export const metadata = { title: "Reset your password — Lebrunji" };
 
 export default function ForgotPasswordPage() {
   return (

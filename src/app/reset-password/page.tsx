@@ -1,10 +1,10 @@
-import { Suspense } from 'react';
+import { Suspense } from "react";
 
-import { Wordmark } from '@/components/brand/wordmark';
+import { Wordmark } from "@/components/brand/wordmark";
 
-import { ResetPasswordForm } from './reset-password-form';
+import { ResetPasswordForm } from "./reset-password-form";
 
-export const metadata = { title: 'Choose a new password — Lebrunji' };
+export const metadata = { title: "Choose a new password — Lebrunji" };
 
 export default function ResetPasswordPage() {
   return (

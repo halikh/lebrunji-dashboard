@@ -1,6 +1,6 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from "next/server";
 
-import { anonymousClient } from '@/lib/auth/session';
+import { anonymousClient } from "@/lib/auth/session";
 
 /**
  * Asks Supabase to email a recovery link.
@@ -19,10 +19,10 @@ import { anonymousClient } from '@/lib/auth/session';
  * exchange has to happen somewhere that can write `HttpOnly` cookies.
  */
 export async function POST(request: NextRequest) {
-  let email = '';
+  let email = "";
   try {
     const body: { email?: unknown } = await request.json();
-    email = typeof body.email === 'string' ? body.email.trim() : '';
+    email = typeof body.email === "string" ? body.email.trim() : "";
   } catch {
     // Falls through to the same answer as everything else.
   }

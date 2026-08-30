@@ -1,4 +1,4 @@
-import { t, type TranslationKey } from '@/i18n/translations';
+import { t, type TranslationKey } from "@/i18n/translations";
 
 /**
  * A section that exists in the rail and does not exist yet.
@@ -13,18 +13,24 @@ import { t, type TranslationKey } from '@/i18n/translations';
  * editor; a phase number is at least a thing that can be looked up and asked
  * about.
  */
-export function NotBuilt({ sectionKey, phase }: { sectionKey: TranslationKey; phase: number }) {
+export function NotBuilt({
+  sectionKey,
+  phase,
+}: {
+  sectionKey: TranslationKey;
+  phase: number;
+}) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-sm px-xxl py-huge text-center">
       <p className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
         {t(sectionKey)}
       </p>
-      <h2 className="text-[18px]">{t('shell.notBuiltTitle')}</h2>
+      <h2 className="text-[18px]">{t("shell.notBuiltTitle")}</h2>
       <p className="max-w-[380px] text-[14px] text-text-soft">
         {/* The phase number goes *through* the string rather than being
             appended to it. Appending reads fine in English and is unbuildable
             in a language that puts the number somewhere else in the sentence. */}
-        {t('shell.notBuiltBody', { phase })}
+        {t("shell.notBuiltBody", { phase })}
       </p>
     </div>
   );

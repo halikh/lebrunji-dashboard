@@ -1,7 +1,7 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import type { EmailOtpType } from '@supabase/supabase-js';
+import { NextResponse, type NextRequest } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
-import { anonymousClient, toPair, writeSession } from '@/lib/auth/session';
+import { anonymousClient, toPair, writeSession } from "@/lib/auth/session";
 
 /**
  * Where a link from an email lands.
@@ -24,25 +24,30 @@ import { anonymousClient, toPair, writeSession } from '@/lib/auth/session';
  */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
-  const tokenHash = url.searchParams.get('token_hash');
-  const type = url.searchParams.get('type') as EmailOtpType | null;
+  const tokenHash = url.searchParams.get("token_hash");
+  const type = url.searchParams.get("type") as EmailOtpType | null;
 
-  const failed = new URL('/reset-password?error=expired', url.origin);
+  const failed = new URL("/reset-password?error=expired", url.origin);
 
   if (!tokenHash || !type) return NextResponse.redirect(failed);
 
   const supabase = anonymousClient();
-  const { data, error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+  const { data, error } = await supabase.auth.verifyOtp({
+    type,
+    token_hash: tokenHash,
+  });
 
   // A used or expired link is an ordinary thing to hit, not an alarm — these
   // are single-use and time-limited by design. The screen says so and offers
   // another.
   if (error || !data.session) return NextResponse.redirect(failed);
 
-  const response = NextResponse.redirect(new URL('/reset-password', url.origin));
+  const response = NextResponse.redirect(
+    new URL("/reset-password", url.origin),
+  );
   writeSession(response.cookies, toPair(data.session), {
     remember: false,
-    isSecure: url.protocol === 'https:',
+    isSecure: url.protocol === "https:",
   });
 
   return response;

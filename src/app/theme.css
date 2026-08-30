@@ -189,8 +189,10 @@
    * each and `font-weight` does what it says.
    */
   --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
-  --font-heading: var(--font-barlow-condensed), var(--font-barlow), ui-sans-serif, sans-serif;
-  --font-arabic: var(--font-cairo), var(--font-barlow), ui-sans-serif, sans-serif;
+  --font-heading:
+    var(--font-barlow-condensed), var(--font-barlow), ui-sans-serif, sans-serif;
+  --font-arabic:
+    var(--font-cairo), var(--font-barlow), ui-sans-serif, sans-serif;
 
   /* ---- Spacing and radius ---------------------------------------------
    * The app's scales, in px, so a card's corner and a row's padding are the

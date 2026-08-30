@@ -1,8 +1,8 @@
-import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
-import { Barlow, Barlow_Condensed, Cairo } from 'next/font/google';
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import { Barlow, Barlow_Condensed, Cairo } from "next/font/google";
 
-import './globals.css';
+import "./globals.css";
 
 /**
  * The app's three faces.
@@ -19,29 +19,29 @@ import './globals.css';
  * what it says.
  */
 const barlow = Barlow({
-  variable: '--font-barlow',
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  display: 'swap',
+  variable: "--font-barlow",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 const barlowCondensed = Barlow_Condensed({
-  variable: '--font-barlow-condensed',
-  subsets: ['latin'],
-  weight: ['500', '600', '700'],
-  display: 'swap',
+  variable: "--font-barlow-condensed",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
 });
 
 const cairo = Cairo({
-  variable: '--font-cairo',
-  subsets: ['arabic', 'latin'],
-  weight: ['400', '500', '600', '700'],
-  display: 'swap',
+  variable: "--font-cairo",
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: 'Lebrunji',
-  description: 'Operations for Lebrunji.',
+  title: "Lebrunji",
+  description: "Operations for Lebrunji.",
   // Nothing here is for the public, and a staff login page in a search index is
   // an invitation rather than a feature.
   robots: { index: false, follow: false },

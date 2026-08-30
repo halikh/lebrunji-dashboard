@@ -1,8 +1,13 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from "next/server";
 
-import { REFRESH_COOKIE } from '@/lib/auth/cookies';
-import { anonymousClient, readRemember, toPair, writeSession } from '@/lib/auth/session';
-import { validatePassword } from '@/lib/validation';
+import { REFRESH_COOKIE } from "@/lib/auth/cookies";
+import {
+  anonymousClient,
+  readRemember,
+  toPair,
+  writeSession,
+} from "@/lib/auth/session";
+import { validatePassword } from "@/lib/validation";
 
 /**
  * Sets a new password for whoever the cookies say is signed in.
@@ -28,34 +33,41 @@ import { validatePassword } from '@/lib/validation';
  */
 export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
-  if (!refreshToken) return NextResponse.json({ error: 'expired' }, { status: 401 });
+  if (!refreshToken)
+    return NextResponse.json({ error: "expired" }, { status: 401 });
 
-  let password = '';
+  let password = "";
   try {
     const body: { password?: unknown } = await request.json();
-    password = typeof body.password === 'string' ? body.password : '';
+    password = typeof body.password === "string" ? body.password : "";
   } catch {
-    return NextResponse.json({ error: 'invalid' }, { status: 400 });
+    return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
 
   const strong = validatePassword(password);
-  if (!strong.ok) return NextResponse.json({ error: strong.message }, { status: 400 });
+  if (!strong.ok)
+    return NextResponse.json({ error: strong.message }, { status: 400 });
 
   const supabase = anonymousClient();
 
-  const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession({
-    refresh_token: refreshToken,
-  });
+  const { data: refreshed, error: refreshError } =
+    await supabase.auth.refreshSession({
+      refresh_token: refreshToken,
+    });
   if (refreshError || !refreshed.session) {
-    return NextResponse.json({ error: 'expired' }, { status: 401 });
+    return NextResponse.json({ error: "expired" }, { status: 401 });
   }
 
   await supabase.auth.setSession(refreshed.session);
 
   const { data, error } = await supabase.auth.updateUser({ password });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 400 });
 
-  const response = NextResponse.json({ ok: true, email: data.user?.email ?? null });
+  const response = NextResponse.json({
+    ok: true,
+    email: data.user?.email ?? null,
+  });
 
   // The pair issued by the update, so success does not sign them out.
   const { data: after } = await supabase.auth.getSession();
@@ -68,7 +80,7 @@ export async function POST(request: NextRequest) {
         },
         set: () => {},
       }),
-      isSecure: request.nextUrl.protocol === 'https:',
+      isSecure: request.nextUrl.protocol === "https:",
     });
   }
 

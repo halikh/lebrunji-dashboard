@@ -1,7 +1,7 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from "next/server";
 
-import { bridgeCookies } from '@/lib/auth/request-cookies';
-import { currentAccessToken } from '@/lib/auth/session';
+import { bridgeCookies } from "@/lib/auth/request-cookies";
+import { currentAccessToken } from "@/lib/auth/session";
 
 /**
  * Hands the browser an access token, refreshing first if the old one is spent.
@@ -27,12 +27,12 @@ export async function GET(request: NextRequest) {
   const response = NextResponse.json(
     { accessToken: null, expiresAt: null },
     // A token must never be written to a shared cache, nor kept on disk.
-    { headers: { 'cache-control': 'no-store, private' } },
+    { headers: { "cache-control": "no-store, private" } },
   );
 
   const { accessToken, expiresAt } = await currentAccessToken(
     bridgeCookies(request, response),
-    { write: true, isSecure: request.nextUrl.protocol === 'https:' },
+    { write: true, isSecure: request.nextUrl.protocol === "https:" },
   );
 
   // Rebuilt onto the *same* headers, so any Set-Cookie from the rotation above

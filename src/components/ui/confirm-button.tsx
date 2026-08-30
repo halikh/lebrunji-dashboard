@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from "react";
 
-import { t, type TranslationKey } from '@/i18n/translations';
+import { t, type TranslationKey } from "@/i18n/translations";
 
-import { Button, cx } from './index';
-import { Modal } from './modal';
+import { Button, cx } from "./index";
+import { Modal } from "./modal";
 
 /**
  * A button that asks first.
@@ -46,7 +46,7 @@ export function ConfirmButton({
   titleKey,
   bodyKey,
   confirmKey,
-  variant = 'danger',
+  variant = "danger",
   children,
   size,
   fullWidth,
@@ -58,9 +58,9 @@ export function ConfirmButton({
   bodyKey: TranslationKey;
   confirmKey: TranslationKey;
   /** The *confirm* button's variant. The trigger keeps its own look. */
-  variant?: 'danger' | 'primary';
+  variant?: "danger" | "primary";
   children: ReactNode;
-  size?: 'md' | 'sm';
+  size?: "md" | "sm";
   fullWidth?: boolean;
   className?: string;
   /**
@@ -108,7 +108,7 @@ export function ConfirmButton({
         renderTrigger({ onClick: () => setOpen(true) })
       ) : (
         <Button
-          variant={variant === 'danger' ? 'quiet' : 'primary'}
+          variant={variant === "danger" ? "quiet" : "primary"}
           size={size}
           fullWidth={fullWidth}
           onClick={() => setOpen(true)}
@@ -118,7 +118,12 @@ export function ConfirmButton({
         </Button>
       )}
 
-      <Modal open={open} onClose={close} labelledBy={`${id}-title`} describedBy={`${id}-body`}>
+      <Modal
+        open={open}
+        onClose={close}
+        labelledBy={`${id}-title`}
+        describedBy={`${id}-body`}
+      >
         <div className="flex flex-col gap-lg">
           <h2 id={`${id}-title`} className="text-[18px]">
             {t(titleKey)}
@@ -129,20 +134,20 @@ export function ConfirmButton({
 
           {failed && (
             <p role="alert" className="text-[13px] font-medium text-danger">
-              {t('common.somethingWentWrong')}
+              {t("common.somethingWentWrong")}
             </p>
           )}
 
-          <div className={cx('flex justify-end gap-sm')}>
+          <div className={cx("flex justify-end gap-sm")}>
             <Button
               variant="secondary"
               onClick={close}
               disabled={pending}
               // Focused on open for a destructive action, so Enter is the safe
               // answer rather than the expensive one.
-              autoFocus={variant === 'danger'}
+              autoFocus={variant === "danger"}
             >
-              {t('common.cancel')}
+              {t("common.cancel")}
             </Button>
             <Button variant={variant} pending={pending} onClick={confirm}>
               {t(confirmKey)}

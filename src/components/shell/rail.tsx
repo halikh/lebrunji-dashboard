@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-import { Wordmark } from '@/components/brand/wordmark';
-import { SignOutButton } from '@/components/sign-out-button';
-import { cx } from '@/components/ui';
-import { t } from '@/i18n/translations';
+import { Wordmark } from "@/components/brand/wordmark";
+import { SignOutButton } from "@/components/sign-out-button";
+import { cx } from "@/components/ui";
+import { t } from "@/i18n/translations";
 
-import { Icon } from './icons';
-import { SECTIONS, activeSection } from './nav';
-import { railItemClass } from './rail-item';
+import { Icon } from "./icons";
+import { SECTIONS, activeSection } from "./nav";
+import { railItemClass } from "./rail-item";
 
 /**
  * The rail.
@@ -39,13 +39,13 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
 
   return (
     <nav
-      aria-label={t('nav.label')}
+      aria-label={t("nav.label")}
       className={cx(
-        'flex shrink-0 gap-xs border-border bg-surface',
+        "flex shrink-0 gap-xs border-border bg-surface",
         // Bottom bar on a phone, left rail from `md` up. One component, because
         // two would be two things to keep in step.
-        'order-last w-full flex-row justify-around border-t px-sm py-xs',
-        'md:order-first md:h-full md:w-[124px] md:flex-col md:justify-start md:border-r md:border-t-0 md:px-sm md:py-lg',
+        "order-last w-full flex-row justify-around border-t px-sm py-xs",
+        "md:order-first md:h-full md:w-[124px] md:flex-col md:justify-start md:border-r md:border-t-0 md:px-sm md:py-lg",
       )}
     >
       <div className="hidden md:mb-xl md:flex md:justify-center">
@@ -60,21 +60,21 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
             href={section.href}
             // The one place a screen reader needs more than the label: which
             // of these is where you already are.
-            aria-current={isActive ? 'page' : undefined}
+            aria-current={isActive ? "page" : undefined}
             className={railItemClass({ active: isActive })}
           >
             <Icon name={section.icon} />
             {t(section.labelKey)}
 
-            {section.href === '/' && liveOrders > 0 && (
+            {section.href === "/" && liveOrders > 0 && (
               <span
                 // The count is on the icon, but the meaning is in the label —
                 // a bare "3" read aloud is not information.
-                aria-label={`${liveOrders} ${t('nav.liveOrders')}`}
+                aria-label={`${liveOrders} ${t("nav.liveOrders")}`}
                 className={cx(
-                  'absolute right-[18px] top-[2px] min-w-[18px] rounded-full px-[5px]',
-                  'bg-danger-action text-center text-[11px] font-bold text-on-active',
-                  'md:right-[36px] md:top-[6px]',
+                  "absolute right-[18px] top-[2px] min-w-[18px] rounded-full px-[5px]",
+                  "bg-danger-action text-center text-[11px] font-bold text-on-active",
+                  "md:right-[36px] md:top-[6px]",
                 )}
               >
                 {liveOrders}

@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
 
-import { Wordmark } from '@/components/brand/wordmark';
-import { SignOutButton } from '@/components/sign-out-button';
-import { Rail } from '@/components/shell/rail';
-import { t } from '@/i18n/translations';
+import { Wordmark } from "@/components/brand/wordmark";
+import { SignOutButton } from "@/components/sign-out-button";
+import { Rail } from "@/components/shell/rail";
+import { Providers } from "@/app/providers";
+import { t } from "@/i18n/translations";
 
 /**
  * The shell every signed-in screen renders inside.
@@ -19,37 +20,39 @@ import { t } from '@/i18n/translations';
  */
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-full flex-col md:flex-row">
-      {/*
+    <Providers>
+      <div className="flex h-full flex-col md:flex-row">
+        {/*
         First in the DOM and visually hidden until focused. Without it, reaching
         the content from the keyboard means tabbing through every section link
         on every page load — which is exactly the operator this dashboard is
         supposed to be fast for.
       */}
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:m-sm focus:rounded-md focus:bg-surface focus:px-lg focus:py-md focus:font-semibold"
-      >
-        {t('nav.skipToContent')}
-      </a>
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:m-sm focus:rounded-md focus:bg-surface focus:px-lg focus:py-md focus:font-semibold"
+        >
+          {t("nav.skipToContent")}
+        </a>
 
-      {/*
+        {/*
         A top bar on a phone only. The rail becomes a bottom bar there and
         carries the six sections; adding sign-out as a seventh would crowd them
         and put a destructive-ish action a thumb-width from Orders. So it moves
         up here, where the wordmark also does the job of saying which app this
         is on a screen too narrow for the rail to show it.
       */}
-      <header className="flex items-center justify-between border-b border-border bg-surface px-lg py-sm md:hidden">
-        <Wordmark scale={0.5} />
-        <SignOutButton />
-      </header>
+        <header className="flex items-center justify-between border-b border-border bg-surface px-lg py-sm md:hidden">
+          <Wordmark scale={0.5} />
+          <SignOutButton />
+        </header>
 
-      <Rail />
+        <Rail />
 
-      <main id="main" className="flex-1 overflow-y-auto">
-        {children}
-      </main>
-    </div>
+        <main id="main" className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </Providers>
   );
 }

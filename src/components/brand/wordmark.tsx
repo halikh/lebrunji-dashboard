@@ -45,43 +45,55 @@
  * the mark.
  */
 const mark = {
-  tile: '#e01f28',
-  shadow: '#1e1b18',
-  cream: '#fff8f0',
-  sun: '#ffc634',
+  tile: "#e01f28",
+  shadow: "#1e1b18",
+  cream: "#fff8f0",
+  sun: "#ffc634",
 } as const;
 
 /**
  * Each letter, with its angle in degrees, its vertical nudge in pixels, and
  * which of the two colour groups it belongs to. Verbatim from the design.
  */
-const LETTERS: { char: string; size: number; rotate: number; lift: number; sun: boolean }[] = [
-  { char: 'L', size: 31, rotate: -3, lift: 1, sun: false },
-  { char: 'E', size: 28, rotate: 2, lift: 0, sun: false },
-  { char: 'B', size: 31, rotate: -1, lift: -1, sun: false },
-  { char: 'R', size: 29, rotate: 3, lift: 0, sun: true },
-  { char: 'U', size: 32, rotate: -2, lift: -1, sun: true },
-  { char: 'N', size: 28, rotate: 1, lift: 0, sun: true },
-  { char: 'J', size: 31, rotate: -3, lift: 1, sun: true },
-  { char: 'I', size: 29, rotate: 2, lift: 0, sun: true },
+const LETTERS: {
+  char: string;
+  size: number;
+  rotate: number;
+  lift: number;
+  sun: boolean;
+}[] = [
+  { char: "L", size: 31, rotate: -3, lift: 1, sun: false },
+  { char: "E", size: 28, rotate: 2, lift: 0, sun: false },
+  { char: "B", size: 31, rotate: -1, lift: -1, sun: false },
+  { char: "R", size: 29, rotate: 3, lift: 0, sun: true },
+  { char: "U", size: 32, rotate: -2, lift: -1, sun: true },
+  { char: "N", size: 28, rotate: 1, lift: 0, sun: true },
+  { char: "J", size: 31, rotate: -3, lift: 1, sun: true },
+  { char: "I", size: 29, rotate: 2, lift: 0, sun: true },
 ];
 
 /** How far the whole tile is tilted, in degrees. */
 const TILT = -2.2;
 
-export function Wordmark({ scale = 1, className }: { scale?: number; className?: string }) {
+export function Wordmark({
+  scale = 1,
+  className,
+}: {
+  scale?: number;
+  className?: string;
+}) {
   return (
     // Inline-block so the wrap hugs the tile rather than filling its parent —
     // the tilt has to happen around the word, not around a full-width box.
-    <span className={className} style={{ display: 'inline-block' }}>
+    <span className={className} style={{ display: "inline-block" }}>
       <span
         // `aria-label` on the tile and `aria-hidden` on the letters: eight
         // separate spans would otherwise be read out one glyph at a time.
         role="img"
         aria-label="Lebrunji"
         style={{
-          display: 'inline-flex',
-          alignItems: 'baseline',
+          display: "inline-flex",
+          alignItems: "baseline",
           gap: 0,
           background: mark.tile,
           padding: `${8 * scale}px ${15 * scale}px ${10 * scale}px`,
@@ -89,7 +101,7 @@ export function Wordmark({ scale = 1, className }: { scale?: number; className?:
           transform: `rotate(${TILT}deg)`,
           // Hard offset, no blur — see above.
           boxShadow: `${4 * scale}px ${4 * scale}px 0 ${mark.shadow}`,
-          fontFamily: 'var(--font-heading)',
+          fontFamily: "var(--font-heading)",
           fontWeight: 700,
           letterSpacing: 0,
         }}
@@ -104,7 +116,7 @@ export function Wordmark({ scale = 1, className }: { scale?: number; className?:
               color: letter.sun ? mark.sun : mark.cream,
               fontSize: letter.size * scale,
               lineHeight: `${letter.size * 0.9 * scale}px`,
-              display: 'inline-block',
+              display: "inline-block",
               transform: `rotate(${letter.rotate}deg) translateY(${letter.lift * scale}px)`,
             }}
           >

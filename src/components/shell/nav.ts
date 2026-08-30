@@ -1,4 +1,4 @@
-import type { TranslationKey } from '@/i18n/translations';
+import type { TranslationKey } from "@/i18n/translations";
 
 /**
  * The sections, declared once.
@@ -16,24 +16,34 @@ export type Section = {
 };
 
 export type IconName =
-  | 'orders'
-  | 'catalogue'
-  | 'pricing'
-  | 'customers'
-  | 'reports'
-  | 'settings'
-  | 'sign-out';
+  | "orders"
+  | "catalogue"
+  | "pricing"
+  | "customers"
+  | "reports"
+  | "settings"
+  | "sign-out";
 
 export const SECTIONS: readonly Section[] = [
   // The queue is first and is home: signing in lands on live orders, not on a
   // statistics page. Statistics are something you go and look at; orders are
   // something that happens to you.
-  { href: '/', labelKey: 'nav.orders', phase: null, icon: 'orders' },
-  { href: '/catalogue', labelKey: 'nav.catalogue', phase: 4, icon: 'catalogue' },
-  { href: '/pricing', labelKey: 'nav.pricing', phase: 5, icon: 'pricing' },
-  { href: '/customers', labelKey: 'nav.customers', phase: 6, icon: 'customers' },
-  { href: '/reports', labelKey: 'nav.reports', phase: 6, icon: 'reports' },
-  { href: '/settings', labelKey: 'nav.settings', phase: 7, icon: 'settings' },
+  { href: "/", labelKey: "nav.orders", phase: null, icon: "orders" },
+  {
+    href: "/catalogue",
+    labelKey: "nav.catalogue",
+    phase: 4,
+    icon: "catalogue",
+  },
+  { href: "/pricing", labelKey: "nav.pricing", phase: 5, icon: "pricing" },
+  {
+    href: "/customers",
+    labelKey: "nav.customers",
+    phase: 6,
+    icon: "customers",
+  },
+  { href: "/reports", labelKey: "nav.reports", phase: 6, icon: "reports" },
+  { href: "/settings", labelKey: "nav.settings", phase: 7, icon: "settings" },
 ];
 
 /**
@@ -44,10 +54,9 @@ export const SECTIONS: readonly Section[] = [
  * "here" means.
  */
 export function activeSection(pathname: string): Section | undefined {
-  return SECTIONS.filter(
-    (section) =>
-      section.href === '/'
-        ? pathname === '/'
-        : pathname === section.href || pathname.startsWith(`${section.href}/`),
+  return SECTIONS.filter((section) =>
+    section.href === "/"
+      ? pathname === "/"
+      : pathname === section.href || pathname.startsWith(`${section.href}/`),
   ).sort((a, b) => b.href.length - a.href.length)[0];
 }

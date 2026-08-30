@@ -34,13 +34,13 @@
  */
 
 /** The refresh token. The one that matters. */
-export const REFRESH_COOKIE = 'lb-refresh';
+export const REFRESH_COOKIE = "lb-refresh";
 
 /** The current access token, so a server render does not have to mint one. */
-export const ACCESS_COOKIE = 'lb-access';
+export const ACCESS_COOKIE = "lb-access";
 
 /** Whether this browser asked to be remembered. Not a credential. */
-export const REMEMBER_COOKIE = 'lb-remember';
+export const REMEMBER_COOKIE = "lb-remember";
 
 /** Thirty days, when the box is ticked. */
 export const REMEMBER_MAX_AGE = 60 * 60 * 24 * 30;
@@ -56,7 +56,7 @@ export const EXPIRY_MARGIN_SECONDS = 60;
 
 export type CookieAttributes = {
   httpOnly: boolean;
-  sameSite: 'lax';
+  sameSite: "lax";
   secure: boolean;
   path: string;
   maxAge?: number;
@@ -80,9 +80,9 @@ export function authCookieAttributes(options: {
 }): CookieAttributes {
   return {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: "lax",
     secure: options.isSecure,
-    path: '/',
+    path: "/",
     // No `maxAge` at all when the box is cleared — that is a session cookie,
     // and there is no value of maxAge that means "until the window closes".
     ...(options.remember ? { maxAge: REMEMBER_MAX_AGE } : {}),
@@ -93,9 +93,9 @@ export function authCookieAttributes(options: {
 export function clearedCookieAttributes(isSecure: boolean): CookieAttributes {
   return {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: "lax",
     secure: isSecure,
-    path: '/',
+    path: "/",
     maxAge: 0,
   };
 }
@@ -107,7 +107,10 @@ export function clearedCookieAttributes(isSecure: boolean): CookieAttributes {
  * A missing one counts as expired: a token whose lifetime is unknown cannot be
  * assumed good.
  */
-export function isExpiring(expiresAt: number | null | undefined, now = Date.now()): boolean {
-  if (typeof expiresAt !== 'number') return true;
+export function isExpiring(
+  expiresAt: number | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (typeof expiresAt !== "number") return true;
   return expiresAt - EXPIRY_MARGIN_SECONDS <= Math.floor(now / 1000);
 }

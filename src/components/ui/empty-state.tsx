@@ -1,6 +1,6 @@
-import { t, type TranslationKey } from '@/i18n/translations';
+import { t, type TranslationKey } from "@/i18n/translations";
 
-import { cx } from './index';
+import { cx } from "./index";
 
 /**
  * What a screen shows when it has nothing to show.
@@ -17,18 +17,18 @@ import { cx } from './index';
 export function EmptyState({
   titleKey,
   bodyKey,
-  mood = 'waiting',
+  mood = "waiting",
   className,
 }: {
   titleKey: TranslationKey;
   bodyKey: TranslationKey;
-  mood?: 'waiting' | 'done' | 'lost';
+  mood?: "waiting" | "done" | "lost";
   className?: string;
 }) {
   return (
     <div
       className={cx(
-        'flex h-full flex-col items-center justify-center gap-lg px-xxl py-huge text-center',
+        "flex h-full flex-col items-center justify-center gap-lg px-xxl py-huge text-center",
         className,
       )}
     >
@@ -52,11 +52,11 @@ export function EmptyState({
  * This holds the space at the right size and weight so the layout is real, and
  * is the one thing in the shell that is deliberately temporary.
  */
-function Placeholder({ mood }: { mood: 'waiting' | 'done' | 'lost' }) {
+function Placeholder({ mood }: { mood: "waiting" | "done" | "lost" }) {
   const tone = {
-    waiting: 'text-text-faint',
-    done: 'text-accent',
-    lost: 'text-text-faint',
+    waiting: "text-text-faint",
+    done: "text-accent",
+    lost: "text-text-faint",
   }[mood];
 
   return (
@@ -74,7 +74,11 @@ function Placeholder({ mood }: { mood: 'waiting' | 'done' | 'lost' }) {
     >
       <circle cx="12" cy="12" r="9" />
       <path d="M9 10h.01M15 10h.01" />
-      {mood === 'done' ? <path d="M8.5 14.5a4 4 0 0 0 7 0" /> : <path d="M9 15h6" />}
+      {mood === "done" ? (
+        <path d="M8.5 14.5a4 4 0 0 0 7 0" />
+      ) : (
+        <path d="M9 15h6" />
+      )}
     </svg>
   );
 }

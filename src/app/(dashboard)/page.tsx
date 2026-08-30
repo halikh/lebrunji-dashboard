@@ -1,18 +1,11 @@
-import { EmptyState } from '@/components/ui/empty-state';
+import { OrdersQueue } from "@/features/orders/orders-queue";
 
 /**
- * The order queue.
+ * The dashboard opens on live orders.
  *
- * Empty until Phase 3. It is the dashboard's home because the operator lives
- * here: statistics are something you go and look at, orders are something that
- * happens to you.
+ * Not on a statistics page: statistics are something you go and look at, orders
+ * are something that happens to you.
  */
 export default function OrdersPage() {
-  return (
-    <EmptyState
-      titleKey="orders.emptyTitle"
-      bodyKey="orders.emptyBody"
-      mood="waiting"
-    />
-  );
+  return <OrdersQueue />;
 }

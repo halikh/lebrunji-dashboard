@@ -1,7 +1,7 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from "next/server";
 
-import { REFRESH_COOKIE } from '@/lib/auth/cookies';
-import { anonymousClient, clearSession } from '@/lib/auth/session';
+import { REFRESH_COOKIE } from "@/lib/auth/cookies";
+import { anonymousClient, clearSession } from "@/lib/auth/session";
 
 /**
  * Ends the session on this browser, and revokes it at Supabase.
@@ -26,15 +26,17 @@ import { anonymousClient, clearSession } from '@/lib/auth/session';
  */
 export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
-  const isSecure = request.nextUrl.protocol === 'https:';
+  const isSecure = request.nextUrl.protocol === "https:";
 
   if (refreshToken) {
     try {
       const supabase = anonymousClient();
-      const { data } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+      const { data } = await supabase.auth.refreshSession({
+        refresh_token: refreshToken,
+      });
       if (data.session) {
         await supabase.auth.setSession(data.session);
-        await supabase.auth.signOut({ scope: 'local' });
+        await supabase.auth.signOut({ scope: "local" });
       }
     } catch {
       // Reported below by clearing regardless. See the note above.

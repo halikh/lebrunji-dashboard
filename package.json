@@ -14,7 +14,7 @@
     "verify": "npm run typecheck && npm run lint && npm run test",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
-    "db:types": "npx supabase gen types typescript --linked > src/lib/database.types.ts",
+    "db:types": "tsx scripts/db-types.ts",
     "check:limits": "tsx scripts/check-limits.ts",
     "create-admin": "tsx scripts/create-admin.ts"
   },

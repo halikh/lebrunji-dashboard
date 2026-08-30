@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import Link from "next/link";
+import { useState, type FormEvent } from "react";
 
-import { Button, Card, Field, FormNotice, Input } from '@/components/ui';
-import { t } from '@/i18n/translations';
+import { Button, Card, Field, FormNotice, Input } from "@/components/ui";
+import { t } from "@/i18n/translations";
 
 /**
  * Asks Supabase Auth to email a recovery link.
@@ -21,7 +21,7 @@ import { t } from '@/i18n/translations';
  * be written as an `HttpOnly` cookie by something the browser cannot see.
  */
 export function ForgotPasswordForm() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -33,9 +33,9 @@ export function ForgotPasswordForm() {
     // the client is built with `accessToken`, which is how this design keeps
     // every auth call on the server where the tokens live.
     try {
-      await fetch('/auth/reset-request', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
+      await fetch("/auth/reset-request", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ email: email.trim() }),
       });
     } catch {
@@ -57,12 +57,12 @@ export function ForgotPasswordForm() {
     return (
       <Card>
         <div className="flex flex-col gap-lg">
-          <FormNotice>{t('forgotPassword.sent')}</FormNotice>
+          <FormNotice>{t("forgotPassword.sent")}</FormNotice>
           <Link
             href="/login"
             className="text-center text-[14px] font-medium text-primary hover:underline"
           >
-            {t('forgotPassword.backToLogin')}
+            {t("forgotPassword.backToLogin")}
           </Link>
         </div>
       </Card>
@@ -72,10 +72,12 @@ export function ForgotPasswordForm() {
   return (
     <Card>
       <form onSubmit={onSubmit} className="flex flex-col gap-lg">
-        <h1 className="text-[22px]">{t('forgotPassword.title')}</h1>
-        <p className="text-[14px] text-text-soft">{t('forgotPassword.subtitle')}</p>
+        <h1 className="text-[22px]">{t("forgotPassword.title")}</h1>
+        <p className="text-[14px] text-text-soft">
+          {t("forgotPassword.subtitle")}
+        </p>
 
-        <Field id="email" label={t('login.email')}>
+        <Field id="email" label={t("login.email")}>
           <Input
             id="email"
             type="email"
@@ -89,14 +91,14 @@ export function ForgotPasswordForm() {
         </Field>
 
         <Button type="submit" pending={pending}>
-          {t('forgotPassword.submit')}
+          {t("forgotPassword.submit")}
         </Button>
 
         <Link
           href="/login"
           className="text-center text-[14px] font-medium text-primary hover:underline"
         >
-          {t('forgotPassword.backToLogin')}
+          {t("forgotPassword.backToLogin")}
         </Link>
       </form>
     </Card>

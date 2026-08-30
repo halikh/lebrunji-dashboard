@@ -106,7 +106,7 @@ export const IMAGE = {
   minPixels: 200,
   maxPixels: 4000,
   /** Decided from magic bytes, never from the browser's claimed MIME type. */
-  types: ['image/jpeg', 'image/png', 'image/webp'] as const,
+  types: ["image/jpeg", "image/png", "image/webp"] as const,
 } as const;
 
 export const PAGE = {

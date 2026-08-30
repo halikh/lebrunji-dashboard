@@ -1,4 +1,4 @@
-import type { IconName } from './nav';
+import type { IconName } from "./nav";
 
 /**
  * The rail's icons, drawn rather than installed.
@@ -32,15 +32,15 @@ import type { IconName } from './nav';
 const COMMON = {
   width: 22,
   height: 22,
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
   strokeWidth: 1.75,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
   // Decorative: every icon in the rail sits beside a real label, so announcing
   // it would read the name twice.
-  'aria-hidden': true,
+  "aria-hidden": true,
 };
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -108,7 +108,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   // A door with an arrow leaving it. The arrow points out, which is the half
   // that carries the meaning — a door alone reads as "enter" just as easily —
   // and on hover it goes.
-  'sign-out': (
+  "sign-out": (
     <>
       <path d="M14 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8" />
       <g data-anim="leave">

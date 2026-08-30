@@ -1,6 +1,6 @@
-import type { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest, NextResponse } from "next/server";
 
-import type { CookieWriter } from './session';
+import type { CookieWriter } from "./session";
 
 /**
  * Reads from the request, writes to the response.
@@ -16,7 +16,10 @@ import type { CookieWriter } from './session';
  * spent one — which matters when a refresh happens in the proxy and the handler
  * after it reads again.
  */
-export function bridgeCookies(request: NextRequest, response: NextResponse): CookieWriter {
+export function bridgeCookies(
+  request: NextRequest,
+  response: NextResponse,
+): CookieWriter {
   return {
     get(name) {
       const cookie = request.cookies.get(name);

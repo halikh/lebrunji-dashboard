@@ -173,43 +173,43 @@ svg,
 
 /* Staggered by position, so the eye reads left to right rather than seeing
    everything move at once. */
-.group:hover [data-anim-order='2'],
-.group:focus-visible [data-anim-order='2'] {
+.group:hover [data-anim-order="2"],
+.group:focus-visible [data-anim-order="2"] {
   animation-delay: 90ms;
 }
-.group:hover [data-anim-order='3'],
-.group:focus-visible [data-anim-order='3'] {
+.group:hover [data-anim-order="3"],
+.group:focus-visible [data-anim-order="3"] {
   animation-delay: 180ms;
 }
 
-.group:hover [data-anim='line'],
-.group:focus-visible [data-anim='line'] {
+.group:hover [data-anim="line"],
+.group:focus-visible [data-anim="line"] {
   animation-name: icon-write;
 }
-.group:hover [data-anim='shutter'],
-.group:focus-visible [data-anim='shutter'] {
+.group:hover [data-anim="shutter"],
+.group:focus-visible [data-anim="shutter"] {
   transform-origin: bottom;
   animation-name: icon-shutter;
 }
-.group:hover [data-anim='swing'],
-.group:focus-visible [data-anim='swing'] {
+.group:hover [data-anim="swing"],
+.group:focus-visible [data-anim="swing"] {
   animation-name: icon-swing;
 }
-.group:hover [data-anim='bob'],
-.group:focus-visible [data-anim='bob'] {
+.group:hover [data-anim="bob"],
+.group:focus-visible [data-anim="bob"] {
   animation-name: icon-bob;
 }
-.group:hover [data-anim='bar'],
-.group:focus-visible [data-anim='bar'] {
+.group:hover [data-anim="bar"],
+.group:focus-visible [data-anim="bar"] {
   transform-origin: bottom;
   animation-name: icon-grow;
 }
-.group:hover [data-anim='knob'],
-.group:focus-visible [data-anim='knob'] {
+.group:hover [data-anim="knob"],
+.group:focus-visible [data-anim="knob"] {
   animation-name: icon-slide;
 }
-.group:hover [data-anim='leave'],
-.group:focus-visible [data-anim='leave'] {
+.group:hover [data-anim="leave"],
+.group:focus-visible [data-anim="leave"] {
   animation-name: icon-leave;
 }
 

@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, type FormEvent } from "react";
 
-import { Button, Card, Field, FormError, Input } from '@/components/ui';
-import { t, type TranslationKey } from '@/i18n/translations';
-import { forgetAccessToken } from '@/lib/supabase/client';
+import { Button, Card, Field, FormError, Input } from "@/components/ui";
+import { t, type TranslationKey } from "@/i18n/translations";
+import { forgetAccessToken } from "@/lib/supabase/client";
 
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -30,15 +30,15 @@ export function LoginForm() {
     // when the `accessToken` option is set.
     let response: Response;
     try {
-      response = await fetch('/auth/sign-in', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
+      response = await fetch("/auth/sign-in", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password, remember }),
       });
     } catch {
       // The request never left. "Your password is wrong" would be untrue, and
       // would send the operator off to reset a password that was fine.
-      setError(t('login.offline'));
+      setError(t("login.offline"));
       setPending(false);
       return;
     }
@@ -60,21 +60,23 @@ export function LoginForm() {
     // any later and the first order of the day arrives silently.
     unlockAudio();
 
-    const next = params.get('next');
+    const next = params.get("next");
     // Only a path, never an absolute URL: `?next=https://elsewhere` on a login
     // page is an open redirect, and this one is reachable signed out.
-    router.replace(next && next.startsWith('/') && !next.startsWith('//') ? next : '/');
+    router.replace(
+      next && next.startsWith("/") && !next.startsWith("//") ? next : "/",
+    );
     router.refresh();
   }
 
   return (
     <Card>
       <form onSubmit={onSubmit} className="flex flex-col gap-lg">
-        <h1 className="text-[22px]">{t('login.title')}</h1>
+        <h1 className="text-[22px]">{t("login.title")}</h1>
 
         <FormError>{error}</FormError>
 
-        <Field id="email" label={t('login.email')}>
+        <Field id="email" label={t("login.email")}>
           <Input
             id="email"
             type="email"
@@ -87,7 +89,7 @@ export function LoginForm() {
           />
         </Field>
 
-        <Field id="password" label={t('login.password')}>
+        <Field id="password" label={t("login.password")}>
           <Input
             id="password"
             type="password"
@@ -106,18 +108,18 @@ export function LoginForm() {
             onChange={(e) => setRemember(e.target.checked)}
             className="size-[16px] accent-[var(--color-active)]"
           />
-          {t('login.rememberMe')}
+          {t("login.rememberMe")}
         </label>
 
         <Button type="submit" pending={pending}>
-          {t('login.submit')}
+          {t("login.submit")}
         </Button>
 
         <Link
           href="/forgot-password"
           className="text-center text-[14px] font-medium text-primary hover:underline"
         >
-          {t('login.forgot')}
+          {t("login.forgot")}
         </Link>
       </form>
     </Card>
@@ -141,7 +143,7 @@ export function LoginForm() {
  *   reason — it confirms the account exists.
  */
 function messageFor(status: number): TranslationKey {
-  return status === 429 ? 'login.tooManyAttempts' : 'login.failed';
+  return status === 429 ? "login.tooManyAttempts" : "login.failed";
 }
 
 /**
@@ -154,7 +156,10 @@ function messageFor(status: number): TranslationKey {
  */
 function unlockAudio() {
   try {
-    const Ctor = window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const Ctor =
+      window.AudioContext ??
+      (window as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
     if (!Ctor) return;
     void new Ctor().resume();
   } catch {
