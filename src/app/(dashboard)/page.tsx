@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { OrdersQueue } from "@/features/orders/orders-queue";
 
 /**
@@ -7,5 +9,11 @@ import { OrdersQueue } from "@/features/orders/orders-queue";
  * are something that happens to you.
  */
 export default function OrdersPage() {
-  return <OrdersQueue />;
+  // The queue reads `?order=` to decide whether the detail panel is open, and
+  // Next requires a boundary around `useSearchParams` during static rendering.
+  return (
+    <Suspense>
+      <OrdersQueue />
+    </Suspense>
+  );
 }

@@ -247,7 +247,7 @@
  * time — which is the whole reason they are applied inline.
  */
 :root {
-/* ---- Order status ----------------------------------------------------
+  /* ---- Order status ----------------------------------------------------
  * Four roles per status, not one colour.
  *
  * A single hue is enough for a dot and useless for anything else: the same
@@ -269,43 +269,43 @@
  * "delivered" stays the app's "going well" rather than drifting into a
  * second green.
  */
---color-status-ordered: var(--color-sun);
---color-status-ordered-ink: var(--color-ink);
---color-status-ordered-fill: var(--color-sun);
---color-status-ordered-on-fill: var(--color-ink);
---color-status-ordered-wash: var(--color-sun-tint);
+  --color-status-ordered: var(--color-sun);
+  --color-status-ordered-ink: var(--color-ink);
+  --color-status-ordered-fill: var(--color-sun);
+  --color-status-ordered-on-fill: var(--color-ink);
+  --color-status-ordered-wash: var(--color-sun-tint);
 
---color-status-confirmed: var(--color-blue);
---color-status-confirmed-ink: var(--color-blue);
---color-status-confirmed-fill: var(--color-blue);
---color-status-confirmed-on-fill: #ffffff;
---color-status-confirmed-wash: var(--color-blue-tint);
+  --color-status-confirmed: var(--color-blue);
+  --color-status-confirmed-ink: var(--color-blue);
+  --color-status-confirmed-fill: var(--color-blue);
+  --color-status-confirmed-on-fill: #ffffff;
+  --color-status-confirmed-wash: var(--color-blue-tint);
 
---color-status-driver-sent: var(--color-grape);
---color-status-driver-sent-ink: var(--color-grape);
---color-status-driver-sent-fill: var(--color-grape);
---color-status-driver-sent-on-fill: #ffffff;
---color-status-driver-sent-wash: var(--color-grape-tint);
+  --color-status-driver-sent: var(--color-grape);
+  --color-status-driver-sent-ink: var(--color-grape);
+  --color-status-driver-sent-fill: var(--color-grape);
+  --color-status-driver-sent-on-fill: #ffffff;
+  --color-status-driver-sent-wash: var(--color-grape-tint);
 
---color-status-delivered: var(--color-mint);
---color-status-delivered-ink: var(--color-mint-deep);
---color-status-delivered-fill: var(--color-mint);
---color-status-delivered-on-fill: #ffffff;
---color-status-delivered-wash: var(--color-mint-tint);
+  --color-status-delivered: var(--color-mint);
+  --color-status-delivered-ink: var(--color-mint-deep);
+  --color-status-delivered-fill: var(--color-mint);
+  --color-status-delivered-on-fill: #ffffff;
+  --color-status-delivered-wash: var(--color-mint-tint);
 
---color-status-cancelled: var(--color-red-danger);
---color-status-cancelled-ink: var(--color-red-danger);
---color-status-cancelled-fill: var(--color-red-danger-bright);
---color-status-cancelled-on-fill: #ffffff;
---color-status-cancelled-wash: var(--color-red-danger-tint);
+  --color-status-cancelled: var(--color-red-danger);
+  --color-status-cancelled-ink: var(--color-red-danger);
+  --color-status-cancelled-fill: var(--color-red-danger-bright);
+  --color-status-cancelled-on-fill: #ffffff;
+  --color-status-cancelled-wash: var(--color-red-danger-tint);
 
-/* `order_statuses` is a lookup table, not an enum — a merchant may add a
+  /* `order_statuses` is a lookup table, not an enum — a merchant may add a
  * step, and it will arrive with no colour. Neutral rather than transparent:
  * a missing dot reads as a bug, a grey one reads as a step nobody has
  * chosen a colour for yet. */
---color-status-unknown: var(--color-faint);
---color-status-unknown-ink: var(--color-muted);
---color-status-unknown-fill: var(--color-muted);
---color-status-unknown-on-fill: #ffffff;
---color-status-unknown-wash: var(--color-sand);
+  --color-status-unknown: var(--color-faint);
+  --color-status-unknown-ink: var(--color-muted);
+  --color-status-unknown-fill: var(--color-muted);
+  --color-status-unknown-on-fill: #ffffff;
+  --color-status-unknown-wash: var(--color-sand);
 }

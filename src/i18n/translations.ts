@@ -90,6 +90,29 @@ const en = {
     keyboardAdvance: "advance",
     keyboardSearch: "search",
     loadMore: "Load older orders",
+    panelLabel: "Order detail",
+    placed: "Placed",
+    customer: "Customer",
+    address: "Address",
+    courierNote: "Note for the courier",
+    items: "Items",
+    subtotal: "Subtotal",
+    delivery: "Delivery",
+    discount: "Discount",
+    total: "Total",
+    payment: "Payment",
+    cancel: "Cancel order",
+    cancelTitle: "Cancel this order?",
+    // Terminal, and it reaches a person who is waiting. Says both.
+    cancelBody:
+      "The customer is told immediately, and this cannot be undone. Nothing else on the order changes.",
+    cancelConfirm: "Cancel the order",
+    detailFailed: "Could not load this order.",
+    noPhone: "No phone number",
+    // A multiplication sign, not the letter x — and a translated string rather
+    // than a literal, because where the number sits relative to it is not
+    // universal.
+    quantity: "{count}×",
   },
 
   confirm: {

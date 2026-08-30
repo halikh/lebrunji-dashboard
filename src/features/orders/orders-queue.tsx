@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
@@ -9,6 +10,7 @@ import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone, type StatusTone } from "@/lib/order-status";
 
 import type { Scope } from "./api/orders";
+import { OrderPanel } from "./order-panel";
 import { OrderRow } from "./order-row";
 import { useOrderRealtime } from "./use-order-realtime";
 import {
@@ -46,6 +48,30 @@ export function OrdersQueue() {
   const [focused, setFocused] = useState(0);
 
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // The open order lives in the URL, so a view can be reloaded, bookmarked or
+  // sent to somebody — and so the browser's back button closes the panel,
+  // which is what everyone tries first.
+  //
+  // `replace`, not `push`: opening four orders in a row should not mean four
+  // presses of Back to get out of the queue.
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const openOrderId = params.get("order");
+
+  const setOpenOrderId = useCallback(
+    (id: string | null) => {
+      const next = new URLSearchParams(params);
+      if (id) next.set("order", id);
+      else next.delete("order");
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    },
+    [params, pathname, router],
+  );
 
   const statuses = useOrderStatuses();
   const counts = useStatusCounts(statuses.data);
@@ -85,6 +111,11 @@ export function OrdersQueue() {
       }
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
+      if (event.key === "Escape" && openOrderId) {
+        event.preventDefault();
+        setOpenOrderId(null);
+        return;
+      }
       if (event.key === "/") {
         event.preventDefault();
         searchRef.current?.focus();
@@ -125,11 +156,14 @@ export function OrdersQueue() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [rows, active, statuses.data, advance]);
+  }, [rows, active, statuses.data, advance, openOrderId, setOpenOrderId]);
 
   return (
-    <div className="flex h-full flex-col">
-      {/*
+    // The queue and the panel side by side. `relative` so the panel can cover
+    // the queue on a narrow screen, where there is no room for both.
+    <div className="relative flex h-full">
+      <div className="flex min-w-0 flex-grow flex-col">
+        {/*
         `shrink-0` on all three pieces of chrome.
 
         A flex child defaults to `flex-shrink: 1`, so when the list grows past
@@ -139,142 +173,148 @@ export function OrdersQueue() {
         that should absorb the overflow; it already says so with `flex-grow`
         and `overflow-y-auto`, and this is the other half of that statement.
       */}
-      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-        <h1 className="text-[24px]">{t("orders.title")}</h1>
+        <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
+          <h1 className="text-[24px]">{t("orders.title")}</h1>
 
-        {/* The scope switch sits beside the title rather than among the status
+          {/* The scope switch sits beside the title rather than among the status
             tabs, because it is a different question: the tabs ask "at which
             step", this asks "which orders are we even looking at". */}
-        <div
-          role="group"
-          aria-label={t("orders.title")}
-          className="flex shrink-0 items-center gap-xxs rounded-md bg-neutral-fill p-xxs"
-        >
-          <ScopeButton
-            label={t("orders.scopeLive")}
-            active={scope === "live"}
-            onClick={() => setScope("live")}
-          />
-          <ScopeButton
-            label={t("orders.scopeToday")}
-            active={scope === "today"}
-            onClick={() => setScope("today")}
-          />
-          <ScopeButton
-            label={t("orders.scopeAll")}
-            active={scope === "all"}
-            onClick={() => setScope("all")}
+          <div
+            role="group"
+            aria-label={t("orders.title")}
+            className="flex shrink-0 items-center gap-xxs rounded-md bg-neutral-fill p-xxs"
+          >
+            <ScopeButton
+              label={t("orders.scopeLive")}
+              active={scope === "live"}
+              onClick={() => setScope("live")}
+            />
+            <ScopeButton
+              label={t("orders.scopeToday")}
+              active={scope === "today"}
+              onClick={() => setScope("today")}
+            />
+            <ScopeButton
+              label={t("orders.scopeAll")}
+              active={scope === "all"}
+              onClick={() => setScope("all")}
+            />
+          </div>
+
+          <span className="flex-grow" />
+          <Input
+            ref={searchRef}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t("orders.searchPlaceholder")}
+            aria-label={t("orders.searchPlaceholder")}
+            className="w-[280px]"
           />
         </div>
 
-        <span className="flex-grow" />
-        <Input
-          ref={searchRef}
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder={t("orders.searchPlaceholder")}
-          aria-label={t("orders.searchPlaceholder")}
-          className="w-[280px]"
-        />
-      </div>
-
-      <div
-        role="tablist"
-        aria-label={t("orders.title")}
-        className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
-      >
-        <Tab
-          label={t("orders.all")}
-          active={statusSlug === null}
-          onClick={() => setStatusSlug(null)}
-        />
-        {statuses.data?.map((status) => (
+        <div
+          role="tablist"
+          aria-label={t("orders.title")}
+          className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
+        >
           <Tab
-            key={status.id}
-            label={status.name}
-            count={counts.data?.[status.slug]}
-            active={statusSlug === status.slug}
-            // The tab wears the status's own colour, so the queue's tabs are a
-            // legend for the dots in the rows below rather than five identical
-            // coral chips.
-            tone={statusTone(status.slug)}
-            onClick={() => setStatusSlug(status.slug)}
+            label={t("orders.all")}
+            active={statusSlug === null}
+            onClick={() => setStatusSlug(null)}
           />
-        ))}
-      </div>
+          {statuses.data?.map((status) => (
+            <Tab
+              key={status.id}
+              label={status.name}
+              count={counts.data?.[status.slug]}
+              active={statusSlug === status.slug}
+              // The tab wears the status's own colour, so the queue's tabs are a
+              // legend for the dots in the rows below rather than five identical
+              // coral chips.
+              tone={statusTone(status.slug)}
+              onClick={() => setStatusSlug(status.slug)}
+            />
+          ))}
+        </div>
 
-      {/* The one part that scrolls. `min-h-0` for the same reason as the
+        {/* The one part that scrolls. `min-h-0` for the same reason as the
           layout's main — without it this grows to its content and the header
           and tabs get squeezed instead. */}
-      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-        {orders.isPending && <Skeleton />}
+        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+          {orders.isPending && <Skeleton />}
 
-        {orders.isError && (
-          <div className="flex flex-col items-center gap-lg py-huge text-center">
-            <div className="flex flex-col gap-xs">
-              <h2 className="text-[18px]">{t("orders.failedTitle")}</h2>
-              <p className="text-[14px] text-text-soft">
-                {t("orders.failedBody")}
-              </p>
+          {orders.isError && (
+            <div className="flex flex-col items-center gap-lg py-huge text-center">
+              <div className="flex flex-col gap-xs">
+                <h2 className="text-[18px]">{t("orders.failedTitle")}</h2>
+                <p className="text-[14px] text-text-soft">
+                  {t("orders.failedBody")}
+                </p>
+              </div>
+              <Button variant="secondary" onClick={() => void orders.refetch()}>
+                {t("common.retry")}
+              </Button>
             </div>
-            <Button variant="secondary" onClick={() => void orders.refetch()}>
-              {t("common.retry")}
-            </Button>
-          </div>
-        )}
+          )}
 
-        {orders.isSuccess && rows.length === 0 && (
-          <EmptyState
-            titleKey={search ? "orders.noMatchTitle" : EMPTY[scope].title}
-            bodyKey={search ? "orders.noMatchBody" : EMPTY[scope].body}
-            mood={scope === "live" ? "done" : "waiting"}
-          />
-        )}
+          {orders.isSuccess && rows.length === 0 && (
+            <EmptyState
+              titleKey={search ? "orders.noMatchTitle" : EMPTY[scope].title}
+              bodyKey={search ? "orders.noMatchBody" : EMPTY[scope].body}
+              mood={scope === "live" ? "done" : "waiting"}
+            />
+          )}
 
-        {rows.map((order, index) => (
-          <OrderRow
-            key={order.id}
-            order={order}
-            statuses={statuses.data}
-            focused={index === active}
-            onOpen={() => setFocused(index)}
-            onAdvance={({ store, to }) =>
-              advance({
-                orderStoreId: store.id,
-                fromSlug: store.statusSlug,
-                toSlug: to.slug,
-                toName: to.name,
-                // A move onto a terminal status cannot be undone — the RPC
-                // refuses to come back off `delivered` or `cancelled`, and an
-                // undo that fails is worse than no undo offered.
-                undoable: to.progress !== null,
-              })
-            }
-          />
-        ))}
+          {rows.map((order, index) => (
+            <OrderRow
+              key={order.id}
+              order={order}
+              statuses={statuses.data}
+              focused={index === active}
+              onOpen={() => {
+                setFocused(index);
+                setOpenOrderId(order.id);
+              }}
+              onAdvance={({ store, to }) =>
+                advance({
+                  orderStoreId: store.id,
+                  fromSlug: store.statusSlug,
+                  toSlug: to.slug,
+                  toName: to.name,
+                  // A move onto a terminal status cannot be undone — the RPC
+                  // refuses to come back off `delivered` or `cancelled`, and an
+                  // undo that fails is worse than no undo offered.
+                  undoable: to.progress !== null,
+                })
+              }
+            />
+          ))}
 
-        {orders.isSuccess && rows.length > 0 && (
-          <InfiniteSentinel
-            hasMore={orders.hasNextPage}
-            loading={orders.isFetchingNextPage}
-            onLoadMore={() => void orders.fetchNextPage()}
-          />
-        )}
+          {orders.isSuccess && rows.length > 0 && (
+            <InfiniteSentinel
+              hasMore={orders.hasNextPage}
+              loading={orders.isFetchingNextPage}
+              onLoadMore={() => void orders.fetchNextPage()}
+            />
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-xl border-t border-border bg-surface px-xxl py-md text-[12px] text-text-faint">
+          <Key label="J" /> <Key label="K" /> {t("orders.keyboardMove")}
+          <span className="flex items-center gap-sm">
+            <Key label="Enter" /> {t("orders.keyboardAdvance")}
+          </span>
+          <span className="flex items-center gap-sm">
+            <Key label="/" /> {t("orders.keyboardSearch")}
+          </span>
+          <span className="ml-auto flex items-center gap-sm">
+            <span aria-hidden className="size-[7px] rounded-full bg-accent" />
+            {t("orders.live")}
+          </span>
+        </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-xl border-t border-border bg-surface px-xxl py-md text-[12px] text-text-faint">
-        <Key label="J" /> <Key label="K" /> {t("orders.keyboardMove")}
-        <span className="flex items-center gap-sm">
-          <Key label="Enter" /> {t("orders.keyboardAdvance")}
-        </span>
-        <span className="flex items-center gap-sm">
-          <Key label="/" /> {t("orders.keyboardSearch")}
-        </span>
-        <span className="ml-auto flex items-center gap-sm">
-          <span aria-hidden className="size-[7px] rounded-full bg-accent" />
-          {t("orders.live")}
-        </span>
-      </div>
+      <OrderPanel orderId={openOrderId} onClose={() => setOpenOrderId(null)} />
     </div>
   );
 }

@@ -367,6 +367,28 @@ dialog[open]::backdrop {
 }
 
 /**
+ * The side panel arriving.
+ *
+ * A slide rather than a fade, because it comes from the edge and the movement
+ * says where it came from — which is also where it will go back to. Short, and
+ * on the arriving curve: content that eases in slowly reads as loading.
+ *
+ * There is no matching exit. The panel unmounts on close, and animating that
+ * would mean keeping a closed panel in the tree holding stale order data —
+ * a cost out of all proportion to a 220ms flourish nobody is waiting for.
+ */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/**
  * Respect the setting. The app has `use-reduce-motion.ts` for the same reason:
  * the toast that slides in and the row that animates on advance are pleasant,
  * and they are not information.
