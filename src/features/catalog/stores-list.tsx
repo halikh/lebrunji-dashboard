@@ -237,7 +237,15 @@ function StoreRow({
           button: it is a place, so it should be openable in a new tab. */}
       <Link
         href={`/catalogue/${store.id}`}
-        className="shrink-0 rounded-md px-md py-sm text-[13px] font-semibold text-primary hover:bg-primary-wash"
+        // A filled ground, not bare text. It sits beside a filled Archive
+        // button, and blue text alone read as a footnote next to it — the two
+        // are both things you press, and the one you press far more often
+        // should not be the quieter of the pair.
+        //
+        // `primary-wash` with `primary` type rather than a solid fill: it is
+        // navigation, not the row's primary action, and a second solid button
+        // per row would leave nothing to distinguish weight with.
+        className="shrink-0 rounded-md bg-primary-wash px-md py-sm text-[13px] font-semibold text-primary hover:brightness-95"
       >
         {t("catalogue.openMenu")}
       </Link>

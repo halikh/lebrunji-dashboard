@@ -316,6 +316,9 @@ export function OrdersQueue() {
             <Key label="Enter" /> {t("orders.keyboardAdvance")}
           </span>
           <span className="flex items-center gap-sm">
+            <Key label="O" /> {t("orders.keyboardOpen")}
+          </span>
+          <span className="flex items-center gap-sm">
             <Key label="/" /> {t("orders.keyboardSearch")}
           </span>
           <span className="ml-auto flex items-center gap-sm">
