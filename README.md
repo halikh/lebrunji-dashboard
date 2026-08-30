@@ -21,17 +21,28 @@ components, flows or conventions are carried over from any other dashboard.
    cp .env.example .env.local
    ```
 
-   Two variables, both from the Supabase project the app uses. `src/lib/env.ts`
-   validates them at startup and reports everything missing at once.
+   `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are all the
+   app needs; `src/lib/env.ts` validates them at startup and reports everything
+   missing at once.
+
+   The file also has slots for `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and
+   `SUPABASE_DB_URL`, which only the scripts read. Note the missing
+   `NEXT_PUBLIC_` prefix on those three: that prefix means *inlined into the
+   browser bundle*, and it is exactly what the service-role key must never be.
 
 3. Create the one admin account, once
 
    ```bash
-   npm run create-admin -- you@example.com
+   npm run create-admin you@example.com
    ```
 
    This is the only thing that ever uses the service-role key, and it reads it
    from `.env.local` on your machine. See below.
+
+   The scripts are plain Node, not Next, so they load `.env.local` themselves —
+   `scripts/load-env.ts`. Worth knowing, because it is easy to assume Node reads
+   that file and then be confused by a script reporting a variable that is
+   plainly sitting in it.
 
 4. Run
 

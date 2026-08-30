@@ -31,21 +31,38 @@ import { stdin, stdout } from 'node:process';
 
 import { createClient } from '@supabase/supabase-js';
 
+import { loadLocalEnv } from './load-env';
+
 async function main() {
   const email = process.argv[2];
   if (!email || !email.includes('@')) {
-    console.error('Usage: npm run create-admin -- you@example.com');
+    console.error('Usage: npm run create-admin you@example.com');
     process.exit(2);
   }
+
+  const source = loadLocalEnv();
 
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !serviceRoleKey) {
+  const missing = [
+    !url && 'SUPABASE_URL',
+    !serviceRoleKey && 'SUPABASE_SERVICE_ROLE_KEY',
+  ].filter(Boolean);
+
+  if (missing.length > 0) {
     console.error(
-      'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.\n\n' +
-        'Put them in .env.local (gitignored, never deployed). Supabase dashboard →\n' +
-        'Project Settings → API. The service-role key belongs on your machine only.',
+      `Missing: ${missing.join(', ')}\n\n` +
+        (source === 'file'
+          ? 'Read .env.local, but it does not set them.\n\n'
+          : 'There is no .env.local to read.\n\n') +
+        'Add to .env.local (gitignored, never deployed):\n\n' +
+        '  SUPABASE_URL=https://<project-ref>.supabase.co\n' +
+        '  SUPABASE_SERVICE_ROLE_KEY=<the service_role key>\n\n' +
+        'Supabase dashboard → Project Settings → API. Note these are the plain\n' +
+        'names, without the NEXT_PUBLIC_ prefix the app uses — that prefix means\n' +
+        '"inlined into the browser bundle", which this key must never be.\n\n' +
+        'The service-role key belongs on your machine only. Never on Vercel.',
     );
     process.exit(2);
   }
@@ -59,7 +76,7 @@ async function main() {
     process.exit(2);
   }
 
-  const supabase = createClient(url, serviceRoleKey, {
+  const supabase = createClient(url as string, serviceRoleKey as string, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
