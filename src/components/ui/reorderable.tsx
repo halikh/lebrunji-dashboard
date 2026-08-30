@@ -194,6 +194,27 @@ export function useReorder({
   const lastTop = useRef(new Map<string, number>());
   /** What we have currently translated each row by. */
   const shifted = useRef(new Map<string, number>());
+  /**
+   * Each row's element and height, as of the last layout.
+   *
+   * ## Why the drag reads these instead of the DOM
+   *
+   * `follow` ran on every pointer event and, for each row, called
+   * `querySelector` and then read `offsetHeight` — immediately after writing a
+   * transform to the dragged row. Writing a style and then reading a geometric
+   * property forces the browser to lay the page out again, synchronously, right
+   * then. Once per row, on every one of a hundred-odd pointer events a second,
+   * on a page holding a whole menu. That is the lag.
+   *
+   * None of it needed to be read: rows do not change height while one of them
+   * is being carried, and the layout effect has already measured everything in
+   * a single pass. So the pointer path now writes one transform and reads
+   * nothing at all.
+   */
+  const nodes = useRef(new Map<string, HTMLElement>());
+  const heights = useRef(new Map<string, number>());
+  /** Set by `pointermove`, consumed by the frame loop. */
+  const dirty = useRef(false);
   /** Pointer position and the row's layout top when the drag began. */
   const grip = useRef<{ pointerY: number; top: number } | null>(null);
   /** The last pointer position, so the edge-scroll loop knows where it is. */
@@ -335,7 +356,7 @@ export function useReorder({
       const id = held.current;
       if (!id || !grip.current) return;
 
-      const node = rowNode(id);
+      const node = nodes.current.get(id);
       if (!node) return;
 
       const y = clientY + scrolled();
@@ -346,7 +367,7 @@ export function useReorder({
       // put it in its new slot while the transform is still measured from the
       // old one.
       const slot = lastTop.current.get(id) ?? grip.current.top;
-      const height = node.offsetHeight;
+      const height = heights.current.get(id) ?? 0;
       let by = y - grip.current.pointerY + (grip.current.top - slot);
 
       const current = orderRef.current;
@@ -361,10 +382,10 @@ export function useReorder({
       // not be draggable outside it either.
       const first = lastTop.current.get(current[0]);
       const lastId = current[current.length - 1];
-      const lastNode = rowNode(lastId);
       const lastSlot = lastTop.current.get(lastId);
-      if (first !== undefined && lastSlot !== undefined && lastNode) {
-        const bottom = lastSlot + lastNode.offsetHeight;
+      const lastHeight = heights.current.get(lastId);
+      if (first !== undefined && lastSlot !== undefined && lastHeight) {
+        const bottom = lastSlot + lastHeight;
         by = Math.max(first - slot, Math.min(by, bottom - height - slot));
       }
 
@@ -394,10 +415,10 @@ export function useReorder({
       let to = from;
       for (let i = 0; i < current.length; i += 1) {
         if (current[i] === id) continue;
-        const other = rowNode(current[i]);
         const otherTop = lastTop.current.get(current[i]);
-        if (!other || otherTop === undefined) continue;
-        const middle = otherTop + other.offsetHeight / 2;
+        const otherHeight = heights.current.get(current[i]);
+        if (otherTop === undefined || otherHeight === undefined) continue;
+        const middle = otherTop + otherHeight / 2;
         if (i < from && draggedTop < middle) {
           to = i;
           break;
@@ -438,6 +459,8 @@ export function useReorder({
     if (dragging === null) return;
 
     let frame = requestAnimationFrame(function tick() {
+      let moved = false;
+
       const box = scroller.current;
       if (box && travelled.current) {
         const bounds = box.getBoundingClientRect();
@@ -461,8 +484,13 @@ export function useReorder({
           // Only when it actually moved. At either end of the list this does
           // nothing, and re-placing the row for a scroll that did not happen
           // would fight the pointer.
-          if (box.scrollTop !== before) followRef.current?.(pointerY.current);
+          if (box.scrollTop !== before) moved = true;
         }
+      }
+
+      if (moved || dirty.current) {
+        dirty.current = false;
+        followRef.current?.(pointerY.current);
       }
 
       frame = requestAnimationFrame(tick);
@@ -512,10 +540,14 @@ export function useReorder({
       ) {
         travelled.current = true;
       }
+      // Recorded, not acted on. A pointer reports far more often than the
+      // screen refreshes — more still once coalesced events are delivered — and
+      // moving the row twice between two frames is work nobody can see. The
+      // frame loop below does it once, which is as often as it can matter.
       pointerY.current = event.clientY;
-      follow(event.clientY);
+      dirty.current = true;
     },
-    [follow, scrolled],
+    [scrolled],
   );
 
   const onPointerUp = useCallback(
@@ -575,10 +607,14 @@ export function useReorder({
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
-    const nodes: [string, HTMLElement][] = [];
+    const present: [string, HTMLElement][] = [];
+    nodes.current.clear();
     for (const id of order) {
       const node = rowNode(id);
-      if (node) nodes.push([id, node]);
+      if (node) {
+        present.push([id, node]);
+        nodes.current.set(id, node);
+      }
     }
 
     const signature = order.join(",");
@@ -599,32 +635,34 @@ export function useReorder({
       // slightly the wrong place.
       if (held.current === null && performance.now() > settleBy.current) {
         const idle = scrolled();
-        for (const [id, node] of nodes) {
-          lastTop.current.set(id, node.getBoundingClientRect().top + idle);
+        for (const [id, node] of present) {
+          const box = node.getBoundingClientRect();
+          lastTop.current.set(id, box.top + idle);
+          heights.current.set(id, box.height);
         }
       }
       return;
     }
 
     // 1. Neutralise, so what is measured is layout rather than paint.
-    for (const [, node] of nodes) {
+    for (const [, node] of present) {
       node.style.transition = "none";
       node.style.transform = "";
     }
 
     // 2. Measure. One forced reflow for the whole list, not one per row.
     const offset = scrolled();
-    const tops = new Map(
-      nodes.map(([id, node]) => [
-        id,
-        node.getBoundingClientRect().top + offset,
-      ]),
-    );
+    const tops = new Map<string, number>();
+    for (const [id, node] of present) {
+      const box = node.getBoundingClientRect();
+      tops.set(id, box.top + offset);
+      heights.current.set(id, box.height);
+    }
 
     orderRef.current = order;
 
     // 3. Invert, and play.
-    for (const [id, node] of nodes) {
+    for (const [id, node] of present) {
       const top = tops.get(id) as number;
       const before = lastTop.current.get(id);
       lastTop.current.set(id, top);
