@@ -2,7 +2,7 @@
 
 import { useId, useState, type ReactNode } from "react";
 
-import { t, type TranslationKey } from "@/i18n/translations";
+import { t, type Params, type TranslationKey } from "@/i18n/translations";
 
 import { Button, cx } from "./index";
 import { Modal } from "./modal";
@@ -46,6 +46,7 @@ export function ConfirmButton({
   titleKey,
   bodyKey,
   confirmKey,
+  params,
   variant = "danger",
   children,
   size,
@@ -58,6 +59,15 @@ export function ConfirmButton({
   titleKey: TranslationKey;
   bodyKey: TranslationKey;
   confirmKey: TranslationKey;
+  /**
+   * Filled into the title and the body.
+   *
+   * Almost always the name of the thing. "Archive this item?" is a question
+   * about a category; "Archive Kibbeh Plate?" is a question about the thing the
+   * operator clicked, and it is the only version that catches the case where
+   * they clicked the wrong row — which is the case a confirmation exists for.
+   */
+  params?: Params;
   /** The *confirm* button's variant. The trigger keeps its own look. */
   variant?: "danger" | "primary";
   children: ReactNode;
@@ -101,8 +111,20 @@ export function ConfirmButton({
     setFailed(false);
     try {
       await onConfirm();
-      // Deliberately not closed here. A successful action usually navigates or
-      // unmounts this; closing first would flash the page underneath.
+      // Closed on success.
+      //
+      // This used to stay open, on the reasoning that a confirmed action
+      // usually navigates away or unmounts the thing it was about — true of
+      // archiving a row, and false of everything else. A switch confirmed here
+      // leaves its row exactly where it was, so the dialog sat there with a
+      // spinner that would never stop, and the operator had to dismiss a
+      // question they had already answered.
+      //
+      // Where the action really does unmount this, closing first costs
+      // nothing: the state update lands on a component that is going away, and
+      // React treats that as the no-op it is.
+      setOpen(false);
+      setPending(false);
     } catch {
       setFailed(true);
       setPending(false);
@@ -143,10 +165,10 @@ export function ConfirmButton({
       >
         <div className="flex flex-col gap-lg">
           <h2 id={`${id}-title`} className="text-[18px]">
-            {t(titleKey)}
+            {t(titleKey, params)}
           </h2>
           <p id={`${id}-body`} className="text-[14px] text-text-soft">
-            {t(bodyKey)}
+            {t(bodyKey, params)}
           </p>
 
           {failed && (

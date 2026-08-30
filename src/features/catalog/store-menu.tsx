@@ -10,7 +10,7 @@ import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { useRevealOnMount } from "@/components/ui/reveal";
-import { Toggle } from "@/components/ui/toggle";
+import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Price } from "@/features/reference/price";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -717,11 +717,22 @@ function ItemRow({
           row never did. */}
       {!carried && (
         <>
-          <Toggle
+          <ConfirmToggle
             on={item.isActive}
             onChange={onToggle}
             labelOn={t("menu.live")}
             labelOff={t("menu.hidden")}
+            params={{ name: pickLocalized(item.name) }}
+            whenTurningOn={{
+              titleKey: "menu.showTitle",
+              bodyKey: "menu.showBody",
+              confirmKey: "menu.showConfirm",
+            }}
+            whenTurningOff={{
+              titleKey: "menu.hideTitle",
+              bodyKey: "menu.hideBody",
+              confirmKey: "menu.hideConfirm",
+            }}
             className="w-[92px]"
           />
 

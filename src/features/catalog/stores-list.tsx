@@ -6,7 +6,7 @@ import { useState } from "react";
 import { cx, Input } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Toggle } from "@/components/ui/toggle";
+import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Button } from "@/components/ui";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -221,17 +221,39 @@ function StoreRow({
           competing controls — worse, the second one pushed the actions around
           on every row where a name was long. */}
       <div className="flex shrink-0 flex-col gap-xs">
-        <Toggle
+        <ConfirmToggle
           on={store.isActive}
           onChange={onToggleActive}
           labelOn={t("catalogue.active")}
           labelOff={t("catalogue.inactive")}
+          params={{ name: pickLocalized(store.name) }}
+          whenTurningOn={{
+            titleKey: "catalogue.openTitle",
+            bodyKey: "catalogue.openBody",
+            confirmKey: "catalogue.openConfirm",
+          }}
+          whenTurningOff={{
+            titleKey: "catalogue.closeTitle",
+            bodyKey: "catalogue.closeBody",
+            confirmKey: "catalogue.closeConfirm",
+          }}
           className="w-[104px]"
         />
-        <Toggle
+        <ConfirmToggle
           on={store.isFeatured}
           onChange={onToggleFeatured}
           labelOn={t("catalogue.featured")}
+          params={{ name: pickLocalized(store.name) }}
+          whenTurningOn={{
+            titleKey: "catalogue.featureTitle",
+            bodyKey: "catalogue.featureBody",
+            confirmKey: "catalogue.featureConfirm",
+          }}
+          whenTurningOff={{
+            titleKey: "catalogue.unfeatureTitle",
+            bodyKey: "catalogue.unfeatureBody",
+            confirmKey: "catalogue.unfeatureConfirm",
+          }}
           className="w-[104px]"
         />
       </div>

@@ -209,6 +209,21 @@ const en = {
     failedBody: "The connection may have dropped. Nothing has been changed.",
     // Named, like every other confirmation: see the note on `menu.added`.
     archived: "{name} archived",
+
+    openTitle: "Open {name} to customers?",
+    openBody: "It appears in the app straight away and can take orders.",
+    openConfirm: "Open it",
+    closeTitle: "Close {name} to customers?",
+    closeBody:
+      "It disappears from the app straight away and can take no new orders. Orders already placed are not affected.",
+    closeConfirm: "Close it",
+    featureTitle: "Feature {name}?",
+    featureBody: "It is promoted on the app's home screen.",
+    featureConfirm: "Feature it",
+    unfeatureTitle: "Stop featuring {name}?",
+    unfeatureBody:
+      "It keeps trading; it just no longer appears in the promoted row on the home screen.",
+    unfeatureConfirm: "Stop featuring",
     archiveTitle: "Archive this shop?",
     archiveBody:
       "It disappears from the app immediately. Its orders and menu are kept, and it can be brought back.",
@@ -295,6 +310,16 @@ const en = {
     archiveConfirm: "Archive",
     archive: "Archive",
     itemCount: "{count} items",
+
+    // Turning an item on or off. Both directions ask, and they ask different
+    // things: one publishes, the other withdraws.
+    showTitle: "Show {name} to customers?",
+    showBody: "It appears on the shop's menu straight away and can be ordered.",
+    showConfirm: "Show it",
+    hideTitle: "Hide {name} from customers?",
+    hideBody:
+      "It disappears from the shop's menu straight away. Orders already placed are not affected, and you can show it again at any time.",
+    hideConfirm: "Hide it",
 
     // Sections. A section is the heading a customer scans before they read any
     // item under it, so what it is called is the menu's structure rather than
