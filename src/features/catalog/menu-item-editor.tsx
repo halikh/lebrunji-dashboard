@@ -26,12 +26,26 @@ export type ItemDraft = {
 };
 
 /**
- * The row that edits an item, in place.
+ * The form that adds or edits an item, in the side panel.
  *
- * The flow study settled this shape: a menu item is created forty times in an
- * afternoon, so it is a row in the list rather than a page you navigate to.
- * The section around it stays visible, which is the context that tells you
- * whether the thing you are adding belongs there.
+ * ## Why a panel rather than the row itself
+ *
+ * The flow study called for editing in place, and this replaces that. An item
+ * carries more than a row can hold without pushing the list around: two
+ * languages of name, two of description, a price, a slug, a switch — and
+ * eventually an image. Growing a row to fit all of that reflows every row below
+ * it, so the list the operator was reading moves under them each time they open
+ * one.
+ *
+ * The panel keeps what mattered about the inline idea and drops what did not:
+ * **the section stays on screen beside the form**, which is the context that
+ * says whether the thing being added belongs there, and "save and add another"
+ * still leaves the operator exactly where they are. What is lost is editing
+ * literally within the row, which was never the point — not losing your place
+ * was.
+ *
+ * It also means one shell pattern: detail opens beside the list here exactly as
+ * an order's receipt does.
  *
  * ## The slug follows the name, until it does not
  *
@@ -94,9 +108,9 @@ export function MenuItemEditor({
   }
 
   return (
-    <div className="flex flex-col gap-lg rounded-md border border-border bg-surface p-lg shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]">
-      <div className="flex flex-col gap-lg md:flex-row md:gap-xl">
-        <div className="flex flex-grow flex-col gap-lg">
+    <div className="flex h-full flex-col">
+      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
+        <div className="flex flex-col gap-lg">
           <LocalizedField
             label={t("menu.name")}
             value={name}
@@ -113,7 +127,7 @@ export function MenuItemEditor({
           />
         </div>
 
-        <div className="flex w-full flex-col gap-lg md:w-[220px]">
+        <div className="flex w-full flex-col gap-lg">
           <Field id="price" label={t("menu.price")}>
             <Input
               id="price"
@@ -148,15 +162,17 @@ export function MenuItemEditor({
             labelOff={t("menu.hidden")}
           />
         </div>
+
+        {(shown || error) && (
+          <p role="alert" className="text-[13px] font-medium text-danger">
+            {shown ?? error}
+          </p>
+        )}
       </div>
 
-      {(shown || error) && (
-        <p role="alert" className="text-[13px] font-medium text-danger">
-          {shown ?? error}
-        </p>
-      )}
-
-      <div className="flex items-center justify-end gap-sm">
+      {/* Pinned, not scrolled with the fields. On a long form the operator
+          should never have to scroll to find Save. */}
+      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
         <Button variant="quiet" onClick={onCancel} disabled={pending}>
           {t("common.cancel")}
         </Button>

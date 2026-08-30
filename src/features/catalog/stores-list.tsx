@@ -215,23 +215,25 @@ function StoreRow({
         )}
       </div>
 
-      <Toggle
-        on={store.isActive}
-        onChange={onToggleActive}
-        labelOn={t("catalogue.active")}
-        labelOff={t("catalogue.inactive")}
-        className="w-[104px]"
-      />
-
-      {/* A switch, not a button. Featured is a *state* the shop is in — a
-          button implied an action with no visible result, and nothing on the
-          row said whether it was on. */}
-      <Toggle
-        on={store.isFeatured}
-        onChange={onToggleFeatured}
-        labelOn={t("catalogue.featured")}
-        className="w-[104px]"
-      />
+      {/* Stacked, not side by side. They are two properties of the same shop
+          rather than a choice between them, and in a row they read as a pair of
+          competing controls — worse, the second one pushed the actions around
+          on every row where a name was long. */}
+      <div className="flex shrink-0 flex-col gap-xs">
+        <Toggle
+          on={store.isActive}
+          onChange={onToggleActive}
+          labelOn={t("catalogue.active")}
+          labelOff={t("catalogue.inactive")}
+          className="w-[104px]"
+        />
+        <Toggle
+          on={store.isFeatured}
+          onChange={onToggleFeatured}
+          labelOn={t("catalogue.featured")}
+          className="w-[104px]"
+        />
+      </div>
 
       {/* The menu is what an operator comes to a shop for. A link rather than a
           button: it is a place, so it should be openable in a new tab. */}

@@ -182,6 +182,8 @@ const en = {
     // The slug is derived from the English name until somebody edits it. Saying
     // so stops it looking like a field that ignores what you type.
     slugHint: "Used by imports. Filled in from the name.",
+    formLabel: "Item details",
+    newItem: "New item",
   },
 
   map: {
