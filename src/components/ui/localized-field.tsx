@@ -46,6 +46,7 @@ export function LocalizedField({
   onChange,
   multiline = false,
   maxLength,
+  placeholder,
   error,
   optional = false,
 }: {
@@ -54,6 +55,20 @@ export function LocalizedField({
   onChange: (value: Localized) => void;
   multiline?: boolean;
   maxLength?: number;
+  /**
+   * An **example**, never the label — and one per language.
+   *
+   * A placeholder disappears the moment somebody types, so a field carrying its
+   * name only there is a field nobody can check afterwards. The label above says
+   * what it is; this shows what a good answer looks like.
+   *
+   * Keyed by language code, because an English example above an Arabic input is
+   * worse than none: it shows the wrong script in the wrong direction, and
+   * quietly suggests that English is what belongs in the box.
+   *
+   * A language with no example gets no placeholder rather than the English one.
+   */
+  placeholder?: Record<string, string>;
   error?: string | null;
   optional?: boolean;
 }) {
@@ -102,14 +117,30 @@ export function LocalizedField({
           const isMissing = partial && text.trim().length === 0;
 
           return (
-            <div key={language.code} className="flex items-stretch gap-sm">
+            // `dir` on the wrapper rather than only on the input, so the
+            // logical properties below flip with the language: the code sits at
+            // the *start* of the reading direction, which is the right edge for
+            // Arabic.
+            <div
+              key={language.code}
+              dir={language.rtl ? "rtl" : "ltr"}
+              className="relative"
+            >
+              {/*
+                The code sits inside the field, not in a box beside it.
+                A separate tile made every row two objects with a seam down the
+                middle, and the inputs no longer lined up with the single-value
+                fields above and below them. Inside, each row reads as one
+                control that happens to be labelled.
+
+                `pointer-events-none` so a click lands on the input underneath —
+                the label still focuses it via `htmlFor`, and text selection is
+                not interrupted by a dead patch.
+              */}
               <label
                 htmlFor={inputId}
-                // The code, not the name: `EN` and `AR` are two characters and
-                // unambiguous, where "English" and "العربية" are different
-                // widths and push the inputs out of alignment.
-                className="flex w-[34px] shrink-0 items-center justify-center rounded-md bg-neutral-fill text-[10px] font-bold uppercase text-text-soft"
                 title={language.name}
+                className="pointer-events-none absolute start-[13px] top-[14px] z-10 text-[10px] font-bold uppercase tracking-[0.08em] text-text-faint"
               >
                 {language.code}
               </label>
@@ -117,21 +148,22 @@ export function LocalizedField({
               {multiline ? (
                 <textarea
                   id={inputId}
-                  // `lang` and `dir` on the input itself, so an RTL language is
-                  // typed right-to-left even though the page is not — and so a
-                  // screen reader switches voice for it.
+                  // `lang` and `dir` so an RTL language is typed right-to-left
+                  // even though the page is not — and so a screen reader
+                  // switches voice for it.
                   lang={language.code}
                   dir={language.rtl ? "rtl" : "ltr"}
                   rows={4}
                   maxLength={maxLength}
+                  placeholder={placeholder?.[language.code]}
                   value={text}
                   onChange={(event) =>
                     onChange({ ...value, [language.code]: event.target.value })
                   }
                   aria-invalid={isMissing || undefined}
                   className={cx(
-                    "w-full resize-y rounded-md border bg-surface px-md py-md text-[15px] text-text",
-                    "focus:bg-field-focus",
+                    "w-full rounded-md border bg-surface py-md pe-md ps-[42px] text-[15px] text-text",
+                    "placeholder:text-text-faint focus:bg-field-focus",
                     isMissing || error ? "border-danger" : "border-border",
                   )}
                 />
@@ -141,11 +173,13 @@ export function LocalizedField({
                   lang={language.code}
                   dir={language.rtl ? "rtl" : "ltr"}
                   maxLength={maxLength}
+                  placeholder={placeholder?.[language.code]}
                   value={text}
                   onChange={(event) =>
                     onChange({ ...value, [language.code]: event.target.value })
                   }
                   invalid={isMissing || Boolean(error)}
+                  padding="ps-[42px] pe-md"
                 />
               )}
             </div>

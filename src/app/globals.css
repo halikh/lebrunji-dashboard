@@ -43,6 +43,22 @@ h4 {
 }
 
 /**
+ * Text areas do not carry a resize handle.
+ *
+ * Set here rather than per component, for the reason every global rule in this
+ * file exists: a convention repeated on each new field is one that will be
+ * missed on the fourth.
+ *
+ * Two reasons it is off. A handle lets one field grow taller than the panel it
+ * sits in, pushing the buttons below it out of view — the operator drags to see
+ * more and loses Save. And how tall a field should be is a design decision made
+ * once, not one handed to whoever happens to be typing; `rows` says it.
+ */
+textarea {
+  resize: none;
+}
+
+/**
  * Anything you can press says so.
  *
  * A `<button>` gets `cursor: default` from the browser — the arrow, the same as

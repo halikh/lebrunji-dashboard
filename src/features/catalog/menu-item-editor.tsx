@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-import { Button, Field, Input } from "@/components/ui";
+import { Button, Field } from "@/components/ui";
+import { NumberInput } from "@/components/ui/number-input";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Toggle } from "@/components/ui/toggle";
 import { useLanguages } from "@/features/reference/use-languages";
@@ -13,11 +14,9 @@ import {
   firstFailure,
   validateLocalizedText,
   validatePrice,
-  validateSlug,
 } from "@/lib/validation";
 
 export type ItemDraft = {
-  slug: string;
   name: Localized;
   description: Localized;
   /** Minor units, as an integer. Never a float — see `lib/money.ts`. */
@@ -47,12 +46,17 @@ export type ItemDraft = {
  * It also means one shell pattern: detail opens beside the list here exactly as
  * an order's receipt does.
  *
- * ## The slug follows the name, until it does not
+ * ## There is no slug field
  *
- * Nobody wants to type a slug, and it is only ever seen by an import file — but
- * it is the key that file joins on, so it cannot be generated silently and then
- * change when a name is corrected. So it is derived while untouched, and stops
- * the moment somebody edits it. The hint says which it is doing.
+ * A slug is a key, not content — nobody using the app ever sees one. It exists
+ * so an import file has something stable to join on, and the database fills it
+ * from the English name (migration 0070).
+ *
+ * Generating it here was the first attempt and could not do the part that
+ * matters: make it **unique without racing**. Checking whether a slug is taken
+ * and then inserting is two round trips with a gap in the middle, and the gap is
+ * where two tabs both decide `kibbeh-plate` is free. A trigger runs inside the
+ * insert's own transaction.
  */
 export function MenuItemEditor({
   initial,
@@ -72,8 +76,6 @@ export function MenuItemEditor({
 }) {
   const languages = useLanguages();
 
-  const [slug, setSlug] = useState(initial?.slug ?? "");
-  const [slugEdited, setSlugEdited] = useState(Boolean(initial?.slug));
   const [name, setName] = useState<Localized>(initial?.name ?? {});
   const [description, setDescription] = useState<Localized>(
     initial?.description ?? {},
@@ -83,14 +85,9 @@ export function MenuItemEditor({
   const [shown, setShown] = useState<string | null>(null);
 
   const codes = languages.data?.map((language) => language.code) ?? [];
-  const effectiveSlug = slugEdited
-    ? slug
-    : slugify(name.en ?? firstValue(name));
-
   function build(): ItemDraft | null {
     const parsed = Number(price);
     const problem = firstFailure([
-      validateSlug(effectiveSlug),
       validateLocalizedText(name, codes, TEXT.name),
       validateLocalizedText(description, codes, TEXT.description, {
         optional: true,
@@ -104,23 +101,41 @@ export function MenuItemEditor({
     }
 
     setShown(null);
-    return { slug: effectiveSlug, name, description, price: parsed, isActive };
+    return { name, description, price: parsed, isActive };
   }
 
   return (
-    <div className="flex h-full flex-col">
+    // `flex-1 min-h-0`, not `h-full`.
+    //
+    // This sits in a flex column that already has a header above it, so
+    // `h-full` asked for the panel's whole height *in addition to* that header
+    // — the total overflowed and the button row fell out of the bottom of the
+    // panel. `flex-1` claims what is left instead, and `min-h-0` is what lets
+    // it shrink below its content so the scrolling happens inside.
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
         <div className="flex flex-col gap-lg">
           <LocalizedField
             label={t("menu.name")}
             value={name}
             onChange={setName}
+            // One example per language. An English example above an Arabic
+            // input shows the wrong script in the wrong direction, and hints
+            // that English is what belongs there.
+            placeholder={{
+              en: t("menu.namePlaceholder"),
+              ar: t("menu.namePlaceholderAr"),
+            }}
             maxLength={TEXT.name}
           />
           <LocalizedField
             label={t("menu.description")}
             value={description}
             onChange={setDescription}
+            placeholder={{
+              en: t("menu.descriptionPlaceholder"),
+              ar: t("menu.descriptionPlaceholderAr"),
+            }}
             multiline
             optional
             maxLength={TEXT.description}
@@ -129,29 +144,13 @@ export function MenuItemEditor({
 
         <div className="flex w-full flex-col gap-lg">
           <Field id="price" label={t("menu.price")}>
-            <Input
+            <NumberInput
               id="price"
-              // `inputMode` rather than `type="number"`: a number input adds
-              // spinners nobody wants on a price and, on some browsers, lets a
-              // scroll wheel change the value of a field somebody is only
-              // passing over.
-              inputMode="numeric"
+              min={0}
+              step={1}
+              placeholder={t("menu.pricePlaceholder")}
               value={price}
-              onChange={(event) =>
-                setPrice(event.target.value.replace(/[^\d-]/g, ""))
-              }
-              className="text-right tabular-nums"
-            />
-          </Field>
-
-          <Field id="slug" label={t("menu.slug")} hint={t("menu.slugHint")}>
-            <Input
-              id="slug"
-              value={effectiveSlug}
-              onChange={(event) => {
-                setSlugEdited(true);
-                setSlug(event.target.value);
-              }}
+              onChange={(event) => setPrice(event.target.value)}
             />
           </Field>
 
@@ -173,12 +172,12 @@ export function MenuItemEditor({
       {/* Pinned, not scrolled with the fields. On a long form the operator
           should never have to scroll to find Save. */}
       <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
-        <Button variant="quiet" onClick={onCancel} disabled={pending}>
+        <Button variant="secondary" onClick={onCancel} disabled={pending}>
           {t("common.cancel")}
         </Button>
         {onSaveAndAnother && (
           <Button
-            variant="secondary"
+            variant="primary-quiet"
             pending={pending}
             onClick={() => {
               const draft = build();
@@ -200,37 +199,4 @@ export function MenuItemEditor({
       </div>
     </div>
   );
-}
-
-/**
- * A slug from a name.
- *
- * Latin letters and digits only, which means an Arabic-only name produces
- * nothing and the operator has to type one. That is the honest outcome:
- * transliterating Arabic is a guess, and a wrong guess becomes the key an
- * import file joins on.
- */
-export function slugify(input: string): string {
-  return (
-    input
-      .toLowerCase()
-      .normalize("NFD")
-      // Strip the accents `NFD` just separated, so "café" becomes "cafe" rather
-      // than losing the letter entirely.
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      // Cut to length *before* trimming, not after. Trimming first and slicing
-      // second can leave the cut landing on a separator — `some-long-name-` —
-      // which `validateSlug` then refuses, so the form would reject a slug it
-      // generated itself.
-      .slice(0, 64)
-      .replace(/^-+|-+$/g, "")
-  );
-}
-
-function firstValue(value: Localized): string {
-  for (const candidate of Object.values(value)) {
-    if (candidate?.trim()) return candidate;
-  }
-  return "";
 }

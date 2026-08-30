@@ -79,7 +79,6 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
 export type MenuItemDraft = {
   storeId: string;
   sectionId: string;
-  slug: string;
   name: Localized;
   description: Localized;
   price: number;
@@ -101,7 +100,9 @@ export async function createMenuItem(
   const { error } = await getClient().from("menu_items").insert({
     store_id: draft.storeId,
     menu_section_id: draft.sectionId,
-    slug: draft.slug,
+    // No `slug`. The trigger from migration 0070 derives it from the English
+    // name and makes it unique inside the shop — which a client cannot do
+    // without racing another tab.
     name: draft.name,
     description: draft.description,
     price: draft.price,
@@ -123,7 +124,6 @@ export async function updateMenuItem(
   patch: MenuItemPatch,
 ): Promise<void> {
   const row: Record<string, unknown> = {};
-  if (patch.slug !== undefined) row.slug = patch.slug;
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.price !== undefined) row.price = patch.price;

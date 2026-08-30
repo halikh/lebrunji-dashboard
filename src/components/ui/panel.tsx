@@ -88,7 +88,11 @@ export function Panel({
       aria-label={label}
       tabIndex={-1}
       className={cx(
-        "flex w-full shrink-0 flex-col border-border bg-surface outline-none",
+        // `overflow-hidden` so a child that misjudges its own height is
+        // clipped by the panel rather than spilling past it — the panel owns
+        // its bounds, and a footer escaping out of the bottom should be a
+        // visible mistake, not an invisible one.
+        "flex w-full shrink-0 flex-col overflow-hidden border-border bg-surface outline-none",
         // Full width on a phone, a column beside the queue from `lg` up. Below
         // that there is not enough room for both, and a 380px panel next to a
         // 200px queue serves neither.

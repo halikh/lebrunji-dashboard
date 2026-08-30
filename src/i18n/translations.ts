@@ -184,6 +184,14 @@ const en = {
     slugHint: "Used by imports. Filled in from the name.",
     formLabel: "Item details",
     newItem: "New item",
+    // Placeholders are examples, never labels. Each shows what a good answer
+    // looks like for a field whose name is already above it.
+    namePlaceholder: "Kibbeh plate",
+    namePlaceholderAr: "صحن كبة",
+    descriptionPlaceholder: "Baked lamb kibbeh, tahini, pickles",
+    descriptionPlaceholderAr: "كبة لحم مشوية، طحينة، كبيس",
+    pricePlaceholder: "380000",
+    slugPlaceholder: "kibbeh-plate",
   },
 
   map: {

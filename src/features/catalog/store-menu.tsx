@@ -168,13 +168,36 @@ export function StoreMenu({ storeId }: { storeId: string }) {
       >
         {open && openSection && (
           <>
-            <div className="flex shrink-0 flex-col gap-xxs border-b border-border p-xxl">
-              <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
-                {pick(openSection.title)}
-              </span>
-              <h2 className="text-[20px]">
-                {editingItem ? pick(editingItem.name) : t("menu.newItem")}
-              </h2>
+            <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
+              <div className="flex flex-grow flex-col gap-xxs">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
+                  {pick(openSection.title)}
+                </span>
+                <h2 className="text-[20px]">
+                  {editingItem ? pick(editingItem.name) : t("menu.newItem")}
+                </h2>
+              </div>
+              {/* The same close the receipt has. Escape and Cancel both work,
+                  but a visible affordance is what people look for first. */}
+              <button
+                type="button"
+                onClick={() => setOpen(null)}
+                aria-label={t("common.close")}
+                className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft hover:bg-neutral-fill lg:flex"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  aria-hidden
+                >
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
             </div>
 
             <MenuItemEditor

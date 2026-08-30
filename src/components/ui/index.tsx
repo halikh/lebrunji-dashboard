@@ -41,7 +41,12 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 // ---------------------------------------------------------------------------
 
 type ButtonVariant =
-  "primary" | "secondary" | "quiet" | "danger" | "danger-quiet";
+  | "primary"
+  | "secondary"
+  | "quiet"
+  | "danger"
+  | "danger-quiet"
+  | "primary-quiet";
 type ButtonSize = "md" | "sm";
 
 /**
@@ -80,6 +85,15 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
    * the one tuned for text on cream, where it clears 7.4:1.
    */
   "danger-quiet": "bg-transparent text-danger hover:bg-danger-wash",
+  /**
+   * A filled ground without the weight of the primary action.
+   *
+   * For the second-most-likely thing to press when it needs to look pressable
+   * — beside a coral Save, a blue-on-tint button reads as a real button and
+   * still loses the contest for the eye, which is what a secondary action
+   * should do.
+   */
+  "primary-quiet": "bg-primary-wash text-primary hover:brightness-95",
 };
 
 export function Button({
@@ -179,11 +193,22 @@ export function Field({
 
 export function Input({
   invalid = false,
+  padding = "px-md",
   className,
   ref,
   ...rest
 }: InputHTMLAttributes<HTMLInputElement> & {
   invalid?: boolean;
+  /**
+   * Horizontal padding, as a prop rather than a class to override.
+   *
+   * `className="ps-[42px]"` on top of a base `px-md` looks like it should win
+   * and does not: `padding-left` and `padding-inline-start` are different
+   * properties resolving to the same computed value, so which one applies
+   * depends on stylesheet order — the same coin-toss the `Button` size prop was
+   * added to remove. Replacing the value leaves nothing to conflict.
+   */
+  padding?: string;
   // React 19 passes `ref` as an ordinary prop to function components, so no
   // `forwardRef` wrapper is needed — but the type has to say so.
   ref?: Ref<HTMLInputElement>;
@@ -197,7 +222,8 @@ export function Input({
         invalid && rest.id ? `${rest.id}-error` : rest["aria-describedby"]
       }
       className={cx(
-        "w-full rounded-md border bg-surface px-md py-md text-[15px] text-text",
+        "w-full rounded-md border bg-surface py-md text-[15px] text-text",
+        padding,
         "placeholder:text-text-faint",
         // A shade warmer while it is being typed into — "this one is live",
         // not "this one is highlighted". The app does the same.
