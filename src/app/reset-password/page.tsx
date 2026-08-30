@@ -1,3 +1,5 @@
+import { Suspense } from 'react';
+
 import { Wordmark } from '@/components/brand/wordmark';
 
 import { ResetPasswordForm } from './reset-password-form';
@@ -11,7 +13,11 @@ export default function ResetPasswordPage() {
         <div className="flex flex-col items-center gap-lg">
           <Wordmark scale={0.9} />
         </div>
-        <ResetPasswordForm />
+        {/* The form reads `?error=expired`, which Next requires a boundary
+            for during static rendering. */}
+        <Suspense>
+          <ResetPasswordForm />
+        </Suspense>
       </div>
     </main>
   );

@@ -101,34 +101,53 @@ What is actually in play on a signed-in request:
 | --- | --- |
 | **Access token** | A short-lived JWT signed by the project, carrying `sub` (the user id). This is what RLS reads through `auth.uid()`, so it is the thing every policy in migrations 0062–0068 is deciding about. Default lifetime one hour, set in the Supabase dashboard. |
 | **Refresh token** | Long-lived, rotating, single-use. Exchanged for a new access token when the old one expires. Reuse of a spent one revokes the family. |
-| **Where they live** | Cookies, written by `@supabase/ssr`, chunked across `…auth-token.0`, `.1` when a token is too long for one cookie. `SameSite=Lax`, and `Secure` on https. |
-| **Refresh** | `src/proxy.ts` calls `getUser()` on every matched request. That revalidates the token against the auth server — not merely decoding the cookie — and writes back a refreshed one when it has rotated. |
-| **Reset** | Supabase's recovery flow: `resetPasswordForEmail` sends a single-use, time-limited link over Resend SMTP; `/reset-password` waits for the resulting `PASSWORD_RECOVERY` session before showing the form. No token table here, and nothing in this repo mints or validates one. |
-| **Sign-out** | `signOut({ scope: 'local' })` — revokes this browser's refresh token and deletes the cookies, leaving other devices signed in. |
-| **Remember me** | A cookie *lifetime*, not a token lifetime. Ticked, the session cookies get a 30-day `Max-Age`; cleared, they get none and die with the window. It does not shorten the refresh token, which has its own server-side life. |
+| **Where they live** | **Split.** The refresh token and the current access token are `HttpOnly` cookies the browser cannot read. The page holds an access token in memory only, fetched from `/auth/token`. |
+| **Refresh** | `src/proxy.ts` on every matched page request, and `/auth/token` when the browser needs one. Both go through `currentAccessToken`, the single place a rotation happens. |
+| **Reset** | Supabase's recovery flow over Resend SMTP. The link points at `/auth/confirm` — a route handler, not a page — because the exchange produces a refresh token, and that has to be written as an `HttpOnly` cookie by something the browser cannot see. |
+| **Sign-out** | `/auth/sign-out` revokes at Supabase (`scope: 'local'`) and clears the cookies. It clears them even if the revoke fails: neither a dead network nor a spent token is a reason to leave somebody signed in on a machine where they asked not to be. |
+| **Remember me** | A cookie *lifetime*, not a token lifetime. Ticked, the auth cookies get a 30-day `Max-Age`; cleared, they get none and die with the window. It does not shorten the refresh token, which has its own server-side life. |
 
 ### `getUser()`, never `getSession()`
 
-`getSession` reads the cookie and decodes it. `getUser` asks the auth server.
-Anything deciding what to render or whether to redirect uses the second one,
-because the first proves only that a cookie exists — and a cookie outlives the
-session behind it after a revocation, a password change, or an expiry.
+`getSession` reads a token and decodes it. `getUser` asks the auth server.
+Anything deciding what to render uses the second, because the first proves only
+that a well-formed token exists — it would not notice a revoked session, and a
+revoked session is exactly the case worth noticing.
 
-### The real limitation: these cookies are not `HttpOnly`
+### The split, and what it actually buys
 
-`createBrowserClient` writes them with `document.cookie`, and JavaScript cannot
-set `HttpOnly`. So a successful XSS in this app could read the access token.
+The ordinary Supabase browser setup keeps both tokens where JavaScript can read
+them, because the client manages refresh itself and needs the refresh token to
+do it. This app does not use that client.
 
-That is inherent to a browser-side Supabase client, not an oversight, and the
-alternative is worth naming so the trade is visible: routing every authenticated
-call through server actions or route handlers, which would give `HttpOnly`
-cookies and cost the two things this dashboard is built on — Realtime
-subscriptions for the order queue, and direct-to-Storage uploads.
+Instead the browser client is built with supabase-js's `accessToken` option —
+intended for third-party auth systems, and an exact fit here. supabase-js stops
+managing sessions and simply asks a function for a token whenever it needs one:
+for PostgREST, for Storage, and for Realtime. **A consequence worth stating,
+because it is load-bearing: `supabase.auth.*` throws when that option is set.**
+Signing in, signing out and password reset therefore cannot happen in the
+browser even by accident. They are route handlers under `/auth`. The library
+enforces the architecture rather than a convention doing it.
 
-What limits the damage: the access token is short-lived and carries no more
-authority than the operator has, every write it can make is still gated by RLS
-and `is_admin()`, and the refresh token rotates. What would *not* limit it is a
-service-role key, which is one more reason there is not one here.
+What this buys, precisely:
+
+- An XSS on this origin **can** still call `/auth/token` and get an access
+  token — a same-origin request carries the cookies. It can act as the operator
+  for as long as the page is open.
+- What it **cannot** do is take away a credential that still works tomorrow.
+  There is no refresh token in the page to steal.
+
+That is the difference between losing a session and losing the business. It is
+not the same as being immune to XSS, and nothing here should be read as
+claiming that.
+
+### Why not go further
+
+Routing *every* authenticated call through server actions would give better
+isolation still. It would also remove the live order queue's Realtime
+subscription and direct-to-Storage image upload, which are two of the things the
+dashboard is built around. The split above is the point on that curve where the
+cost is a few route handlers rather than a different product.
 
 ### Project settings that are part of this, and are not in this repo
 

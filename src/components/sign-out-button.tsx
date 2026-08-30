@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui';
 import { t } from '@/i18n/translations';
-import { getClient } from '@/lib/supabase/client';
+import { forgetAccessToken } from '@/lib/supabase/client';
 
 /**
  * Signs the operator out of **this browser**.
@@ -22,9 +22,15 @@ import { getClient } from '@/lib/supabase/client';
  * A "sign out everywhere" action is a different button, and it belongs next to
  * the password change rather than in the shell.
  *
+ * ## Why the cookies are cleared even when revocation fails
+ *
+ * `/auth/sign-out` clears them regardless of whether Supabase accepted the
+ * revoke — the network may be down, or the token already spent. Neither is a
+ * reason to leave somebody signed in on a machine where they asked not to be.
+ *
  * ## Why the remember-me preference survives
  *
- * `lebrunji-remember` is not cleared. It records how this person wants to be
+ * `lb-remember` is not cleared. It records how this person wants to be
  * treated on this machine, not whether they are currently signed in — someone
  * who cleared the box on a shared computer should still find it cleared at the
  * next sign-in, and clearing it here would silently reset that to the default.
@@ -45,13 +51,28 @@ export function SignOutButton({ variant = 'quiet' }: { variant?: 'quiet' | 'seco
     setPending(true);
     setFailed(false);
 
-    const { error } = await getClient().auth.signOut({ scope: 'local' });
-
-    if (error) {
+    // A route handler, because the refresh token it has to revoke is in an
+    // `HttpOnly` cookie this code cannot read. `supabase.auth.*` would throw
+    // here anyway — the browser client is built with `accessToken`, which turns
+    // the auth namespace off.
+    let response: Response;
+    try {
+      response = await fetch('/auth/sign-out', { method: 'POST' });
+    } catch {
       setFailed(true);
       setPending(false);
       return;
     }
+
+    if (!response.ok) {
+      setFailed(true);
+      setPending(false);
+      return;
+    }
+
+    // The in-memory access token outlives the cookies otherwise, and a
+    // component querying on its way out would use one that was just revoked.
+    forgetAccessToken();
 
     router.replace('/login');
     // The session is read on the server too, so the cached render has to go

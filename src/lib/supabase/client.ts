@@ -1,33 +1,40 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 
 import { readEnv } from '../env';
-import { REMEMBER_COOKIE, withRememberMe, type CookieOptions } from './cookies';
 
 /**
- * The browser client. Anon key, and a real signed-in user behind it.
+ * The browser client. Anon key, and an access token held in memory only.
  *
- * This is the one that does nearly all the work — reads, writes, Realtime
- * subscriptions and Storage uploads all go straight from the browser to
- * Supabase. There is no API route in front of them, and that is not a shortcut:
- * every permission is an RLS policy or an `is_admin()`-gated RPC, so a server
- * hop would add a second place to get authorisation right without adding any
- * authorisation. It would also break Realtime, which the order queue is built
- * on.
+ * ## Why this is not `createBrowserClient`
  *
- * ## One instance
+ * `@supabase/ssr`'s browser client keeps the whole session — access token *and*
+ * refresh token — in cookies that JavaScript can read, because it manages
+ * refresh itself and needs the refresh token to do it. That is the ordinary
+ * setup and it is what this project deliberately does not use: the refresh
+ * token is the credential that keeps working after the laptop is closed, and it
+ * should not be reachable from the page.
  *
- * `createBrowserClient` is memoised below. Two clients would mean two Realtime
- * connections and two copies of the auth state trying to refresh the same
- * token, which surfaces as an intermittent sign-out that is very hard to
- * attribute.
+ * Instead the `accessToken` option below is used. It exists for third-party
+ * auth systems, and it fits this exactly: supabase-js stops managing sessions
+ * altogether and simply asks a function for a token whenever it needs one —
+ * for PostgREST requests, for Storage uploads, and for Realtime.
+ *
+ * ## The consequence, which is the point
+ *
+ * **`supabase.auth.*` throws when `accessToken` is set.** Signing in, signing
+ * out and password reset therefore cannot be done from here even by accident;
+ * they are route handlers under `/auth`, which is where they have to be for the
+ * refresh token to stay `HttpOnly`. The library enforces the architecture.
+ *
+ * ## The honest limit
+ *
+ * An XSS on this origin can still call `/auth/token` and get a token — the
+ * request carries the cookies. What it cannot do is take a credential that
+ * outlives the tab. See `lib/auth/cookies.ts`.
  */
 
-// Typed off `create` rather than off `createBrowserClient` directly: the latter
-// is generic, so `ReturnType` resolves its parameters to their defaults and the
-// client comes back weakly typed — which surfaces later as `implicitly has an
-// any type` on every callback the client hands you.
 let client: ReturnType<typeof create> | null = null;
 
 export function getClient() {
@@ -38,51 +45,78 @@ export function getClient() {
 function create() {
   const { supabaseUrl, supabaseAnonKey } = readEnv();
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return readCookies();
-      },
-      // Supabase writes the auth cookies itself, from inside the sign-in call,
-      // so this is the only place the remember-me preference can reach them.
-      // It reads the preference back out of its own cookie on every write
-      // rather than being told once at construction: the client is created
-      // once and the preference changes at each sign-in.
-      setAll(cookies) {
-        const remember = readCookies().some(
-          (cookie) => cookie.name === REMEMBER_COOKIE && cookie.value === '1',
-        );
-        for (const { name, value, options } of cookies) {
-          writeCookie(name, value, withRememberMe((options ?? {}) as CookieOptions, remember, value));
-        }
-      },
-    },
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    accessToken: getAccessToken,
   });
 }
 
-function readCookies(): { name: string; value: string }[] {
-  if (typeof document === 'undefined') return [];
-  return document.cookie
-    .split('; ')
-    .filter(Boolean)
-    .map((pair) => {
-      const index = pair.indexOf('=');
-      return {
-        name: pair.slice(0, index),
-        value: decodeURIComponent(pair.slice(index + 1)),
-      };
-    });
+/** The token and when it dies, as `/auth/token` last reported them. */
+let cached: { token: string; expiresAt: number } | null = null;
+
+/**
+ * One in-flight request, shared.
+ *
+ * The docs for `accessToken` warn that it "may be called concurrently and many
+ * times" — a page load that fires four queries and opens a Realtime channel
+ * calls it five times at once. Without this, that is five refreshes of a
+ * rotating token, four of which race each other into using an already-spent
+ * one, and the visible result is being signed out on load.
+ */
+let inFlight: Promise<string | null> | null = null;
+
+async function getAccessToken(): Promise<string | null> {
+  // A minute of margin: a token valid for another two seconds is not worth
+  // handing to a request that has to cross a network first.
+  if (cached && cached.expiresAt - 60 > Math.floor(Date.now() / 1000)) {
+    return cached.token;
+  }
+
+  inFlight ??= fetchAccessToken().finally(() => {
+    inFlight = null;
+  });
+
+  return inFlight;
 }
 
-function writeCookie(name: string, value: string, options: CookieOptions) {
-  const parts = [`${name}=${encodeURIComponent(value)}`, `Path=${options.path ?? '/'}`];
+async function fetchAccessToken(): Promise<string | null> {
+  try {
+    const response = await fetch('/auth/token', {
+      // Same-origin so the HttpOnly cookies go with it, and `no-store` so a
+      // token is never served from a cache.
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
 
-  if (typeof options.maxAge === 'number') parts.push(`Max-Age=${options.maxAge}`);
-  if (options.expires instanceof Date) parts.push(`Expires=${options.expires.toUTCString()}`);
-  parts.push(`SameSite=${(options.sameSite as string) ?? 'Lax'}`);
-  // Localhost is served over http in development, and a Secure cookie would
-  // simply not be stored there — which looks exactly like a broken login.
-  if (window.location.protocol === 'https:') parts.push('Secure');
+    if (!response.ok) {
+      cached = null;
+      return null;
+    }
 
-  document.cookie = parts.join('; ');
+    const body: { accessToken?: string | null; expiresAt?: number | null } =
+      await response.json();
+
+    if (!body.accessToken) {
+      cached = null;
+      return null;
+    }
+
+    cached = { token: body.accessToken, expiresAt: body.expiresAt ?? 0 };
+    return cached.token;
+  } catch {
+    // Offline, most likely. Returning null makes the query fail rather than
+    // hang, and the next attempt tries again.
+    cached = null;
+    return null;
+  }
+}
+
+/**
+ * Drops the cached token.
+ *
+ * Called after signing out, so a component that queries on its way out does not
+ * do so with a token that was just revoked.
+ */
+export function forgetAccessToken() {
+  cached = null;
+  inFlight = null;
 }

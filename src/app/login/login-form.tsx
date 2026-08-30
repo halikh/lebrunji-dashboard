@@ -6,8 +6,7 @@ import { useState, type FormEvent } from 'react';
 
 import { Button, Card, Field, FormError, Input } from '@/components/ui';
 import { t, type TranslationKey } from '@/i18n/translations';
-import { getClient } from '@/lib/supabase/client';
-import { REMEMBER_COOKIE, REMEMBER_MAX_AGE } from '@/lib/supabase/cookies';
+import { forgetAccessToken } from '@/lib/supabase/client';
 
 export function LoginForm() {
   const router = useRouter();
@@ -24,22 +23,36 @@ export function LoginForm() {
     setPending(true);
     setError(null);
 
-    // Recorded *before* signing in, because Supabase writes its auth cookies
-    // from inside `signInWithPassword` and the cookie writer reads this to
-    // decide whether to give them a lifetime. Written after the fact it would
-    // be a request too late. See `lib/supabase/cookies.ts`.
-    writeRememberPreference(remember);
-
-    const { error: signInError } = await getClient().auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (signInError) {
-      setError(t(messageFor(signInError)));
+    // Posted to a route handler rather than called on a browser Supabase
+    // client, and that is the whole design: the response sets the refresh token
+    // as an `HttpOnly` cookie, so it never exists anywhere this code could read
+    // it. The client cannot sign in even by accident — `supabase.auth.*` throws
+    // when the `accessToken` option is set.
+    let response: Response;
+    try {
+      response = await fetch('/auth/sign-in', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password, remember }),
+      });
+    } catch {
+      // The request never left. "Your password is wrong" would be untrue, and
+      // would send the operator off to reset a password that was fine.
+      setError(t('login.offline'));
       setPending(false);
       return;
     }
+
+    if (!response.ok) {
+      setError(t(messageFor(response.status)));
+      setPending(false);
+      return;
+    }
+
+    // The token the page will use lives in memory from here on. Dropping any
+    // stale one first, so the first query does not go out with a token from a
+    // previous session.
+    forgetAccessToken();
 
     // The chime on a new order is Web Audio, and a browser will not let a page
     // make a sound until it has been interacted with. This click is the first
@@ -114,41 +127,21 @@ export function LoginForm() {
 /**
  * Which sentence to show for a failed sign-in.
  *
- * The line this draws is about what each message *reveals*:
+ * There are only two answers here because `/auth/sign-in` only gives two, and
+ * that is deliberate — every distinction the endpoint draws is a distinction it
+ * discloses to anyone who can reach it, and this page is reachable signed out.
  *
- * - **Anything to do with the credentials collapses into one message.**
- *   "No such account" and "wrong password" as separate answers turn this form
- *   into a way of asking which email addresses are staff, and it is reachable
- *   signed out by anyone. "Email not confirmed" is in here for the same reason
- *   — it confirms the account exists.
- * - **Rate limiting is said plainly.** It reveals nothing about the account,
- *   and collapsing it was actively harmful: someone who has been throttled was
- *   told their password was wrong, so they retried, which extended the
- *   throttle. The one case where the operator needs to know exactly what
- *   happened is the one case where telling them is free.
- * - **A network failure is said plainly**, because "your password is wrong" is
- *   simply untrue when the request never arrived, and it sends the operator to
- *   reset a password that was fine.
+ * - **429 is said plainly.** Rate limiting reveals nothing about whether an
+ *   account exists, and collapsing it was actively harmful: someone who had
+ *   been throttled was told their password was wrong, so they retried, which
+ *   extended the throttle.
+ * - **Everything else is one message.** "No such account" and "wrong password"
+ *   as separate answers would turn this form into a way of asking which email
+ *   address is the operator's. "Email not confirmed" is folded in for the same
+ *   reason — it confirms the account exists.
  */
-function messageFor(error: { status?: number; code?: string; message?: string }): TranslationKey {
-  if (error.status === 429 || error.code === 'over_request_rate_limit') {
-    return 'login.tooManyAttempts';
-  }
-  // supabase-js surfaces a failed fetch with no status at all.
-  if (error.status === undefined && error.code === undefined) return 'login.offline';
-  return 'login.failed';
-}
-
-/**
- * A preference, not a credential — knowing it grants nothing, which is why it
- * is an ordinary readable cookie rather than anything more careful.
- *
- * It outlives the session deliberately: cleared, the next sign-in on this
- * machine should still default to not being remembered.
- */
-function writeRememberPreference(remember: boolean) {
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${REMEMBER_COOKIE}=${remember ? '1' : '0'}; Path=/; Max-Age=${REMEMBER_MAX_AGE}; SameSite=Lax${secure}`;
+function messageFor(status: number): TranslationKey {
+  return status === 429 ? 'login.tooManyAttempts' : 'login.failed';
 }
 
 /**

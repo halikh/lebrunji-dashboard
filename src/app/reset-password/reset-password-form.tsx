@@ -1,60 +1,54 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, type FormEvent } from 'react';
 
 import { Button, Card, Field, FormError, FormNotice, Input } from '@/components/ui';
 import { t } from '@/i18n/translations';
-import { getClient } from '@/lib/supabase/client';
 import { validatePassword } from '@/lib/validation';
 
 /**
- * Sets a new password from a recovery link.
+ * Sets a new password.
  *
- * ## How the link becomes a session
+ * ## By the time this renders, the link has already been used
  *
- * Supabase's recovery link lands here carrying a token, and the client exchanges
- * it for a short-lived session in which `updateUser` is allowed. That exchange
- * happens inside `@supabase/ssr` on load, and it fires `PASSWORD_RECOVERY` when
- * it succeeds — so the form waits for that event rather than assuming the link
- * was good. A link that has expired or already been used produces no session,
- * and the operator gets a sentence instead of a form that fails on submit.
+ * The recovery mail does not point here — it points at `/auth/confirm`, which
+ * exchanges the token and redirects. That is not indirection for its own sake:
+ * the exchange produces a **refresh token**, and a refresh token must never
+ * reach JavaScript. A route handler can write an `HttpOnly` cookie; a client
+ * component cannot.
+ *
+ * So this screen has no token to inspect and no session to wait for. It knows
+ * only what the redirect told it: either it arrived clean, or with
+ * `?error=expired`. Everything else is the server's.
+ *
+ * ## The rule runs on both sides
+ *
+ * `validatePassword` here explains before a round trip. The copy in
+ * `/auth/update-password` is the one that counts, because a POST does not have
+ * to come from this form. Neither is the last word — the project's password
+ * policy is.
  */
 export function ResetPasswordForm() {
   const router = useRouter();
+  const params = useSearchParams();
 
-  const [ready, setReady] = useState<boolean | null>(null);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    const supabase = getClient();
-
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') setReady(true);
-    });
-
-    // The event may already have fired before this effect ran, so the current
-    // session is checked too — otherwise a fast exchange leaves the form
-    // permanently in its loading state.
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      setReady((current) => current ?? session !== null);
-    });
-
-    return () => data.subscription.unsubscribe();
-  }, []);
+  // A used or expired link is an ordinary thing to hit — they are single-use
+  // and time-limited by design — so it is a sentence and an offer of another,
+  // not an alarm.
+  const expired = params.get('error') === 'expired';
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
 
-    // The shared rule, not a second copy of it. `create-admin` applies the
-    // same function, so a password this screen accepts is one that script would
-    // have accepted too.
     const strong = validatePassword(password);
     if (!strong.ok) {
       setError(strong.message);
@@ -66,11 +60,33 @@ export function ResetPasswordForm() {
     }
 
     setPending(true);
-    const { error: updateError } = await getClient().auth.updateUser({ password });
+
+    let response: Response;
+    try {
+      response = await fetch('/auth/update-password', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+    } catch {
+      setError(t('login.offline'));
+      setPending(false);
+      return;
+    }
+
     setPending(false);
 
-    if (updateError) {
-      setError(updateError.message);
+    if (!response.ok) {
+      // 401 means the recovery session is gone — the link was used or timed
+      // out while the form sat open. Anything else carries a reason worth
+      // showing, because by this point the operator is authenticated and it is
+      // their own account.
+      if (response.status === 401) {
+        setError(t('resetPassword.expired'));
+        return;
+      }
+      const body: { error?: string } = await response.json().catch(() => ({}));
+      setError(body.error ?? t('common.somethingWentWrong'));
       return;
     }
 
@@ -94,7 +110,7 @@ export function ResetPasswordForm() {
     );
   }
 
-  if (ready === false) {
+  if (expired) {
     return (
       <Card>
         <div className="flex flex-col gap-lg">
@@ -140,7 +156,7 @@ export function ResetPasswordForm() {
           />
         </Field>
 
-        <Button type="submit" pending={pending || ready === null}>
+        <Button type="submit" pending={pending}>
           {t('resetPassword.submit')}
         </Button>
       </form>
