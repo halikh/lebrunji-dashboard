@@ -176,6 +176,9 @@ export function StoreMenu({ storeId }: { storeId: string }) {
    * running anything on every frame of a scroll.
    */
   const [topRef, atTop] = useOnScreen<HTMLDivElement>();
+
+  /** Scrolled away from the top, and the real button is not in view. */
+  const showAddBar = !adding && !atTop && !addButtonOnScreen;
   const matches = useMenuSearch(storeId, search);
 
   const openSection =
@@ -202,7 +205,9 @@ export function StoreMenu({ storeId }: { storeId: string }) {
     // The shop's name and its tabs belong to `StoreScreen`, which draws them
     // once for both panes. This is the menu itself and the panel beside it.
     <div className="relative flex h-full">
-      <div className="flex min-w-0 flex-grow flex-col">
+      {/* `relative`, so the pinned add-a-section bar can lie over the bottom of
+          the list rather than taking height from it. */}
+      <div className="relative flex min-w-0 flex-grow flex-col">
         {/* The hint sits under the box, not beside it — where a field's helper
             always goes, so it reads as belonging to the input rather than as a
             note that happens to be next to it.
@@ -445,17 +450,36 @@ export function StoreMenu({ storeId }: { storeId: string }) {
 
             Hidden while searching, because there is no menu on screen for a new
             section to join. */}
-        {!searching &&
-          menu.isSuccess &&
-          !adding &&
-          !atTop &&
-          !addButtonOnScreen && (
-            <div className="flex shrink-0 items-center border-t border-border bg-surface p-lg">
-              <Button fullWidth onClick={() => setAdding(true)}>
-                {t("menu.addSection")}
-              </Button>
-            </div>
-          )}
+        {/* Always rendered while the menu is; it slides rather than appears.
+            Mounting and unmounting it would make the bar blink into existence
+            mid-scroll, and — because it was a flex sibling — take a strip of
+            height with it each time, shunting the list up and down.
+
+            So it is absolute: it lies over the bottom of the list instead of
+            shrinking it, which is what a floating action bar should do anyway.
+            Nothing under it is lost, because it hides exactly when the end of
+            the list comes into view.
+
+            `inert` while hidden, so a bar that is off screen and unreadable is
+            not still in the tab order — an invisible control that can be
+            focused is worse than one that is simply absent. */}
+        {!searching && menu.isSuccess && (
+          <div
+            inert={!showAddBar}
+            aria-hidden={!showAddBar}
+            className={cx(
+              "absolute inset-x-0 bottom-0 z-10 flex items-center border-t border-border bg-surface p-lg",
+              "transition-[transform,opacity] duration-[var(--duration-control)] ease-[var(--ease-arrive)]",
+              showAddBar
+                ? "translate-y-0 opacity-100"
+                : "pointer-events-none translate-y-full opacity-0",
+            )}
+          >
+            <Button fullWidth onClick={() => setAdding(true)}>
+              {t("menu.addSection")}
+            </Button>
+          </div>
+        )}
       </div>
 
       <Panel
