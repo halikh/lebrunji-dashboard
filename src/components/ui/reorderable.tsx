@@ -297,6 +297,7 @@ export function useReorder({
    */
   const positionRef = useRef<((clientY: number) => unknown) | null>(null);
   const retargetRef = useRef<((clientY: number) => void) | null>(null);
+  const endRef = useRef<(() => void) | null>(null);
   const orderRef = useRef<string[]>(ids);
   const moveRef = useRef<((id: string, to: number) => string[]) | null>(null);
   const announceRef = useRef<((id: string, next: string[]) => void) | null>(
@@ -540,6 +541,49 @@ export function useReorder({
   useEffect(() => {
     if (dragging === null) return;
 
+    /**
+     * The window, not the handle.
+     *
+     * This used `setPointerCapture` on the grip, which is the documented way to
+     * follow a pointer that has left the element it started on — and it is the
+     * wrong tool the moment the element **moves**. Every time the list
+     * reorders, React moves that row's DOM node to its new position; browsers
+     * implement a move as a removal and an insertion, and a removal releases
+     * pointer capture. So the events stopped arriving at the exact instant the
+     * drag did something, and started again only once the pointer happened to
+     * be over the grip in its new place.
+     *
+     * That is the pause: not slow work, but no events at all for a moment. It
+     * looked like jank and no amount of making the frame cheaper touched it.
+     *
+     * Listening on the window has none of that fragility — there is nothing to
+     * move and nothing to lose — and it also catches a pointer released outside
+     * the browser entirely, which capture on a removed node would have dropped.
+     */
+    function onMove(event: PointerEvent) {
+      // A few pixels of slack, so a press that is really a click does not count
+      // as travel and start the list moving.
+      if (
+        Math.abs(event.clientY - (grip.current?.pointerY ?? 0) + scrolled()) > 4
+      ) {
+        travelled.current = true;
+      }
+      // Recorded, not acted on. A pointer reports far more often than the
+      // screen refreshes — more still once coalesced events are delivered — and
+      // moving the row twice between two frames is work nobody can see. The
+      // frame loop does it once, which is as often as it can matter.
+      pointerY.current = event.clientY;
+      dirty.current = true;
+    }
+
+    function onUp() {
+      endRef.current?.();
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+
     let frame = requestAnimationFrame(function tick() {
       let moved = false;
 
@@ -580,8 +624,13 @@ export function useReorder({
       frame = requestAnimationFrame(tick);
     });
 
-    return () => cancelAnimationFrame(frame);
-  }, [dragging]);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      cancelAnimationFrame(frame);
+    };
+  }, [dragging, scrolled]);
 
   const onPointerDown = useCallback(
     (id: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -590,9 +639,6 @@ export function useReorder({
       // neither gesture asked for.
       if (disabled || event.button !== 0 || grabbed !== null) return;
       event.preventDefault();
-      // Capture, so the drag survives the pointer leaving the handle — which it
-      // does immediately, because the row moves out from under it.
-      event.currentTarget.setPointerCapture(event.pointerId);
 
       const node = rowNode(id);
       if (!node) return;
@@ -631,34 +677,12 @@ export function useReorder({
     [disabled, grabbed, ids, scrolled, setDraft],
   );
 
-  const onPointerMove = useCallback(
-    (id: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (held.current !== id) return;
-      // A few pixels of slack, so a press that is really a click does not
-      // count as travel and start the list moving.
-      if (
-        Math.abs(event.clientY - (grip.current?.pointerY ?? 0) + scrolled()) > 4
-      ) {
-        travelled.current = true;
-      }
-      // Recorded, not acted on. A pointer reports far more often than the
-      // screen refreshes — more still once coalesced events are delivered — and
-      // moving the row twice between two frames is work nobody can see. The
-      // frame loop below does it once, which is as often as it can matter.
-      pointerY.current = event.clientY;
-      dirty.current = true;
-    },
-    [scrolled],
-  );
-
-  const onPointerUp = useCallback(
-    (id: string) => () => {
-      if (held.current !== id) return;
-      release(id);
-      commit(draft ?? ids);
-    },
-    [commit, draft, ids, release],
-  );
+  const end = useCallback(() => {
+    const id = held.current;
+    if (!id) return;
+    release(id);
+    commit(draft ?? ids);
+  }, [commit, draft, ids, release]);
 
   /**
    * Measure, invert, play — **when the order changed, and only then.**
@@ -702,6 +726,7 @@ export function useReorder({
     // makes a component's output depend on when it happened to be called.
     positionRef.current = position;
     retargetRef.current = retarget;
+    endRef.current = end;
     moveRef.current = moveTo;
     announceRef.current = announce;
 
@@ -908,9 +933,6 @@ export function useReorder({
       // the live region carries the rest.
       "aria-pressed": grabbed === id,
       onPointerDown: onPointerDown(id),
-      onPointerMove: onPointerMove(id),
-      onPointerUp: onPointerUp(id),
-      onPointerCancel: onPointerUp(id),
       onKeyDown: onKeyDown(id),
       // `touch-none` so a drag on a phone moves the row rather than scrolling
       // the page out from under it.
@@ -928,8 +950,6 @@ export function useReorder({
       moving,
       onKeyDown,
       onPointerDown,
-      onPointerMove,
-      onPointerUp,
     ],
   );
 

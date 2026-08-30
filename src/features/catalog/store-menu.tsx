@@ -483,6 +483,11 @@ function Section({
     onReorder: onReorderItems,
     labelOf: (id) =>
       pickLocalized(section.items.find((item) => item.id === id)?.name ?? {}),
+    // A ring as well as the shadow. An item row already sits on white, so a
+    // shadow alone is a soft edge against a soft background and the carried row
+    // is hard to pick out of the ones it is passing — which is the one thing
+    // the lifted state exists to say.
+    lifted: "relative z-10 shadow-raised ring-2 ring-active",
   });
 
   const row = rowProps(
@@ -575,6 +580,7 @@ function Section({
               currencyCode={currencyCode}
               handleProps={itemOrder.handleProps}
               rowProps={itemOrder.rowProps}
+              carried={itemOrder.movingId === item.id}
               // The row the panel is showing is marked, so the form and the list
               // agree about what is being edited.
               open={openItemId === item.id}
@@ -613,6 +619,7 @@ function ItemRow({
   item,
   currencyCode,
   open,
+  carried,
   rowProps,
   handleProps,
   onEdit,
@@ -622,6 +629,8 @@ function ItemRow({
   item: MenuItem;
   currencyCode: string;
   open: boolean;
+  /** Being dragged, so it sheds everything that is not identity. */
+  carried: boolean;
   onEdit: () => void;
   onToggle: () => void;
   onArchive: () => Promise<void>;
@@ -696,25 +705,39 @@ function ItemRow({
         />
       </div>
 
-      <Toggle
-        on={item.isActive}
-        onChange={onToggle}
-        labelOn={t("menu.live")}
-        labelOff={t("menu.hidden")}
-        className="w-[92px]"
-      />
+      {/* The same rule the section header follows: nothing in a row
+          travelling under the cursor is pressable, so a switch and a
+          destructive button riding along with it are claims the row cannot
+          honour. They go, and what stays is what says *which* row this is —
+          the picture, the name and the price.
 
-      <ConfirmButton
-        onConfirm={onArchive}
-        titleKey="menu.archiveTitle"
-        bodyKey="menu.archiveBody"
-        confirmKey="menu.archiveConfirm"
-        variant="danger"
-        triggerVariant="danger"
-        size="sm"
-      >
-        {t("menu.archive")}
-      </ConfirmButton>
+          Unlike a section this changes almost no height, because these sit
+          beside the name rather than under it. That is deliberate: the whole
+          reason a section folds is that carrying it hid the list, and an item
+          row never did. */}
+      {!carried && (
+        <>
+          <Toggle
+            on={item.isActive}
+            onChange={onToggle}
+            labelOn={t("menu.live")}
+            labelOff={t("menu.hidden")}
+            className="w-[92px]"
+          />
+
+          <ConfirmButton
+            onConfirm={onArchive}
+            titleKey="menu.archiveTitle"
+            bodyKey="menu.archiveBody"
+            confirmKey="menu.archiveConfirm"
+            variant="danger"
+            triggerVariant="danger"
+            size="sm"
+          >
+            {t("menu.archive")}
+          </ConfirmButton>
+        </>
+      )}
     </div>
   );
 }
