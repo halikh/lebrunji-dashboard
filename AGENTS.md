@@ -16,8 +16,9 @@ the dashboard cannot do something, the usual cause is that no policy permits it,
 and the fix is a migration in the app repo — followed by `supabase/verify.sql`,
 which is the only thing that confirms a migration actually applied.
 
-The admin layer is migrations **0062–0067**. `is_admin()` is the single seam
-everything goes through.
+The admin layer is migrations **0062–0068**. `is_admin()` is the single seam
+everything goes through, and it reads a `role` off `operators` — so a second
+role is a migration there, not a change here.
 
 ## No service-role key. Ever.
 

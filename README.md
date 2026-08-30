@@ -32,7 +32,7 @@ components, flows or conventions are carried over from any other dashboard.
      the same one renamed. In Supabase's current format both start with `sb_`,
      which makes them look interchangeable: `sb_publishable_...` is the anon
      key, `sb_secret_...` is this one. The anon key gets a 401 from the admin
-     API and cannot write to `admins`, so substituting it fails on the first
+     API and cannot write to `operators`, so substituting it fails on the first
      call. It carries no `NEXT_PUBLIC_` prefix because that prefix means
      *inlined into the browser bundle*, and this key bypasses RLS entirely.
    - `SUPABASE_DB_URL` — only for `npm run check:limits`.
@@ -65,9 +65,10 @@ components, flows or conventions are carried over from any other dashboard.
 
 **The database decides. This app holds only the anon key.**
 
-The dashboard signs in as a real Supabase user whose id is a row in `admins`.
+The dashboard signs in as a real Supabase user whose id is a row in `operators`.
+That row carries a `role`; today there is one, `admin`.
 Every capability it has is either an RLS policy or a `security definer` function
-gated on `is_admin()` — migrations 0062 to 0067 in the app repo. Nothing is
+gated on `is_admin()` — migrations 0062 to 0068 in the app repo. Nothing is
 granted by this codebase.
 
 That has three consequences worth knowing before changing anything here:

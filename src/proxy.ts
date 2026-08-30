@@ -30,9 +30,9 @@ import { REMEMBER_COOKIE, withRememberMe, type CookieOptions } from './lib/supab
  *
  * ## Why it is not the authorisation check
  *
- * It cannot be. Being signed in is not being staff: `admins` decides that, and
+ * It cannot be. Being signed in is not being staff: `operators` decides that, and
  * the decision is made inside the database on every policy and every RPC
- * (migrations 0062–0064). If this file were deleted, a stranger would gain
+ * (migrations 0062–0068). If this file were deleted, a stranger would gain
  * nothing but a redirect they could have followed themselves — every query
  * they made would still return nothing. That is the property worth having, and
  * it is why this file is allowed to be optimistic.

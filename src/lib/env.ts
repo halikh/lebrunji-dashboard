@@ -9,8 +9,8 @@
  * ## There are only two, and that is the design
  *
  * The dashboard holds the **anon key** and nothing else. Its powers come from
- * being signed in as a real Supabase user whose id is in `admins` — every one
- * of them is an RLS policy or an `is_admin()`-gated RPC (migrations 0062–0064).
+ * being signed in as a real Supabase user whose id is in `operators` — every one
+ * of them is an RLS policy or an `is_admin()`-gated RPC (migrations 0062–0068).
  *
  * So there is no service-role key here, on Vercel, or in any environment file
  * this app reads. A service-role key bypasses RLS entirely, which would make
