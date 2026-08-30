@@ -1,5 +1,11 @@
-import { NotBuilt } from "@/components/shell/not-built";
+import { StoresList } from "@/features/catalog/stores-list";
 
+/**
+ * The catalogue starts at the shops.
+ *
+ * A menu belongs to a shop, so there is no useful "all items" view to land on —
+ * the first question is always which shop.
+ */
 export default function CataloguePage() {
-  return <NotBuilt sectionKey="nav.catalogue" phase={4} />;
+  return <StoresList />;
 }

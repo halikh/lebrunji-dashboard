@@ -32,7 +32,7 @@ export const SECTIONS: readonly Section[] = [
   {
     href: "/catalogue",
     labelKey: "nav.catalogue",
-    phase: 4,
+    phase: null,
     icon: "catalogue",
   },
   { href: "/pricing", labelKey: "nav.pricing", phase: 5, icon: "pricing" },

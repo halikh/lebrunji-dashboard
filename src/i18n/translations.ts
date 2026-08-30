@@ -116,6 +116,41 @@ const en = {
     locationLabel: "Where {name} is",
   },
 
+  form: {
+    optional: "optional",
+    // Names the languages rather than saying "incomplete": the operator has
+    // done most of the work, and what they need is which box is empty.
+    stillNeeded: "Still needed in: {languages}",
+  },
+
+  catalogue: {
+    title: "Catalogue",
+    stores: "Stores",
+    searchPlaceholder: "Search shops",
+    active: "Live",
+    inactive: "Hidden",
+    featured: "Featured",
+    // Not "no location" — the consequence is what the operator needs to know,
+    // and it is money.
+    noPin: "No pin — every delivery charged at the top band",
+    prep: "{min}–{max} min",
+    emptyTitle: "No shops yet",
+    emptyBody: "A shop is where a menu lives. Add one to start.",
+    noMatchTitle: "No shops match",
+    noMatchBody: "Try part of the name, or clear the search.",
+    failedTitle: "Could not load the catalogue",
+    failedBody: "The connection may have dropped. Nothing has been changed.",
+    archived: "Shop archived",
+    archiveTitle: "Archive this shop?",
+    archiveBody:
+      "It disappears from the app immediately. Its orders and menu are kept, and it can be brought back.",
+    archiveConfirm: "Archive",
+    archive: "Archive",
+    truncated:
+      "Showing the first 200 shops. Reordering and search still work, but the list is not complete.",
+    openMenu: "Menu",
+  },
+
   map: {
     noPin: "No location saved for this address.",
     openLarger: "Open in OpenStreetMap",
