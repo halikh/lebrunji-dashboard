@@ -231,7 +231,10 @@ function NewChoice({
   }
 
   return (
-    <div className="flex flex-col gap-sm border-t border-border pt-sm">
+    // White, like every other form surface in the dashboard. On the neutral
+    // wash it read as part of the list of existing choices rather than as the
+    // place to type a new one.
+    <div className="flex flex-col gap-sm rounded-md border border-border bg-surface p-md">
       <LocalizedField
         label={t("options.optionName")}
         value={name}

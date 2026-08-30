@@ -62,33 +62,19 @@ export function ItemOptions({
     );
   }
 
-  if (groups.isPending) {
-    return <div aria-hidden className="h-[44px] rounded-md bg-neutral-fill" />;
-  }
-
-  /**
-   * Failure says so, and says what failed.
-   *
-   * There was no branch here at all, so a refused query drew an empty list —
-   * indistinguishable from a shop with no option groups. The operator would be
-   * told "there are none" by a screen that had no idea, while the actual
-   * message, which named a missing column and therefore a migration, lived only
-   * in the network tab.
-   */
-  if (groups.isError) {
-    return (
-      <p role="alert" className="text-[13px] font-medium text-danger">
-        {groups.error instanceof Error
-          ? groups.error.message
-          : t("common.somethingWentWrong")}
-      </p>
-    );
-  }
-
   const linked = new Set(attached.data ?? []);
 
   return (
     <div className="flex flex-col gap-xxl">
+      {/*
+        First, and outside anything that depends on the shared query.
+
+        These were two independent questions rendered as one component, so the
+        shop's list being slow hid the dish's own section behind a skeleton —
+        and the shop's list *failing* hid it completely, behind an error about
+        something else entirely. An operator looking for where to add a question
+        to one dish would find a screen that had never rendered it.
+      */}
       <OwnGroups storeId={storeId} itemId={itemId} />
 
       <section className="flex flex-col gap-sm">
@@ -101,13 +87,30 @@ export function ItemOptions({
           </p>
         </div>
 
-        {groups.data.length === 0 && (
+        {groups.isPending && (
+          <div aria-hidden className="h-[44px] rounded-md bg-neutral-fill" />
+        )}
+
+        {/* Failure says what failed. There was no branch here at all, so a
+            refused query drew an empty list — indistinguishable from a shop
+            with no option groups. The operator was told "there are none" by a
+            screen that had no idea, while the message naming the missing column
+            lived only in the network tab. */}
+        {groups.isError && (
+          <p role="alert" className="text-[13px] font-medium text-danger">
+            {groups.error instanceof Error
+              ? groups.error.message
+              : t("common.somethingWentWrong")}
+          </p>
+        )}
+
+        {groups.isSuccess && groups.data.length === 0 && (
           <p className="ps-md text-[13px] text-text-faint">
             {t("options.noneYet")}
           </p>
         )}
 
-        {groups.data.map((group) => (
+        {groups.data?.map((group) => (
           <div
             key={group.id}
             className="flex items-center gap-md rounded-md border border-border bg-surface px-md py-sm"
