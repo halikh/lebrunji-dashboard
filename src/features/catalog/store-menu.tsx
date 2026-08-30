@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
+import { useRevealOnMount } from "@/components/ui/reveal";
 import { Toggle } from "@/components/ui/toggle";
 import { Price } from "@/features/reference/price";
 import { t } from "@/i18n/translations";
@@ -491,13 +492,16 @@ function Section({
         </span>
 
         {/* Pushed to the far end. These are the section's own controls and
-            they should not compete with the items under it,
-              which is what the operator is actually reading. */}
+            should not compete with the items under it, which is what the
+            operator is actually reading. */}
         <div className="ms-auto flex items-center gap-sm">
-          {/* A background, like the Archive beside it. Two controls sitting
-                together where only one has a surface reads as one button and
-                one label. */}
-          <Button variant="secondary" size="sm" onClick={onRename}>
+          {/* Blue on a blue tint, beside a filled red Archive.
+              It needs a ground of its own — two controls together where only
+              one has a surface read as one button and one label — and the
+              palette says which ground: **blue is what you act on**. A neutral
+              fill made it look like a label with a box round it, and coral is
+              reserved for the one primary move on a screen. */}
+          <Button variant="primary-quiet" size="sm" onClick={onRename}>
             {t("menu.renameSection")}
           </Button>
           <ConfirmButton
@@ -729,6 +733,15 @@ function SectionForm({
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
 
+  // Added at the bottom of a list that scrolls, so it can open entirely below
+  // the fold: the click works, the form is there, and the operator sees nothing
+  // happen — which reads as the button being broken. Focus lands in the first
+  // field too, so they can simply start typing.
+  //
+  // Only inline. The panel arrives beside the list rather than below it, and it
+  // takes focus itself so that Escape closes it.
+  const form = useRevealOnMount<HTMLDivElement>({ focus: true });
+
   const [title, setTitle] = useState<Localized>(initial ?? {});
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -785,7 +798,10 @@ function SectionForm({
   }
 
   return (
-    <div className="flex flex-col gap-lg rounded-md border border-active bg-surface p-lg">
+    <div
+      ref={form}
+      className="flex flex-col gap-lg rounded-md border border-active bg-surface p-lg"
+    >
       {field}
       <div className="flex items-center gap-sm">{buttons}</div>
     </div>

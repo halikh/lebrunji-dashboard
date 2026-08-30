@@ -88,6 +88,29 @@ function rowNode(id: string): HTMLElement | null {
   );
 }
 
+/**
+ * The scrolling box a row lives in, or null when the page itself scrolls.
+ *
+ * Found per drag rather than passed in: every screen here pins a header and
+ * scrolls a list under it, so the box exists, but which element it is depends
+ * on the screen — and a hook that demanded a ref for it would make every list
+ * wire one up for something the DOM can simply be asked.
+ */
+function scrollerOf(node: HTMLElement): HTMLElement | null {
+  let element = node.parentElement;
+  while (element) {
+    const overflow = getComputedStyle(element).overflowY;
+    if (
+      (overflow === "auto" || overflow === "scroll") &&
+      element.scrollHeight > element.clientHeight
+    ) {
+      return element;
+    }
+    element = element.parentElement;
+  }
+  return null;
+}
+
 type Options = {
   /** The current order, as the server has it. */
   ids: string[];
@@ -144,18 +167,52 @@ export function useReorder({
   // Refs rather than state: none of it is rendered, and writing it during a
   // pointer move sixty times a second must not cost a render.
 
-  /** Where each row's box sat after the last layout, ignoring our transform. */
+  /**
+   * Where each row sat after the last layout, in **container** coordinates.
+   *
+   * Container rather than viewport, so the numbers survive scrolling. A drag
+   * near the bottom of a long menu scrolls the list — deliberately, see the
+   * edge-scroll loop below — and viewport coordinates would shift under every
+   * row at once while none of them had actually moved.
+   */
   const lastTop = useRef(new Map<string, number>());
   /** What we have currently translated each row by. */
   const shifted = useRef(new Map<string, number>());
-  /** The pointer position and the row's layout top when the drag began. */
+  /** Pointer position and the row's layout top when the drag began. */
   const grip = useRef<{ pointerY: number; top: number } | null>(null);
+  /** The last pointer position, so the edge-scroll loop knows where it is. */
+  const pointerY = useRef(0);
+  /** The scrolling ancestor the drag happens inside, found once per drag. */
+  const scroller = useRef<HTMLElement | null>(null);
   const frames = useRef<number[]>([]);
 
-  /** A row's layout position — its box, with our own transform taken back out. */
-  const layoutTopOf = useCallback((id: string, node: HTMLElement): number => {
-    return node.getBoundingClientRect().top - (shifted.current.get(id) ?? 0);
-  }, []);
+  /**
+   * Set in the pointer handlers, never during render.
+   *
+   * The edge-scroll loop runs outside React and needs to know whether a drag is
+   * still in progress; `dragging` state alone would be a stale closure by the
+   * time the loop reads it.
+   */
+  const held = useRef<string | null>(null);
+  /**
+   * Re-pointed at the current render's logic, so the loop is never stale.
+   *
+   * The edge-scroll loop and the layout effect both run outside React's data
+   * flow and need this render's `order`, `moveTo` and `announce`. Captured in a
+   * closure they would be whatever they were when the drag started.
+   */
+  const followRef = useRef<((clientY: number) => void) | null>(null);
+  const orderRef = useRef<string[]>(ids);
+  const moveRef = useRef<((id: string, to: number) => string[]) | null>(null);
+  const announceRef = useRef<((id: string, next: string[]) => void) | null>(
+    null,
+  );
+
+  /** How far the container has scrolled, which container coordinates add back. */
+  const scrolled = useCallback(
+    () => scroller.current?.scrollTop ?? window.scrollY,
+    [],
+  );
 
   const place = useCallback(
     (node: HTMLElement, id: string, by: number, animate: boolean) => {
@@ -167,54 +224,6 @@ export function useReorder({
     },
     [],
   );
-
-  // Measure, invert, play. Runs after every render, which is what makes a
-  // keyboard move and a pointer move animate identically — neither one has to
-  // tell this that anything happened.
-  useIsomorphicLayoutEffect(() => {
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-
-    for (const id of order) {
-      const node = rowNode(id);
-      if (!node) continue;
-
-      const top = layoutTopOf(id, node);
-      const before = lastTop.current.get(id);
-      lastTop.current.set(id, top);
-
-      // The dragged row is following the pointer; its transform is not this
-      // effect's to set. Its baseline moved though, and `onPointerMove` reads
-      // `lastTop` to correct for exactly that.
-      //
-      // `dragging` is read straight from the closure: the effect has no
-      // dependency array, so it re-runs after every render with the current
-      // value — a ref mirroring it would be one more thing to keep in step,
-      // and writing one during render is what React's lint rule forbids.
-      if (id === dragging) continue;
-
-      if (before === undefined || before === top || reduced) continue;
-
-      // Put it back where it was, then let it go. Two frames, because a
-      // transform set and cleared within one is not a transition.
-      place(node, id, before - top, false);
-      frames.current.push(
-        requestAnimationFrame(() => {
-          frames.current.push(
-            requestAnimationFrame(() => place(node, id, 0, true)),
-          );
-        }),
-      );
-    }
-  });
-
-  useEffect(() => {
-    const pending = frames.current;
-    return () => {
-      for (const frame of pending) cancelAnimationFrame(frame);
-    };
-  }, []);
 
   const announce = useCallback(
     (id: string, next: string[]) => {
@@ -252,6 +261,13 @@ export function useReorder({
       const node = rowNode(id);
       if (node) place(node, id, 0, true);
       grip.current = null;
+      held.current = null;
+      scroller.current = null;
+      // Otherwise text selects itself all the way down the page as you drag,
+      // and the cursor reverts to an arrow the moment it leaves the handle —
+      // which it does immediately, because the row moves out from under it.
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
     },
     [place],
   );
@@ -277,6 +293,120 @@ export function useReorder({
 
   // ---- pointer -----------------------------------------------------------
 
+  /**
+   * Put the held row under the cursor, and work out where it now belongs.
+   *
+   * Called from `pointermove`, from the edge-scroll loop — where the pointer is
+   * still and the list is what moves — and from the layout effect, so a row
+   * whose slot has just changed is repositioned before anything is painted.
+   */
+  const follow = useCallback(
+    (clientY: number) => {
+      const id = held.current;
+      if (!id || !grip.current) return;
+
+      const node = rowNode(id);
+      if (!node) return;
+
+      const y = clientY + scrolled();
+
+      // How far the pointer has travelled, less however far the row's own slot
+      // has moved since the drag began. Without the second term the row leaps
+      // by its own height the moment it swaps past a neighbour: the layout has
+      // put it in its new slot while the transform is still measured from the
+      // old one.
+      const top = lastTop.current.get(id) ?? grip.current.top;
+      place(
+        node,
+        id,
+        y - grip.current.pointerY + (grip.current.top - top),
+        false,
+      );
+
+      const current = orderRef.current;
+      const from = current.indexOf(id);
+
+      // The first row whose midpoint the pointer has crossed, in the direction
+      // of travel. Stored layout positions, not freshly measured ones: a
+      // neighbour part way through its own animation is somewhere neither here
+      // nor there, and comparing against that makes the target flicker.
+      let to = from;
+      for (let i = 0; i < current.length; i += 1) {
+        if (current[i] === id) continue;
+        const other = rowNode(current[i]);
+        const otherTop = lastTop.current.get(current[i]);
+        if (!other || otherTop === undefined) continue;
+        const middle = otherTop + other.offsetHeight / 2;
+        if (i < from && y < middle) {
+          to = i;
+          break;
+        }
+        if (i > from && y > middle) to = i;
+      }
+
+      if (to !== from) {
+        const next = moveRef.current?.(id, to);
+        if (next) announceRef.current?.(id, next);
+      }
+    },
+    [place, scrolled],
+  );
+
+  /**
+   * Scrolls the list when the drag reaches its edge.
+   *
+   * Without it, reordering is bounded by whatever happens to be on screen:
+   * moving an item to the top of a menu that does not fit means dropping it,
+   * scrolling by hand, picking it up again, and repeating. The list coming to
+   * meet the drag is the difference between a gesture and a chore.
+   *
+   * ## Why an effect rather than a loop the handlers start and stop
+   *
+   * It lives exactly as long as a drag, and React is what starts and ends it —
+   * so there is no way to leave a frame loop running after a pointer is lost, a
+   * row unmounts, or the operator navigates away mid-drag. The first version
+   * started it in `pointerdown` and cancelled it in three separate places, and
+   * a loop that has to be cancelled in three places is one that will one day be
+   * cancelled in two.
+   *
+   * It runs on its own frames rather than on `pointermove`, because the pointer
+   * stops moving once it reaches the edge — which is precisely when the
+   * scrolling needs to keep going.
+   */
+  useEffect(() => {
+    if (dragging === null) return;
+
+    let frame = requestAnimationFrame(function tick() {
+      const box = scroller.current;
+      if (box) {
+        const bounds = box.getBoundingClientRect();
+        const edge = 64;
+        const fromTop = pointerY.current - bounds.top;
+        const fromBottom = bounds.bottom - pointerY.current;
+
+        // Proportional to how far into the edge the pointer is, so it creeps at
+        // the boundary and moves properly at the very end. A fixed speed is
+        // either too slow to be useful or too fast to aim with.
+        let by = 0;
+        if (fromTop < edge) by = -Math.ceil((edge - fromTop) / 4);
+        else if (fromBottom < edge) by = Math.ceil((edge - fromBottom) / 4);
+
+        if (by !== 0) {
+          const before = box.scrollTop;
+          box.scrollTop += by;
+          // Only when it actually moved. At either end of the list this does
+          // nothing, and re-placing the row for a scroll that did not happen
+          // would fight the pointer.
+          if (box.scrollTop !== before) followRef.current?.(pointerY.current);
+        }
+      }
+
+      frame = requestAnimationFrame(tick);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [dragging]);
+
   const onPointerDown = useCallback(
     (id: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
       // Primary button only, and never while a keyboard move is in progress —
@@ -289,69 +419,131 @@ export function useReorder({
       event.currentTarget.setPointerCapture(event.pointerId);
 
       const node = rowNode(id);
-      grip.current = node
-        ? { pointerY: event.clientY, top: layoutTopOf(id, node) }
-        : null;
+      if (!node) return;
+
+      scroller.current = scrollerOf(node);
+      pointerY.current = event.clientY;
+      held.current = id;
+      grip.current = {
+        pointerY: event.clientY + scrolled(),
+        top: node.getBoundingClientRect().top + scrolled(),
+      };
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "grabbing";
 
       setDragging(id);
       setDraft(ids);
     },
-    [disabled, grabbed, ids, layoutTopOf, setDraft],
+    [disabled, grabbed, ids, scrolled, setDraft],
   );
 
   const onPointerMove = useCallback(
     (id: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (dragging !== id || !grip.current) return;
-
-      const node = rowNode(id);
-      if (!node) return;
-
-      // How far the pointer has travelled, less however far the row's own
-      // layout position has moved since the drag began. Without the second
-      // term the row leaps by its own height the moment it swaps past a
-      // neighbour — the layout puts it in its new slot while the transform is
-      // still measured from the old one.
-      const top = lastTop.current.get(id) ?? grip.current.top;
-      const by =
-        event.clientY - grip.current.pointerY + (grip.current.top - top);
-      place(node, id, by, false);
-
-      const current = draft ?? ids;
-      const from = current.indexOf(id);
-      const y = event.clientY;
-
-      // The first row whose midpoint the pointer has crossed, in the direction
-      // of travel. Layout positions, not painted ones: comparing against a
-      // neighbour that is itself mid-animation makes the target flicker.
-      let to = from;
-      for (let i = 0; i < current.length; i += 1) {
-        if (current[i] === id) continue;
-        const other = rowNode(current[i]);
-        if (!other) continue;
-        const middle =
-          (lastTop.current.get(current[i]) ??
-            other.getBoundingClientRect().top) +
-          other.offsetHeight / 2;
-        if (i < from && y < middle) {
-          to = i;
-          break;
-        }
-        if (i > from && y > middle) to = i;
-      }
-
-      if (to !== from) announce(id, moveTo(id, to));
+      if (held.current !== id) return;
+      pointerY.current = event.clientY;
+      follow(event.clientY);
     },
-    [announce, dragging, draft, ids, moveTo, place],
+    [follow],
   );
 
   const onPointerUp = useCallback(
     (id: string) => () => {
-      if (dragging !== id) return;
+      if (held.current !== id) return;
       release(id);
       commit(draft ?? ids);
     },
-    [commit, dragging, draft, ids, release],
+    [commit, draft, ids, release],
   );
+
+  /**
+   * Measure, invert, play. Runs after every render, which is what makes a
+   * keyboard move and a pointer move animate identically — neither has to tell
+   * this that anything happened.
+   *
+   * ## Transforms are cleared before measuring, and that is the whole trick
+   *
+   * The first version subtracted the transform it *intended* each row to have.
+   * `getBoundingClientRect` reports the **interpolated** one — so for the
+   * couple of hundred milliseconds a row is animating home, the measurement was
+   * wrong by however far it had left to travel. Reorder again inside that
+   * window, which is exactly what happens when somebody drags at a normal
+   * speed, and the bad number is stored as that row's layout position and
+   * every calculation after it inherits the error. The symptom is a row
+   * stranded a long way from its slot with a gap where it belongs.
+   *
+   * So every transform is cleared first, then everything is measured, then the
+   * inversions go on. Three passes rather than one, because interleaving them
+   * would have each measurement invalidated by the previous write.
+   */
+  useIsomorphicLayoutEffect(() => {
+    // Re-point the out-of-React handles at this render's logic. In the effect
+    // rather than in the body, because writing a ref during render is what
+    // makes a component's output depend on when it happened to be called.
+    followRef.current = follow;
+    moveRef.current = moveTo;
+    announceRef.current = announce;
+
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    const nodes: [string, HTMLElement][] = [];
+    for (const id of order) {
+      const node = rowNode(id);
+      if (node) nodes.push([id, node]);
+    }
+
+    // 1. Neutralise, so what is measured is layout rather than paint.
+    for (const [, node] of nodes) {
+      node.style.transition = "none";
+      node.style.transform = "";
+    }
+
+    // 2. Measure. One forced reflow for the whole list, not one per row.
+    const offset = scrolled();
+    const tops = new Map(
+      nodes.map(([id, node]) => [
+        id,
+        node.getBoundingClientRect().top + offset,
+      ]),
+    );
+
+    orderRef.current = order;
+
+    // 3. Invert, and play.
+    for (const [id, node] of nodes) {
+      const top = tops.get(id) as number;
+      const before = lastTop.current.get(id);
+      lastTop.current.set(id, top);
+      shifted.current.set(id, 0);
+
+      // The dragged row answers to the pointer, not to this. Its baseline has
+      // just moved though, so it is put back under the cursor immediately —
+      // within this same frame, so nothing is ever painted at zero.
+      if (id === held.current) {
+        followRef.current?.(pointerY.current);
+        continue;
+      }
+
+      if (before === undefined || before === top || reduced) continue;
+
+      place(node, id, before - top, false);
+      frames.current.push(
+        requestAnimationFrame(() => {
+          frames.current.push(
+            requestAnimationFrame(() => place(node, id, 0, true)),
+          );
+        }),
+      );
+    }
+  });
+
+  useEffect(() => {
+    const pending = frames.current;
+    return () => {
+      for (const frame of pending) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   // ---- keyboard ----------------------------------------------------------
 
