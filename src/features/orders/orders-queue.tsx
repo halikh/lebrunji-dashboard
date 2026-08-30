@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button, cx, Input } from "@/components/ui";
 import { t } from "@/i18n/translations";
+import { statusTone, type StatusTone } from "@/lib/order-status";
 
 import { OrderRow } from "./order-row";
 import { useOrderRealtime } from "./use-order-realtime";
@@ -114,7 +115,17 @@ export function OrdersQueue() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
+      {/*
+        `shrink-0` on all three pieces of chrome.
+
+        A flex child defaults to `flex-shrink: 1`, so when the list grows past
+        the viewport the browser takes the space back from whatever will give —
+        and that was the header and the tab row, which got squeezed to half
+        their height and clipped their own text. The scrolling list is the part
+        that should absorb the overflow; it already says so with `flex-grow`
+        and `overflow-y-auto`, and this is the other half of that statement.
+      */}
+      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
         <h1 className="flex-grow text-[24px]">{t("orders.title")}</h1>
         <Input
           ref={searchRef}
@@ -129,7 +140,7 @@ export function OrdersQueue() {
       <div
         role="tablist"
         aria-label={t("orders.title")}
-        className="flex gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl"
+        className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
       >
         <Tab
           label={t("orders.all")}
@@ -142,12 +153,19 @@ export function OrdersQueue() {
             label={status.name}
             count={counts.data?.[status.slug]}
             active={statusSlug === status.slug}
+            // The tab wears the status's own colour, so the queue's tabs are a
+            // legend for the dots in the rows below rather than five identical
+            // coral chips.
+            tone={statusTone(status.slug)}
             onClick={() => setStatusSlug(status.slug)}
           />
         ))}
       </div>
 
-      <div className="flex flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+      {/* The one part that scrolls. `min-h-0` for the same reason as the
+          layout's main — without it this grows to its content and the header
+          and tabs get squeezed instead. */}
+      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
         {orders.isPending && <Skeleton />}
 
         {orders.isError && (
@@ -194,7 +212,7 @@ export function OrdersQueue() {
         ))}
       </div>
 
-      <div className="flex items-center gap-xl border-t border-border bg-surface px-xxl py-md text-[12px] text-text-faint">
+      <div className="flex shrink-0 items-center gap-xl border-t border-border bg-surface px-xxl py-md text-[12px] text-text-faint">
         <Key label="J" /> <Key label="K" /> {t("orders.keyboardMove")}
         <span className="flex items-center gap-sm">
           <Key label="Enter" /> {t("orders.keyboardAdvance")}
@@ -215,11 +233,14 @@ function Tab({
   label,
   count,
   active,
+  tone,
   onClick,
 }: {
   label: string;
   count?: number;
   active: boolean;
+  /** Absent on "All", which is not a status and keeps the app's coral. */
+  tone?: StatusTone;
   onClick: () => void;
 }) {
   return (
@@ -228,20 +249,29 @@ function Tab({
       role="tab"
       aria-selected={active}
       onClick={onClick}
+      // A dot on every tab, active or not. Colour alone is not a distinction a
+      // colour-blind operator can rely on, and the dot is what ties a tab to
+      // the rows beneath it — the tabs are the legend.
+      style={
+        active && tone ? { background: tone.wash, color: tone.ink } : undefined
+      }
       className={cx(
-        "flex shrink-0 items-center gap-sm rounded-t-md px-lg py-sm text-[14px] font-semibold",
-        active
-          ? "bg-active-wash text-active-ink"
-          : "text-text-soft hover:bg-neutral-fill",
+        "flex shrink-0 items-center gap-sm whitespace-nowrap rounded-t-md px-lg py-sm text-[14px] font-semibold",
+        active && !tone && "bg-active-wash text-active-ink",
+        !active && "text-text-soft hover:bg-neutral-fill",
       )}
     >
+      {tone && (
+        <span
+          aria-hidden
+          className="size-[7px] shrink-0 rounded-full"
+          style={{ background: tone.dot }}
+        />
+      )}
       {label}
       {count !== undefined && count > 0 && (
         <span
-          className={cx(
-            "tabular-nums",
-            active ? "font-bold" : "font-medium text-text-faint",
-          )}
+          className={cx("tabular-nums", active ? "font-bold" : "font-medium")}
         >
           {count}
         </span>

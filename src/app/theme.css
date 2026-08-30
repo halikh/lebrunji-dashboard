@@ -161,24 +161,6 @@
   --color-danger: var(--color-red-danger);
   --color-danger-wash: var(--color-red-danger-tint);
   --color-danger-action: var(--color-red-danger-bright);
-
-  /* ---- Order status ----------------------------------------------------
-   * Defined once, here, so a status is the same colour in the queue, in the
-   * detail panel and in a chart. Mapped onto the roles above rather than
-   * given values of their own: "delivered" is the app's "going well", and
-   * saying so in the token is what keeps them in step.
-   *
-   * The slugs are `order_statuses.slug` — reference data, not an enum, so a
-   * merchant may add a step. An unknown slug falls back to `--color-status-
-   * unknown` rather than rendering colourless.
-   */
-  --color-status-ordered: var(--color-yellow);
-  --color-status-confirmed: var(--color-primary);
-  --color-status-driver-sent: var(--color-info);
-  --color-status-delivered: var(--color-accent);
-  --color-status-cancelled: var(--color-danger);
-  --color-status-unknown: var(--color-faint);
-
   /* ---- Type ------------------------------------------------------------
    * Barlow for body, Barlow Condensed for headings, Cairo for Arabic — the
    * app's three faces, all on Google Fonts.
@@ -247,4 +229,83 @@
    * enough to be watched rather than merely noticed, which is what the rail's
    * icon animations are for. */
   --duration-rise: 500ms;
+}
+
+/**
+ * Order status colours — a plain `:root` block, deliberately not `@theme`.
+ *
+ * Tailwind v4 emits only the theme variables it can see *used*, and these are
+ * read as `var(--color-status-…)` strings assembled in TypeScript. Tailwind
+ * cannot see that, so inside `@theme` every one of them was tree-shaken out of
+ * the stylesheet: the build succeeded, the classes were fine, and every status
+ * dot rendered with no colour at all. A silent failure, and only visible by
+ * grepping the emitted CSS.
+ *
+ * A plain custom-property block is never shaken. Nothing is lost by moving
+ * them: they could never have been Tailwind utilities anyway, because
+ * `order_statuses` is a lookup table and the slug set is not known at build
+ * time — which is the whole reason they are applied inline.
+ */
+:root {
+/* ---- Order status ----------------------------------------------------
+ * Four roles per status, not one colour.
+ *
+ * A single hue is enough for a dot and useless for anything else: the same
+ * value that reads well as a 7px marker is unreadable as body text and
+ * illegible under a white label. So each status carries the set the app's
+ * palette already implies — a graphic colour, an ink that clears 4.5:1 on
+ * cream, a fill with a stated label colour, and a wash.
+ *
+ * Two pairings are inherited rather than chosen, and both come from
+ * `colors.ts`:
+ *
+ * - **Sun always takes dark type, never white.** So `ordered`'s fill carries
+ *   ink, unlike every other status.
+ * - **Mint is a fill colour, not a text colour.** Its text pairing is
+ *   `mint-deep`, which is what the app uses for the "open now" pill.
+ *
+ * Mapped onto the existing roles rather than given values of their own, so a
+ * status is the same colour in the queue, the panel and a chart — and so
+ * "delivered" stays the app's "going well" rather than drifting into a
+ * second green.
+ */
+--color-status-ordered: var(--color-sun);
+--color-status-ordered-ink: var(--color-ink);
+--color-status-ordered-fill: var(--color-sun);
+--color-status-ordered-on-fill: var(--color-ink);
+--color-status-ordered-wash: var(--color-sun-tint);
+
+--color-status-confirmed: var(--color-blue);
+--color-status-confirmed-ink: var(--color-blue);
+--color-status-confirmed-fill: var(--color-blue);
+--color-status-confirmed-on-fill: #ffffff;
+--color-status-confirmed-wash: var(--color-blue-tint);
+
+--color-status-driver-sent: var(--color-grape);
+--color-status-driver-sent-ink: var(--color-grape);
+--color-status-driver-sent-fill: var(--color-grape);
+--color-status-driver-sent-on-fill: #ffffff;
+--color-status-driver-sent-wash: var(--color-grape-tint);
+
+--color-status-delivered: var(--color-mint);
+--color-status-delivered-ink: var(--color-mint-deep);
+--color-status-delivered-fill: var(--color-mint);
+--color-status-delivered-on-fill: #ffffff;
+--color-status-delivered-wash: var(--color-mint-tint);
+
+--color-status-cancelled: var(--color-red-danger);
+--color-status-cancelled-ink: var(--color-red-danger);
+--color-status-cancelled-fill: var(--color-red-danger-bright);
+--color-status-cancelled-on-fill: #ffffff;
+--color-status-cancelled-wash: var(--color-red-danger-tint);
+
+/* `order_statuses` is a lookup table, not an enum — a merchant may add a
+ * step, and it will arrive with no colour. Neutral rather than transparent:
+ * a missing dot reads as a bug, a grey one reads as a step nobody has
+ * chosen a colour for yet. */
+--color-status-unknown: var(--color-faint);
+--color-status-unknown-ink: var(--color-muted);
+--color-status-unknown-fill: var(--color-muted);
+--color-status-unknown-on-fill: #ffffff;
+--color-status-unknown-wash: var(--color-sand);
 }

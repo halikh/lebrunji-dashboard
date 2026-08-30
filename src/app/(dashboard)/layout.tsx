@@ -49,7 +49,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         <Rail />
 
-        <main id="main" className="flex-1 overflow-y-auto">
+        {/*
+          `min-h-0` is what makes the inner scroll areas work.
+
+          A flex item's `min-height` defaults to `auto`, which means "never
+          smaller than my content" — so this would grow to fit the whole queue
+          instead of bounding it, the scrolling would happen on the page, and
+          the screen chrome would slide away with it.
+        */}
+        <main id="main" className="min-h-0 flex-1 overflow-y-auto">
           {children}
         </main>
       </div>

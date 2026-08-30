@@ -3,6 +3,7 @@
 import { Button, cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
 import { formatMoney } from "@/lib/money";
+import { statusTone } from "@/lib/order-status";
 
 import type { Order, OrderStatus } from "./api/orders";
 import { nextStatus } from "./use-orders";
@@ -79,19 +80,25 @@ export function OrderRow({
       </div>
 
       <div className="flex flex-grow flex-col gap-xs">
-        {order.stores.map((store) => (
-          <span
-            key={store.id}
-            className="flex items-center gap-sm text-[13px] text-text-soft"
-          >
+        {order.stores.map((store) => {
+          const tone = statusTone(store.statusSlug);
+          return (
             <span
-              aria-hidden
-              className="size-[7px] rounded-full"
-              style={{ background: statusColour(store.statusSlug) }}
-            />
-            {store.storeName} · {store.statusName}
-          </span>
-        ))}
+              key={store.id}
+              className="flex items-center gap-sm text-[13px] text-text-soft"
+            >
+              <span
+                aria-hidden
+                className="size-[7px] shrink-0 rounded-full"
+                style={{ background: tone.dot }}
+              />
+              <span className="truncate">{store.storeName}</span>
+              <span className="font-semibold" style={{ color: tone.ink }}>
+                {store.statusName}
+              </span>
+            </span>
+          );
+        })}
       </div>
 
       <span className="w-[130px] shrink-0 text-right text-[15px] font-bold tabular-nums">
@@ -102,10 +109,18 @@ export function OrderRow({
         {order.stores.map((store) => {
           const next = nextStatus(statuses, store.statusSlug);
           if (!next) return null;
+          // The colour of the step being moved *to*, not the one being left:
+          // the button is a promise about what happens next, and an operator
+          // working quickly learns the colour of the action.
+          //
+          // Inline rather than a class because the slug set is not known at
+          // build time — see `lib/order-status.ts`.
+          const tone = statusTone(next.slug);
           return (
             <Button
               key={store.id}
               size="sm"
+              style={{ background: tone.fill, color: tone.onFill }}
               onClick={(event) => {
                 // The row opens the panel; the button only advances. Without
                 // this, advancing also opens the detail of the order that just
@@ -121,24 +136,6 @@ export function OrderRow({
       </div>
     </div>
   );
-}
-
-/**
- * Status colour, from the palette's status ramp.
- *
- * `order_statuses` is a lookup table a merchant may add to, so an unknown slug
- * has to render as something — `unknown` rather than transparent, which would
- * read as a missing dot rather than a step nobody has given a colour yet.
- */
-function statusColour(slug: string): string {
-  const known: Record<string, string> = {
-    ordered: "var(--color-status-ordered)",
-    confirmed: "var(--color-status-confirmed)",
-    driverSent: "var(--color-status-driver-sent)",
-    delivered: "var(--color-status-delivered)",
-    cancelled: "var(--color-status-cancelled)",
-  };
-  return known[slug] ?? "var(--color-status-unknown)";
 }
 
 /**
