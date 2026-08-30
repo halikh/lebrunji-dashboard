@@ -159,7 +159,7 @@ function Rate() {
     <div className="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
       <section className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto">
         <div className="flex flex-col gap-xs">
-          <h2 className="text-[18px]">{t("pricing.rateTitle")}</h2>
+          <h2 className="ps-md text-[18px]">{t("pricing.rateTitle")}</h2>
           <p className="ps-md text-[14px] text-text-soft">
             {t("pricing.rateBody")}
           </p>
@@ -269,7 +269,7 @@ function Conversions({
   return (
     <aside className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto">
       <div className="flex flex-col gap-xs">
-        <h3 className="text-[15px] font-semibold">
+        <h3 className="ps-md text-[15px] font-semibold">
           {t("pricing.whatItMeans")}
         </h3>
         <p className="ps-md text-[13px] text-text-faint">
