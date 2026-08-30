@@ -214,7 +214,7 @@ function Form({ store }: { store: Store }) {
           </section>
 
           <section className="flex flex-col gap-lg">
-            <h2 className="text-[17px]">{t("store.prepTitle")}</h2>
+            <h2 className="ps-md text-[17px]">{t("store.prepTitle")}</h2>
 
             {/* One field would be a lie — a kitchen quotes a range, and the app
               shows both ends of it. The error belongs to the pair rather than
@@ -255,7 +255,7 @@ function Form({ store }: { store: Store }) {
             worked through. It is the reference the other column is edited
             against, not a section that comes after it. */}
         <section className="flex min-h-0 flex-col gap-lg p-xxl pt-0 lg:flex-1 lg:ps-0 lg:pt-xxl">
-          <h2 className="text-[17px]">{t("store.locationTitle")}</h2>
+          <h2 className="ps-md text-[17px]">{t("store.locationTitle")}</h2>
 
           {/* Said here, not left to be found on a customer's bill. */}
           {!coordinates && (

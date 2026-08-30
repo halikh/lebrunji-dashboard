@@ -486,6 +486,100 @@ const en = {
       "At least cannot be more than At most — nobody could satisfy that.",
   },
 
+  /**
+   * The two numbers that price every order.
+   *
+   * Both are read by `delivery_quote` on every basket, and both are the kind of
+   * setting whose mistakes are invisible: a wrong rate misprices the whole
+   * catalogue without breaking anything, and a wrong top band silently changes
+   * where the business delivers.
+   */
+  pricing: {
+    title: "Pricing",
+
+    rateTitle: "Exchange rate",
+    rateBody:
+      "Every price the app shows in the second currency is worked out from this number.",
+    rateNow: "Right now",
+    // The whole equation, so it can be read aloud and checked. Assembling it
+    // out of JSX would put "1" and "=" in the markup, which is exactly the kind
+    // of stray literal the lint rule exists to catch — and the two halves of a
+    // sentence a second language would want to reorder.
+    rateLine: "1 {base} = {amount} {other}",
+    // `0028` stores `rate_updated_at` precisely so this can be said: a rate
+    // with no date is a rumour.
+    rateAsOf: "Set {when}",
+    rateLabel: "{code} per unit",
+    rateHint: "How many {other} one {base} is worth.",
+    rateSave: "Change the rate",
+    ratePositive: "A rate has to be more than zero.",
+    rateSaved: "{code} rate updated",
+    rateMissing: "No second currency is set up.",
+
+    // What the rate does to real amounts. A rate is an abstraction until it is
+    // multiplied by something a merchant recognises.
+    whatItMeans: "What that means",
+    whatItMeansHint:
+      "The same amounts at the rate you have, and at the one you are typing.",
+    amount: "Amount",
+    atCurrent: "Now",
+    atNew: "After",
+    sampleAmount: "{amount} {code}",
+    allIn: "All figures in {other}.",
+    rateConfirmTitle: "Change the rate?",
+    // The arithmetic, not a reassurance. An operator can check a worked example
+    // against what they expected; they cannot check a bare number.
+    rateConfirmBody:
+      "{sample}. Every price the app shows in that currency changes with it, straight away.",
+    rateConfirmAction: "Change it",
+
+    ladderTitle: "Delivery ladder",
+    ladderBody:
+      "What delivery costs by distance. Each row is the top of a band, and the largest is also how far you deliver.",
+    upTo: "Up to (km)",
+    fee: "Fee",
+    minor: "In the smallest unit of the currency.",
+    isRadius: "Delivery radius",
+    // What the label means, in consequences. Two of them, and neither is
+    // visible anywhere else in the dashboard.
+    radiusMeans:
+      "You do not deliver past {km} km. An order this far, or one whose distance cannot be worked out, is charged this fee.",
+    addBand: "Add a band",
+    remove: "Remove",
+    removeConfirm: "Remove it",
+    // Removing the top row is not removing a price — it is shrinking where the
+    // business delivers, and nothing else on the screen would say so.
+    removeTopTitle: "Remove the {km} km band?",
+    removeTopBody:
+      "It is the largest, so it is also the delivery radius. Removing it means you no longer deliver past {next} km, and anything further is out of range.",
+    ladderSave: "Save the ladder",
+    ladderSaved: "Delivery ladder saved",
+    discard: "Discard changes",
+    bandDistancePositive: "Every band needs a distance greater than zero.",
+    bandAmountNegative: "A fee cannot be negative.",
+    bandDuplicate:
+      "Two bands share a distance. Each one is the top of its own.",
+    unsavedBand: "Not saved yet",
+
+    // The ladder read back. A table is right for setting prices and wrong for
+    // checking them: "what does someone four kilometres away pay" is the
+    // question, and reading it off a table means scanning for the first ceiling
+    // above four and hoping there is no gap.
+    tryTitle: "Try a distance",
+    tryHint:
+      "What a customer this far away is charged, by the ladder on the left.",
+    tryLabel: "Distance (km)",
+    tryBand: "Charged by the band up to {km} km.",
+    // Out of range is a different answer from expensive: there is no delivery
+    // at all, and saying "the top fee" would be wrong in a way that costs an
+    // order.
+    tryOutOfRange:
+      "Out of range. You do not deliver past {km} km, so this order could not be placed.",
+    tryNoBands: "Add a band and this will price it.",
+    tryUnsaved:
+      "Pricing the ladder as you have edited it. Save to make it real.",
+  },
+
   reorder: {
     handle: "Reorder {name}",
     instructions:

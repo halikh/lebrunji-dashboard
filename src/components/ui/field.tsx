@@ -40,6 +40,12 @@ import { createContext, useContext, useId, type ReactNode } from "react";
  *
  * So they are inset by the control's own padding, and the column of text runs
  * straight down: label, value, hint.
+ *
+ * **The inset is the column, not the component.** A section heading above a
+ * stack of fields, a sentence introducing them, a note under a pill — anything
+ * sharing that column takes the same `ps-md`, or it sits a few pixels to the
+ * left of everything else and reads as a mistake. `Field` owns the rule; the
+ * screens that stack things around it have to keep it.
  */
 
 export type FieldWiring = {

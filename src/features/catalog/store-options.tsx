@@ -176,7 +176,7 @@ function ItemQuestions({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
-        <h2 className="text-[20px]">{itemName}</h2>
+        <h2 className="ps-md text-[20px]">{itemName}</h2>
 
         {groups.isPending && (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />

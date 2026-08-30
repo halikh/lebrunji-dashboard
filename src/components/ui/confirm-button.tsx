@@ -98,8 +98,12 @@ export function ConfirmButton({
    * - **`danger-quiet`** where it repeats down a list: red type says
    *   destructive without a column of filled red buttons, which stops meaning
    *   anything by the fourth row.
+   * - **`primary`** (coral) where the confirmed action is the *only* thing to
+   *   do on the panel. A quiet trigger there is the quietest control on a
+   *   screen whose whole purpose is that one button.
    */
-  triggerVariant?: "quiet" | "secondary" | "danger" | "danger-quiet";
+  triggerVariant?:
+    "quiet" | "secondary" | "primary" | "danger" | "danger-quiet";
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
