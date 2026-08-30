@@ -252,7 +252,8 @@ export function useReorder({
    * flow and need this render's `order`, `moveTo` and `announce`. Captured in a
    * closure they would be whatever they were when the drag started.
    */
-  const followRef = useRef<((clientY: number) => void) | null>(null);
+  const positionRef = useRef<((clientY: number) => unknown) | null>(null);
+  const retargetRef = useRef<((clientY: number) => void) | null>(null);
   const orderRef = useRef<string[]>(ids);
   const moveRef = useRef<((id: string, to: number) => string[]) | null>(null);
   const announceRef = useRef<((id: string, next: string[]) => void) | null>(
@@ -351,13 +352,27 @@ export function useReorder({
    * still and the list is what moves — and from the layout effect, so a row
    * whose slot has just changed is repositioned before anything is painted.
    */
-  const follow = useCallback(
+  /**
+   * Put the held row under the cursor. Writes one transform, decides nothing.
+   *
+   * Separate from `retarget` because of what happens when they are one thing.
+   * The layout effect has to reposition the row the instant its slot moves —
+   * within the same frame, or the row is painted back at zero for a moment. If
+   * that call also re-evaluated which slot the row belongs in, it could decide
+   * to move it again, which is a `setState` **inside a layout effect**: React
+   * flushes it synchronously, the effect runs again, and it can decide again.
+   * A single crossing became a burst of full-tree renders before one paint,
+   * and what that looks like is the drag stopping dead and then catching up.
+   *
+   * So the effect only positions. Deciding happens once a frame, in the loop.
+   */
+  const position = useCallback(
     (clientY: number) => {
       const id = held.current;
-      if (!id || !grip.current) return;
+      if (!id || !grip.current) return null;
 
       const node = nodes.current.get(id);
-      if (!node) return;
+      if (!node) return null;
 
       const y = clientY + scrolled();
 
@@ -377,9 +392,8 @@ export function useReorder({
       // Nothing stopped a row travelling past the ends. With the edge-scroll
       // pushing the pointer's position ever further down and only two or three
       // sections to pass, a dragged section ran out of neighbours and simply
-      // kept going — off into empty space below the list, which is what the bug
-      // report showed. A row cannot be dropped outside the list, so it should
-      // not be draggable outside it either.
+      // kept going — off into empty space below the list. A row cannot be
+      // dropped outside the list, so it should not be draggable outside it.
       const first = lastTop.current.get(current[0]);
       const lastId = current[current.length - 1];
       const lastSlot = lastTop.current.get(lastId);
@@ -391,23 +405,40 @@ export function useReorder({
 
       place(node, id, by, false);
 
-      const from = current.indexOf(id);
+      return { id, current, top: slot + by, bottom: slot + by + height };
+    },
+    [place, scrolled],
+  );
 
-      // ## The row's own edges decide, not the pointer
-      //
-      // Comparing the *pointer* against a neighbour's midpoint works while
-      // every row is the same height, and fails badly once they are not. A menu
-      // section is a header plus all its items — several hundred pixels — so
-      // its neighbour's midpoint is a long way off, and the pointer had to
-      // travel most of a section's height before anything swapped, by which
-      // time the dragged block had visibly ploughed through the one below it.
-      //
-      // Where the dragged row *is* answers the question the operator is
-      // actually asking: its leading edge passing a neighbour's midpoint is the
-      // moment it has taken that place. It is also independent of where within
-      // the row the handle happens to sit.
-      const draggedTop = slot + by;
-      const draggedBottom = draggedTop + height;
+  /**
+   * Where the carried row now belongs, and moving it there.
+   *
+   * ## The row's own edges decide, not the pointer
+   *
+   * Comparing the *pointer* against a neighbour's midpoint works while every
+   * row is the same height, and fails badly once they are not. A menu section
+   * is a header plus all its items — several hundred pixels — so its
+   * neighbour's midpoint is a long way off, and the pointer had to travel most
+   * of a section's height before anything swapped, by which time the dragged
+   * block had visibly ploughed through the one below it.
+   *
+   * Where the dragged row *is* answers the question the operator is actually
+   * asking: its leading edge passing a neighbour's midpoint is the moment it
+   * has taken that place. It is also independent of where within the row the
+   * handle happens to sit.
+   *
+   * At most one move per call, and this is called once a frame — so a row
+   * crossing several places travels through them over several frames rather
+   * than in one synchronous burst. That is both smoother to watch and a
+   * fraction of the work.
+   */
+  const retarget = useCallback(
+    (clientY: number) => {
+      const placed = position(clientY);
+      if (!placed) return;
+
+      const { id, current, top, bottom } = placed;
+      const from = current.indexOf(id);
 
       // Stored layout positions, not freshly measured ones: a neighbour part
       // way through its own animation is somewhere neither here nor there, and
@@ -419,11 +450,11 @@ export function useReorder({
         const otherHeight = heights.current.get(current[i]);
         if (otherTop === undefined || otherHeight === undefined) continue;
         const middle = otherTop + otherHeight / 2;
-        if (i < from && draggedTop < middle) {
+        if (i < from && top < middle) {
           to = i;
           break;
         }
-        if (i > from && draggedBottom > middle) to = i;
+        if (i > from && bottom > middle) to = i;
       }
 
       if (to !== from) {
@@ -431,7 +462,7 @@ export function useReorder({
         if (next) announceRef.current?.(id, next);
       }
     },
-    [place, scrolled],
+    [position],
   );
 
   /**
@@ -490,7 +521,7 @@ export function useReorder({
 
       if (moved || dirty.current) {
         dirty.current = false;
-        followRef.current?.(pointerY.current);
+        retargetRef.current?.(pointerY.current);
       }
 
       frame = requestAnimationFrame(tick);
@@ -599,7 +630,8 @@ export function useReorder({
     // Re-point the out-of-React handles at this render's logic. In the effect
     // rather than in the body, because writing a ref during render is what
     // makes a component's output depend on when it happened to be called.
-    followRef.current = follow;
+    positionRef.current = position;
+    retargetRef.current = retarget;
     moveRef.current = moveTo;
     announceRef.current = announce;
 
@@ -671,8 +703,12 @@ export function useReorder({
       // The dragged row answers to the pointer, not to this. Its baseline has
       // just moved though, so it is put back under the cursor immediately —
       // within this same frame, so nothing is ever painted at zero.
+      //
+      // Positioned, never retargeted: deciding here would `setState` inside a
+      // layout effect, which React flushes synchronously, which runs this
+      // again. See `position`.
       if (id === held.current) {
-        followRef.current?.(pointerY.current);
+        positionRef.current?.(pointerY.current);
         continue;
       }
 
