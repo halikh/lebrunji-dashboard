@@ -10,6 +10,7 @@ import { t } from '@/i18n/translations';
 
 import { Icon } from './icons';
 import { SECTIONS, activeSection } from './nav';
+import { railItemClass } from './rail-item';
 
 /**
  * The rail.
@@ -60,11 +61,7 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
             // The one place a screen reader needs more than the label: which
             // of these is where you already are.
             aria-current={isActive ? 'page' : undefined}
-            className={cx(
-              'relative flex flex-1 flex-col items-center gap-xxs rounded-md px-xs py-sm',
-              'text-[11px] font-semibold md:flex-none md:py-md md:text-[12px]',
-              isActive ? 'bg-active-wash text-active-ink' : 'text-text-soft hover:bg-neutral-fill',
-            )}
+            className={railItemClass({ active: isActive })}
           >
             <Icon name={section.icon} />
             {t(section.labelKey)}
@@ -87,7 +84,10 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
         );
       })}
 
-      <div className="hidden md:mt-auto md:block">
+      {/* Below `md` the rail is a bottom bar and sign-out lives in the top bar
+          instead — a seventh item there would crowd the six and put it a
+          thumb-width from Orders. */}
+      <div className="hidden w-full md:mt-auto md:block">
         <SignOutButton />
       </div>
     </nav>

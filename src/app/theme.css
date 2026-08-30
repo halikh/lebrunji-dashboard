@@ -214,8 +214,35 @@
   --radius-xl: 24px;
   --radius-xxl: 30px;
 
-  /* ---- Motion ---- */
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
+  /* ---- Motion ----------------------------------------------------------
+   * Taken from `src/theme/motion.ts` in the app, which says motion is
+   * specified by the design as precisely as colour is. These were invented
+   * numbers before — close enough to look fine and wrong enough that the
+   * dashboard would have felt subtly unlike the product it runs.
+   *
+   * Three curves, and the app's note on why one of them does almost
+   * everything: `arrive` is fast-start-and-settle — the curve of something
+   * *arriving*. Content that eases in slowly reads as loading; content on this
+   * curve reads as already there.
+   *
+   * `press` overshoots, because a press should feel like a physical thing
+   * giving way and springing back. `standard` is symmetric and unemotional,
+   * for focus rings and progress — a progress bar that overshoots is lying
+   * about progress.
+   */
+  --ease-arrive: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-press: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Named by what they are for, not by length — so changing how long a
+   * backdrop fades cannot accidentally change how a button presses. */
+  --duration-press: 140ms;
+  --duration-control: 220ms;
+  --duration-fade: 220ms;
+  --duration-focus: 320ms;
+  --duration-expand: 440ms;
+  /* The app's longest ordinary duration — "a row rising into a list". Long
+   * enough to be watched rather than merely noticed, which is what the rail's
+   * icon animations are for. */
+  --duration-rise: 500ms;
 }

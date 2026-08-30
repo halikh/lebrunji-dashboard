@@ -51,13 +51,18 @@ h4 {
  * entering the state, and on blur the element falls back to a base rule that
  * has none.
  *
- * Short — 120ms — because this follows the caret. Anything slower and the ring
- * is still arriving at the field you have already started typing in.
+ * Every duration and curve is the app's, from `src/theme/motion.ts`. Each
+ * property gets the one it was specified with rather than a single number for
+ * everything: focus rings are `standard`, because that curve is symmetric and
+ * does not overshoot — a ring that springs past its size reads as a bounce
+ * rather than as attention. Transforms are `press`, which *does* overshoot,
+ * because that is the curve of a thing giving way and springing back.
  *
- * `filter` is in the list for the buttons' hover, so that no component has to
- * declare a transition of its own. One that did would *replace* this rather
- * than add to it — a Tailwind `transition-[...]` utility outranks an element
- * selector — and the property it forgot would be the one that snapped.
+ * `svg` is in the selector so an icon can move with its link. `filter` and
+ * `transform` are in the list so that no component has to declare a transition
+ * of its own — one that did would *replace* this rather than add to it (a
+ * Tailwind `transition-[...]` utility outranks an element selector), and the
+ * property it forgot would be the one that snapped.
  */
 a,
 button,
@@ -65,12 +70,14 @@ input,
 select,
 textarea,
 summary,
+svg,
 [tabindex] {
   transition:
-    box-shadow var(--duration-fast) var(--ease-standard),
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    filter var(--duration-fast) var(--ease-standard);
+    box-shadow var(--duration-focus) var(--ease-standard),
+    background-color var(--duration-control) var(--ease-standard),
+    border-color var(--duration-control) var(--ease-standard),
+    filter var(--duration-control) var(--ease-standard),
+    transform var(--duration-press) var(--ease-press);
 }
 
 /**
@@ -114,6 +121,185 @@ summary,
 }
 
 /**
+ * The rail's icons, animated on hover.
+ *
+ * Each moves the part that carries its meaning — the arrow leaves the door, the
+ * bars grow, the sliders slide. Scaling the whole icon would have been one line
+ * and would have said nothing, because every icon would move identically.
+ *
+ * ## The two rules that make SVG transforms behave
+ *
+ * `transform-box: fill-box` makes a child's transform origin its **own** box
+ * rather than the whole 24-unit viewBox. Without it, `transform-origin: bottom`
+ * on a report bar means the bottom of the icon, not the bottom of the bar, and
+ * the bar grows from somewhere below itself and drifts sideways.
+ *
+ * `will-change` is deliberately absent: six small icons do not need their own
+ * compositor layers, and asking for them on every rail item costs memory to
+ * solve a problem nobody has.
+ *
+ * ## Why the there-and-back keyframes hold at 40–60%
+ *
+ * A single midpoint at 50% over half a second reads as a twitch with a long
+ * pause either side — the motion is over before the eye has followed it. A held
+ * middle gives the extreme a moment to be seen, which is the difference between
+ * an animation that is noticed and one that is watched.
+ *
+ * Driven from `.group:hover` on the link rather than from `svg:hover`, so the
+ * animation runs when the whole item is hovered — hovering the label should
+ * move the icon, since they are one control.
+ *
+ * `:has()` is not used, and `prefers-reduced-motion` is honoured by the block
+ * at the end of this file, which zeroes `animation-duration` globally.
+ */
+[data-anim] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.group:hover [data-anim],
+.group:focus-visible [data-anim] {
+  animation-duration: var(--duration-rise);
+  /* `standard`, not `arrive`.
+   *
+   * `arrive` is fast-start-and-settle — the curve of something appearing, and
+   * it reads as snappy however long it runs, because most of the distance is
+   * covered in the first third. These animations are meant to be watched, and
+   * most of them go out and come back, so they want a curve that is symmetric:
+   * eased at both ends, even through the middle. */
+  animation-timing-function: var(--ease-standard);
+  animation-fill-mode: both;
+}
+
+/* Staggered by position, so the eye reads left to right rather than seeing
+   everything move at once. */
+.group:hover [data-anim-order='2'],
+.group:focus-visible [data-anim-order='2'] {
+  animation-delay: 90ms;
+}
+.group:hover [data-anim-order='3'],
+.group:focus-visible [data-anim-order='3'] {
+  animation-delay: 180ms;
+}
+
+.group:hover [data-anim='line'],
+.group:focus-visible [data-anim='line'] {
+  animation-name: icon-write;
+}
+.group:hover [data-anim='shutter'],
+.group:focus-visible [data-anim='shutter'] {
+  transform-origin: bottom;
+  animation-name: icon-shutter;
+}
+.group:hover [data-anim='swing'],
+.group:focus-visible [data-anim='swing'] {
+  animation-name: icon-swing;
+}
+.group:hover [data-anim='bob'],
+.group:focus-visible [data-anim='bob'] {
+  animation-name: icon-bob;
+}
+.group:hover [data-anim='bar'],
+.group:focus-visible [data-anim='bar'] {
+  transform-origin: bottom;
+  animation-name: icon-grow;
+}
+.group:hover [data-anim='knob'],
+.group:focus-visible [data-anim='knob'] {
+  animation-name: icon-slide;
+}
+.group:hover [data-anim='leave'],
+.group:focus-visible [data-anim='leave'] {
+  animation-name: icon-leave;
+}
+
+/* The line is drawn rather than moved: a dash offset that runs to zero reads as
+   printing, where a slide would read as the line arriving from off-paper. */
+@keyframes icon-write {
+  from {
+    stroke-dasharray: 5;
+    stroke-dashoffset: 5;
+  }
+  to {
+    stroke-dasharray: 5;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes icon-shutter {
+  from {
+    transform: scaleY(0.2);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes icon-swing {
+  0% {
+    transform: rotate(0deg);
+  }
+  40%,
+  60% {
+    transform: rotate(-9deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes icon-bob {
+  0% {
+    transform: translateY(0);
+  }
+  40%,
+  60% {
+    transform: translateY(-2px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes icon-grow {
+  from {
+    transform: scaleY(0.35);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes icon-slide {
+  0% {
+    transform: translateX(0);
+  }
+  40%,
+  60% {
+    transform: translateX(-4px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes icon-leave {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  40%,
+  60% {
+    transform: translateX(4px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/**
  * Anything that opens over the page.
  *
  * A modal that appears instantly reads as a page change rather than as a layer
@@ -144,10 +330,10 @@ dialog {
   opacity: 0;
   transform: translateY(6px) scale(0.98);
   transition:
-    opacity var(--duration-base) var(--ease-standard),
-    transform var(--duration-base) var(--ease-standard),
-    overlay var(--duration-base) var(--ease-standard) allow-discrete,
-    display var(--duration-base) var(--ease-standard) allow-discrete;
+    opacity var(--duration-fade) var(--ease-arrive),
+    transform var(--duration-fade) var(--ease-arrive),
+    overlay var(--duration-fade) var(--ease-arrive) allow-discrete,
+    display var(--duration-fade) var(--ease-arrive) allow-discrete;
 }
 
 dialog[open] {
@@ -165,9 +351,9 @@ dialog[open] {
 dialog::backdrop {
   background: color-mix(in oklab, var(--color-ink) 0%, transparent);
   transition:
-    background var(--duration-base) var(--ease-standard),
-    overlay var(--duration-base) var(--ease-standard) allow-discrete,
-    display var(--duration-base) var(--ease-standard) allow-discrete;
+    background var(--duration-fade) var(--ease-arrive),
+    overlay var(--duration-fade) var(--ease-arrive) allow-discrete,
+    display var(--duration-fade) var(--ease-arrive) allow-discrete;
 }
 
 dialog[open]::backdrop {

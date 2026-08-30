@@ -2,8 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 
-import { ConfirmButton } from '@/components/ui/confirm-button';
 import { Icon } from '@/components/shell/icons';
+import { railItemClass } from '@/components/shell/rail-item';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { t } from '@/i18n/translations';
 import { forgetAccessToken } from '@/lib/supabase/client';
 
@@ -70,23 +71,24 @@ export function SignOutButton() {
   }
 
   return (
-    // One line — icon beside label, never wrapping. In the rail a two-line
-    // "Sign out" is taller than the section links above it and starts reading
-    // as a heading rather than a control.
     <ConfirmButton
       onConfirm={signOut}
       titleKey="confirm.signOutTitle"
       bodyKey="confirm.signOutBody"
       confirmKey="confirm.signOutConfirm"
       variant="danger"
-      // `sm`, not the default: at `md` the icon, the label and the padding come
-      // to about 120px, and the rail's usable width is 108. It would not fit,
-      // and `whitespace-nowrap` means it would overflow rather than wrap.
-      size="sm"
-      fullWidth
-      className="whitespace-nowrap"
+      // Rendered as a rail item rather than a button, from the same class
+      // builder the nav links use — so it is the same box, the same stack and
+      // the same type, and differs only in colour. A `Button` bent into that
+      // shape with overrides would drift the first time the rail's padding
+      // changed.
+      renderTrigger={({ onClick }) => (
+        <button type="button" onClick={onClick} className={railItemClass({ tone: 'danger' })}>
+          <Icon name="sign-out" />
+          {t('common.signOut')}
+        </button>
+      )}
     >
-      <Icon name="sign-out" size={18} />
       {t('common.signOut')}
     </ConfirmButton>
   );

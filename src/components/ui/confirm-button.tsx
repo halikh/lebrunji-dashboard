@@ -51,6 +51,7 @@ export function ConfirmButton({
   size,
   fullWidth,
   className,
+  renderTrigger,
 }: {
   onConfirm: () => Promise<void> | void;
   titleKey: TranslationKey;
@@ -62,6 +63,18 @@ export function ConfirmButton({
   size?: 'md' | 'sm';
   fullWidth?: boolean;
   className?: string;
+  /**
+   * For a trigger that is not a button-shaped button.
+   *
+   * The rail's sign-out has to look like the nav items beside it — same box,
+   * same stack, same type — and a `Button` cannot be bent into that without
+   * class overrides, which is the conflict `size` was added to remove. So the
+   * caller supplies the trigger and this keeps the dialog.
+   *
+   * The `onClick` it is handed is the whole contract: whatever is rendered must
+   * be a real focusable control, or the dialog becomes unreachable by keyboard.
+   */
+  renderTrigger?: (props: { onClick: () => void }) => ReactNode;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -91,15 +104,19 @@ export function ConfirmButton({
 
   return (
     <>
-      <Button
-        variant={variant === 'danger' ? 'quiet' : 'primary'}
-        size={size}
-        fullWidth={fullWidth}
-        onClick={() => setOpen(true)}
-        className={className}
-      >
-        {children}
-      </Button>
+      {renderTrigger ? (
+        renderTrigger({ onClick: () => setOpen(true) })
+      ) : (
+        <Button
+          variant={variant === 'danger' ? 'quiet' : 'primary'}
+          size={size}
+          fullWidth={fullWidth}
+          onClick={() => setOpen(true)}
+          className={className}
+        >
+          {children}
+        </Button>
+      )}
 
       <Modal open={open} onClose={close} labelledBy={`${id}-title`} describedBy={`${id}-body`}>
         <div className="flex flex-col gap-lg">
