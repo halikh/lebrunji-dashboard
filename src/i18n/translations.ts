@@ -42,6 +42,7 @@ const en = {
     undo: "Undo",
     retry: "Try again",
     loading: "Loading",
+    copied: "Copied",
   },
 
   nav: {
@@ -109,6 +110,8 @@ const en = {
     cancelConfirm: "Cancel the order",
     detailFailed: "Could not load this order.",
     noPhone: "No phone number",
+    copyPhone: "Copy phone number",
+    copyCode: "Copy order code",
     // A multiplication sign, not the letter x — and a translated string rather
     // than a literal, because where the number sits relative to it is not
     // universal.
@@ -153,7 +156,7 @@ const en = {
 
   map: {
     noPin: "No location saved for this address.",
-    openLarger: "Open in OpenStreetMap",
+    openLarger: "Open in Google Maps",
   },
 
   confirm: {

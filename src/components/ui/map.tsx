@@ -19,8 +19,17 @@ import { cx } from "./index";
  * code, which for a read-only "where is this" is not a cost.
  *
  * **The seam is the props, not the implementation.** When a screen genuinely
- * needs a draggable pin — the store wizard, in Phase 4 — this component grows a
- * library behind the same interface, and nothing that renders a map moves.
+ * needs a draggable pin — the store wizard — this component grows a library
+ * behind the same interface, and nothing that renders a map moves.
+ *
+ * ## Why the picture is OSM and the link is Google
+ *
+ * Two different jobs. The embed answers *where is this* at a glance, and OSM
+ * does that without a key. The link is pressed when somebody is about to
+ * **drive there** — and that is Google Maps, because it is what the courier
+ * already has open, what knows the traffic, and what a phone will hand to
+ * turn-by-turn navigation. Sending them to a map they would then have to copy
+ * an address out of is the wrong end of a delivery.
  *
  * ## Why it takes coordinates rather than an address
  *
@@ -90,10 +99,11 @@ export function Map({
         className="h-[200px] w-full rounded-md border border-border bg-neutral-fill"
       />
       <a
-        // Opens the real map, where the operator can zoom, get directions, or
-        // hand the coordinates to a courier. The embed deliberately does none
-        // of that.
-        href={`https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=${zoom}/${latitude}/${longitude}`}
+        // Google Maps, by coordinates rather than by address text: the pin
+        // lands exactly where the customer put it, with no geocoder in between
+        // guessing at a street name. On a phone this opens the Maps app, which
+        // is one tap from directions.
+        href={`https://www.google.com/maps/search/?api=1&query=${latitude}%2C${longitude}`}
         target="_blank"
         rel="noreferrer noopener"
         className="self-start text-[13px] font-semibold text-primary hover:underline"

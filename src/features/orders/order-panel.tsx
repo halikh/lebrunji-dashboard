@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { Copyable } from "@/components/ui/copyable";
 import { Map } from "@/components/ui/map";
 import { Panel } from "@/components/ui/panel";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -67,7 +68,15 @@ export function OrderPanel({
         <>
           <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
             <div className="flex flex-grow flex-col gap-xxs">
-              <h2 className="text-[20px] tabular-nums">{order.data.code}</h2>
+              {/* Copy only: there is nowhere for a code to go, and it is pasted
+                  into messages constantly. Reading sixteen characters back off
+                  a screen by hand is where mistakes come from. */}
+              <h2 className="flex items-center gap-sm text-[20px]">
+                <Copyable
+                  value={order.data.code}
+                  label={t("orders.copyCode")}
+                />
+              </h2>
               <span className="text-[13px] text-text-faint">
                 {t("orders.placed")} {formatDayAndTime(order.data.placedAt)}
               </span>
@@ -101,14 +110,16 @@ export function OrderPanel({
                   {order.data.customerName || t("orders.incompleteSignup")}
                 </span>
                 {order.data.customerPhone ? (
-                  // A link, because the next move is almost always to ring —
-                  // not to read a number and pick up a handset.
-                  <a
+                  // Both: tap to ring, copy to paste into a courier app. The
+                  // two are separate gestures on purpose — a number that dialled
+                  // when somebody meant to copy it is a call to a customer at
+                  // eleven at night.
+                  <Copyable
+                    value={order.data.customerPhone}
                     href={`tel:${order.data.customerPhone}`}
-                    className="text-[14px] font-semibold text-primary hover:underline"
-                  >
-                    {order.data.customerPhone}
-                  </a>
+                    label={t("orders.copyPhone")}
+                    className="text-[14px]"
+                  />
                 ) : (
                   <span className="text-[13px] text-text-faint">
                     {t("orders.noPhone")}
