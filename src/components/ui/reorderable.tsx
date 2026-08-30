@@ -236,6 +236,17 @@ export function useReorder({
   const heights = useRef(new Map<string, number>());
   /** Set by `pointermove`, consumed by the frame loop. */
   const dirty = useRef(false);
+  /**
+   * Measure everything again on the next layout, even mid-drag.
+   *
+   * Normally a drag must **not** re-measure: a row part way through an
+   * animation is somewhere it is only passing through, and storing that poisons
+   * every calculation after it. The exception is the first layout after the
+   * drag begins, because a list is allowed to change shape at that moment — a
+   * section collapses to its header while it is carried — and nothing has been
+   * transformed yet, so measuring is exact.
+   */
+  const remeasure = useRef(false);
   /** Pointer position and the row's layout top when the drag began. */
   const grip = useRef<{ pointerY: number; top: number } | null>(null);
   /** The last pointer position, so the edge-scroll loop knows where it is. */
@@ -592,6 +603,7 @@ export function useReorder({
       });
       pointerY.current = event.clientY;
       travelled.current = false;
+      remeasure.current = true;
       held.current = id;
       grip.current = {
         pointerY: event.clientY + scrolled(),
@@ -723,7 +735,11 @@ export function useReorder({
       // Skipping is safe where guessing is not: the next reorder measures
       // afresh anyway, and the worst case is one animation that starts from
       // slightly the wrong place.
-      if (held.current === null && performance.now() > settleBy.current) {
+      if (
+        remeasure.current ||
+        (held.current === null && performance.now() > settleBy.current)
+      ) {
+        remeasure.current = false;
         const idle = scrolled();
         for (const [id, node] of present) {
           const box = node.getBoundingClientRect();
@@ -938,6 +954,20 @@ export function useReorder({
     ordered,
     rowProps,
     handleProps,
+    /**
+     * The row currently being carried, if any.
+     *
+     * Exposed so a list can render that one row differently — a menu section
+     * carries only its header, because carrying the whole block means an opaque
+     * slab the height of a screen passing over the list and hiding it. What is
+     * being reordered is the *section*, and its heading is the part that says
+     * which section it is.
+     *
+     * Changing a row's size while it is carried is safe **only at the moment
+     * the drag begins**, which is when this changes: everything is re-measured
+     * on that layout, and nothing has been transformed yet.
+     */
+    movingId: moving,
     isMoving: moving !== null,
     /**
      * Render once per list. Carries the instructions the handles point at, and

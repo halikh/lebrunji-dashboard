@@ -105,12 +105,10 @@ export function StoreMenu({ storeId }: { storeId: string }) {
     onReorder: reorderSections,
     labelOf: (id) =>
       pickLocalized(sections.find((section) => section.id === id)?.title ?? {}),
-    // A section has no surface of its own — it is a heading and some cards
-    // with gaps between them — so carrying one needs a ground, or its header
-    // and its items simply overlay whatever they pass. The cream is the page's
-    // own, so it reads as a slab of the page being lifted rather than as a new
-    // kind of card appearing for the length of a drag.
-    lifted: "relative z-10 rounded-lg bg-background shadow-raised",
+    // Carried, a section is just its heading — see `carried` on `Section`. So
+    // the lifted look is a small card rather than a slab: white, because that
+    // is what every other draggable row in this list is.
+    lifted: "relative z-10 rounded-md bg-surface shadow-raised",
     // Reordering stays available while the panel is open — it is beside the
     // list, not over it, and moving a section is not an edit to the one being
     // renamed.
@@ -230,6 +228,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                 renaming={
                   open?.kind === "section" && open.sectionId === section.id
                 }
+                carried={sectionOrder.movingId === section.id}
                 rowProps={sectionOrder.rowProps}
                 handleProps={sectionOrder.handleProps}
                 onRename={() =>
@@ -452,6 +451,7 @@ function Section({
   rowProps,
   handleProps,
   renaming,
+  carried,
   onRename,
   onArchiveSection,
   onReorderItems,
@@ -466,6 +466,8 @@ function Section({
   /** The panel is showing this section's name — the heading is marked, not
    *  replaced. */
   renaming: boolean;
+  /** Being dragged, so it shows as its heading alone. */
+  carried: boolean;
   onRename: () => void;
   onArchiveSection: () => Promise<void>;
   onReorderItems: (ids: string[]) => void;
@@ -483,7 +485,10 @@ function Section({
       pickLocalized(section.items.find((item) => item.id === id)?.name ?? {}),
   });
 
-  const row = rowProps(section.id, "flex flex-col gap-sm");
+  const row = rowProps(
+    section.id,
+    cx("flex flex-col gap-sm", carried && "px-md py-sm"),
+  );
 
   return (
     <section {...row}>
@@ -503,8 +508,16 @@ function Section({
 
         {/* Pushed to the far end. These are the section's own controls and
             should not compete with the items under it, which is what the
-            operator is actually reading. */}
-        <div className="ms-auto flex items-center gap-sm">
+            operator is actually reading.
+
+            Hidden while the section is being carried: they are things to press,
+            and nothing in a block travelling under the cursor is pressable. */}
+        <div
+          className={cx(
+            "ms-auto flex items-center gap-sm",
+            carried && "hidden",
+          )}
+        >
           {/* Blue on a blue tint, beside a filled red Archive.
               It needs a ground of its own — two controls together where only
               one has a surface read as one button and one label — and the
@@ -530,29 +543,46 @@ function Section({
 
       {itemOrder.instructions}
 
-      {section.items.length === 0 && (
+      {section.items.length === 0 && !carried && (
         <p className="rounded-md border border-dashed border-border px-lg py-md text-[13px] text-text-faint">
           {t("menu.sectionEmpty")}
         </p>
       )}
 
-      {itemOrder
-        .ordered(section.items, (item) => item.id)
-        .map((item) => (
-          <ItemRow
-            key={item.id}
-            item={item}
-            currencyCode={currencyCode}
-            handleProps={itemOrder.handleProps}
-            rowProps={itemOrder.rowProps}
-            // The row the panel is showing is marked, so the form and the list
-            // agree about what is being edited.
-            open={openItemId === item.id}
-            onEdit={() => onEdit(item.id)}
-            onToggle={() => onToggle(item)}
-            onArchive={() => onArchive(item)}
-          />
-        ))}
+      {/* ## Carried, a section is only its heading
+
+          Dragging the whole block meant an opaque slab the height of a screen
+          passing over the list and hiding whatever was under it — three items
+          would show as "3 items" and one visible row, which reads as data
+          missing rather than as something being carried.
+
+          What is being reordered is the *section*, and its heading is the part
+          that says which one. So the items fold away for the length of the
+          drag and the operator carries a strip instead of a page. It is also
+          far less to paint on every frame.
+
+          Changing a row's size mid-drag is normally the one thing that breaks
+          all of this — every stored position would be wrong. It is safe here
+          because it happens at the instant the drag begins, which is the one
+          moment `useReorder` re-measures on purpose. */}
+      {!carried &&
+        itemOrder
+          .ordered(section.items, (item) => item.id)
+          .map((item) => (
+            <ItemRow
+              key={item.id}
+              item={item}
+              currencyCode={currencyCode}
+              handleProps={itemOrder.handleProps}
+              rowProps={itemOrder.rowProps}
+              // The row the panel is showing is marked, so the form and the list
+              // agree about what is being edited.
+              open={openItemId === item.id}
+              onEdit={() => onEdit(item.id)}
+              onToggle={() => onToggle(item)}
+              onArchive={() => onArchive(item)}
+            />
+          ))}
 
       {/* At the bottom of the section, not in a header. It is where the eye
           already is after reading the list. */}
