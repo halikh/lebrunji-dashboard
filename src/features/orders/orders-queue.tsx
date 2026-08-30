@@ -8,6 +8,7 @@ import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
 import { Button, cx, Input } from "@/components/ui";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone, type StatusTone } from "@/lib/order-status";
+import { useMoney } from "@/features/reference/use-currencies";
 
 import type { Scope } from "./api/orders";
 import { OrderPanel } from "./order-panel";
@@ -15,6 +16,7 @@ import { OrderRow } from "./order-row";
 import { useOrderRealtime } from "./use-order-realtime";
 import {
   nextStatus,
+  orderStatus,
   useOrderStatuses,
   useOrders,
   useStatusCounts,
@@ -74,9 +76,10 @@ export function OrdersQueue() {
   );
 
   const statuses = useOrderStatuses();
-  const counts = useStatusCounts(statuses.data);
+  const counts = useStatusCounts(statuses.data, scope);
   const orders = useOrders(scope, statusSlug, search, statuses.data);
-  const { advance } = useAdvanceOrder();
+  const { advance } = useAdvanceOrder(statuses.data);
+  const { format } = useMoney();
 
   useOrderRealtime();
 
@@ -134,23 +137,19 @@ export function OrdersQueue() {
       if (event.key === "Enter") {
         const order = rows[active];
         if (!order) return;
-        // The first shop with somewhere to go. On a single-shop order that is
-        // simply "the order"; on a two-shop one it advances the leg that is
-        // behind, which is the one holding the delivery up.
-        for (const store of order.stores) {
-          const next = nextStatus(statuses.data, store.statusSlug);
-          if (next) {
-            event.preventDefault();
-            advance({
-              orderStoreId: store.id,
-              fromSlug: store.statusSlug,
-              toSlug: next.slug,
-              toName: next.name,
-              undoable: next.progress !== null,
-            });
-            return;
-          }
-        }
+        // The whole order, not a shop. A customer who ordered from two shops
+        // placed one order, and it moves as one.
+        const status = orderStatus(order, statuses.data);
+        const next = status ? nextStatus(statuses.data, status.slug) : null;
+        if (!next || !status) return;
+        event.preventDefault();
+        advance({
+          orderId: order.id,
+          fromSlug: status.slug,
+          toSlug: next.slug,
+          toName: next.name,
+          undoable: next.progress !== null,
+        });
       }
     }
 
@@ -275,18 +274,20 @@ export function OrdersQueue() {
                 setFocused(index);
                 setOpenOrderId(order.id);
               }}
-              onAdvance={({ store, to }) =>
+              money={format}
+              onAdvance={(to) => {
+                const status = orderStatus(order, statuses.data);
                 advance({
-                  orderStoreId: store.id,
-                  fromSlug: store.statusSlug,
+                  orderId: order.id,
+                  fromSlug: status?.slug ?? "",
                   toSlug: to.slug,
                   toName: to.name,
-                  // A move onto a terminal status cannot be undone — the RPC
-                  // refuses to come back off `delivered` or `cancelled`, and an
-                  // undo that fails is worse than no undo offered.
+                  // A move onto a terminal status cannot be undone — the
+                  // function refuses to come back off `delivered` or
+                  // `cancelled`, and an undo that fails is worse than none.
                   undoable: to.progress !== null,
-                })
-              }
+                });
+              }}
             />
           ))}
 

@@ -94,14 +94,14 @@ const en = {
     placed: "Placed",
     customer: "Customer",
     address: "Address",
-    courierNote: "Note for the courier",
+    courierNote: "Note for the courier: ",
     items: "Items",
     subtotal: "Subtotal",
     delivery: "Delivery",
     discount: "Discount",
     total: "Total",
     payment: "Payment",
-    cancel: "Cancel order",
+    cancel: "Cancel",
     cancelTitle: "Cancel this order?",
     // Terminal, and it reaches a person who is waiting. Says both.
     cancelBody:
@@ -113,6 +113,12 @@ const en = {
     // than a literal, because where the number sits relative to it is not
     // universal.
     quantity: "{count}×",
+    locationLabel: "Where {name} is",
+  },
+
+  map: {
+    noPin: "No location saved for this address.",
+    openLarger: "Open in OpenStreetMap",
   },
 
   confirm: {

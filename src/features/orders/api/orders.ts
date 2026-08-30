@@ -21,6 +21,7 @@ export type OrderStore = {
   id: string;
   storeId: string;
   storeName: string;
+  storeImageUrl: string | null;
   statusSlug: string;
   statusName: string;
   /** Position on the path. `null` is terminal and off it — cancelled. */
@@ -32,6 +33,16 @@ export type OrderLine = {
   id: string;
   orderStoreId: string;
   name: string;
+  /**
+   * Today's picture, not a snapshot.
+   *
+   * The *name* and the *price* on a line are snapshots — they are what was
+   * agreed. The image is not stored on the line, so this is whatever the item
+   * carries now, and it is null for an item since deleted. That is acceptable
+   * for a picture whose only job is helping somebody check a bag, and it is
+   * worth knowing before anyone treats it as evidence.
+   */
+  imageUrl: string | null;
   quantity: number;
   unitPrice: number;
   note: string | null;
@@ -46,6 +57,17 @@ export type Order = {
   customerPhone: string;
   addressLine: string;
   courierNote: string | null;
+  /**
+   * Where the address is, if it is known.
+   *
+   * Read from `addresses`, not from the order: `orders` snapshots the address
+   * *line* (migration 0024) and never the coordinates. So this is the pin as it
+   * stands **now** — null for a one-time address with no `address_id`, and
+   * stale if the customer has since moved the pin. The line is the record; this
+   * is only a convenience for finding the door.
+   */
+  latitude: number | null;
+  longitude: number | null;
   currencyCode: string;
   subtotal: number;
   deliveryFee: number;
@@ -224,10 +246,12 @@ export async function fetchOrder(
       `id, code, placed_at, address_line, courier_note, currency_code,
        subtotal, delivery_fee, discount, total,
        users:user_id ( name, phone ),
+       addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal,
-         stores ( name ),
+         stores ( name, image_url ),
          order_statuses ( slug, name, progress ),
          order_lines ( id, name, quantity, unit_price, note,
+           menu_items ( image_url ),
            order_line_options ( item_options ( name ) ) ) )`,
     )
     .eq("id", id)
@@ -249,6 +273,8 @@ export async function fetchOrder(
         quantity: line.quantity as number,
         unitPrice: line.unit_price as number,
         note: (line.note as string | null) ?? null,
+        imageUrl:
+          (asRecord(line.menu_items)?.image_url as string | null) ?? null,
         options: asArray(line.order_line_options).map((o) =>
           localized(asRecord(o.item_options)?.name, locale),
         ),
@@ -260,26 +286,45 @@ export async function fetchOrder(
 }
 
 /**
- * How many order-portions sit at each status. Drives the tab counts.
+ * How many orders sit at each status, **within the current scope**.
  *
- * One `head` request per status, counted in the database — never a select of
- * every row to be counted in the browser. `delivered` only grows, so reading it
- * all back would mean transferring the entire order history to draw a number
- * beside a tab, and it would get slower every week the business succeeds.
+ * Scoped, because a count that ignores the scope contradicts the list beside
+ * it: Today showing four orders under a tab labelled thirty-nine is not a
+ * detail, it is the screen disagreeing with itself.
  *
- * Served by `order_stores_status_order_idx` (migration 0067), which carries
- * `order_id` after the status precisely so a count is answerable from the index.
+ * ## What is being counted
+ *
+ * Orders, not portions — the order is the operator's unit. An order counts
+ * toward a status when **any** of its shops is at it, so a two-shop order split
+ * across two statuses appears under both. That is the honest reading of "this
+ * status has work at N orders", and the alternative — deriving one status per
+ * order in SQL — would need a function for a number beside a tab.
+ *
+ * One `head` request per status, counted in the database. Never a select whose
+ * rows are counted in the browser: `delivered` only grows, so that would mean
+ * transferring the whole order history to draw a number, getting slower every
+ * week the business succeeds.
  */
 export async function fetchStatusCounts(
   statuses: readonly OrderStatus[],
+  scope: Scope = "all",
 ): Promise<Record<string, number>> {
+  const since = scope === "today" ? startOfBusinessDay().toISOString() : null;
+
   const results = await Promise.all(
     statuses.map(async (status) => {
-      const { count, error } = await getClient()
-        .from("order_stores")
-        .select("id", { count: "exact", head: true })
-        .eq("order_status_id", status.id);
+      let query = getClient()
+        .from("orders")
+        .select("id, order_stores!inner(order_statuses!inner(slug))", {
+          count: "exact",
+          head: true,
+        })
+        .is("deleted_at", null)
+        .eq("order_stores.order_statuses.slug", status.slug);
 
+      if (since) query = query.gte("placed_at", since);
+
+      const { count, error } = await query;
       if (error)
         throw new Error(`Could not count ${status.slug}: ${error.message}`);
       return [status.slug, count ?? 0] as const;
@@ -307,6 +352,33 @@ export async function setOrderStatus(
   });
 
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Sets a whole order's status.
+ *
+ * **The order is the unit, not the shop.** A customer who orders from two shops
+ * places one order: they are told one status, they wait for one delivery, and
+ * it arrives on one courier run — `place_order` prices the delivery from the
+ * farthest shop precisely because the basket is one journey. "Half confirmed"
+ * is not a state anybody outside the schema can act on.
+ *
+ * One call, not a loop over the portions. A loop that fails on its third
+ * request leaves an order half-moved, with no record of what was intended; the
+ * function is atomic, so either the order moved or it did not. It is also
+ * idempotent, which is what makes the optimistic UI safe to retry.
+ */
+export async function advanceOrder(
+  orderId: string,
+  statusSlug: string,
+): Promise<number> {
+  const { data, error } = await getClient().rpc("api_v1_advance_order", {
+    p_order_id: orderId,
+    p_status_slug: statusSlug,
+  });
+
+  if (error) throw new Error(error.message);
+  return (data as number | null) ?? 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +426,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function toOrder(row: Record<string, unknown>, locale: string): Order {
   const user = asRecord(row.users);
+  const address = asRecord(row.addresses);
 
   return {
     id: row.id as string,
@@ -365,6 +438,8 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     customerPhone: (user?.phone as string) ?? "",
     addressLine: row.address_line as string,
     courierNote: (row.courier_note as string | null) ?? null,
+    latitude: (address?.latitude as number | null) ?? null,
+    longitude: (address?.longitude as number | null) ?? null,
     currencyCode: row.currency_code as string,
     subtotal: row.subtotal as number,
     deliveryFee: row.delivery_fee as number,
@@ -376,6 +451,8 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
         id: store.id as string,
         storeId: store.store_id as string,
         storeName: localized(asRecord(store.stores)?.name, locale),
+        storeImageUrl:
+          (asRecord(store.stores)?.image_url as string | null) ?? null,
         statusSlug: (status?.slug as string) ?? "",
         statusName: localized(status?.name, locale),
         progress: (status?.progress as number | null) ?? null,

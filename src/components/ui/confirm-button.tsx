@@ -52,6 +52,7 @@ export function ConfirmButton({
   fullWidth,
   className,
   renderTrigger,
+  triggerVariant,
 }: {
   onConfirm: () => Promise<void> | void;
   titleKey: TranslationKey;
@@ -75,6 +76,17 @@ export function ConfirmButton({
    * be a real focusable control, or the dialog becomes unreachable by keyboard.
    */
   renderTrigger?: (props: { onClick: () => void }) => ReactNode;
+  /**
+   * The trigger's own look, when the default is the wrong weight.
+   *
+   * By default a destructive action gets a *quiet* trigger — the dialog is
+   * where the weight belongs, and a page of red buttons is a page nobody reads.
+   * But a filled one is right where the action is a real, expected choice
+   * sitting beside another filled button: a text link there reads as a
+   * footnote, which is the wrong weight for the one thing that cannot be
+   * undone.
+   */
+  triggerVariant?: "quiet" | "secondary" | "danger";
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -108,7 +120,9 @@ export function ConfirmButton({
         renderTrigger({ onClick: () => setOpen(true) })
       ) : (
         <Button
-          variant={variant === "danger" ? "quiet" : "primary"}
+          variant={
+            triggerVariant ?? (variant === "danger" ? "quiet" : "primary")
+          }
           size={size}
           fullWidth={fullWidth}
           onClick={() => setOpen(true)}

@@ -12,11 +12,11 @@ import { useToasts } from "@/components/ui/toast";
 import { t } from "@/i18n/translations";
 
 import {
+  advanceOrder,
   fetchOrder,
   fetchOrderStatuses,
   fetchOrders,
   fetchStatusCounts,
-  setOrderStatus,
   type Order,
   type OrderStatus,
   type Scope,
@@ -32,7 +32,7 @@ import {
 export const orderKeys = {
   all: ["orders"] as const,
   statuses: () => ["orders", "statuses"] as const,
-  counts: () => ["orders", "counts"] as const,
+  counts: (scope: Scope) => ["orders", "counts", scope] as const,
   list: (scope: Scope, statusSlug: string | null, search: string) =>
     ["orders", "list", scope, statusSlug, search] as const,
   detail: (id: string) => ["orders", "detail", id] as const,
@@ -48,10 +48,26 @@ export function useOrderStatuses() {
   });
 }
 
-export function useStatusCounts(statuses: OrderStatus[] | undefined) {
+/**
+ * The tab counts, for the scope the queue is showing.
+ *
+ * Keyed by scope so switching to Today does not read yesterday's numbers out of
+ * the cache — a count that disagrees with the list beneath it is worse than one
+ * that takes a moment to arrive.
+ *
+ * `all` is deliberately not scoped by date, so its counts are the whole
+ * history. That is the question that tab asks.
+ */
+export function useStatusCounts(
+  statuses: OrderStatus[] | undefined,
+  scope: Scope,
+) {
   return useQuery({
-    queryKey: orderKeys.counts(),
-    queryFn: () => fetchStatusCounts(statuses ?? []),
+    queryKey: orderKeys.counts(scope),
+    // `live` and `all` count the same rows — the live tabs *are* the
+    // non-terminal statuses, so there is nothing extra to filter.
+    queryFn: () =>
+      fetchStatusCounts(statuses ?? [], scope === "today" ? "today" : "all"),
     enabled: (statuses?.length ?? 0) > 0,
   });
 }
@@ -115,6 +131,18 @@ export function useOrder(id: string | null) {
  * (`progress: null`, or the last one on the path) have no next step, and the
  * RPC refuses to move off them anyway.
  */
+/** Terminal: off the path, or the end of it. Mirrors the RPC's own rule. */
+function isTerminalSlug(
+  slug: string,
+  statuses: OrderStatus[] | undefined,
+): boolean {
+  if (!statuses) return false;
+  const status = statuses.find((s) => s.slug === slug);
+  if (!status || status.progress === null) return true;
+  const highest = Math.max(...statuses.map((s) => s.progress ?? -1));
+  return status.progress >= highest;
+}
+
 export function nextStatus(
   statuses: OrderStatus[] | undefined,
   currentSlug: string,
@@ -133,7 +161,50 @@ export function nextStatus(
 }
 
 /**
- * Advances one shop's portion, optimistically, with undo.
+ * The order's own status.
+ *
+ * An order spans shops, and the shops each carry one — so "the order's status"
+ * has to be derived. It is the **least advanced portion that can still move**:
+ * an order is not confirmed until every shop has confirmed it, because the
+ * customer is told one thing and the courier collects one bag.
+ *
+ * When nothing can move, the order is finished, and the *most* advanced portion
+ * is the answer — a two-shop order where one delivered and the other cancelled
+ * reads as delivered, which is what the customer experienced.
+ */
+export function orderStatus(
+  order: Order,
+  statuses: OrderStatus[] | undefined,
+): OrderStatus | null {
+  if (!statuses || order.stores.length === 0) return null;
+
+  const bySlug = new Map(statuses.map((s) => [s.slug, s]));
+  const present = order.stores
+    .map((store) => bySlug.get(store.statusSlug))
+    .filter((s): s is OrderStatus => s !== undefined);
+
+  if (present.length === 0) return null;
+
+  const highest = Math.max(...statuses.map((s) => s.progress ?? -1));
+  const movable = present.filter(
+    (s) => s.progress !== null && s.progress < highest,
+  );
+
+  if (movable.length > 0) {
+    return movable.reduce((least, s) =>
+      (s.progress as number) < (least.progress as number) ? s : least,
+    );
+  }
+
+  // All finished. The furthest along is what the customer saw; `cancelled` has
+  // no progress and loses to a delivered sibling, deliberately.
+  return present.reduce((furthest, s) =>
+    (s.progress ?? -1) > (furthest.progress ?? -1) ? s : furthest,
+  );
+}
+
+/**
+ * Advances a whole order, optimistically, with undo.
  *
  * ## Why optimistic is honest here
  *
@@ -154,13 +225,13 @@ export function nextStatus(
  * refuses to move off `delivered` or `cancelled` — an undo offered there would
  * fail, and an undo that does not undo is worse than no undo.
  */
-export function useAdvanceOrder() {
+export function useAdvanceOrder(statuses?: OrderStatus[]) {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
   const mutation = useMutation({
-    mutationFn: (input: { orderStoreId: string; toSlug: string }) =>
-      setOrderStatus(input.orderStoreId, input.toSlug),
+    mutationFn: (input: { orderId: string; toSlug: string }) =>
+      advanceOrder(input.orderId, input.toSlug),
 
     onMutate: async (input) => {
       // Stop any list refetch from landing mid-flight and overwriting the
@@ -179,14 +250,22 @@ export function useAdvanceOrder() {
             ...data,
             pages: data.pages.map((page) => ({
               ...page,
-              orders: page.orders.map((order) => ({
-                ...order,
-                stores: order.stores.map((store) =>
-                  store.id === input.orderStoreId
-                    ? { ...store, statusSlug: input.toSlug }
-                    : store,
-                ),
-              })),
+              orders: page.orders.map((order) =>
+                order.id !== input.orderId
+                  ? order
+                  : {
+                      ...order,
+                      // Every portion, because the whole order moved. Terminal
+                      // ones stay put — the function will not move them either,
+                      // so an optimistic row that did would disagree with what
+                      // comes back.
+                      stores: order.stores.map((store) =>
+                        isTerminalSlug(store.statusSlug, statuses)
+                          ? store
+                          : { ...store, statusSlug: input.toSlug },
+                      ),
+                    },
+              ),
             })),
           },
       );
@@ -213,7 +292,7 @@ export function useAdvanceOrder() {
 
   const advance = useCallback(
     (input: {
-      orderStoreId: string;
+      orderId: string;
       fromSlug: string;
       toSlug: string;
       toName: string;
@@ -221,7 +300,7 @@ export function useAdvanceOrder() {
       undoable?: boolean;
     }) => {
       mutation.mutate(
-        { orderStoreId: input.orderStoreId, toSlug: input.toSlug },
+        { orderId: input.orderId, toSlug: input.toSlug },
         {
           onSuccess: () => {
             toast.success(
@@ -231,10 +310,7 @@ export function useAdvanceOrder() {
                 : () =>
                     new Promise<void>((resolve, reject) => {
                       mutation.mutate(
-                        {
-                          orderStoreId: input.orderStoreId,
-                          toSlug: input.fromSlug,
-                        },
+                        { orderId: input.orderId, toSlug: input.fromSlug },
                         { onSuccess: () => resolve(), onError: reject },
                       );
                     }),
