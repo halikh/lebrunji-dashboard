@@ -25,10 +25,21 @@ components, flows or conventions are carried over from any other dashboard.
    app needs; `src/lib/env.ts` validates them at startup and reports everything
    missing at once.
 
-   The file also has slots for `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and
-   `SUPABASE_DB_URL`, which only the scripts read. Note the missing
-   `NEXT_PUBLIC_` prefix on those three: that prefix means *inlined into the
-   browser bundle*, and it is exactly what the service-role key must never be.
+   The file has two more slots that only the scripts read, and neither is a
+   copy of anything above it:
+
+   - `SUPABASE_SERVICE_ROLE_KEY` — a **different key** from the anon key, not
+     the same one renamed. In Supabase's current format both start with `sb_`,
+     which makes them look interchangeable: `sb_publishable_...` is the anon
+     key, `sb_secret_...` is this one. The anon key gets a 401 from the admin
+     API and cannot write to `admins`, so substituting it fails on the first
+     call. It carries no `NEXT_PUBLIC_` prefix because that prefix means
+     *inlined into the browser bundle*, and this key bypasses RLS entirely.
+   - `SUPABASE_DB_URL` — only for `npm run check:limits`.
+
+   The project URL is **not** repeated: the scripts read
+   `NEXT_PUBLIC_SUPABASE_URL`. `SUPABASE_URL` still overrides it if set, so a
+   script can be pointed at another project, but nothing requires it.
 
 3. Create the one admin account, once
 

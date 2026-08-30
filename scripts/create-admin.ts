@@ -42,27 +42,40 @@ async function main() {
 
   const source = loadLocalEnv();
 
-  const url = process.env.SUPABASE_URL;
+  // The project URL is the same string the app already has, and there is no
+  // reason to write it down twice. `SUPABASE_URL` still wins if it is set, so
+  // a script can be pointed at a different project without touching the app's
+  // configuration — but nobody has to set it to run this.
+  //
+  // The *key* is not like this. See below.
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const missing = [
-    !url && 'SUPABASE_URL',
-    !serviceRoleKey && 'SUPABASE_SERVICE_ROLE_KEY',
-  ].filter(Boolean);
-
-  if (missing.length > 0) {
+  if (!url) {
     console.error(
-      `Missing: ${missing.join(', ')}\n\n` +
+      'No project URL.\n\n' +
         (source === 'file'
-          ? 'Read .env.local, but it does not set them.\n\n'
+          ? 'Read .env.local, but it sets neither NEXT_PUBLIC_SUPABASE_URL nor SUPABASE_URL.\n\n'
           : 'There is no .env.local to read.\n\n') +
-        'Add to .env.local (gitignored, never deployed):\n\n' +
-        '  SUPABASE_URL=https://<project-ref>.supabase.co\n' +
-        '  SUPABASE_SERVICE_ROLE_KEY=<the service_role key>\n\n' +
-        'Supabase dashboard → Project Settings → API. Note these are the plain\n' +
-        'names, without the NEXT_PUBLIC_ prefix the app uses — that prefix means\n' +
-        '"inlined into the browser bundle", which this key must never be.\n\n' +
-        'The service-role key belongs on your machine only. Never on Vercel.',
+        '  NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co',
+    );
+    process.exit(2);
+  }
+
+  if (!serviceRoleKey) {
+    console.error(
+      'SUPABASE_SERVICE_ROLE_KEY is not set.\n\n' +
+        (source === 'file' ? 'Read .env.local, but it does not set it.\n\n' : '') +
+        'This is a different key from the anon key, not the same one under\n' +
+        'another name. The anon key cannot do either half of this job:\n\n' +
+        '  - creating an auth user is an admin API call, which it is refused, and\n' +
+        '  - `admins` has a select policy and no insert policy, so nothing\n' +
+        '    holding the anon key can write to it — deliberately, because the\n' +
+        '    account that can do everything must not be able to mint another.\n\n' +
+        'Supabase dashboard → Project Settings → API → service_role.\n\n' +
+        'It carries no NEXT_PUBLIC_ prefix on purpose: that prefix means\n' +
+        '"inlined into the browser bundle and readable by anyone with the URL".\n' +
+        'This key bypasses RLS entirely. Local only. Never on Vercel.',
     );
     process.exit(2);
   }
