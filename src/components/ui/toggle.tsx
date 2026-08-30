@@ -56,6 +56,17 @@ export function Toggle({
       onClick={onChange}
       className={cx(
         "flex shrink-0 items-center gap-sm text-[13px] font-semibold",
+        // Lined up with the label above it.
+        //
+        // A `Field` insets its label and hint by the padding an *input* puts
+        // before its text, so the three read as one column. A switch has no
+        // such padding — its pill starts at the edge — so without this it sits
+        // outdented under a label that looks indented, which is the misalignment
+        // an operator notices before they notice anything else on the form.
+        //
+        // Only inside a `Field`: a switch in a table row is its own column and
+        // has nothing to line up with.
+        field && "ps-md",
         // The label carries the state in colour *as well as* in words — never
         // instead of them.
         on ? "text-text" : "text-text-soft",

@@ -29,23 +29,19 @@ import type { Localized } from "@/lib/validation";
  * - **`is_default`** says which answer a required group opens on. Before it,
  *   the app took whichever sorted first, which is a guess dressed as a decision.
  *
- * ## A group belongs to the shop, or to one dish
+ * ## Every group belongs to exactly one dish
  *
- * Both are real, and a menu has both (migration 0073).
+ * There was briefly a second kind — a shop-wide group offered on many items —
+ * and migration `0074` removed it. Sharing a group sounds like a saving and is
+ * not, because what merchants share is the *shape* of a question, never its
+ * answers: "Add extras" on a grill and "Add extras" on a dessert have the same
+ * name and nothing else in common. A shared group is either edited into
+ * something wrong for half the dishes offering it, or split by hand until it is
+ * per-item anyway — while every screen has to explain which kind it is showing.
  *
- * - **Shared** — `menu_item_id is null`. "Add extras" exists once and is offered
- *   on twenty dishes; editing it once is the entire point of it being a row
- *   rather than a repeated list. Removing it from an item is a **detach**, not
- *   a withdrawal: the operator means "not on this dish", and withdrawing would
- *   take it off the other nineteen.
- * - **Owned** — `menu_item_id` set. "How would you like the steak done?"
- *   belongs to the steak, is created from that dish's editor, and is offered
- *   nowhere else. Deleting the dish takes it with it.
- *
- * The difference is about who may edit the group and where it is listed, not
- * about how it is served: **both kinds are attached through
- * `menu_item_option_group_links`**, so the app reads one thing and needs no
- * knowledge of ownership at all.
+ * So `menu_item_id` is `not null`, and the join table is gone: one-to-many
+ * needs none, and keeping it would store the same fact twice for a reader to
+ * choose between.
  */
 
 export type ItemOption = {
@@ -70,8 +66,8 @@ export type OptionGroup = {
   maxSelections: number | null;
   isActive: boolean;
   sortOrder: number;
-  /** The dish this belongs to, or null when the whole shop shares it. */
-  ownerItemId: string | null;
+  /** The dish this question is asked about. Never null. */
+  itemId: string;
   options: ItemOption[];
 };
 
@@ -80,105 +76,60 @@ const GROUP_COLUMNS = `id, title, mode, min_selections, max_selections,
    item_options ( id, name, price, is_active, is_default, sort_order )`;
 
 /**
- * The shop's **shared** groups, with their options — including withdrawn ones.
+ * Which dishes in a shop have questions, and how many.
  *
- * Owned groups are deliberately absent: they are each about one dish, and a
- * list meant to show what is shared stops being able to the moment it is full
- * of entries that are not.
- *
- * Withdrawn rows are present, though. The app filters to what is offered; this
- * is the screen that *decides* what is offered, so it has to show the rest. A
- * withdrawn option that vanished from here could never be brought back, and
- * "where did the large size go" would have no answer on the page that took it
- * away.
+ * One aggregate rather than a group list per item: the options screen needs to
+ * mark every dish in a section that has nothing set up, and asking per row would
+ * be a request per dish to answer a question about all of them.
  */
-export async function fetchOptionGroups(
+export async function fetchOptionCounts(
   storeId: string,
-): Promise<OptionGroup[]> {
+): Promise<Map<string, number>> {
   const { data, error } = await getClient()
     .from("option_groups")
-    .select(GROUP_COLUMNS)
-    .eq("store_id", storeId)
-    .is("menu_item_id", null)
-    .order("sort_order", { ascending: true });
+    .select("menu_item_id, menu_items!inner(store_id)")
+    .eq("menu_items.store_id", storeId);
 
   if (error) throw new Error(`Could not read the options: ${error.message}`);
 
-  return (data ?? []).map(toGroup);
-}
-
-/** The groups belonging to one dish and offered nowhere else. */
-export async function fetchItemOwnGroups(
-  itemId: string,
-): Promise<OptionGroup[]> {
-  const { data, error } = await getClient()
-    .from("option_groups")
-    .select(GROUP_COLUMNS)
-    .eq("menu_item_id", itemId)
-    .order("sort_order", { ascending: true });
-
-  if (error) throw new Error(`Could not read the options: ${error.message}`);
-
-  return (data ?? []).map(toGroup);
-}
-
-/** The ids of the groups attached to one item. */
-export async function fetchItemGroupIds(itemId: string): Promise<string[]> {
-  const { data, error } = await getClient()
-    .from("menu_item_option_group_links")
-    .select("option_group_id")
-    .eq("menu_item_id", itemId);
-
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => row.option_group_id as string);
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const id = row.menu_item_id as string;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
 }
 
 /**
- * Attaches or detaches one group.
+ * One dish's groups, with their options — **including withdrawn ones**.
  *
- * One link at a time rather than a whole set, because that is how the operator
- * acts on it — a switch per group — and because a set-shaped write would delete
- * and re-insert links that were not touched.
- *
- * `(menu_item_id, option_group_id)` is unique, so `ignoreDuplicates` makes a
- * second attach the no-op it should be, which matters when two tabs are open on
- * the same dish.
+ * The app filters to what is offered; this is the screen that *decides* what is
+ * offered, so it has to show the rest. A withdrawn option that vanished from
+ * here could never be brought back, and "where did the large size go" would
+ * have no answer on the page that took it away.
  */
-export async function setItemGroup(
+export async function fetchItemOptionGroups(
   itemId: string,
-  groupId: string,
-  attached: boolean,
-): Promise<void> {
-  const client = getClient();
-
-  if (attached) {
-    const { error } = await client
-      .from("menu_item_option_group_links")
-      .upsert(
-        { menu_item_id: itemId, option_group_id: groupId },
-        { onConflict: "menu_item_id,option_group_id", ignoreDuplicates: true },
-      );
-    if (error) throw new Error(error.message);
-    return;
-  }
-
-  const { error } = await client
-    .from("menu_item_option_group_links")
-    .delete()
+): Promise<OptionGroup[]> {
+  const { data, error } = await getClient()
+    .from("option_groups")
+    .select(GROUP_COLUMNS)
     .eq("menu_item_id", itemId)
-    .eq("option_group_id", groupId);
+    .order("sort_order", { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(`Could not read the options: ${error.message}`);
+
+  return (data ?? []).map(toGroup);
 }
 
 export type OptionGroupDraft = {
   storeId: string;
+  /** The dish it is asked about. Required — there is no other kind. */
+  itemId: string;
   title: Localized;
   mode: OptionGroupMode;
   minSelections: number;
   maxSelections: number | null;
-  /** Set to make the group that dish's own. Null for a shop-wide group. */
-  ownerItemId?: string | null;
 };
 
 export async function createOptionGroup(
@@ -196,7 +147,7 @@ export async function createOptionGroup(
       // a number there would be a fact nothing reads and everything ignores.
       max_selections: draft.mode === "multi" ? draft.maxSelections : null,
       sort_order: sortOrder,
-      menu_item_id: draft.ownerItemId ?? null,
+      menu_item_id: draft.itemId,
       // No `slug`: the trigger from migration 0071 derives it from the English
       // title and makes it unique within the shop.
     })
@@ -204,20 +155,7 @@ export async function createOptionGroup(
     .single();
 
   if (error) throw new Error(friendly(error.message));
-
-  const id = data.id as string;
-
-  // An owned group is linked to its own dish immediately.
-  //
-  // Ownership says who may edit it; the **link** is what serves it — the app
-  // reads an item's options through `menu_item_option_group_links` and knows
-  // nothing about `menu_item_id`. A group created without this would belong to
-  // a dish that never offers it, which looks like a save that did nothing.
-  if (draft.ownerItemId) {
-    await setItemGroup(draft.ownerItemId, id, true);
-  }
-
-  return id;
+  return data.id as string;
 }
 
 export type OptionGroupPatch = Partial<Omit<OptionGroupDraft, "storeId">> & {
@@ -330,11 +268,6 @@ export async function setDefaultOption(
  */
 function friendly(message: string): string {
   if (message.includes("selection_range")) return t("options.rangeImpossible");
-  // Migration 0073's second guard: an owned group offered on a second dish.
-  // The operator's next step is to make it shop-wide, and the message says so.
-  if (message.includes("cannot be offered on")) {
-    return t("options.ownedElsewhere");
-  }
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("slug")) return t("dbError.duplicateSlug");
   return message;
@@ -349,7 +282,7 @@ function toGroup(row: Record<string, unknown>): OptionGroup {
     maxSelections: (row.max_selections as number | null) ?? null,
     isActive: row.is_active as boolean,
     sortOrder: row.sort_order as number,
-    ownerItemId: (row.menu_item_id as string | null) ?? null,
+    itemId: row.menu_item_id as string,
     options: asArray(row.item_options)
       .map((option) => ({
         id: option.id as string,

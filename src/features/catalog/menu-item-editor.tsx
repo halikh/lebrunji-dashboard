@@ -66,6 +66,7 @@ export type ItemDraft = {
 export function MenuItemEditor({
   storeId,
   itemId,
+  sectionId,
   initial,
   pending,
   error,
@@ -79,9 +80,10 @@ export function MenuItemEditor({
   onSave: (draft: ItemDraft) => void;
   /** Absent when editing: "add another" only means something while adding. */
   onSaveAndAnother?: (draft: ItemDraft) => void;
-  /** The shop, and the saved item, so options can be attached to it. */
+  /** Where this dish lives, so the options link can open on it. */
   storeId: string;
   itemId: string | null;
+  sectionId: string;
   onCancel: () => void;
 }) {
   const languages = useLanguages();
@@ -245,7 +247,11 @@ export function MenuItemEditor({
               own list of questions, not this row. */}
           <div className="flex flex-col gap-lg border-t border-border pt-lg">
             <Field label={t("options.title")} hint={t("options.hint")}>
-              <ItemOptions storeId={storeId} itemId={itemId} />
+              <ItemOptions
+                storeId={storeId}
+                itemId={itemId}
+                sectionId={sectionId}
+              />
             </Field>
           </div>
 

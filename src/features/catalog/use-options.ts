@@ -10,11 +10,9 @@ import type { Localized } from "@/lib/validation";
 import {
   createItemOption,
   createOptionGroup,
-  fetchItemGroupIds,
-  fetchItemOwnGroups,
-  fetchOptionGroups,
+  fetchItemOptionGroups,
+  fetchOptionCounts,
   setDefaultOption,
-  setItemGroup,
   updateItemOption,
   updateOptionGroup,
   type ItemOptionPatch,
@@ -24,91 +22,44 @@ import {
 } from "./api/options";
 
 export const optionKeys = {
-  /** The shop's shared groups. */
-  store: (storeId: string) => ["options", storeId] as const,
-  /** Which shared groups one dish offers. */
+  /** One dish's questions. */
   item: (itemId: string) => ["options", "item", itemId] as const,
-  /** The groups that dish owns outright. */
-  own: (itemId: string) => ["options", "own", itemId] as const,
+  /** How many questions each dish in a shop has. */
+  counts: (storeId: string) => ["options", "counts", storeId] as const,
 };
 
-export function useOptionGroups(storeId: string) {
-  return useQuery({
-    queryKey: optionKeys.store(storeId),
-    queryFn: () => fetchOptionGroups(storeId),
-    // Reference data for a shop: read on every item that is opened, changed
-    // rarely. Refetching it per dish would be a request per click for an answer
-    // that is almost always the same one.
-    staleTime: 5 * 60_000,
-  });
-}
-
-/** The groups belonging to this dish alone. */
-export function useItemOwnGroups(itemId: string | null) {
-  return useQuery({
-    queryKey: optionKeys.own(itemId ?? ""),
-    queryFn: () => fetchItemOwnGroups(itemId as string),
-    enabled: itemId !== null,
-  });
-}
-
-export function useItemGroups(itemId: string | null) {
+export function useItemOptionGroups(itemId: string | null) {
   return useQuery({
     queryKey: optionKeys.item(itemId ?? ""),
-    queryFn: () => fetchItemGroupIds(itemId as string),
+    queryFn: () => fetchItemOptionGroups(itemId as string),
     enabled: itemId !== null,
   });
 }
 
 /**
- * Attaching a group to a dish, or taking it off.
+ * How many questions each dish has.
  *
- * **Optimistic**, and this is the case for it: the operator works down a list
- * of switches, and one that waits for a round trip before moving reads as
- * broken. A refusal puts it back and says why.
- *
- * The invalidation is only the item's links — not the store's groups, which
- * this cannot have changed. Invalidating both would refetch every group and its
- * options on every switch, for nothing.
+ * Read for a whole shop rather than per dish, so the item picker can mark the
+ * ones with nothing set up without a request per row.
  */
-export function useSetItemGroup(itemId: string) {
-  const queryClient = useQueryClient();
-  const toast = useToasts();
-
-  return useMutation({
-    mutationFn: (input: { groupId: string; attached: boolean }) =>
-      setItemGroup(itemId, input.groupId, input.attached),
-
-    onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: optionKeys.item(itemId) });
-      const snapshot = queryClient.getQueryData<string[]>(
-        optionKeys.item(itemId),
-      );
-
-      queryClient.setQueryData<string[]>(optionKeys.item(itemId), (ids) => {
-        const current = ids ?? [];
-        return input.attached
-          ? [...new Set([...current, input.groupId])]
-          : current.filter((id) => id !== input.groupId);
-      });
-
-      return { snapshot };
-    },
-
-    onError: (error, _input, context) => {
-      queryClient.setQueryData(optionKeys.item(itemId), context?.snapshot);
-      toast.danger(
-        error instanceof Error ? error.message : t("common.somethingWentWrong"),
-      );
-    },
-
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: optionKeys.item(itemId) });
-    },
+export function useOptionCounts(storeId: string) {
+  return useQuery({
+    queryKey: optionKeys.counts(storeId),
+    queryFn: () => fetchOptionCounts(storeId),
+    staleTime: 60_000,
   });
 }
 
-export function useCreateOptionGroup(storeId: string) {
+/**
+ * These three take no `storeId`, deliberately.
+ *
+ * Everything they touch is invalidated by the `["options"]` prefix — a dish's
+ * questions, and the shop's counts that mark dishes with none. Threading a shop
+ * id through them would be a parameter that exists only to be ignored, and the
+ * first reader to notice would wire it into a narrower invalidation and leave
+ * the counts stale.
+ */
+export function useCreateOptionGroup() {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
@@ -116,13 +67,9 @@ export function useCreateOptionGroup(storeId: string) {
     mutationFn: (input: { draft: OptionGroupDraft; sortOrder: number }) =>
       createOptionGroup(input.draft, input.sortOrder),
     onSuccess: (_id, input) => {
-      // Whichever list it joined. A shared group appears on the Options tab; an
-      // owned one appears under its dish, and also changes that dish's links,
-      // because creating it attached it.
+      // The prefix: the dish's own list, and the shop's counts, which have
+      // just changed for the picker that marks dishes with nothing set up.
       void queryClient.invalidateQueries({ queryKey: ["options"] });
-      void queryClient.invalidateQueries({
-        queryKey: optionKeys.store(storeId),
-      });
       toast.success(
         t("options.groupAdded", { name: pickLocalized(input.draft.title) }),
       );
@@ -143,7 +90,7 @@ export function useCreateOptionGroup(storeId: string) {
  * confirmations for something the operator can already see. Failure still
  * speaks, because that is the case they cannot see.
  */
-export function useUpdateOptionGroup(storeId: string) {
+export function useUpdateOptionGroup() {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
@@ -151,13 +98,7 @@ export function useUpdateOptionGroup(storeId: string) {
     mutationFn: (input: { id: string; patch: OptionGroupPatch }) =>
       updateOptionGroup(input.id, input.patch),
     onSuccess: () => {
-      // The prefix, because the same group can be read as one of the shop's or
-      // as one of a dish's, and a screen showing the stale half of that is a
-      // screen disagreeing with itself.
       void queryClient.invalidateQueries({ queryKey: ["options"] });
-      void queryClient.invalidateQueries({
-        queryKey: optionKeys.store(storeId),
-      });
     },
     onError: (error) => {
       toast.danger(
@@ -173,16 +114,13 @@ export function useUpdateOptionGroup(storeId: string) {
  * One hook for all of them, because they share an invalidation and a failure
  * message, and four near-identical hooks is four places for those to drift.
  */
-export function useItemOptions(storeId: string) {
+export function useItemOptions() {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
   const settle = {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["options"] });
-      void queryClient.invalidateQueries({
-        queryKey: optionKeys.store(storeId),
-      });
     },
     onError: (error: unknown) => {
       toast.danger(

@@ -348,32 +348,39 @@ const en = {
    * what the shop actually offers, and those are the same fact in the form a
    * person holds it in.
    */
+  /**
+   * The questions a dish asks when it is ordered.
+   *
+   * The vocabulary is deliberately not the database's. A row stores `single` /
+   * `multi` and a number; an operator checks "choose one, required" against
+   * what the shop actually offers, and those are the same fact in the form a
+   * person holds it in.
+   */
   options: {
     tab: "Options",
     tabHint:
-      "Questions this shop can ask about a dish. Each one is offered on as many items as you like.",
-    pickOne: "Choose a group to see its choices.",
-    newGroup: "New option group",
-    choices: "Choices",
-    noChoices: "No choices yet. Add the first one below.",
-    noneYet: "This shop has no option groups yet.",
-    offered: "Offered",
-    notOffered: "Not offered",
-    manage: "Manage this shop's options",
-    failedTitle: "Could not load the options",
+      "Pick a section, then a dish. Its questions are set up on the right.",
+    section: "Section",
+    sectionHint: "Narrows the list of dishes below.",
+    pickSection: "Choose a section",
+    item: "Dish",
+    itemHint: "The questions belong to this dish and no other.",
+    pickItem: "Choose a dish",
+    // The marker in the picker. A dish with no questions looks complete
+    // everywhere else, so this is the only place it can be seen at a glance.
+    noneSet: "no options yet",
+    noQuestions: "This dish asks nothing yet.",
     title: "Options",
     hint: "Questions asked when this dish is ordered — a size, extras, something left out.",
-    saveFirst: "Save this item first, then choose which options it offers.",
-    none: "This shop has no option groups yet.",
-    onThisItem: "Offered here",
-    notOnThisItem: "Not offered",
+    saveFirst: "Save this dish first, then set up its options.",
+    openFor: "Set up this dish's options",
     chooseOne: "Choose one",
     chooseAny: "Choose any",
     required: "Required",
     optional: "Optional",
     count: "{count} choices",
     free: "Free",
-    addGroup: "New option group",
+    addGroup: "New question",
     groupTitle: "What is being asked",
     groupTitleHint: "The customer reads this above the choices.",
     howMany: "How many can be chosen",
@@ -384,39 +391,27 @@ const en = {
     mustChoose: "Must the customer answer",
     mustChooseHint:
       "Required questions have to be answered before the dish can be added.",
-    saveGroup: "Create group",
+    saveGroup: "Create question",
     optionName: "Choice",
     extraCost: "Adds",
-    // Says the unit and that zero is a real answer, which a bare number field
-    // cannot.
-    extraCostHint: "Added to the item's price. Leave at 0 for a free choice.",
+    extraCostHint: "Added to the dish's price. Leave at 0 for a free choice.",
     addOption: "Add choice",
-    // "Withdrawn", not "retired" or "deleted". These rows are referenced by
-    // past orders forever and are never removed; what changes is whether the
-    // shop still offers them, and that is reversible.
+    // Names the question, because a dish has several and the buttons are
+    // otherwise identical down the page.
+    addChoiceTo: "Add a choice to {name}",
+    choices: "Choices",
+    noChoices: "No choices yet. Add the first one below.",
+    // "Withdrawn", not "deleted". These rows are referenced by past orders
+    // forever and are never removed; what changes is whether the shop still
+    // offers them, and that is reversible.
     offeredGroup: "Offered",
     withdrawn: "Withdrawn",
-    atLeast: "Choose at least {count}",
-    atLeastLabel: "At least",
-    atLeastHint: "0 lets the customer skip the question.",
     isDefault: "Default",
     makeDefault: "Make default",
+    failedTitle: "Could not load the options",
     groupAdded: "{name} created",
     // The one constraint an operator can actually hit: a floor above the
     // ceiling is unsatisfiable, and the database says so by constraint name.
-    // Migration 0073's second guard, in terms of what to do about it.
-    ownedElsewhere:
-      "That group belongs to another dish. Make it shop-wide to offer it on more than one.",
-    // The two kinds of group, named where the operator meets them.
-    ownTitle: "Only on this dish",
-    ownHint:
-      "Questions asked about this dish and nothing else — how it is cooked, which sauce.",
-    ownEmpty: "None yet.",
-    addOwn: "Add a question for this dish",
-    sharedTitle: "Shared with the shop",
-    sharedHint:
-      "Groups this shop offers on several dishes. Switch on the ones this dish asks.",
-    editInTab: "Edit choices on the Options tab",
     rangeImpossible:
       "At least cannot be more than At most — nobody could satisfy that.",
   },

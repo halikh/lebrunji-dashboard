@@ -587,6 +587,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                 }
                 storeId={storeId}
                 itemId={open.itemId}
+                sectionId={open.sectionId}
                 initial={editingItem}
                 pending={pending}
                 error={error}
