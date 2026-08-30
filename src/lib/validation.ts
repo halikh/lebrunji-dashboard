@@ -21,6 +21,7 @@ import {
   DISCOUNT,
   IMAGE,
   MONEY,
+  PASSWORD,
   PREP_MINUTES,
   SLUG_PATTERN,
   TEXT,
@@ -242,6 +243,56 @@ export function sniffImageType(bytes: Uint8Array): string | null {
     return 'image/webp';
   }
   return null;
+}
+
+/**
+ * The operator's password.
+ *
+ * One implementation, used by the reset screen and by `create-admin`. It was
+ * two `length < 12` checks in two files, which is exactly how a rule ends up
+ * enforced in one place and not the other.
+ *
+ * **This is not the enforcing layer.** The Supabase project's password policy
+ * is, because the auth endpoint is reachable without going through this app.
+ * What this does is explain, before a round trip, in a sentence rather than as
+ * a 422.
+ *
+ * ## Why the rejected list is so short
+ *
+ * It is not a breach corpus, and pretending otherwise would be worse than not
+ * having one — a five-entry denylist that says "not a common password" implies
+ * a check it is not making. These are the specific strings a person types when
+ * they intend to change the password later and then does not. Real breach
+ * checking is Supabase's `HaveIBeenPwned` integration, a project setting, and
+ * the right place for it.
+ */
+export function validatePassword(password: string, options: { email?: string } = {}): Valid {
+  if (password.length < PASSWORD.min) {
+    return fail(`Use at least ${PASSWORD.min} characters. Length is what makes it hard to guess.`);
+  }
+  // bcrypt ignores everything past 72 bytes, so a longer one is not stronger —
+  // it just has a tail that does nothing, which is worth saying rather than
+  // silently accepting. Counted in bytes: a passphrase with an accent or an
+  // emoji reaches the limit sooner than its character count suggests.
+  if (new TextEncoder().encode(password).length > PASSWORD.max) {
+    return fail(`At most ${PASSWORD.max} bytes — anything past that is ignored, not extra.`);
+  }
+  if (/^\s|\s$/.test(password)) {
+    return fail('Remove the leading or trailing space — it is easy to lose and hard to notice.');
+  }
+
+  const lower = password.toLowerCase();
+
+  const local = options.email?.split('@')[0]?.toLowerCase();
+  if (local && local.length >= 3 && lower.includes(local)) {
+    return fail('Do not put your email address in your password.');
+  }
+
+  if (['lebrunji', 'password', 'qwerty'].some((word) => lower.includes(word))) {
+    return fail('That contains a word an attacker would try first.');
+  }
+
+  return OK;
 }
 
 /** Collapses a set of results into the first failure, for a whole form. */

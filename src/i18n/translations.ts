@@ -52,6 +52,12 @@ const en = {
     // password". The pair would tell anyone who asked which email addresses
     // are staff.
     failed: 'That email and password do not match.',
+    // Rate limiting *is* distinguished, and safely: it says nothing about
+    // whether the account exists. Collapsing it into the message above was
+    // actively harmful — it told someone who had been throttled that their
+    // password was wrong, so they tried again, which extended the throttle.
+    tooManyAttempts: 'Too many attempts. Wait a minute and try again.',
+    offline: 'Cannot reach the server. Check your connection.',
   },
 
   forgotPassword: {

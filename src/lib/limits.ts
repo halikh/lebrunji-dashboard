@@ -117,3 +117,28 @@ export const PAGE = {
 } as const;
 
 export const SEARCH = { minTerm: 2, maxTerm: 64 } as const;
+
+/**
+ * The operator's password.
+ *
+ * Unlike everything else in this file, there is no CHECK constraint behind
+ * this — a password never reaches a table. The enforcing copy lives in the
+ * Supabase project's password policy (Authentication → Policies), because that
+ * is the layer the auth endpoint actually goes through, and the auth endpoint
+ * is reachable without this app. What is here is the layer that can *explain*.
+ *
+ * Set the project policy to match these numbers, or the two will disagree and
+ * the operator will be refused by the server after passing the form.
+ *
+ * ## Length, not character classes
+ *
+ * No "must contain a symbol" rule. Composition rules are the classic example of
+ * a policy that measurably makes passwords worse: they push people to
+ * `Password1!` — which satisfies every class and is guessed instantly — and
+ * they refuse long passphrases that are far stronger. Length is what actually
+ * costs an attacker, so length is what is asked for.
+ *
+ * `max` exists because bcrypt silently truncates past 72 bytes; refusing is
+ * better than accepting a password whose tail does nothing.
+ */
+export const PASSWORD = { min: 12, max: 72 } as const;

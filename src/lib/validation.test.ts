@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { TEXT } from './limits';
+import { PASSWORD, TEXT } from './limits';
 import {
   firstFailure,
   sniffImageType,
@@ -10,6 +10,7 @@ import {
   validateHours,
   validateImage,
   validateLocalizedText,
+  validatePassword,
   validatePrepWindow,
   validatePrice,
   validateSlug,
@@ -205,5 +206,57 @@ describe('firstFailure', () => {
 
   it('passes when everything passes', () => {
     expect(firstFailure([validateSlug('ok'), validatePrice(100)]).ok).toBe(true);
+  });
+});
+
+describe('validatePassword', () => {
+  it('accepts a long passphrase', () => {
+    expect(validatePassword('correct horse battery staple').ok).toBe(true);
+  });
+
+  it('rejects one under the minimum', () => {
+    expect(validatePassword('a'.repeat(PASSWORD.min - 1)).ok).toBe(false);
+  });
+
+  it('asks for length rather than punctuation', () => {
+    // No composition rule. `Password1!` satisfies every character class and is
+    // guessed instantly; a long passphrase satisfies none and is not. Length is
+    // what costs an attacker, so length is what is asked for.
+    expect(validatePassword('a-perfectly-ordinary-passphrase').ok).toBe(true);
+  });
+
+  it('refuses past the bcrypt truncation point rather than ignoring the tail', () => {
+    expect(validatePassword('x'.repeat(PASSWORD.max + 1)).ok).toBe(false);
+  });
+
+  it('counts bytes, not characters, for that limit', () => {
+    // 71 emoji are 284 bytes. Accepting this would mean most of what was typed
+    // does nothing, which is worse than refusing it.
+    expect(validatePassword('\u{1F642}'.repeat(71)).ok).toBe(false);
+  });
+
+  it('refuses a leading or trailing space', () => {
+    expect(validatePassword(' a-long-enough-passphrase').ok).toBe(false);
+    expect(validatePassword('a-long-enough-passphrase ').ok).toBe(false);
+  });
+
+  it('refuses the email address inside the password', () => {
+    // Note the phrase avoids the denylisted words on purpose: this test is
+    // about the email rule, and a string that trips two rules would pass for
+    // the wrong reason.
+    expect(validatePassword('halikh-rides-a-bicycle', { email: 'halikh@example.com' }).ok).toBe(
+      false,
+    );
+    // Without the email it cannot know, and must not guess.
+    expect(validatePassword('halikh-rides-a-bicycle').ok).toBe(true);
+  });
+
+  it('ignores a very short local part, which would match almost anything', () => {
+    expect(validatePassword('a-long-enough-passphrase', { email: 'hi@example.com' }).ok).toBe(true);
+  });
+
+  it('refuses the words an attacker starts with', () => {
+    expect(validatePassword('lebrunji-forever-2026').ok).toBe(false);
+    expect(validatePassword('my-password-is-good').ok).toBe(false);
   });
 });

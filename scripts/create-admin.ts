@@ -31,6 +31,7 @@ import { stdin, stdout } from 'node:process';
 
 import { createClient } from '@supabase/supabase-js';
 
+import { validatePassword } from '../src/lib/validation';
 import { loadLocalEnv } from './load-env';
 
 /**
@@ -94,8 +95,11 @@ async function main() {
   const password = await rl.question(`Password for ${email}: `);
   rl.close();
 
-  if (password.length < 12) {
-    console.error('\nUse at least 12 characters. This account can do everything.');
+  // The same function the reset screen applies. It was a bare `length < 12` in
+  // both places, which is how a rule ends up enforced in one and not the other.
+  const strong = validatePassword(password, { email });
+  if (!strong.ok) {
+    console.error(`\n${strong.message}`);
     process.exit(2);
   }
 

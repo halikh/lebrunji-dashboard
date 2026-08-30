@@ -130,17 +130,42 @@ authority than the operator has, every write it can make is still gated by RLS
 and `is_admin()`, and the refresh token rotates. What would *not* limit it is a
 service-role key, which is one more reason there is not one here.
 
-### Not implemented here, on purpose
+### Project settings that are part of this, and are not in this repo
 
-- **Login rate limiting and lockout.** Supabase Auth applies its own, configured
-  per project under Authentication → Rate Limits. Doing it a second time in this
-  app would be bypassable — the auth endpoint is reachable without going through
-  this app at all.
-- **Password strength rules.** The reset form asks for twelve characters, but
-  the enforcing copy of that rule belongs in the project's password policy, for
-  the same reason.
-- **A sign-in audit trail.** Supabase records auth events; if this ever needs to
-  be visible to the operator it should read those rather than keep its own.
+Two of the protections below cannot live in application code, because the auth
+endpoint is reachable without going through this app — a rule enforced only here
+is a rule an attacker skips by not using the dashboard. They are project
+settings, and they have to be set once per Supabase project.
+
+**Authentication → Rate Limits**
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Sign in / sign up | 10 per 5 minutes per IP | This is the brute-force ceiling. There is one account, and a person signing in gets it right in two or three attempts; ten is generous for them and useless for a guessing attack. |
+| Password reset emails | 4 per hour | Also the outbound-mail cost. Nobody legitimately needs a fifth reset link in an hour. |
+| Token refreshes | leave at the default | Lower it and a busy dashboard signs itself out. |
+
+**Authentication → Policies (password)**
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Minimum length | 12 | Matches `PASSWORD.min` in `src/lib/limits.ts`. If the two disagree, the form accepts what the server then refuses. |
+| Required characters | none | Deliberate. Composition rules push people to `Password1!` — every class satisfied, guessed instantly — and refuse long passphrases that are far stronger. Length is what costs an attacker. |
+| Leaked password protection | on | Checks against HaveIBeenPwned. This is the real breach check; `validatePassword` only refuses a handful of obvious words, and does not pretend otherwise. |
+
+What *is* in this repo is the layer that can explain: `validatePassword` in
+`src/lib/validation.ts`, applied by both the reset screen and `create-admin`, so
+a password one accepts is one the other would have accepted. It is not the gate.
+
+### Still not implemented, and why
+
+- **A sign-in audit trail.** Supabase already records auth events in
+  `auth.audit_log_entries`. If this ever needs to be visible to the operator it
+  should read those rather than keep a second, divergent copy — and it needs a
+  settings screen to live in, which does not exist yet.
+- **Client-side lockout after N failed attempts.** It would be theatre: state
+  held in the browser is cleared by reloading the page. The rate limit above is
+  the real version of this, applied where it cannot be skipped.
 
 ## Scripts
 

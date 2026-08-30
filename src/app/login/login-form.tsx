@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
 import { Button, Card, Field, FormError, Input } from '@/components/ui';
-import { t } from '@/i18n/translations';
+import { t, type TranslationKey } from '@/i18n/translations';
 import { getClient } from '@/lib/supabase/client';
 import { REMEMBER_COOKIE, REMEMBER_MAX_AGE } from '@/lib/supabase/cookies';
 
@@ -36,9 +36,7 @@ export function LoginForm() {
     });
 
     if (signInError) {
-      // Never distinguishes "no such account" from "wrong password": the pair
-      // would answer "is this address staff?" for anyone who asked.
-      setError(t('login.failed'));
+      setError(t(messageFor(signInError)));
       setPending(false);
       return;
     }
@@ -111,6 +109,34 @@ export function LoginForm() {
       </form>
     </Card>
   );
+}
+
+/**
+ * Which sentence to show for a failed sign-in.
+ *
+ * The line this draws is about what each message *reveals*:
+ *
+ * - **Anything to do with the credentials collapses into one message.**
+ *   "No such account" and "wrong password" as separate answers turn this form
+ *   into a way of asking which email addresses are staff, and it is reachable
+ *   signed out by anyone. "Email not confirmed" is in here for the same reason
+ *   — it confirms the account exists.
+ * - **Rate limiting is said plainly.** It reveals nothing about the account,
+ *   and collapsing it was actively harmful: someone who has been throttled was
+ *   told their password was wrong, so they retried, which extended the
+ *   throttle. The one case where the operator needs to know exactly what
+ *   happened is the one case where telling them is free.
+ * - **A network failure is said plainly**, because "your password is wrong" is
+ *   simply untrue when the request never arrived, and it sends the operator to
+ *   reset a password that was fine.
+ */
+function messageFor(error: { status?: number; code?: string; message?: string }): TranslationKey {
+  if (error.status === 429 || error.code === 'over_request_rate_limit') {
+    return 'login.tooManyAttempts';
+  }
+  // supabase-js surfaces a failed fetch with no status at all.
+  if (error.status === undefined && error.code === undefined) return 'login.offline';
+  return 'login.failed';
 }
 
 /**

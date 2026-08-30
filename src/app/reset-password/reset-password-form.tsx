@@ -7,6 +7,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Button, Card, Field, FormError, FormNotice, Input } from '@/components/ui';
 import { t } from '@/i18n/translations';
 import { getClient } from '@/lib/supabase/client';
+import { validatePassword } from '@/lib/validation';
 
 /**
  * Sets a new password from a recovery link.
@@ -51,8 +52,12 @@ export function ResetPasswordForm() {
     event.preventDefault();
     setError(null);
 
-    if (password.length < 12) {
-      setError(t('resetPassword.tooShort'));
+    // The shared rule, not a second copy of it. `create-admin` applies the
+    // same function, so a password this screen accepts is one that script would
+    // have accepted too.
+    const strong = validatePassword(password);
+    if (!strong.ok) {
+      setError(strong.message);
       return;
     }
     if (password !== confirm) {
