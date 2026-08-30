@@ -558,6 +558,9 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                 key={
                   open.itemId ?? `new-${open.sectionId}-${create.submittedAt}`
                 }
+                storeId={storeId}
+                itemId={open.itemId}
+                currencyCode={store.data?.currencyCode ?? ""}
                 initial={editingItem}
                 pending={pending}
                 error={error}

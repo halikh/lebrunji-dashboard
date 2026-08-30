@@ -124,7 +124,47 @@ export async function searchMenu(
     searchMenuSections(storeId, term),
     searchMenuItems(storeId, term),
   ]);
+
+  // A matching section brings its items with it.
+  //
+  // "Mezze" matching a heading means the operator meant that part of the menu,
+  // and answering with the heading alone makes them clear the search and go
+  // hunting for the very thing they asked about. So the items filed under a
+  // matched section are pulled in as well.
+  //
+  // Merged rather than appended, because a dish can match on its own name *and*
+  // sit in a matched section — "Hummus Beiruti" under "Cold mezze", searched
+  // for "mezze" — and listing it twice would look like two dishes with the same
+  // name, which is a real thing a menu can have.
+  const extra = sections.length
+    ? await itemsInSections(sections.map((section) => section.id))
+    : [];
+
+  const seen = new Set(items.map((item) => item.id));
+  for (const item of extra) {
+    if (!seen.has(item.id)) {
+      seen.add(item.id);
+      items.push(item);
+    }
+  }
+
   return { sections, items };
+}
+
+async function itemsInSections(sectionIds: string[]): Promise<MenuItem[]> {
+  const { data, error } = await getClient()
+    .from("menu_items")
+    .select(
+      `id, menu_section_id, slug, name, description, price,
+       image_url, is_active, sort_order`,
+    )
+    .in("menu_section_id", sectionIds)
+    .is("deleted_at", null)
+    .order("sort_order", { ascending: true })
+    .limit(PAGE.size);
+
+  if (error) throw new Error(`Could not search the menu: ${error.message}`);
+  return (data ?? []).map(toItem);
 }
 
 async function searchMenuSections(

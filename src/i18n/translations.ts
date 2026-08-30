@@ -340,6 +340,61 @@ const en = {
       "This is what you are about to save. The app still has the old hours until you do.",
   },
 
+  /**
+   * The choices offered with a dish.
+   *
+   * The vocabulary is deliberately not the database's. A row stores `single` /
+   * `multi` and a boolean; an operator checks "choose one, required" against
+   * what the shop actually offers, and those are the same fact in the form a
+   * person holds it in.
+   */
+  options: {
+    title: "Options",
+    hint: "Questions asked when this dish is ordered — a size, extras, something left out.",
+    saveFirst: "Save this item first, then choose which options it offers.",
+    none: "This shop has no option groups yet.",
+    onThisItem: "Offered here",
+    notOnThisItem: "Not offered",
+    chooseOne: "Choose one",
+    chooseAny: "Choose any",
+    required: "Required",
+    optional: "Optional",
+    count: "{count} choices",
+    free: "Free",
+    addGroup: "New option group",
+    groupTitle: "What is being asked",
+    groupTitleHint: "The customer reads this above the choices.",
+    howMany: "How many can be chosen",
+    howManyHint: "A size is one answer; extras are usually several.",
+    atMost: "At most",
+    atMostHint: "Leave empty for no limit.",
+    noLimit: "No limit",
+    mustChoose: "Must the customer answer",
+    mustChooseHint:
+      "Required questions have to be answered before the dish can be added.",
+    saveGroup: "Create group",
+    optionName: "Choice",
+    extraCost: "Adds",
+    // Says the unit and that zero is a real answer, which a bare number field
+    // cannot.
+    extraCostHint: "Added to the item's price. Leave at 0 for a free choice.",
+    addOption: "Add choice",
+    retire: "Retire",
+    retireGroup: "Retire this group",
+    retireConfirm: "Retire",
+    retireOptionTitle: "Retire {name}?",
+    // Says what happens to history, because "delete" on something that appears
+    // on past orders is the question an operator actually has.
+    retireOptionBody:
+      "Customers stop seeing it straight away. Orders that already included it keep it.",
+    retireGroupTitle: "Retire {name}?",
+    retireGroupBody:
+      "It disappears from every dish that offers it, not just this one. Past orders keep what they included.",
+    groupAdded: "{name} created",
+    groupSaved: "{name} saved",
+    groupArchived: "{name} retired",
+  },
+
   reorder: {
     handle: "Reorder {name}",
     instructions:

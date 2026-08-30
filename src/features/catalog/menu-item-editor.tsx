@@ -7,6 +7,8 @@ import { NumberInput } from "@/components/ui/number-input";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Toggle } from "@/components/ui/toggle";
 import { ImageUploader } from "@/components/ui/image-uploader";
+
+import { ItemOptions } from "./item-options";
 import { useLanguages } from "@/features/reference/use-languages";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
@@ -62,6 +64,9 @@ export type ItemDraft = {
  * insert's own transaction.
  */
 export function MenuItemEditor({
+  storeId,
+  itemId,
+  currencyCode,
   initial,
   pending,
   error,
@@ -75,6 +80,10 @@ export function MenuItemEditor({
   onSave: (draft: ItemDraft) => void;
   /** Absent when editing: "add another" only means something while adding. */
   onSaveAndAnother?: (draft: ItemDraft) => void;
+  /** The shop, and the saved item, so options can be attached to it. */
+  storeId: string;
+  itemId: string | null;
+  currencyCode: string;
   onCancel: () => void;
 }) {
   const languages = useLanguages();
@@ -232,6 +241,19 @@ export function MenuItemEditor({
               disabled={pending}
             />
           </Field>
+
+          {/* After the fields that say what the dish *is*, and separated,
+              because these are a different kind of edit: they change the shop's
+              own list of questions, not this row. */}
+          <div className="flex flex-col gap-lg border-t border-border pt-lg">
+            <Field label={t("options.title")} hint={t("options.hint")}>
+              <ItemOptions
+                storeId={storeId}
+                itemId={itemId}
+                currencyCode={currencyCode}
+              />
+            </Field>
+          </div>
 
           <Field
             label={t("menu.visibility")}
