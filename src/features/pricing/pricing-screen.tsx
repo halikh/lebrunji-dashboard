@@ -215,7 +215,11 @@ function Rate() {
               confirmKey="pricing.rateConfirmAction"
               params={{ sample }}
               variant="primary"
-              triggerVariant="secondary"
+              // Coral, like every other "go on" in the dashboard. A neutral
+              // fill made it the same colour as Cancel, and the quieter of the
+              // two things on screen — the wrong way round for the only action
+              // on the panel.
+              triggerVariant="primary"
             >
               {t("pricing.rateSave")}
             </ConfirmButton>
