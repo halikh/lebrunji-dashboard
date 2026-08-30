@@ -64,7 +64,19 @@ let cached: { token: string; expiresAt: number } | null = null;
  */
 let inFlight: Promise<string | null> | null = null;
 
-async function getAccessToken(): Promise<string | null> {
+/**
+ * The current access token, refreshing it if it is close to expiry.
+ *
+ * Exported because Storage uploads do not go through supabase-js: it has no
+ * progress reporting, and a five-megabyte image uploading behind a spinner that
+ * says nothing is the state in which people press the button again. The upload
+ * is an `XMLHttpRequest`, which does report progress, and it needs the same
+ * token the client would have used.
+ *
+ * This exposes nothing the page could not already reach — the token is in
+ * memory here by design, and the honest limit above is unchanged by naming it.
+ */
+export async function getAccessToken(): Promise<string | null> {
   // A minute of margin: a token valid for another two seconds is not worth
   // handing to a request that has to cross a network first.
   if (cached && cached.expiresAt - 60 > Math.floor(Date.now() / 1000)) {

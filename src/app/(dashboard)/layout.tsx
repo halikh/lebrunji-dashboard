@@ -21,7 +21,21 @@ import { t } from "@/i18n/translations";
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <Providers>
-      <div className="flex h-full flex-col md:flex-row">
+      {/*
+        `h-dvh` and `overflow-hidden`, not `h-full`.
+
+        `h-full` is `height: 100%`, which resolves against the body — and the
+        body is `min-h-full`, a *minimum*. A percentage against a minimum is
+        the kind of thing that lands a pixel or two out, and the symptom is two
+        scrollbars: the window scrolling a hair, and the content area scrolling
+        properly inside it. `h-dvh` measures the viewport itself and asks no
+        ancestor anything, and `overflow-hidden` says out loud that scrolling
+        in the dashboard belongs to the panes, not to the page.
+
+        The dynamic unit also handles a phone's address bar sliding away, which
+        `100vh` famously does not.
+      */}
+      <div className="flex h-dvh flex-col overflow-hidden md:flex-row">
         {/*
         First in the DOM and visually hidden until focused. Without it, reaching
         the content from the keyboard means tabbing through every section link

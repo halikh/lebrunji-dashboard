@@ -226,6 +226,29 @@ const en = {
    * not using a pointer — which is why they name the row and its new position
    * rather than saying "moved".
    */
+  /**
+   * Uploading a picture.
+   *
+   * The distinction these draw is the one the sign-in form draws: a refusal the
+   * operator can do something about, versus one they cannot. "Not allowed"
+   * means this account is not an operator — retrying will not help, and saying
+   * so beats leaving them clicking.
+   */
+  images: {
+    label: "Image",
+    hint: "Shown in the app beside the name. JPEG, PNG or WebP.",
+    choose: "Choose an image",
+    drop: "Drop an image here, or",
+    browse: "browse",
+    paste: "You can also paste one.",
+    replace: "Replace",
+    remove: "Remove",
+    uploading: "Uploading…",
+    notSignedIn: "Your session has expired. Sign in again.",
+    notAllowed: "This account is not allowed to upload images.",
+    failed: "The upload did not finish. Nothing has been changed.",
+  },
+
   reorder: {
     handle: "Reorder {name}",
     instructions:

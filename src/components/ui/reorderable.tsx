@@ -2,9 +2,11 @@
 
 import {
   useCallback,
+  useEffect,
   useId,
+  useLayoutEffect,
+  useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -24,15 +26,33 @@ import { cx } from "./index";
  *
  * So the handle is a **button**, and it does both.
  *
- * - **Pointer** — press and move. Rows shift under the cursor as it passes
- *   their midpoints, so what you see while dragging is the result.
+ * - **Pointer** — press and move. The row follows the cursor, and the rows it
+ *   passes slide out of its way.
  * - **Keyboard** — focus the handle, press Enter or Space to pick the row up,
  *   arrow up and down to move it, Enter or Space to drop, Escape to put it
- *   back. Every move is announced.
+ *   back. Every move is announced, and the rows animate the same way.
  *
  * Both drive the same preview list and commit through the same call, so there
  * is one ordering mechanism rather than a real one and an accessible imitation
  * of it that drifts from it.
+ *
+ * ## The movement is FLIP, and it has to be
+ *
+ * The first version reordered the array and let React re-render. That is
+ * correct and it looks broken: rows teleport, and the one being dragged sits
+ * still under a moving cursor, so there is nothing connecting the gesture to
+ * the result. A CSS transition does not fix it either — the rows are not being
+ * transformed, they are being re-laid-out, and layout does not transition.
+ *
+ * So each render measures where every row *was* and where it now *is*, puts it
+ * back with a transform, and releases it on the next frame — the standard FLIP
+ * inversion. Measuring rather than assuming is what makes it work with rows of
+ * different heights, which these are: a section block is much taller than the
+ * item rows inside it.
+ *
+ * The dragged row is excluded from that and simply tracks the pointer, with its
+ * baseline corrected each time the layout shifts underneath it. Otherwise it
+ * would leap by its own height the moment it swapped past a neighbour.
  *
  * ## Why it commits an order of ids rather than an index
  *
@@ -50,13 +70,17 @@ import { cx } from "./index";
  * the list looking rearranged when nothing was saved.
  */
 
+/** Layout effects do not run on the server, and React says so out loud. */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 /**
  * The row's element, found by the mark `rowProps` puts on it.
  *
  * Searched from the document rather than from a container the hook would have
  * to be handed: ids here are database uuids, so one is unambiguous anywhere on
  * the page, and requiring a container ref would make every list pass one in for
- * the sake of a lookup that happens a few times per drag.
+ * the sake of a lookup that happens outside render anyway.
  */
 function rowNode(id: string): HTMLElement | null {
   return document.querySelector<HTMLElement>(
@@ -109,11 +133,88 @@ export function useReorder({
   const moving = grabbed ?? dragging;
 
   const setDraft = useCallback(
-    (order: string[] | null) => {
-      setPreview(order === null ? null : { signature, order });
+    (next: string[] | null) => {
+      setPreview(next === null ? null : { signature, order: next });
     },
     [signature],
   );
+
+  // ---- the animation's bookkeeping ---------------------------------------
+  //
+  // Refs rather than state: none of it is rendered, and writing it during a
+  // pointer move sixty times a second must not cost a render.
+
+  /** Where each row's box sat after the last layout, ignoring our transform. */
+  const lastTop = useRef(new Map<string, number>());
+  /** What we have currently translated each row by. */
+  const shifted = useRef(new Map<string, number>());
+  /** The pointer position and the row's layout top when the drag began. */
+  const grip = useRef<{ pointerY: number; top: number } | null>(null);
+  const frames = useRef<number[]>([]);
+
+  /** A row's layout position — its box, with our own transform taken back out. */
+  const layoutTopOf = useCallback((id: string, node: HTMLElement): number => {
+    return node.getBoundingClientRect().top - (shifted.current.get(id) ?? 0);
+  }, []);
+
+  const place = useCallback(
+    (node: HTMLElement, id: string, by: number, animate: boolean) => {
+      node.style.transition = animate
+        ? "transform var(--duration-control) var(--ease-arrive)"
+        : "none";
+      node.style.transform = by === 0 ? "" : `translateY(${by}px)`;
+      shifted.current.set(id, by);
+    },
+    [],
+  );
+
+  // Measure, invert, play. Runs after every render, which is what makes a
+  // keyboard move and a pointer move animate identically — neither one has to
+  // tell this that anything happened.
+  useIsomorphicLayoutEffect(() => {
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    for (const id of order) {
+      const node = rowNode(id);
+      if (!node) continue;
+
+      const top = layoutTopOf(id, node);
+      const before = lastTop.current.get(id);
+      lastTop.current.set(id, top);
+
+      // The dragged row is following the pointer; its transform is not this
+      // effect's to set. Its baseline moved though, and `onPointerMove` reads
+      // `lastTop` to correct for exactly that.
+      //
+      // `dragging` is read straight from the closure: the effect has no
+      // dependency array, so it re-runs after every render with the current
+      // value — a ref mirroring it would be one more thing to keep in step,
+      // and writing one during render is what React's lint rule forbids.
+      if (id === dragging) continue;
+
+      if (before === undefined || before === top || reduced) continue;
+
+      // Put it back where it was, then let it go. Two frames, because a
+      // transform set and cleared within one is not a transition.
+      place(node, id, before - top, false);
+      frames.current.push(
+        requestAnimationFrame(() => {
+          frames.current.push(
+            requestAnimationFrame(() => place(node, id, 0, true)),
+          );
+        }),
+      );
+    }
+  });
+
+  useEffect(() => {
+    const pending = frames.current;
+    return () => {
+      for (const frame of pending) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   const announce = useCallback(
     (id: string, next: string[]) => {
@@ -143,6 +244,16 @@ export function useReorder({
       return next;
     },
     [draft, ids, setDraft],
+  );
+
+  /** Lets go: the row settles into its new place rather than snapping to it. */
+  const release = useCallback(
+    (id: string) => {
+      const node = rowNode(id);
+      if (node) place(node, id, 0, true);
+      grip.current = null;
+    },
+    [place],
   );
 
   const commit = useCallback(
@@ -176,29 +287,51 @@ export function useReorder({
       // Capture, so the drag survives the pointer leaving the handle — which it
       // does immediately, because the row moves out from under it.
       event.currentTarget.setPointerCapture(event.pointerId);
+
+      const node = rowNode(id);
+      grip.current = node
+        ? { pointerY: event.clientY, top: layoutTopOf(id, node) }
+        : null;
+
       setDragging(id);
       setDraft(ids);
     },
-    [disabled, grabbed, ids, setDraft],
+    [disabled, grabbed, ids, layoutTopOf, setDraft],
   );
 
   const onPointerMove = useCallback(
     (id: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (dragging !== id) return;
+      if (dragging !== id || !grip.current) return;
+
+      const node = rowNode(id);
+      if (!node) return;
+
+      // How far the pointer has travelled, less however far the row's own
+      // layout position has moved since the drag began. Without the second
+      // term the row leaps by its own height the moment it swaps past a
+      // neighbour — the layout puts it in its new slot while the transform is
+      // still measured from the old one.
+      const top = lastTop.current.get(id) ?? grip.current.top;
+      const by =
+        event.clientY - grip.current.pointerY + (grip.current.top - top);
+      place(node, id, by, false);
 
       const current = draft ?? ids;
       const from = current.indexOf(id);
       const y = event.clientY;
 
       // The first row whose midpoint the pointer has crossed, in the direction
-      // of travel. Midpoints rather than edges: comparing against an edge makes
-      // the row flick back and forth while the pointer sits on the boundary.
+      // of travel. Layout positions, not painted ones: comparing against a
+      // neighbour that is itself mid-animation makes the target flicker.
       let to = from;
       for (let i = 0; i < current.length; i += 1) {
-        const node = rowNode(current[i]);
-        if (!node) continue;
-        const box = node.getBoundingClientRect();
-        const middle = box.top + box.height / 2;
+        if (current[i] === id) continue;
+        const other = rowNode(current[i]);
+        if (!other) continue;
+        const middle =
+          (lastTop.current.get(current[i]) ??
+            other.getBoundingClientRect().top) +
+          other.offsetHeight / 2;
         if (i < from && y < middle) {
           to = i;
           break;
@@ -208,15 +341,16 @@ export function useReorder({
 
       if (to !== from) announce(id, moveTo(id, to));
     },
-    [announce, dragging, draft, ids, moveTo],
+    [announce, dragging, draft, ids, moveTo, place],
   );
 
   const onPointerUp = useCallback(
     (id: string) => () => {
       if (dragging !== id) return;
+      release(id);
       commit(draft ?? ids);
     },
-    [commit, dragging, draft, ids],
+    [commit, dragging, draft, ids, release],
   );
 
   // ---- keyboard ----------------------------------------------------------
@@ -288,24 +422,19 @@ export function useReorder({
     (id: string, className?: string) => ({
       // The row marks itself, rather than handing back a ref callback.
       //
-      // A ref would be the obvious way to measure these, and it is the wrong
-      // one here: the only code that needs a row's position is the pointer-move
-      // handler, which runs in an event and can simply ask the DOM. Collecting
-      // every node into a map during render buys nothing, has to be kept in
-      // step as rows mount and unmount, and means reading a ref while
-      // rendering — which React's own lint rule flags, correctly.
+      // A ref would be the obvious way to find these, and it is the wrong one
+      // here: the only code that needs a row's position is the pointer-move
+      // handler and the FLIP effect, both of which run outside render and can
+      // simply ask the DOM. Collecting every node into a map during render buys
+      // nothing, has to be kept in step as rows mount and unmount, and means
+      // reading a ref while rendering — which React's own lint rule flags.
       "data-reorder-id": id,
-      // Lifted while it is the one being moved, so the eye can follow it over
-      // the rows it is passing.
-      style: (moving === id
-        ? { position: "relative", zIndex: 1 }
-        : undefined) as CSSProperties | undefined,
       className: cx(
         className,
-        moving === id && "shadow-raised",
-        // No transition on the row being moved: it should track the pointer,
-        // not lag behind it. The rows it displaces do animate.
-        moving !== null && moving !== id && "transition-transform",
+        // Lifted while it is the one being moved, so the eye can follow it over
+        // the rows it is passing. `relative` gives the z-index something to
+        // act on.
+        moving === id && "relative z-10 shadow-raised",
       ),
     }),
     [moving],
@@ -326,8 +455,10 @@ export function useReorder({
       onPointerUp: onPointerUp(id),
       onPointerCancel: onPointerUp(id),
       onKeyDown: onKeyDown(id),
+      // `touch-none` so a drag on a phone moves the row rather than scrolling
+      // the page out from under it.
       className: cx(
-        "flex size-[28px] shrink-0 items-center justify-center rounded-sm text-text-faint",
+        "flex size-[28px] shrink-0 touch-none items-center justify-center rounded-sm text-text-faint",
         "hover:bg-neutral-fill hover:text-text-soft",
         moving === id ? "cursor-grabbing" : "cursor-grab",
       ),
