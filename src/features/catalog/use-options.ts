@@ -11,6 +11,7 @@ import {
   createItemOption,
   createOptionGroup,
   fetchItemGroupIds,
+  fetchItemOwnGroups,
   fetchOptionGroups,
   setDefaultOption,
   setItemGroup,
@@ -23,8 +24,12 @@ import {
 } from "./api/options";
 
 export const optionKeys = {
+  /** The shop's shared groups. */
   store: (storeId: string) => ["options", storeId] as const,
+  /** Which shared groups one dish offers. */
   item: (itemId: string) => ["options", "item", itemId] as const,
+  /** The groups that dish owns outright. */
+  own: (itemId: string) => ["options", "own", itemId] as const,
 };
 
 export function useOptionGroups(storeId: string) {
@@ -35,6 +40,15 @@ export function useOptionGroups(storeId: string) {
     // rarely. Refetching it per dish would be a request per click for an answer
     // that is almost always the same one.
     staleTime: 5 * 60_000,
+  });
+}
+
+/** The groups belonging to this dish alone. */
+export function useItemOwnGroups(itemId: string | null) {
+  return useQuery({
+    queryKey: optionKeys.own(itemId ?? ""),
+    queryFn: () => fetchItemOwnGroups(itemId as string),
+    enabled: itemId !== null,
   });
 }
 
@@ -102,6 +116,10 @@ export function useCreateOptionGroup(storeId: string) {
     mutationFn: (input: { draft: OptionGroupDraft; sortOrder: number }) =>
       createOptionGroup(input.draft, input.sortOrder),
     onSuccess: (_id, input) => {
+      // Whichever list it joined. A shared group appears on the Options tab; an
+      // owned one appears under its dish, and also changes that dish's links,
+      // because creating it attached it.
+      void queryClient.invalidateQueries({ queryKey: ["options"] });
       void queryClient.invalidateQueries({
         queryKey: optionKeys.store(storeId),
       });
@@ -133,6 +151,10 @@ export function useUpdateOptionGroup(storeId: string) {
     mutationFn: (input: { id: string; patch: OptionGroupPatch }) =>
       updateOptionGroup(input.id, input.patch),
     onSuccess: () => {
+      // The prefix, because the same group can be read as one of the shop's or
+      // as one of a dish's, and a screen showing the stale half of that is a
+      // screen disagreeing with itself.
+      void queryClient.invalidateQueries({ queryKey: ["options"] });
       void queryClient.invalidateQueries({
         queryKey: optionKeys.store(storeId),
       });
@@ -157,6 +179,7 @@ export function useItemOptions(storeId: string) {
 
   const settle = {
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["options"] });
       void queryClient.invalidateQueries({
         queryKey: optionKeys.store(storeId),
       });

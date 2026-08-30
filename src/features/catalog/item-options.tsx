@@ -6,6 +6,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
+import { OwnGroups } from "./item-own-options";
 import { useItemGroups, useOptionGroups, useSetItemGroup } from "./use-options";
 
 /**
@@ -20,9 +21,18 @@ import { useItemGroups, useOptionGroups, useSetItemGroup } from "./use-options";
  * question. Editing a dish, the operator is answering *does this one offer
  * size?*, not deciding what sizes the shop sells.
  *
- * So this is a list of switches and nothing else. What the groups **are** lives
- * on the shop's Options tab, where there is room for a table of prices, and the
- * link below goes there rather than folding a second screen into this column.
+ * So the shared groups are a list of switches and nothing else. What those
+ * groups *are* lives on the shop's Options tab, where there is room for a table
+ * of prices, and the link below goes there rather than folding a second screen
+ * into this column.
+ *
+ * ## The dish's own questions are the exception, and they belong here
+ *
+ * "How would you like the steak done?" is about the steak. Making it shop-wide
+ * to ask it would leave the shop's list full of entries that are each about one
+ * dish, so the list meant to show what is *shared* would stop being able to.
+ * Those groups are created and edited here (migration 0073), because here is the
+ * only place they are ever offered.
  *
  * ## Why it needs a saved dish
  *
@@ -75,67 +85,72 @@ export function ItemOptions({
     );
   }
 
-  if (groups.data.length === 0) {
-    return (
-      <p className="text-[13px] text-text-faint">
-        {t("options.noneYet")}{" "}
-        <Link
-          href={`/catalogue/${storeId}?tab=options`}
-          className="font-semibold text-primary hover:underline"
-        >
-          {t("options.manage")}
-        </Link>
-      </p>
-    );
-  }
-
   const linked = new Set(attached.data ?? []);
 
   return (
-    <div className="flex flex-col gap-sm">
-      {groups.data.map((group) => (
-        <div
-          key={group.id}
-          className="flex items-center gap-md rounded-md border border-border bg-surface px-md py-sm"
-        >
-          <Toggle
-            on={linked.has(group.id)}
-            onChange={() =>
-              link.mutate({
-                groupId: group.id,
-                attached: !linked.has(group.id),
-              })
-            }
-            labelOn={t("options.offered")}
-            labelOff={t("options.notOffered")}
-            className="w-[104px]"
-          />
-          <div className="flex min-w-0 flex-col">
-            <span className="truncate text-[14px] font-semibold">
-              {pickLocalized(group.title)}
-            </span>
-            {/* The rules in words. `single`/`multi` and a boolean are how the
+    <div className="flex flex-col gap-xxl">
+      <OwnGroups storeId={storeId} itemId={itemId} />
+
+      <section className="flex flex-col gap-sm">
+        <div className="flex flex-col gap-xxs">
+          <h3 className="ps-md text-[13px] font-semibold text-text-soft">
+            {t("options.sharedTitle")}
+          </h3>
+          <p className="ps-md text-[12px] text-text-faint">
+            {t("options.sharedHint")}
+          </p>
+        </div>
+
+        {groups.data.length === 0 && (
+          <p className="ps-md text-[13px] text-text-faint">
+            {t("options.noneYet")}
+          </p>
+        )}
+
+        {groups.data.map((group) => (
+          <div
+            key={group.id}
+            className="flex items-center gap-md rounded-md border border-border bg-surface px-md py-sm"
+          >
+            <Toggle
+              on={linked.has(group.id)}
+              onChange={() =>
+                link.mutate({
+                  groupId: group.id,
+                  attached: !linked.has(group.id),
+                })
+              }
+              labelOn={t("options.offered")}
+              labelOff={t("options.notOffered")}
+              className="w-[104px]"
+            />
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate text-[14px] font-semibold">
+                {pickLocalized(group.title)}
+              </span>
+              {/* The rules in words. `single`/`multi` and a boolean are how the
                 row is stored; "choose one, 3 choices" is the same fact in the
                 form somebody can check against what the shop offers. */}
-            <span className="truncate text-[12px] text-text-faint">
-              {t(
-                group.mode === "single"
-                  ? "options.chooseOne"
-                  : "options.chooseAny",
-              )}
-              {" · "}
-              {t("options.count", { count: group.options.length })}
-            </span>
+              <span className="truncate text-[12px] text-text-faint">
+                {t(
+                  group.mode === "single"
+                    ? "options.chooseOne"
+                    : "options.chooseAny",
+                )}
+                {" · "}
+                {t("options.count", { count: group.options.length })}
+              </span>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
 
-      <Link
-        href={`/catalogue/${storeId}?tab=options`}
-        className="ps-md text-[12px] font-semibold text-primary hover:underline"
-      >
-        {t("options.manage")}
-      </Link>
+        <Link
+          href={`/catalogue/${storeId}?tab=options`}
+          className="ps-md text-[12px] font-semibold text-primary hover:underline"
+        >
+          {t("options.manage")}
+        </Link>
+      </section>
     </div>
   );
 }

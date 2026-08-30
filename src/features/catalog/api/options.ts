@@ -29,13 +29,23 @@ import type { Localized } from "@/lib/validation";
  * - **`is_default`** says which answer a required group opens on. Before it,
  *   the app took whichever sorted first, which is a guess dressed as a decision.
  *
- * ## Groups belong to the shop, not to the item
+ * ## A group belongs to the shop, or to one dish
  *
- * "Add extras" is one group offered on twenty dishes, and editing it once is
- * the entire point of it being a row rather than a repeated list.
- * `menu_item_option_group_links` attaches it. So removing a group from an item
- * is a **detach**, not a withdrawal: the operator means "not on this dish", and
- * withdrawing the group would take it off the other nineteen.
+ * Both are real, and a menu has both (migration 0073).
+ *
+ * - **Shared** — `menu_item_id is null`. "Add extras" exists once and is offered
+ *   on twenty dishes; editing it once is the entire point of it being a row
+ *   rather than a repeated list. Removing it from an item is a **detach**, not
+ *   a withdrawal: the operator means "not on this dish", and withdrawing would
+ *   take it off the other nineteen.
+ * - **Owned** — `menu_item_id` set. "How would you like the steak done?"
+ *   belongs to the steak, is created from that dish's editor, and is offered
+ *   nowhere else. Deleting the dish takes it with it.
+ *
+ * The difference is about who may edit the group and where it is listed, not
+ * about how it is served: **both kinds are attached through
+ * `menu_item_option_group_links`**, so the app reads one thing and needs no
+ * knowledge of ownership at all.
  */
 
 export type ItemOption = {
@@ -60,27 +70,51 @@ export type OptionGroup = {
   maxSelections: number | null;
   isActive: boolean;
   sortOrder: number;
+  /** The dish this belongs to, or null when the whole shop shares it. */
+  ownerItemId: string | null;
   options: ItemOption[];
 };
 
+const GROUP_COLUMNS = `id, title, mode, min_selections, max_selections,
+   is_active, sort_order, menu_item_id,
+   item_options ( id, name, price, is_active, is_default, sort_order )`;
+
 /**
- * Every group in a shop, with its options — **including withdrawn ones**.
+ * The shop's **shared** groups, with their options — including withdrawn ones.
  *
- * The app filters to what is offered; this is the screen that decides what is
- * offered, so it has to show the rest. A withdrawn option that vanished from
- * here could never be brought back, and "where did the large size go" would
- * have no answer on the page that took it away.
+ * Owned groups are deliberately absent: they are each about one dish, and a
+ * list meant to show what is shared stops being able to the moment it is full
+ * of entries that are not.
+ *
+ * Withdrawn rows are present, though. The app filters to what is offered; this
+ * is the screen that *decides* what is offered, so it has to show the rest. A
+ * withdrawn option that vanished from here could never be brought back, and
+ * "where did the large size go" would have no answer on the page that took it
+ * away.
  */
 export async function fetchOptionGroups(
   storeId: string,
 ): Promise<OptionGroup[]> {
   const { data, error } = await getClient()
     .from("option_groups")
-    .select(
-      `id, title, mode, min_selections, max_selections, is_active, sort_order,
-       item_options ( id, name, price, is_active, is_default, sort_order )`,
-    )
+    .select(GROUP_COLUMNS)
     .eq("store_id", storeId)
+    .is("menu_item_id", null)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw new Error(`Could not read the options: ${error.message}`);
+
+  return (data ?? []).map(toGroup);
+}
+
+/** The groups belonging to one dish and offered nowhere else. */
+export async function fetchItemOwnGroups(
+  itemId: string,
+): Promise<OptionGroup[]> {
+  const { data, error } = await getClient()
+    .from("option_groups")
+    .select(GROUP_COLUMNS)
+    .eq("menu_item_id", itemId)
     .order("sort_order", { ascending: true });
 
   if (error) throw new Error(`Could not read the options: ${error.message}`);
@@ -143,6 +177,8 @@ export type OptionGroupDraft = {
   mode: OptionGroupMode;
   minSelections: number;
   maxSelections: number | null;
+  /** Set to make the group that dish's own. Null for a shop-wide group. */
+  ownerItemId?: string | null;
 };
 
 export async function createOptionGroup(
@@ -160,6 +196,7 @@ export async function createOptionGroup(
       // a number there would be a fact nothing reads and everything ignores.
       max_selections: draft.mode === "multi" ? draft.maxSelections : null,
       sort_order: sortOrder,
+      menu_item_id: draft.ownerItemId ?? null,
       // No `slug`: the trigger from migration 0071 derives it from the English
       // title and makes it unique within the shop.
     })
@@ -167,7 +204,20 @@ export async function createOptionGroup(
     .single();
 
   if (error) throw new Error(friendly(error.message));
-  return data.id as string;
+
+  const id = data.id as string;
+
+  // An owned group is linked to its own dish immediately.
+  //
+  // Ownership says who may edit it; the **link** is what serves it — the app
+  // reads an item's options through `menu_item_option_group_links` and knows
+  // nothing about `menu_item_id`. A group created without this would belong to
+  // a dish that never offers it, which looks like a save that did nothing.
+  if (draft.ownerItemId) {
+    await setItemGroup(draft.ownerItemId, id, true);
+  }
+
+  return id;
 }
 
 export type OptionGroupPatch = Partial<Omit<OptionGroupDraft, "storeId">> & {
@@ -280,6 +330,11 @@ export async function setDefaultOption(
  */
 function friendly(message: string): string {
   if (message.includes("selection_range")) return t("options.rangeImpossible");
+  // Migration 0073's second guard: an owned group offered on a second dish.
+  // The operator's next step is to make it shop-wide, and the message says so.
+  if (message.includes("cannot be offered on")) {
+    return t("options.ownedElsewhere");
+  }
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("slug")) return t("dbError.duplicateSlug");
   return message;
@@ -294,6 +349,7 @@ function toGroup(row: Record<string, unknown>): OptionGroup {
     maxSelections: (row.max_selections as number | null) ?? null,
     isActive: row.is_active as boolean,
     sortOrder: row.sort_order as number,
+    ownerItemId: (row.menu_item_id as string | null) ?? null,
     options: asArray(row.item_options)
       .map((option) => ({
         id: option.id as string,

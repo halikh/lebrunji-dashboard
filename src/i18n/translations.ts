@@ -404,6 +404,19 @@ const en = {
     groupAdded: "{name} created",
     // The one constraint an operator can actually hit: a floor above the
     // ceiling is unsatisfiable, and the database says so by constraint name.
+    // Migration 0073's second guard, in terms of what to do about it.
+    ownedElsewhere:
+      "That group belongs to another dish. Make it shop-wide to offer it on more than one.",
+    // The two kinds of group, named where the operator meets them.
+    ownTitle: "Only on this dish",
+    ownHint:
+      "Questions asked about this dish and nothing else — how it is cooked, which sauce.",
+    ownEmpty: "None yet.",
+    addOwn: "Add a question for this dish",
+    sharedTitle: "Shared with the shop",
+    sharedHint:
+      "Groups this shop offers on several dishes. Switch on the ones this dish asks.",
+    editInTab: "Edit choices on the Options tab",
     rangeImpossible:
       "At least cannot be more than At most — nobody could satisfy that.",
   },
