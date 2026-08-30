@@ -185,6 +185,10 @@ export function useReorder({
   /** The scrolling ancestor the drag happens inside, found once per drag. */
   const scroller = useRef<HTMLElement | null>(null);
   const frames = useRef<number[]>([]);
+  /** The order as of the last layout, so a render can be asked what changed. */
+  const lastOrder = useRef("");
+  /** When the last set of return animations will have finished. */
+  const settleBy = useRef(0);
 
   /**
    * Set in the pointer handlers, never during render.
@@ -456,9 +460,25 @@ export function useReorder({
   );
 
   /**
-   * Measure, invert, play. Runs after every render, which is what makes a
-   * keyboard move and a pointer move animate identically — neither has to tell
-   * this that anything happened.
+   * Measure, invert, play — **when the order changed, and only then.**
+   *
+   * It runs after every render, which is what makes a keyboard move and a
+   * pointer move animate identically: neither has to tell this that anything
+   * happened. But a render is not the same thing as a reorder, and conflating
+   * them was a bug people saw as a flicker on screens that have nothing to do
+   * with dragging.
+   *
+   * A row's position changes for all sorts of reasons that are not a move. The
+   * side panel opens and the list beside it narrows, so every description
+   * rewraps and every row below shifts. A toggle flips. A query settles. The
+   * first version animated all of it — open a form and the whole list slid
+   * about for a fifth of a second, which reads as the page glitching.
+   *
+   * So the order is compared first. When it is unchanged the effect only brings
+   * its record of where things are up to date, and nothing moves. **Animation
+   * is for the thing the operator did, never for the layout reacting to
+   * something else** — which is the same rule `reveal()` follows about
+   * scrolling.
    *
    * ## Transforms are cleared before measuring, and that is the whole trick
    *
@@ -491,6 +511,31 @@ export function useReorder({
     for (const id of order) {
       const node = rowNode(id);
       if (node) nodes.push([id, node]);
+    }
+
+    const signature = order.join(",");
+    const reordered = signature !== lastOrder.current;
+    lastOrder.current = signature;
+
+    if (!reordered) {
+      // Nothing moved on purpose. Positions may still have changed — the panel
+      // opening is the common one — and the record has to follow them, or the
+      // next real move would animate from where rows used to be.
+      //
+      // Only while everything is still, though. Measuring a row that is part
+      // way through its own animation stores the position it is passing
+      // through, which is the same poisoned-baseline bug that stranded a
+      // dragged row; and a held row is deliberately not where its layout says.
+      // Skipping is safe where guessing is not: the next reorder measures
+      // afresh anyway, and the worst case is one animation that starts from
+      // slightly the wrong place.
+      if (held.current === null && performance.now() > settleBy.current) {
+        const idle = scrolled();
+        for (const [id, node] of nodes) {
+          lastTop.current.set(id, node.getBoundingClientRect().top + idle);
+        }
+      }
+      return;
     }
 
     // 1. Neutralise, so what is measured is layout rather than paint.
@@ -526,6 +571,11 @@ export function useReorder({
       }
 
       if (before === undefined || before === top || reduced) continue;
+
+      // Comfortably past `--duration-control` plus the two frames below. It
+      // gates a re-measurement, not the animation itself, so an approximation
+      // costs at most a skipped update rather than a wrong one.
+      settleBy.current = performance.now() + 500;
 
       place(node, id, before - top, false);
       frames.current.push(
