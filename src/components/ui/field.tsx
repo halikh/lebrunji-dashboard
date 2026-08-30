@@ -29,6 +29,17 @@ import { createContext, useContext, useId, type ReactNode } from "react";
  * The slot is only rendered when there is something in it — a permanently
  * reserved empty line under every field is a lot of grey space to buy against
  * a shift that only happens while somebody is being corrected.
+ *
+ * ## Why the words are indented
+ *
+ * An input in this project has a large radius and horizontal padding, so the
+ * text a person types starts some way inside its left edge. A label or a hint
+ * set flush at zero therefore lines up with the *border* and with nothing they
+ * can read — and against a pill-shaped field, whose edge curves away, it reads
+ * as slightly misaligned rather than as deliberately outdented.
+ *
+ * So they are inset by the control's own padding, and the column of text runs
+ * straight down: label, value, hint.
  */
 
 export type FieldWiring = {
@@ -80,7 +91,7 @@ export function Field({
       <div className="flex flex-col gap-xs">
         <label
           htmlFor={id}
-          className="text-[13px] font-semibold text-text-soft"
+          className="ps-md text-[13px] font-semibold text-text-soft"
         >
           {label}
         </label>
@@ -93,13 +104,16 @@ export function Field({
           <p
             id={errorId ?? undefined}
             role="alert"
-            className="text-[13px] font-medium text-danger"
+            className="ps-md text-[13px] font-medium text-danger"
           >
             {error}
           </p>
         ) : (
           hint && (
-            <p id={hintId ?? undefined} className="text-[13px] text-text-faint">
+            <p
+              id={hintId ?? undefined}
+              className="ps-md text-[13px] text-text-faint"
+            >
               {hint}
             </p>
           )

@@ -100,7 +100,74 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
  * makes the mode change honest — a searched list cannot be dragged, because a
  * position within a set of matches is not a position in the menu.
  */
-export async function searchMenuItems(
+export type MenuMatches = {
+  sections: { id: string; title: Localized; itemCount: number }[];
+  items: MenuItem[];
+};
+
+/**
+ * Everything in a shop that matches, sections as well as items.
+ *
+ * A menu is two kinds of thing and somebody searching "mezze" may want either —
+ * the heading, to rename or archive it, or the dishes filed under it. Returning
+ * only items means the section is unreachable by name, and the operator scrolls
+ * the whole menu looking for a word the search box has already been told.
+ *
+ * The two queries go together rather than in sequence: they are independent,
+ * and one round trip of latency is enough for one keystroke.
+ */
+export async function searchMenu(
+  storeId: string,
+  term: string,
+): Promise<MenuMatches> {
+  const [sections, items] = await Promise.all([
+    searchMenuSections(storeId, term),
+    searchMenuItems(storeId, term),
+  ]);
+  return { sections, items };
+}
+
+async function searchMenuSections(
+  storeId: string,
+  term: string,
+): Promise<MenuMatches["sections"]> {
+  const like = `%${term.trim()}%`;
+
+  const { data, error } = await getClient()
+    .from("menu_sections")
+    // The count comes back with the row, because a heading on its own says
+    // nothing about whether it is the one you meant — "Cold mezze, 6 items" is
+    // recognisable in a way "Cold mezze" is not.
+    .select("id, title, menu_items(count)")
+    .eq("store_id", storeId)
+    .is("deleted_at", null)
+    .or(
+      [
+        `title->>en.ilike.${like}`,
+        `title->>ar.ilike.${like}`,
+        `slug.ilike.${like}`,
+      ].join(","),
+    )
+    .order("sort_order", { ascending: true })
+    .limit(PAGE.size);
+
+  if (error) throw new Error(`Could not search the menu: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    title: (row.title as Localized) ?? {},
+    itemCount: countOf(row.menu_items),
+  }));
+}
+
+/** PostgREST returns an aggregate embed as `[{ count }]`, or nothing at all. */
+function countOf(value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  const first = value[0] as { count?: number } | undefined;
+  return first?.count ?? 0;
+}
+
+async function searchMenuItems(
   storeId: string,
   term: string,
 ): Promise<MenuItem[]> {

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { Button, Input, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
+import { useOnScreen } from "@/components/ui/on-screen";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { useRevealOnMount } from "@/components/ui/reveal";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
@@ -147,6 +148,34 @@ export function StoreMenu({ storeId }: { storeId: string }) {
    */
   const [search, setSearch] = useState("");
   const searching = search.trim().length >= SEARCH.minTerm;
+  // Tied to the input, so the sentence is read out with the field rather than
+  // being drawn near it and announced to nobody.
+  const searchHintId = useId();
+
+  /**
+   * Whether the in-list "Add a section" can be seen.
+   *
+   * The pinned copy only appears when it cannot. A menu that fits on screen
+   * needs no floating bar — the button is right there at the end of the list,
+   * where a new section is going to appear — and a menu that does not fit gets
+   * the bar so the action is not several screens away. Never both at once.
+   */
+  const [addButtonRef, addButtonOnScreen] = useOnScreen<HTMLDivElement>();
+  /**
+   * A marker at the very top of the list, watched to tell whether the operator
+   * has scrolled at all.
+   *
+   * Two conditions decide the pinned bar, and each removes a different kind of
+   * clutter. It stays away **at the top**, where the menu is being read rather
+   * than built and a floating bar is a strip of chrome over the first section.
+   * And it stays away **at the bottom**, where the real button is already in
+   * view — the two are never on screen together.
+   *
+   * Sentinels rather than a scroll listener: the question is only ever "can
+   * this be seen", which is what an `IntersectionObserver` answers without
+   * running anything on every frame of a scroll.
+   */
+  const [topRef, atTop] = useOnScreen<HTMLDivElement>();
   const matches = useMenuSearch(storeId, search);
 
   const openSection =
@@ -174,39 +203,53 @@ export function StoreMenu({ storeId }: { storeId: string }) {
     // once for both panes. This is the menu itself and the panel beside it.
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
-        <div className="flex shrink-0 items-center gap-lg px-xxl pt-lg">
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t("menu.search")}
-            aria-label={t("menu.search")}
-            className="w-[280px]"
-          />
-          {searching && (
-            <>
-              <span className="text-[13px] text-text-faint">
-                {t("menu.searchResults", {
-                  count: matches.data?.length ?? 0,
-                })}
-              </span>
-              <Button
-                variant="quiet"
-                size="sm"
-                onClick={() => setSearch("")}
-                className="ms-auto"
-              >
-                {t("menu.searchClear")}
-              </Button>
-            </>
-          )}
-          {!searching && (
-            <span className="text-[12px] text-text-faint">
-              {t("menu.searchHint")}
-            </span>
-          )}
+        {/* The hint sits under the box, not beside it — where a field's helper
+            always goes, so it reads as belonging to the input rather than as a
+            note that happens to be next to it.
+
+            It stays while a search is running, too. Hiding it then would move
+            the list up by a line on the first keystroke, and the sentence is
+            most worth reading at exactly the moment somebody has searched and
+            found less than they expected. */}
+        <div className="flex shrink-0 flex-col gap-xs px-xxl pt-lg">
+          <div className="flex items-center gap-lg">
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t("menu.search")}
+              aria-label={t("menu.search")}
+              aria-describedby={searchHintId}
+              className="w-[280px]"
+            />
+            {searching && (
+              <>
+                <span className="text-[13px] text-text-faint">
+                  {t("menu.searchResults", {
+                    count:
+                      (matches.data?.sections.length ?? 0) +
+                      (matches.data?.items.length ?? 0),
+                  })}
+                </span>
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  onClick={() => setSearch("")}
+                  className="ms-auto"
+                >
+                  {t("menu.searchClear")}
+                </Button>
+              </>
+            )}
+          </div>
+          {/* `ps-md`, matching the input's own padding, so the sentence starts
+              under the text rather than under the border. See `Field`. */}
+          <span id={searchHintId} className="ps-md text-[12px] text-text-faint">
+            {t("menu.searchHint")}
+          </span>
         </div>
 
         <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+          <div ref={topRef} aria-hidden className="h-px shrink-0" />
           {menu.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (
@@ -238,13 +281,43 @@ export function StoreMenu({ storeId }: { storeId: string }) {
 
           {searching ? (
             <div className="flex flex-col gap-sm">
-              {matches.data?.length === 0 && !matches.isFetching && (
-                <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
-                  {t("menu.searchNone", { term: search.trim() })}
-                </p>
-              )}
+              {matches.data?.sections.length === 0 &&
+                matches.data.items.length === 0 &&
+                !matches.isFetching && (
+                  <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
+                    {t("menu.searchNone", { term: search.trim() })}
+                  </p>
+                )}
 
-              {matches.data?.map((item) => (
+              {/* Sections first. A heading matching the term is the broader
+                  answer — "you meant this part of the menu" — and burying it
+                  under the dishes would make the operator scroll past what
+                  they were looking for. */}
+              {matches.data?.sections.map((section) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() =>
+                    setOpen({ kind: "section", sectionId: section.id })
+                  }
+                  className="flex items-center gap-md rounded-md border border-border bg-surface px-lg py-md text-left"
+                >
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
+                    {t("menu.sectionLabel")}
+                  </span>
+                  <span className="text-[16px] font-semibold">
+                    {pickLocalized(section.title)}
+                  </span>
+                  <span className="text-[13px] text-text-faint">
+                    {t("menu.itemCount", { count: section.itemCount })}
+                  </span>
+                  <span className="ms-auto text-[13px] font-semibold text-primary">
+                    {t("menu.renameSection")}
+                  </span>
+                </button>
+              ))}
+
+              {matches.data?.items.map((item) => (
                 <SearchResult
                   key={item.id}
                   item={item}
@@ -329,47 +402,60 @@ export function StoreMenu({ storeId }: { storeId: string }) {
               Full width, like the "add an item" button inside each section: a
               row of controls that all mean "add something here" should not be
               three different widths. */}
-          {!searching &&
-            menu.isSuccess &&
-            (adding ? (
-              <SectionForm
-                pending={createSection.isPending}
-                onSave={(title) =>
-                  createSection.mutate(
-                    {
-                      draft: { storeId, title },
-                      // At the end. The column has no default, and where a new
-                      // section goes is a question the caller can answer and
-                      // the database cannot.
-                      sortOrder: sections.length,
-                    },
-                    { onSuccess: () => setAdding(false) },
-                  )
-                }
-                onCancel={() => setAdding(false)}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAdding(true)}
-                className="flex w-full items-center justify-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-soft hover:border-primary hover:text-primary"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  aria-hidden
-                >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
+          {/* The form appears where the new section will, at the end of the
+              list — and scrolls itself into view, because on a long menu it
+              opens below the fold. The button that opens it is pinned below. */}
+          {!searching && menu.isSuccess && adding && (
+            <SectionForm
+              pending={createSection.isPending}
+              onSave={(title) =>
+                createSection.mutate(
+                  {
+                    draft: { storeId, title },
+                    // At the end. The column has no default, and where a new
+                    // section goes is a question the caller can answer and the
+                    // database cannot.
+                    sortOrder: sections.length,
+                  },
+                  { onSuccess: () => setAdding(false) },
+                )
+              }
+              onCancel={() => setAdding(false)}
+            />
+          )}
+
+          {/* Where a new section actually goes: the end of the list. This is
+              the real button; the pinned one below is a shortcut to it that
+              only exists while this one is out of sight. */}
+          {!searching && menu.isSuccess && !adding && (
+            <div ref={addButtonRef}>
+              <Button fullWidth onClick={() => setAdding(true)}>
                 {t("menu.addSection")}
-              </button>
-            ))}
+              </Button>
+            </div>
+          )}
         </div>
+
+        {/* The same action, within reach.
+            A menu runs to several screens, and scrolling to the bottom to add a
+            section is a cost paid over and over on the day a shop is set up —
+            which is exactly when it is used most. It appears only when the real
+            button has scrolled out of view, so a short menu never grows a bar
+            it does not need and the two are never on screen together.
+
+            Hidden while searching, because there is no menu on screen for a new
+            section to join. */}
+        {!searching &&
+          menu.isSuccess &&
+          !adding &&
+          !atTop &&
+          !addButtonOnScreen && (
+            <div className="flex shrink-0 items-center border-t border-border bg-surface p-lg">
+              <Button fullWidth onClick={() => setAdding(true)}>
+                {t("menu.addSection")}
+              </Button>
+            </div>
+          )}
       </div>
 
       <Panel

@@ -14,7 +14,7 @@ import {
   createMenuItem,
   createMenuSection,
   fetchMenu,
-  searchMenuItems,
+  searchMenu,
   setSortOrder,
   updateMenuItem,
   updateMenuSection,
@@ -45,7 +45,7 @@ export function useMenuSearch(storeId: string, term: string) {
 
   return useQuery({
     queryKey: [...menuKeys.store(storeId), "search", trimmed],
-    queryFn: () => searchMenuItems(storeId, trimmed),
+    queryFn: () => searchMenu(storeId, trimmed),
     enabled: trimmed.length >= SEARCH.minTerm,
     placeholderData: (previous) => previous,
   });

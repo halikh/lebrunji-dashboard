@@ -388,10 +388,14 @@ const en = {
     search: "Search this menu",
     // Says where it looks. An operator who has just scrolled past an item and
     // cannot find it needs to know the search is not limited to what is drawn.
-    searchHint: "Searches every item in this shop, in both languages.",
+    searchHint:
+      "Searches every item and section in this shop, in both languages.",
     searchResults: "{count} matching",
     searchNone: "Nothing in this shop matches {term}.",
     searchClear: "Clear search",
+    // Marks a result as a heading rather than a dish. The two sit in one list
+    // and a section's name can read exactly like an item's.
+    sectionLabel: "Section",
     // Reordering is off while searching, and saying so beats a handle that
     // silently does nothing.
     searchNoDrag: "Clear the search to reorder.",
