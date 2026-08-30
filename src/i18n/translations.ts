@@ -349,6 +349,18 @@ const en = {
    * person holds it in.
    */
   options: {
+    tab: "Options",
+    tabHint:
+      "Questions this shop can ask about a dish. Each one is offered on as many items as you like.",
+    pickOne: "Choose a group to see its choices.",
+    newGroup: "New option group",
+    choices: "Choices",
+    noChoices: "No choices yet. Add the first one below.",
+    noneYet: "This shop has no option groups yet.",
+    offered: "Offered",
+    notOffered: "Not offered",
+    manage: "Manage this shop's options",
+    failedTitle: "Could not load the options",
     title: "Options",
     hint: "Questions asked when this dish is ordered — a size, extras, something left out.",
     saveFirst: "Save this item first, then choose which options it offers.",
@@ -379,20 +391,21 @@ const en = {
     // cannot.
     extraCostHint: "Added to the item's price. Leave at 0 for a free choice.",
     addOption: "Add choice",
-    retire: "Retire",
-    retireGroup: "Retire this group",
-    retireConfirm: "Retire",
-    retireOptionTitle: "Retire {name}?",
-    // Says what happens to history, because "delete" on something that appears
-    // on past orders is the question an operator actually has.
-    retireOptionBody:
-      "Customers stop seeing it straight away. Orders that already included it keep it.",
-    retireGroupTitle: "Retire {name}?",
-    retireGroupBody:
-      "It disappears from every dish that offers it, not just this one. Past orders keep what they included.",
+    // "Withdrawn", not "retired" or "deleted". These rows are referenced by
+    // past orders forever and are never removed; what changes is whether the
+    // shop still offers them, and that is reversible.
+    offeredGroup: "Offered",
+    withdrawn: "Withdrawn",
+    atLeast: "Choose at least {count}",
+    atLeastLabel: "At least",
+    atLeastHint: "0 lets the customer skip the question.",
+    isDefault: "Default",
+    makeDefault: "Make default",
     groupAdded: "{name} created",
-    groupSaved: "{name} saved",
-    groupArchived: "{name} retired",
+    // The one constraint an operator can actually hit: a floor above the
+    // ceiling is unsatisfiable, and the database says so by constraint name.
+    rangeImpossible:
+      "At least cannot be more than At most — nobody could satisfy that.",
   },
 
   reorder: {
@@ -447,7 +460,7 @@ const en = {
       "Searches every item and section in this shop, in both languages.",
     searchResults: "{count} matching",
     searchNone: "Nothing in this shop matches {term}.",
-    searchClear: "Clear search",
+    searchClear: "Clear",
     // Marks a result as a heading rather than a dish. The two sit in one list
     // and a section's name can read exactly like an item's.
     sectionLabel: "Section",

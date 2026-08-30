@@ -298,14 +298,15 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                   answer — "you meant this part of the menu" — and burying it
                   under the dishes would make the operator scroll past what
                   they were looking for. */}
+              {/* The same controls a section has in the list.
+                  A result is the same thing found a different way, so what can
+                  be done to it should not depend on how it was reached — and a
+                  row that offers only Rename quietly says archiving is
+                  unavailable here, which is not true. */}
               {matches.data?.sections.map((section) => (
-                <button
+                <div
                   key={section.id}
-                  type="button"
-                  onClick={() =>
-                    setOpen({ kind: "section", sectionId: section.id })
-                  }
-                  className="flex items-center gap-md rounded-md border border-border bg-surface px-lg py-md text-left"
+                  className="flex items-center gap-md rounded-md border border-border bg-surface px-lg py-md"
                 >
                   <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
                     {t("menu.sectionLabel")}
@@ -316,10 +317,36 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                   <span className="text-[13px] text-text-faint">
                     {t("menu.itemCount", { count: section.itemCount })}
                   </span>
-                  <span className="ms-auto text-[13px] font-semibold text-primary">
-                    {t("menu.renameSection")}
-                  </span>
-                </button>
+
+                  <div className="ms-auto flex items-center gap-sm">
+                    <Button
+                      variant="primary-quiet"
+                      size="sm"
+                      onClick={() =>
+                        setOpen({ kind: "section", sectionId: section.id })
+                      }
+                    >
+                      {t("menu.renameSection")}
+                    </Button>
+                    <ConfirmButton
+                      onConfirm={async () => {
+                        await archiveSection.mutateAsync({
+                          id: section.id,
+                          name: section.title,
+                        });
+                      }}
+                      titleKey="menu.sectionArchiveTitle"
+                      bodyKey="menu.sectionArchiveBody"
+                      confirmKey="menu.archiveConfirm"
+                      params={{ name: pickLocalized(section.title) }}
+                      variant="danger"
+                      triggerVariant="danger"
+                      size="sm"
+                    >
+                      {t("menu.archive")}
+                    </ConfirmButton>
+                  </div>
+                </div>
               ))}
 
               {matches.data?.items.map((item) => (
@@ -560,7 +587,6 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                 }
                 storeId={storeId}
                 itemId={open.itemId}
-                currencyCode={store.data?.currencyCode ?? ""}
                 initial={editingItem}
                 pending={pending}
                 error={error}

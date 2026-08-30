@@ -66,7 +66,6 @@ export type ItemDraft = {
 export function MenuItemEditor({
   storeId,
   itemId,
-  currencyCode,
   initial,
   pending,
   error,
@@ -83,7 +82,6 @@ export function MenuItemEditor({
   /** The shop, and the saved item, so options can be attached to it. */
   storeId: string;
   itemId: string | null;
-  currencyCode: string;
   onCancel: () => void;
 }) {
   const languages = useLanguages();
@@ -247,11 +245,7 @@ export function MenuItemEditor({
               own list of questions, not this row. */}
           <div className="flex flex-col gap-lg border-t border-border pt-lg">
             <Field label={t("options.title")} hint={t("options.hint")}>
-              <ItemOptions
-                storeId={storeId}
-                itemId={itemId}
-                currencyCode={currencyCode}
-              />
+              <ItemOptions storeId={storeId} itemId={itemId} />
             </Field>
           </div>
 

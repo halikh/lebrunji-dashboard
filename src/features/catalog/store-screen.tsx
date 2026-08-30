@@ -10,6 +10,7 @@ import { t } from "@/i18n/translations";
 import { StoreDetails } from "./store-details";
 import { StoreHours } from "./store-hours";
 import { StoreMenu } from "./store-menu";
+import { StoreOptions } from "./store-options";
 import { useStore } from "./use-stores";
 
 /**
@@ -37,6 +38,7 @@ import { useStore } from "./use-stores";
 const TABS = [
   { key: "menu", labelKey: "menu.title" },
   { key: "details", labelKey: "store.tab" },
+  { key: "options", labelKey: "options.tab" },
   { key: "hours", labelKey: "hours.tab" },
 ] as const;
 
@@ -140,6 +142,9 @@ export function StoreScreen({ storeId }: { storeId: string }) {
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "details" && "hidden")}>
         <StoreDetails storeId={storeId} />
+      </div>
+      <div className={cx("min-h-0 flex-1", tab !== "options" && "hidden")}>
+        <StoreOptions storeId={storeId} />
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "hours" && "hidden")}>
         <StoreHours storeId={storeId} />
