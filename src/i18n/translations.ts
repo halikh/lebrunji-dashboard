@@ -356,6 +356,63 @@ const en = {
    * what the shop actually offers, and those are the same fact in the form a
    * person holds it in.
    */
+  /**
+   * The tiles on the app's home screen.
+   *
+   * A category is what a customer picks before they pick a shop, so the list is
+   * short, seen by everyone, and ordered by hand — which is why the order is
+   * the thing this screen is really about.
+   */
+  categories: {
+    tab: "Categories",
+    add: "New category",
+    name: "Name",
+    tagline: "Tagline",
+    taglineHint: "A line under the name on the home screen. Optional.",
+    kind: "Kind",
+    kindHint: "Groups categories in the app. Set by migration, not here.",
+    pickKind: "Choose a kind",
+    kindRequired: "Every category belongs to a kind.",
+    imageHint: "The picture on the tile.",
+    visibility: "Visibility",
+    live: "Live",
+    hidden: "Hidden",
+    liveHint: "Customers see this tile on the home screen.",
+    hiddenHint: "The tile is gone from the app. Its shops are unaffected.",
+    featured: "Featured",
+    featuredLabel: "Promotion",
+    featuredHint: "Featured categories lead the home screen.",
+    // The flag exists to switch off the exceptions — the ones that are booked
+    // rather than browsed — so the hint says which those are.
+    menuNav: "Menu tabs",
+    menuNavHint:
+      "Off for shops that are booked rather than browsed, whose menu is a handful of lines.",
+    menuNavOn: "Shown",
+    menuNavOff: "Hidden",
+    save: "Save category",
+    added: "{name} added",
+    saved: "{name} saved",
+    archived: "{name} archived",
+    archive: "Archive",
+    archiveTitle: "Archive {name}?",
+    archiveBody:
+      "The tile disappears from the app immediately. It can be brought back.",
+    archiveConfirm: "Archive",
+    // The refusal an operator is most likely to meet. `stores.category_id` is
+    // not null and references this row, so it says the number and what to do.
+    stillHasShops:
+      "{count} shop(s) are still in this category. Move them first, or they would have nowhere to belong.",
+    showTitle: "Show {name} to customers?",
+    showBody: "The tile appears on the home screen straight away.",
+    showConfirm: "Show it",
+    hideTitle: "Hide {name} from customers?",
+    hideBody:
+      "The tile disappears from the home screen straight away. Its shops keep trading and can still be reached by search.",
+    hideConfirm: "Hide it",
+    formLabel: "Category details",
+    failedTitle: "Could not load the categories",
+  },
+
   options: {
     tab: "Options",
     tabHint:

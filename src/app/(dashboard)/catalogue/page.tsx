@@ -1,4 +1,6 @@
-import { StoresList } from "@/features/catalog/stores-list";
+import { Suspense } from "react";
+
+import { CatalogueScreen } from "@/features/catalog/catalogue-screen";
 
 /**
  * The catalogue starts at the shops.
@@ -7,5 +9,12 @@ import { StoresList } from "@/features/catalog/stores-list";
  * the first question is always which shop.
  */
 export default function CataloguePage() {
-  return <StoresList />;
+  // `Suspense`, because the shell reads its tab out of `useSearchParams` —
+  // which Next refuses to render on the server without a boundary, since the
+  // query string is not known until the request arrives.
+  return (
+    <Suspense>
+      <CatalogueScreen />
+    </Suspense>
+  );
 }

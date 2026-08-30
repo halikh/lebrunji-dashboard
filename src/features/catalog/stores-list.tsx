@@ -136,7 +136,8 @@ function StoreRow({
   return (
     <div
       className={cx(
-        "flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
+        // `relative`, so the name's stretched hit area is bounded by the row.
+        "relative flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
         // A hidden shop is marked, not dimmed.
         //
         // Fading the whole row was wrong: it took the controls with it, and a
@@ -172,14 +173,30 @@ function StoreRow({
 
       <div className="flex min-w-0 flex-grow flex-col gap-xxs">
         <div className="flex items-center gap-sm">
-          <span
+          {/*
+            The row is the link, by way of this one.
+
+            `after:absolute after:inset-0` stretches the anchor's hit area over
+            the whole row while the anchor itself stays the shop's name — so the
+            accessible name is "Nara Kitchen" rather than "row", and the whole
+            row is still openable in a new tab, which a click handler on a div
+            would have taken away.
+
+            The controls after it carry `relative z-10` so they sit above that
+            overlay and keep working. That is the whole trick, and it is why the
+            row needs no separate Menu button: the thing an operator comes to a
+            shop for is now the largest target on the row instead of the
+            smallest.
+          */}
+          <Link
+            href={`/catalogue/${store.id}`}
             className={cx(
-              "truncate text-[15px] font-semibold",
+              "truncate text-[15px] font-semibold after:absolute after:inset-0 after:rounded-md",
               !store.isActive && "text-text-soft",
             )}
           >
             {name}
-          </span>
+          </Link>
           {!store.isActive && (
             // Said in words, not only in colour and dimness.
             <span className="shrink-0 rounded-full bg-danger-wash px-sm text-[11px] font-bold text-danger">
@@ -220,7 +237,10 @@ function StoreRow({
           rather than a choice between them, and in a row they read as a pair of
           competing controls — worse, the second one pushed the actions around
           on every row where a name was long. */}
-      <div className="flex shrink-0 flex-col gap-xs">
+      {/* `relative z-10` puts these above the name's stretched hit area — see
+          the note on the link. Without it they would be unclickable, which is
+          how this pattern fails when it is copied without its second half. */}
+      <div className="relative z-10 flex shrink-0 flex-col gap-xs">
         <ConfirmToggle
           on={store.isActive}
           onChange={onToggleActive}
@@ -258,31 +278,16 @@ function StoreRow({
         />
       </div>
 
-      {/* The menu is what an operator comes to a shop for. A link rather than a
-          button: it is a place, so it should be openable in a new tab. */}
-      <Link
-        href={`/catalogue/${store.id}`}
-        // A filled ground, not bare text. It sits beside a filled Archive
-        // button, and blue text alone read as a footnote next to it — the two
-        // are both things you press, and the one you press far more often
-        // should not be the quieter of the pair.
-        //
-        // `primary-wash` with `primary` type rather than a solid fill: it is
-        // navigation, not the row's primary action, and a second solid button
-        // per row would leave nothing to distinguish weight with.
-        className="shrink-0 rounded-md bg-primary-wash px-md py-sm text-[13px] font-semibold text-primary hover:brightness-95"
-      >
-        {t("catalogue.openMenu")}
-      </Link>
-
       <ConfirmButton
         onConfirm={onArchive}
         titleKey="catalogue.archiveTitle"
         bodyKey="catalogue.archiveBody"
         confirmKey="catalogue.archiveConfirm"
+        params={{ name }}
         variant="danger"
         triggerVariant="danger"
         size="sm"
+        className="relative z-10"
       >
         {t("catalogue.archive")}
       </ConfirmButton>
