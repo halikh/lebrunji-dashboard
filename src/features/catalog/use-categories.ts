@@ -21,13 +21,19 @@ import {
 
 export const categoryKeys = {
   all: ["categories"] as const,
+  list: (search: string) => ["categories", "list", search] as const,
   kinds: ["categories", "kinds"] as const,
 };
 
-export function useCategories() {
+export function useCategories(search = "") {
+  const term = search.trim();
+
   return useQuery({
-    queryKey: categoryKeys.all,
-    queryFn: fetchCategories,
+    queryKey: categoryKeys.list(term),
+    queryFn: () => fetchCategories(term),
+    // The previous rows stay on screen while the next ones are fetched, so
+    // typing does not blink the list empty between keystrokes.
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -85,12 +91,19 @@ export function useUpdateCategory() {
 
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: categoryKeys.all });
-      const snapshot = queryClient.getQueryData<Category[]>(categoryKeys.all);
+      const snapshot = queryClient.getQueriesData<Category[]>({
+        queryKey: categoryKeys.all,
+      });
 
-      queryClient.setQueryData<Category[]>(categoryKeys.all, (rows) =>
-        rows?.map((row) =>
-          row.id === input.id ? { ...row, ...input.patch } : row,
-        ),
+      // Every cached search, not just the visible one: the same category is in
+      // the unfiltered list and in whatever term matches it, and half a rollback
+      // is two views disagreeing about one row.
+      queryClient.setQueriesData<Category[]>(
+        { queryKey: categoryKeys.all },
+        (rows) =>
+          rows?.map((row) =>
+            row.id === input.id ? { ...row, ...input.patch } : row,
+          ),
       );
 
       return { snapshot };
@@ -105,7 +118,9 @@ export function useUpdateCategory() {
     },
 
     onError: (error, _input, context) => {
-      queryClient.setQueryData(categoryKeys.all, context?.snapshot);
+      for (const [key, rows] of context?.snapshot ?? []) {
+        queryClient.setQueryData(key, rows);
+      }
       toast.danger(
         error instanceof Error ? error.message : t("common.somethingWentWrong"),
       );
@@ -158,13 +173,20 @@ export function useReorderCategories() {
 
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: categoryKeys.all });
-      const snapshot = queryClient.getQueryData<Category[]>(categoryKeys.all);
-      queryClient.setQueryData<Category[]>(categoryKeys.all, input.next);
+      const snapshot = queryClient.getQueriesData<Category[]>({
+        queryKey: categoryKeys.all,
+      });
+      queryClient.setQueriesData<Category[]>(
+        { queryKey: categoryKeys.list("") },
+        input.next,
+      );
       return { snapshot };
     },
 
     onError: (error, _input, context) => {
-      queryClient.setQueryData(categoryKeys.all, context?.snapshot);
+      for (const [key, rows] of context?.snapshot ?? []) {
+        queryClient.setQueryData(key, rows);
+      }
       toast.danger(
         error instanceof Error ? error.message : t("reorder.failed"),
       );

@@ -90,7 +90,7 @@ export function LocalizedField({
     // about to change shape under them.
     return (
       <div className="flex flex-col gap-xs">
-        <span className="text-[13px] font-semibold text-text-soft">
+        <span className="ps-md text-[13px] font-semibold text-text-soft">
           {label}
         </span>
         <div aria-hidden className="h-[42px] rounded-md bg-neutral-fill" />
@@ -108,7 +108,14 @@ export function LocalizedField({
 
   return (
     <div className="flex flex-col gap-xs">
-      <div className="flex items-baseline gap-sm">
+      {/* `ps-md`, the same inset `Field` gives its label and hint.
+          These inputs have horizontal padding, so their text starts some way
+          inside the left edge; a label flush at zero lines up with the border
+          and, against a pill-shaped field whose edge curves away, reads as
+          misaligned. This file draws its own label rather than using `Field`,
+          which is how it came to be the one place in the dashboard where that
+          column did not line up. */}
+      <div className="flex items-baseline gap-sm ps-md">
         <span className="text-[13px] font-semibold text-text-soft">
           {label}
         </span>
@@ -197,19 +204,19 @@ export function LocalizedField({
       </div>
 
       {error ? (
-        <p role="alert" className="text-[13px] font-medium text-danger">
+        <p role="alert" className="ps-md text-[13px] font-medium text-danger">
           {error}
         </p>
       ) : partial ? (
         // Names the languages rather than saying "incomplete". The operator has
         // done most of the work; what they need is which box is empty.
-        <p role="alert" className="text-[13px] font-medium text-danger">
+        <p role="alert" className="ps-md text-[13px] font-medium text-danger">
           {t("form.stillNeeded", { languages: missing.join(", ") })}
         </p>
       ) : (
         // The same slot as the error, never a second line: showing both means
         // reading advice about a value already reported as wrong.
-        hint && <p className="text-[13px] text-text-faint">{hint}</p>
+        hint && <p className="ps-md text-[13px] text-text-faint">{hint}</p>
       )}
     </div>
   );

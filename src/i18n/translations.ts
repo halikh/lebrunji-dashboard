@@ -373,7 +373,6 @@ const en = {
     kindHint: "Groups categories in the app. Set by migration, not here.",
     pickKind: "Choose a kind",
     kindRequired: "Every category belongs to a kind.",
-    imageHint: "The picture on the tile.",
     visibility: "Visibility",
     live: "Live",
     hidden: "Hidden",
@@ -409,6 +408,20 @@ const en = {
     hideBody:
       "The tile disappears from the home screen straight away. Its shops keep trading and can still be reached by search.",
     hideConfirm: "Hide it",
+    featureTitle: "Feature {name}?",
+    featureBody:
+      "It leads the home screen, above the categories that are not featured.",
+    featureConfirm: "Feature it",
+    unfeatureTitle: "Stop featuring {name}?",
+    unfeatureBody:
+      "It keeps its place in the list; it just no longer leads the home screen.",
+    unfeatureConfirm: "Stop featuring",
+    search: "Search categories",
+    searchHint: "Drag the tiles to change the order customers see them in.",
+    // Reordering is off while filtered, and saying so beats a handle that
+    // silently does nothing.
+    searchNoDrag: "Clear the search to change the order.",
+    searchNone: "No category matches {term}.",
     formLabel: "Category details",
     failedTitle: "Could not load the categories",
   },

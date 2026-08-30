@@ -401,6 +401,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                     setOpen({ kind: "section", sectionId: section.id })
                   }
                   onArchiveSection={async () => {
+                    setOpen(null);
                     await archiveSection.mutateAsync({
                       id: section.id,
                       name: section.title,

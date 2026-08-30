@@ -36,7 +36,6 @@ export type Category = {
   kindId: string;
   name: Localized;
   tagline: Localized;
-  imageUrl: string | null;
   isActive: boolean;
   isFeatured: boolean;
   /**
@@ -50,15 +49,54 @@ export type Category = {
   sortOrder: number;
 };
 
-const COLUMNS = `id, slug, category_kind_id, name, tagline, image_url,
+const COLUMNS = `id, slug, category_kind_id, name, tagline,
    is_active, is_featured, has_menu_nav, sort_order`;
 
-export async function fetchCategories(): Promise<Category[]> {
-  const { data, error } = await getClient()
+/**
+ * There is no picture, deliberately.
+ *
+ * `0010` added an `image_url` override for the day a merchant supplied
+ * something better than the app's drawn artwork; `0075` removed it, for the
+ * reason `0010` had already written down — a photograph at seventy points reads
+ * as a smudge, and twelve of them read as noise. The drawn set is the designed
+ * artwork, not a placeholder. An uploader here would have offered a decision
+ * with no visible consequence anywhere.
+ */
+
+/**
+ * Every category, or the ones matching a term.
+ *
+ * The term goes into the query rather than filtering the rows already here.
+ * This list is short enough that either would find the same thing today, and
+ * that is exactly why it is worth doing properly: a client-side filter is a
+ * habit that is wrong on every list that pages, where it searches what has been
+ * *downloaded* and silently cannot find the rest.
+ *
+ * Both languages, because an operator who knows a tile as مطاعم should find it
+ * by typing مطاعم.
+ */
+export async function fetchCategories(
+  search?: string | null,
+): Promise<Category[]> {
+  let query = getClient()
     .from("categories")
     .select(COLUMNS)
-    .is("deleted_at", null)
-    .order("sort_order", { ascending: true });
+    .is("deleted_at", null);
+
+  const term = search?.trim();
+  if (term) {
+    const like = `%${term}%`;
+    query = query.or(
+      [
+        `name->>en.ilike.${like}`,
+        `name->>ar.ilike.${like}`,
+        `tagline->>en.ilike.${like}`,
+        `slug.ilike.${like}`,
+      ].join(","),
+    );
+  }
+
+  const { data, error } = await query.order("sort_order", { ascending: true });
 
   if (error) throw new Error(`Could not read the categories: ${error.message}`);
 
@@ -68,7 +106,6 @@ export async function fetchCategories(): Promise<Category[]> {
     kindId: row.category_kind_id as string,
     name: (row.name as Localized) ?? {},
     tagline: (row.tagline as Localized) ?? {},
-    imageUrl: (row.image_url as string | null) ?? null,
     isActive: row.is_active as boolean,
     // Null is "not featured" — the app sorts it last deliberately. Read as a
     // real boolean here so nothing downstream has to keep remembering that.
@@ -97,7 +134,6 @@ export type CategoryDraft = {
   kindId: string;
   name: Localized;
   tagline: Localized;
-  imageUrl: string | null;
   isActive: boolean;
   isFeatured: boolean;
   hasMenuNav: boolean;
@@ -111,7 +147,6 @@ export async function createCategory(
     category_kind_id: draft.kindId,
     name: draft.name,
     tagline: draft.tagline,
-    image_url: draft.imageUrl,
     is_active: draft.isActive,
     is_featured: draft.isFeatured,
     has_menu_nav: draft.hasMenuNav,
@@ -133,9 +168,6 @@ export async function updateCategory(
   if (patch.kindId !== undefined) row.category_kind_id = patch.kindId;
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.tagline !== undefined) row.tagline = patch.tagline;
-  // `null` is a value here — it is how a picture is removed — so what is tested
-  // is the key being absent, not the value.
-  if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
   if (patch.hasMenuNav !== undefined) row.has_menu_nav = patch.hasMenuNav;

@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 
-import { Button, cx } from "@/components/ui";
+import { Button, Input, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Field } from "@/components/ui/field";
-import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
@@ -15,7 +14,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
-import { TEXT } from "@/lib/limits";
+import { SEARCH, TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { applyOrder } from "./api/menu";
@@ -52,13 +51,34 @@ import {
  * your place in the list.
  */
 export function CategoriesList() {
-  const categories = useCategories();
+  /**
+   * The term, and the mode it puts the list in.
+   *
+   * Searching and reordering are different jobs on one list and cannot both be
+   * on: a position among matches is not a position on the home screen, so
+   * dragging while filtered would write a `sort_order` nobody chose. The
+   * handles go away and the list says why.
+   */
+  const [search, setSearch] = useState("");
+  const searching = search.trim().length >= SEARCH.minTerm;
+
+  const categories = useCategories(searching ? search : "");
   const create = useCreateCategory();
   const update = useUpdateCategory();
   const archive = useArchiveCategory();
   const reorder = useReorderCategories();
 
-  /** The row the panel is editing, or `"new"` while one is being added. */
+  /**
+   * The row the panel is editing, or `"new"` while one is being added.
+   *
+   * **Any action on a row closes it.** A form open beside the list holds a copy
+   * of a row as it was when it opened; flipping a switch or archiving something
+   * changes the list underneath it, and a form that stays open then is either
+   * showing a row that no longer exists or is about to save values from before
+   * the change. Closing is the honest answer: the operator has moved on to the
+   * list, and nothing they typed is lost that they had not already abandoned by
+   * reaching past the form to act on a row.
+   */
   const [open, setOpen] = useState<string | null>(null);
 
   const rows = categories.data ?? [];
@@ -72,11 +92,31 @@ export function CategoriesList() {
     },
     labelOf: (id) =>
       pickLocalized(rows.find((row) => row.id === id)?.name ?? {}),
+    disabled: searching,
   });
 
   return (
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
+        {/* The same bar the shops have — same border, same padding, same place
+            for the box — so moving between the two tabs is not relearning
+            where the search is. */}
+        <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
+          <h1 className="flex-grow text-[24px]">{t("categories.tab")}</h1>
+          {searching && (
+            <span className="text-[13px] text-text-faint">
+              {t("categories.searchNoDrag")}
+            </span>
+          )}
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t("categories.search")}
+            aria-label={t("categories.search")}
+            className="w-[260px]"
+          />
+        </div>
+
         <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
           {categories.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
@@ -113,25 +153,36 @@ export function CategoriesList() {
                 rowProps={order.rowProps}
                 handleProps={order.handleProps}
                 onEdit={() => setOpen(row.id)}
-                onToggleActive={() =>
+                onToggleActive={() => {
+                  // The panel closes on any row action — see the note on
+                  // `setOpen` above.
+                  setOpen(null);
                   update.mutate({
                     id: row.id,
                     patch: { isActive: !row.isActive },
-                  })
-                }
-                onToggleFeatured={() =>
+                  });
+                }}
+                onToggleFeatured={() => {
+                  setOpen(null);
                   update.mutate({
                     id: row.id,
                     patch: { isFeatured: !row.isFeatured },
-                  })
-                }
+                  });
+                }}
                 onArchive={async () => {
+                  setOpen(null);
                   await archive.mutateAsync({ id: row.id, name: row.name });
                 }}
               />
             ))}
 
-          {categories.isSuccess && (
+          {searching && rows.length === 0 && (
+            <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
+              {t("categories.searchNone", { term: search.trim() })}
+            </p>
+          )}
+
+          {categories.isSuccess && !searching && (
             <Button fullWidth className="mt-lg" onClick={() => setOpen("new")}>
               {t("categories.add")}
             </Button>
@@ -242,24 +293,6 @@ function Row({
         <GripIcon />
       </button>
 
-      {category.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={category.imageUrl}
-          alt=""
-          aria-hidden
-          className={cx(
-            "size-[44px] shrink-0 rounded-md object-cover",
-            !category.isActive && "opacity-50 grayscale",
-          )}
-        />
-      ) : (
-        <div
-          aria-hidden
-          className="size-[44px] shrink-0 rounded-md bg-neutral-fill"
-        />
-      )}
-
       <button
         type="button"
         onClick={onEdit}
@@ -294,10 +327,21 @@ function Row({
           }}
           className="w-[104px]"
         />
-        <Toggle
+        <ConfirmToggle
           on={category.isFeatured}
           onChange={onToggleFeatured}
           labelOn={t("categories.featured")}
+          params={{ name: pickLocalized(category.name) }}
+          whenTurningOn={{
+            titleKey: "categories.featureTitle",
+            bodyKey: "categories.featureBody",
+            confirmKey: "categories.featureConfirm",
+          }}
+          whenTurningOff={{
+            titleKey: "categories.unfeatureTitle",
+            bodyKey: "categories.unfeatureBody",
+            confirmKey: "categories.unfeatureConfirm",
+          }}
           className="w-[104px]"
         />
       </div>
@@ -336,9 +380,6 @@ function Editor({
   const [name, setName] = useState<Localized>(initial?.name ?? {});
   const [tagline, setTagline] = useState<Localized>(initial?.tagline ?? {});
   const [kindId, setKindId] = useState(initial?.kindId ?? "");
-  const [imageUrl, setImageUrl] = useState<string | null>(
-    initial?.imageUrl ?? null,
-  );
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [isFeatured, setIsFeatured] = useState(initial?.isFeatured ?? false);
   const [hasMenuNav, setHasMenuNav] = useState(initial?.hasMenuNav ?? true);
@@ -362,7 +403,6 @@ function Editor({
       name,
       tagline,
       kindId,
-      imageUrl,
       isActive,
       isFeatured,
       hasMenuNav,
@@ -404,15 +444,6 @@ function Editor({
               value: kind.id,
               label: pickLocalized(kind.name),
             }))}
-          />
-        </Field>
-
-        <Field label={t("images.label")} hint={t("categories.imageHint")}>
-          <ImageUploader
-            value={imageUrl}
-            onChange={setImageUrl}
-            folder="categories"
-            disabled={pending}
           />
         </Field>
 
