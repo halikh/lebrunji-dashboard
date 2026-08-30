@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui';
+import { Icon } from '@/components/shell/icons';
 import { t } from '@/i18n/translations';
 import { forgetAccessToken } from '@/lib/supabase/client';
 
@@ -81,15 +82,28 @@ export function SignOutButton({ variant = 'quiet' }: { variant?: 'quiet' | 'seco
   }
 
   return (
-    <div className="flex items-center gap-md">
+    // The button is one line — icon beside label, never wrapping. It sits in a
+    // 92px rail, where "Sign out" breaking across two lines would make the
+    // control taller than the section links above it and read as a heading.
+    //
+    // The failure goes *underneath* rather than beside, for the same reason:
+    // there is no room beside it, and an alert that pushes the button around is
+    // worse than one that appears below it.
+    <div className="flex flex-col items-center gap-xs">
+      <Button
+        variant={variant}
+        pending={pending}
+        onClick={signOut}
+        className="w-full whitespace-nowrap px-sm py-sm text-[12px]"
+      >
+        {!pending && <Icon name="sign-out" size={16} />}
+        {t('common.signOut')}
+      </Button>
       {failed && (
-        <span role="alert" className="text-[13px] font-medium text-danger">
+        <span role="alert" className="text-center text-[11px] font-medium text-danger">
           {t('common.somethingWentWrong')}
         </span>
       )}
-      <Button variant={variant} pending={pending} onClick={signOut}>
-        {t('common.signOut')}
-      </Button>
     </div>
   );
 }
