@@ -1,11 +1,16 @@
 import { t } from "@/i18n/translations";
-import { readEnv } from "@/lib/env";
-import { IMAGE } from "@/lib/limits";
-import { getAccessToken, getClient } from "@/lib/supabase/client";
-import { sniffImageType, validateImage } from "@/lib/validation";
+import { readEnv } from "./env";
+import { IMAGE } from "./limits";
+import { getAccessToken, getClient } from "./supabase/client";
+import { sniffImageType, validateImage } from "./validation";
 
 /**
  * Pictures, straight from the browser to Storage.
+ *
+ * In `lib` rather than under `features/catalog`, because three features upload
+ * into the same bucket — menu items, stores, categories — and because the
+ * `ImageUploader` primitive in `components/ui` needs it, which the lint
+ * boundary forbids it from reaching into a feature to get.
  *
  * The `images` bucket (migration 0065) is public to read and admin-only to
  * write, so the upload carries the operator's own token and RLS decides — the

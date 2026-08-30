@@ -84,6 +84,7 @@ export type MenuItemDraft = {
   description: Localized;
   price: number;
   isActive: boolean;
+  imageUrl: string | null;
 };
 
 /**
@@ -108,6 +109,7 @@ export async function createMenuItem(
     description: draft.description,
     price: draft.price,
     is_active: draft.isActive,
+    image_url: draft.imageUrl,
     sort_order: sortOrder,
   });
 
@@ -129,6 +131,9 @@ export async function updateMenuItem(
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.price !== undefined) row.price = patch.price;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
+  // `null` is a value here — it is how a picture is removed — so the check is
+  // for the key being absent, not for the value being falsy.
+  if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 
   const { error } = await getClient()

@@ -6,6 +6,7 @@ import { Button, Field } from "@/components/ui";
 import { NumberInput } from "@/components/ui/number-input";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Toggle } from "@/components/ui/toggle";
+import { ImageUploader } from "@/components/ui/image-uploader";
 import { useLanguages } from "@/features/reference/use-languages";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
@@ -22,6 +23,8 @@ export type ItemDraft = {
   /** Minor units, as an integer. Never a float — see `lib/money.ts`. */
   price: number;
   isActive: boolean;
+  /** A Storage URL, or null for no picture. */
+  imageUrl: string | null;
 };
 
 /**
@@ -82,6 +85,9 @@ export function MenuItemEditor({
   );
   const [price, setPrice] = useState(String(initial?.price ?? ""));
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    initial?.imageUrl ?? null,
+  );
 
   /**
    * One message per field, not one for the form.
@@ -149,7 +155,7 @@ export function MenuItemEditor({
     attempt.current += 1;
 
     if (found.name || found.description || found.price) return null;
-    return { name, description, price: parsed, isActive };
+    return { name, description, price: parsed, isActive, imageUrl };
   }
 
   return (
@@ -209,6 +215,21 @@ export function MenuItemEditor({
               placeholder={t("menu.pricePlaceholder")}
               value={price}
               onChange={(event) => setPrice(event.target.value)}
+            />
+          </Field>
+
+          {/* Last, and deliberately.
+              The name and the price are what an item *is*; a picture is how it
+              is sold. Putting it first makes the form open on the slowest,
+              most optional thing in it — and an operator adding forty items in
+              an afternoon would meet the upload box forty times before the
+              field they came to fill in. */}
+          <Field label={t("images.label")} hint={t("images.hint")}>
+            <ImageUploader
+              value={imageUrl}
+              onChange={setImageUrl}
+              folder="menu-items"
+              disabled={pending}
             />
           </Field>
 
