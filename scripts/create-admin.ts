@@ -31,6 +31,7 @@ import { stdin, stdout } from 'node:process';
 
 import { createClient } from '@supabase/supabase-js';
 
+import { t } from '../src/i18n/translations';
 import { validatePassword } from '../src/lib/validation';
 import { loadLocalEnv } from './load-env';
 
@@ -99,7 +100,7 @@ async function main() {
   // both places, which is how a rule ends up enforced in one and not the other.
   const strong = validatePassword(password, { email });
   if (!strong.ok) {
-    console.error(`\n${strong.message}`);
+    console.error(`\n${t(strong.key, strong.params)}`);
     process.exit(2);
   }
 

@@ -8,7 +8,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Panel } from "@/components/ui/panel";
 import { Toggle } from "@/components/ui/toggle";
-import { useMoney } from "@/features/reference/use-currencies";
+import { Price } from "@/features/reference/price";
 import { t } from "@/i18n/translations";
 
 import type { MenuItem, MenuSection } from "./api/menu";
@@ -48,7 +48,6 @@ export function StoreMenu({ storeId }: { storeId: string }) {
   const create = useCreateMenuItem(storeId);
   const update = useUpdateMenuItem(storeId);
   const archive = useArchiveMenuItem(storeId);
-  const { format } = useMoney();
 
   /**
    * What the panel is showing, if anything. `itemId: null` means adding.
@@ -142,7 +141,6 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             <Section
               key={section.id}
               section={section}
-              format={format}
               currencyCode={store.data?.currencyCode ?? ""}
               openItemId={open?.itemId ?? null}
               onEdit={(itemId) => setOpen({ sectionId: section.id, itemId })}
@@ -251,7 +249,6 @@ export function StoreMenu({ storeId }: { storeId: string }) {
 
 function Section({
   section,
-  format,
   currencyCode,
   openItemId,
   onEdit,
@@ -260,7 +257,6 @@ function Section({
   onArchive,
 }: {
   section: MenuSection;
-  format: (minorUnits: number, code: string) => string;
   currencyCode: string;
   openItemId: string | null;
   onEdit: (id: string) => void;
@@ -283,7 +279,6 @@ function Section({
         <ItemRow
           key={item.id}
           item={item}
-          format={format}
           currencyCode={currencyCode}
           // The row the panel is showing is marked, so the form and the list
           // agree about what is being edited.
@@ -321,7 +316,6 @@ function Section({
 
 function ItemRow({
   item,
-  format,
   currencyCode,
   open,
   onEdit,
@@ -329,7 +323,6 @@ function ItemRow({
   onArchive,
 }: {
   item: MenuItem;
-  format: (minorUnits: number, code: string) => string;
   currencyCode: string;
   open: boolean;
   onEdit: () => void;
@@ -387,11 +380,17 @@ function ItemRow({
         </span>
       </button>
 
-      <span className="shrink-0 text-[15px] font-semibold tabular-nums">
-        {/* The shop's own currency. Menu prices are set in it, and converting
-            here would show a number nobody typed. */}
-        {format(item.price, currencyCode)}
-      </span>
+      {/* Set in the shop's own currency, shown in both: the price the merchant
+          typed on top, what a customer thinking in the other one would hear
+          underneath. */}
+      <div className="shrink-0">
+        <Price
+          value={item.price}
+          code={currencyCode}
+          align="end"
+          className="text-[15px] font-semibold"
+        />
+      </div>
 
       <Toggle
         on={item.isActive}

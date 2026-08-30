@@ -58,7 +58,7 @@ export function ResetPasswordForm() {
 
     const strong = validatePassword(password);
     if (!strong.ok) {
-      setError(strong.message);
+      setError(t(strong.key, strong.params));
       return;
     }
     if (password !== confirm) {

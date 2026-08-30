@@ -120,6 +120,67 @@ const en = {
     locationLabel: "Where {name} is",
   },
 
+  /**
+   * What a validator says when it refuses.
+   *
+   * Here rather than inside `validation.ts`, so the rule and the wording are
+   * separable: the module decides *what is wrong*, the bundle decides how to
+   * say it — and a second language translates these like everything else,
+   * instead of finding a class of user-facing text that never went through
+   * `t()`.
+   */
+  validation: {
+    required: "This is required.",
+    slugRequired: "A slug is required.",
+    slugTooLong: "A slug can be at most {max} characters.",
+    slugShape: "Use lower-case letters, numbers and single hyphens.",
+    tooLongIn: "Too long in {languages} — at most {max} characters.",
+    priceRequired: "Enter a price.",
+    priceWhole: "A price must be a whole number.",
+    priceNegative: "A price cannot be negative.",
+    priceHuge: "That price looks wrong — check the number of zeros.",
+    dayOfWeek: "Pick a day of the week.",
+    timeShape: "Times are HH:MM, 24-hour.",
+    hoursSame: "Opening and closing at the same time reads as open all day.",
+    wholeMinutes: "Enter whole minutes.",
+    prepMin: "At least {min} minute.",
+    prepMax: "At most {max} minutes.",
+    prepOrder: "The longest time cannot be shorter than the shortest.",
+    distanceRequired: "Enter a distance.",
+    bandTooSmall: "A band must cover some distance.",
+    bandTooBig: "At most {max} km.",
+    twoDecimals: "At most two decimal places.",
+    bandDuplicate: "There is already a band ending at that distance.",
+    valueRequired: "Enter a value.",
+    discountNegative: "A discount cannot be negative.",
+    percentageOver: "A percentage cannot be over 100.",
+    windowReversed: "The promotion would end before it started.",
+    imageType: "Images must be JPEG, PNG or WebP.",
+    imageTooBig: "Images must be under {max} MB.",
+    imageTooSmall: "At least {min}px on each side.",
+    imageTooLarge: "At most {max}px on each side.",
+    passwordShort: "Use at least {min} characters. Length is what makes it hard to guess.",
+    passwordLong: "At most {max} bytes — anything past that is ignored, not extra.",
+    passwordSpace: "Remove the leading or trailing space.",
+    passwordEmail: "Do not put your email address in your password.",
+    passwordCommon: "That contains a word an attacker would try first.",
+  },
+
+  /**
+   * What the *database* refuses, said in the operator's words.
+   *
+   * A constraint violation arrives as English from Postgres. These are the ones
+   * worth recognising; anything else falls through to the raw message, which is
+   * ugly and true. A wrong-but-friendly translation of an unrecognised error
+   * would be worse than an untranslated accurate one.
+   */
+  dbError: {
+    duplicateSlug: "Another item in this shop already uses that name.",
+    missingLanguage: "Every language needs a value before this can be saved.",
+    priceNegative: "A price cannot be negative.",
+    tooLong: "That is longer than the field allows.",
+  },
+
   form: {
     optional: "optional",
     // Names the languages rather than saying "incomplete": the operator has

@@ -7,6 +7,7 @@ import {
   toPair,
   writeSession,
 } from "@/lib/auth/session";
+import { t } from "@/i18n/translations";
 import { validatePassword } from "@/lib/validation";
 
 /**
@@ -45,8 +46,12 @@ export async function POST(request: NextRequest) {
   }
 
   const strong = validatePassword(password);
-  if (!strong.ok)
-    return NextResponse.json({ error: strong.message }, { status: 400 });
+  if (!strong.ok) {
+    // Translated here, on the server, because the route answers a request that
+    // did not have to come from the form — a client posting directly gets a
+    // sentence rather than a key it has no bundle for.
+    return NextResponse.json({ error: t(strong.key, strong.params) }, { status: 400 });
+  }
 
   const supabase = anonymousClient();
 

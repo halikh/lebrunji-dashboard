@@ -5,7 +5,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Copyable } from "@/components/ui/copyable";
 import { Map } from "@/components/ui/map";
 import { Panel } from "@/components/ui/panel";
-import { useMoney } from "@/features/reference/use-currencies";
+import { Price } from "@/features/reference/price";
 import { t } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
 import { formatDayAndTime } from "@/lib/time";
@@ -39,7 +39,6 @@ export function OrderPanel({
   const statuses = useOrderStatuses();
   const order = useOrder(orderId);
   const { advance } = useAdvanceOrder(statuses.data);
-  const { format, convertTo, secondaryCode } = useMoney();
 
   const cancelled = statuses.data?.find((status) => status.progress === null);
   const status = order.data ? orderStatus(order.data, statuses.data) : null;
@@ -164,7 +163,6 @@ export function OrderPanel({
                   (line) => line.orderStoreId === store.id,
                 )}
                 currencyCode={order.data.currencyCode}
-                format={format}
               />
             ))}
 
@@ -173,42 +171,29 @@ export function OrderPanel({
                 label={t("orders.subtotal")}
                 value={order.data.subtotal}
                 code={order.data.currencyCode}
-                format={format}
               />
               <Money
                 label={t("orders.delivery")}
                 value={order.data.deliveryFee}
                 code={order.data.currencyCode}
-                format={format}
               />
               {order.data.discount > 0 && (
                 <Money
                   label={t("orders.discount")}
                   value={-order.data.discount}
                   code={order.data.currencyCode}
-                  format={format}
                 />
               )}
               <div className="flex items-baseline justify-between pt-xs">
                 <span className="text-[16px] font-bold">
                   {t("orders.total")}
                 </span>
-                <div className="flex flex-col items-end">
-                  <span className="text-[16px] font-bold tabular-nums">
-                    {format(order.data.total, order.data.currencyCode)}
-                  </span>
-                  {/* The same money in the other currency.
-                      Display only, and it says so by sitting under the real
-                      total in lighter type: an order is recorded in what it was
-                      priced and paid in, and a stored amount that moved with
-                      the rate would be a receipt that rewrites itself. */}
-                  <Secondary
-                    value={order.data.total}
-                    code={order.data.currencyCode}
-                    convertTo={convertTo}
-                    secondaryCode={secondaryCode}
-                  />
-                </div>
+                <Price
+                  value={order.data.total}
+                  code={order.data.currencyCode}
+                  align="end"
+                  className="text-[16px] font-bold"
+                />
               </div>
             </div>
           </div>
@@ -287,12 +272,10 @@ function StoreSection({
   store,
   lines,
   currencyCode,
-  format,
 }: {
   store: OrderStore;
   lines: OrderLine[];
   currencyCode: string;
-  format: (minorUnits: number, code: string) => string;
 }) {
   const tone = statusTone(store.statusSlug);
 
@@ -331,9 +314,14 @@ function StoreSection({
                 </span>
               )}
             </div>
-            <span className="shrink-0 pt-xs font-semibold tabular-nums">
-              {format(line.unitPrice * line.quantity, currencyCode)}
-            </span>
+            <div className="shrink-0 pt-xs">
+              <Price
+                value={line.unitPrice * line.quantity}
+                code={currencyCode}
+                align="end"
+                className="font-semibold"
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -398,47 +386,27 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * One line of the breakdown.
+ *
+ * `items-baseline` rather than centred: the two labels and the two primary
+ * figures sit on one line whether or not a converted figure hangs below, so the
+ * column of amounts reads straight down even when a rate is missing for one.
+ */
 function Money({
   label,
   value,
   code,
-  format,
 }: {
   label: string;
   value: number;
   code: string;
-  format: (minorUnits: number, code: string) => string;
 }) {
   return (
-    <div className="flex justify-between text-text-soft">
+    <div className="flex items-baseline justify-between text-text-soft">
       <span>{label}</span>
-      <span className="tabular-nums">{format(value, code)}</span>
+      <Price value={value} code={code} align="end" />
     </div>
-  );
-}
-
-function Secondary({
-  value,
-  code,
-  convertTo,
-  secondaryCode,
-}: {
-  value: number;
-  code: string;
-  convertTo: (minorUnits: number, from: string, to: string) => string | null;
-  secondaryCode: (primary: string) => string | null;
-}) {
-  const other = secondaryCode(code);
-  const converted = other ? convertTo(value, code, other) : null;
-
-  // Absent rather than wrong. A converted figure that quietly used a rate of 1
-  // would be a number somebody might read out to a customer.
-  if (!converted) return null;
-
-  return (
-    <span className="text-[13px] text-text-faint tabular-nums">
-      {converted}
-    </span>
   );
 }
 

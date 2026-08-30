@@ -15,6 +15,8 @@
  * exists to produce a sentence a person can act on, not to be the gate.
  */
 
+import type { Params, TranslationKey } from "@/i18n/translations";
+
 import {
   DAY_OF_WEEK,
   DELIVERY,
@@ -33,23 +35,40 @@ import {
  * A discriminated union rather than `string | null`, so a caller that forgets to
  * check is a type error rather than a form that silently accepts anything.
  */
-export type Valid = { ok: true } | { ok: false; message: string };
+/**
+ * `ok`, or a **translation key** and its parameters — never a sentence.
+ *
+ * The first version returned English strings, which quietly put a whole class of
+ * user-facing text outside `t()`. Every other string in the dashboard goes
+ * through the bundle; validation messages are the ones an operator reads most
+ * often, and they were the ones that would have stayed English when a second
+ * language arrived.
+ *
+ * Returning a key also keeps this module pure: it decides *what is wrong*, and
+ * the screen decides how to say it. The two are different jobs and only one of
+ * them is testable without a locale.
+ */
+export type Valid =
+  | { ok: true }
+  | { ok: false; key: TranslationKey; params?: Params };
 
 const OK: Valid = { ok: true };
-const fail = (message: string): Valid => ({ ok: false, message });
+const fail = (key: TranslationKey, params?: Params): Valid => ({
+  ok: false,
+  key,
+  params,
+});
 
 /** A translated value: one string per language code. */
 export type Localized = Record<string, string>;
 
 export function validateSlug(value: string): Valid {
   const slug = value.trim();
-  if (slug.length === 0) return fail("A slug is required.");
+  if (slug.length === 0) return fail("validation.slugRequired");
   if (slug.length > TEXT.slug)
-    return fail(`A slug can be at most ${TEXT.slug} characters.`);
+    return fail("validation.slugTooLong", { max: TEXT.slug });
   if (!SLUG_PATTERN.test(slug)) {
-    return fail(
-      "Use lower-case letters, numbers and single hyphens, like kibbeh-plate.",
-    );
+    return fail("validation.slugShape");
   }
   return OK;
 }
@@ -76,23 +95,21 @@ export function validateLocalizedText(
   const filled = languages.filter(isFilled);
 
   if (filled.length === 0) {
-    return options.optional ? OK : fail("This is required.");
+    return options.optional ? OK : fail("validation.required");
   }
 
   // Partly filled is the case worth a good message: the operator has done most
   // of the work and is about to lose it to a constraint violation.
   const missing = languages.filter((code) => !isFilled(code));
   if (missing.length > 0) {
-    return fail(`Still needed in: ${missing.join(", ")}.`);
+    return fail("form.stillNeeded", { languages: missing.join(", ") });
   }
 
   const tooLong = languages.filter(
     (code) => (value?.[code] ?? "").trim().length > maxLength,
   );
   if (tooLong.length > 0) {
-    return fail(
-      `Too long in ${tooLong.join(", ")} — at most ${maxLength} characters.`,
-    );
+    return fail("validation.tooLongIn", { languages: tooLong.join(", "), max: maxLength });
   }
 
   return OK;
@@ -110,14 +127,14 @@ export function validatePrice(
   minorUnits: number,
   options: { max?: number } = {},
 ): Valid {
-  if (!Number.isFinite(minorUnits)) return fail("Enter a price.");
+  if (!Number.isFinite(minorUnits)) return fail("validation.priceRequired");
   if (!Number.isInteger(minorUnits)) {
-    return fail("A price must be a whole number of minor units.");
+    return fail("validation.priceWhole");
   }
-  if (minorUnits < MONEY.min) return fail("A price cannot be negative.");
+  if (minorUnits < MONEY.min) return fail("validation.priceNegative");
   const max = options.max ?? MONEY.maxUnitPrice;
   if (minorUnits > max)
-    return fail("That price looks wrong — check the number of zeros.");
+    return fail("validation.priceHuge");
   return OK;
 }
 
@@ -141,28 +158,26 @@ export function validateHours(
     day < DAY_OF_WEEK.min ||
     day > DAY_OF_WEEK.max
   ) {
-    return fail("Pick a day of the week.");
+    return fail("validation.dayOfWeek");
   }
   const time = /^([01]\d|2[0-3]):[0-5]\d$/;
   if (!time.test(opensAt) || !time.test(closesAt))
-    return fail("Times are HH:MM, 24-hour.");
+    return fail("validation.timeShape");
   if (opensAt === closesAt) {
-    return fail(
-      "Opening and closing at the same time reads as open all day — change one.",
-    );
+    return fail("validation.hoursSame");
   }
   return OK;
 }
 
 export function validatePrepWindow(min: number, max: number): Valid {
   if (!Number.isInteger(min) || !Number.isInteger(max))
-    return fail("Enter whole minutes.");
+    return fail("validation.wholeMinutes");
   if (min < PREP_MINUTES.min)
-    return fail(`At least ${PREP_MINUTES.min} minute.`);
+    return fail("validation.prepMin", { min: PREP_MINUTES.min });
   if (max > PREP_MINUTES.max)
-    return fail(`At most ${PREP_MINUTES.max} minutes.`);
+    return fail("validation.prepMax", { max: PREP_MINUTES.max });
   if (max < min)
-    return fail("The longest time cannot be shorter than the shortest.");
+    return fail("validation.prepOrder");
   return OK;
 }
 
@@ -178,25 +193,25 @@ export function validateDeliveryBand(
   amountMinorUnits: number,
   existing: readonly number[] = [],
 ): Valid {
-  if (!Number.isFinite(upToKm)) return fail("Enter a distance.");
-  if (upToKm < DELIVERY.minKm) return fail("A band must cover some distance.");
-  if (upToKm > DELIVERY.maxKm) return fail(`At most ${DELIVERY.maxKm} km.`);
+  if (!Number.isFinite(upToKm)) return fail("validation.distanceRequired");
+  if (upToKm < DELIVERY.minKm) return fail("validation.bandTooSmall");
+  if (upToKm > DELIVERY.maxKm) return fail("validation.bandTooBig", { max: DELIVERY.maxKm });
   // `numeric(5,2)` — a third decimal place would be rounded away on write, and
   // a band that silently becomes a different band is worse than a refusal.
   if (Math.abs(upToKm * 100 - Math.round(upToKm * 100)) > 1e-9) {
-    return fail("At most two decimal places.");
+    return fail("validation.twoDecimals");
   }
   if (existing.includes(upToKm))
-    return fail("There is already a band ending at that distance.");
+    return fail("validation.bandDuplicate");
 
   return validatePrice(amountMinorUnits);
 }
 
 export function validateDiscountValue(kind: string, value: number): Valid {
-  if (!Number.isFinite(value)) return fail("Enter a value.");
-  if (value < DISCOUNT.minValue) return fail("A discount cannot be negative.");
+  if (!Number.isFinite(value)) return fail("validation.valueRequired");
+  if (value < DISCOUNT.minValue) return fail("validation.discountNegative");
   if (kind === "percentage" && value > DISCOUNT.maxPercentage) {
-    return fail("A percentage cannot be over 100.");
+    return fail("validation.percentageOver");
   }
   return OK;
 }
@@ -207,7 +222,7 @@ export function validateDiscountWindow(
 ): Valid {
   if (!startsAt || !endsAt) return OK;
   if (new Date(startsAt) >= new Date(endsAt)) {
-    return fail("The promotion would end before it started.");
+    return fail("validation.windowReversed");
   }
   return OK;
 }
@@ -229,20 +244,18 @@ export function validateImage(input: {
     input.type === null ||
     !(IMAGE.types as readonly string[]).includes(input.type)
   ) {
-    return fail("Images must be JPEG, PNG or WebP.");
+    return fail("validation.imageType");
   }
   if (input.bytes > IMAGE.maxBytes) {
-    return fail(
-      `Images must be under ${Math.round(IMAGE.maxBytes / 1024 / 1024)} MB.`,
-    );
+    return fail("validation.imageTooBig", { max: Math.round(IMAGE.maxBytes / 1024 / 1024) });
   }
   const { width, height } = input;
   if (width !== undefined && height !== undefined) {
     if (width < IMAGE.minPixels || height < IMAGE.minPixels) {
-      return fail(`At least ${IMAGE.minPixels}px on each side.`);
+      return fail("validation.imageTooSmall", { min: IMAGE.minPixels });
     }
     if (width > IMAGE.maxPixels || height > IMAGE.maxPixels) {
-      return fail(`At most ${IMAGE.maxPixels}px on each side.`);
+      return fail("validation.imageTooLarge", { max: IMAGE.maxPixels });
     }
   }
   return OK;
@@ -312,34 +325,28 @@ export function validatePassword(
   options: { email?: string } = {},
 ): Valid {
   if (password.length < PASSWORD.min) {
-    return fail(
-      `Use at least ${PASSWORD.min} characters. Length is what makes it hard to guess.`,
-    );
+    return fail("validation.passwordShort", { min: PASSWORD.min });
   }
   // bcrypt ignores everything past 72 bytes, so a longer one is not stronger —
   // it just has a tail that does nothing, which is worth saying rather than
   // silently accepting. Counted in bytes: a passphrase with an accent or an
   // emoji reaches the limit sooner than its character count suggests.
   if (new TextEncoder().encode(password).length > PASSWORD.max) {
-    return fail(
-      `At most ${PASSWORD.max} bytes — anything past that is ignored, not extra.`,
-    );
+    return fail("validation.passwordLong", { max: PASSWORD.max });
   }
   if (/^\s|\s$/.test(password)) {
-    return fail(
-      "Remove the leading or trailing space — it is easy to lose and hard to notice.",
-    );
+    return fail("validation.passwordSpace");
   }
 
   const lower = password.toLowerCase();
 
   const local = options.email?.split("@")[0]?.toLowerCase();
   if (local && local.length >= 3 && lower.includes(local)) {
-    return fail("Do not put your email address in your password.");
+    return fail("validation.passwordEmail");
   }
 
   if (["lebrunji", "password", "qwerty"].some((word) => lower.includes(word))) {
-    return fail("That contains a word an attacker would try first.");
+    return fail("validation.passwordCommon");
   }
 
   return OK;
@@ -347,5 +354,5 @@ export function validatePassword(
 
 /** Collapses a set of results into the first failure, for a whole form. */
 export function firstFailure(results: readonly Valid[]): Valid {
-  return results.find((r): r is { ok: false; message: string } => !r.ok) ?? OK;
+  return results.find((result) => !result.ok) ?? OK;
 }

@@ -16,9 +16,23 @@ import {
   validateSlug,
 } from "./validation";
 
-/** Reads better than `expect(r.ok).toBe(false)` and names the message. */
-const message = (r: ReturnType<typeof validateSlug>) =>
-  r.ok ? null : r.message;
+/**
+ * The failing key, or null.
+ *
+ * Validators return keys rather than sentences, so the tests assert on the key
+ * — which is also the more durable assertion: rewording a message should not
+ * break a test about which rule fired.
+ */
+const key = (r: ReturnType<typeof validateSlug>) => (r.ok ? null : r.key);
+
+/**
+ * The parameters that go into the sentence.
+ *
+ * Asserting on these rather than on the rendered text is the more precise
+ * check: the point is that the validator *identified which language* is
+ * missing, and that fact survives rewording the message or translating it.
+ */
+const params = (r: ReturnType<typeof validateSlug>) => (r.ok ? null : r.params);
 
 describe("validateSlug", () => {
   it("accepts the shape every existing slug takes", () => {
@@ -64,9 +78,13 @@ describe("validateLocalizedText", () => {
   it("names the missing language rather than failing anonymously", () => {
     // This is the case the locales CHECK constraint would otherwise report as
     // `menu_items_name_locales`, which tells the operator nothing.
-    expect(
-      message(validateLocalizedText({ en: "Kibbeh" }, languages, TEXT.name)),
-    ).toContain("ar");
+    const result = validateLocalizedText(
+      { en: "Kibbeh" },
+      languages,
+      TEXT.name,
+    );
+    expect(key(result)).toBe("form.stillNeeded");
+    expect(params(result)?.languages).toBe("ar");
   });
 
   it("treats whitespace as empty, because the constraint does too", () => {
@@ -90,9 +108,9 @@ describe("validateLocalizedText", () => {
 
   it("reports which language is too long", () => {
     const over = { en: "x".repeat(TEXT.name + 1), ar: "كبة" };
-    expect(
-      message(validateLocalizedText(over, languages, TEXT.name)),
-    ).toContain("en");
+    const result = validateLocalizedText(over, languages, TEXT.name);
+    expect(key(result)).toBe("validation.tooLongIn");
+    expect(params(result)?.languages).toBe("en");
   });
 
   it("follows the languages it is given, not a hardcoded pair", () => {
@@ -249,7 +267,7 @@ describe("firstFailure", () => {
       validatePrice(-1),
       validateSlug("Bad"),
     ]);
-    expect(message(result)).toBe("A price cannot be negative.");
+    expect(key(result)).toBe("validation.priceNegative");
   });
 
   it("passes when everything passes", () => {

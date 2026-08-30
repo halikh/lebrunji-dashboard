@@ -1,4 +1,5 @@
 import { getClient } from "@/lib/supabase/client";
+import { t } from "@/i18n/translations";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -148,7 +149,7 @@ export async function archiveMenuItem(id: string): Promise<void> {
 }
 
 /**
- * Turns a constraint violation into a sentence.
+ * Turns a constraint violation into a sentence the operator can act on.
  *
  * The form checks these first and this should rarely be seen — but "rarely" is
  * not "never": a second tab, a stale list, an imported row. When it happens the
@@ -160,20 +161,15 @@ export async function archiveMenuItem(id: string): Promise<void> {
  */
 function friendly(message: string): string {
   if (message.includes("slug_live_idx") || message.includes("store_id_slug")) {
-    return "Another item in this shop already uses that slug.";
+    return t("dbError.duplicateSlug");
   }
-  if (message.includes("_locales")) {
-    return "Every language needs a value before this can be saved.";
-  }
-  if (message.includes("price_positive")) {
-    return "A price cannot be negative.";
-  }
-  if (message.includes("slug_shape")) {
-    return "Use lower-case letters, numbers and single hyphens in the slug.";
-  }
-  if (message.includes("_len")) {
-    return "That is longer than the field allows.";
-  }
+  if (message.includes("_locales")) return t("dbError.missingLanguage");
+  if (message.includes("price_positive")) return t("dbError.priceNegative");
+  if (message.includes("_len")) return t("dbError.tooLong");
+
+  // Unrecognised. The raw Postgres message is ugly and *true*; a friendly
+  // translation of an error nobody has read would be worse — it would say
+  // something confident about a failure it does not understand.
   return message;
 }
 

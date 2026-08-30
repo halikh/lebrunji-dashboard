@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button, Field } from "@/components/ui";
 import { NumberInput } from "@/components/ui/number-input";
@@ -11,9 +11,9 @@ import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
 import type { Localized } from "@/lib/validation";
 import {
-  firstFailure,
   validateLocalizedText,
   validatePrice,
+  type Valid,
 } from "@/lib/validation";
 
 export type ItemDraft = {
@@ -82,25 +82,73 @@ export function MenuItemEditor({
   );
   const [price, setPrice] = useState(String(initial?.price ?? ""));
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
-  const [shown, setShown] = useState<string | null>(null);
+
+  /**
+   * One message per field, not one for the form.
+   *
+   * The first version collected the *first* failure and printed it at the
+   * bottom of the panel — so "This is required." sat under the visibility
+   * switch while the empty field it was about had scrolled off the top. A
+   * message detached from its field is barely a message: the operator is told
+   * something is wrong and left to find out what.
+   *
+   * Every field is checked, not just up to the first failure. Reporting one
+   * problem at a time turns a form into a queue of round trips, and the
+   * operator fixes a name only to be told about a price.
+   */
+  const [errors, setErrors] = useState<{
+    name?: string;
+    description?: string;
+    price?: string;
+  }>({});
 
   const codes = languages.data?.map((language) => language.code) ?? [];
+
+  /**
+   * After a failed save, take the operator to the first problem.
+   *
+   * The panel scrolls, so a message can be perfectly well attached to its field
+   * and still be invisible — which is what the screenshot showed: the empty
+   * name had scrolled off the top while the form reported it at the bottom.
+   * Marking the field is not enough if the field is not on screen.
+   *
+   * Focus as well as scroll, so a screen reader lands on the control and reads
+   * the error `aria-describedby` points at — the same journey, by another
+   * route.
+   */
+  const form = useRef<HTMLDivElement>(null);
+  const attempt = useRef(0);
+
+  useEffect(() => {
+    if (attempt.current === 0) return;
+    const first = form.current?.querySelector<HTMLElement>(
+      '[aria-invalid="true"]',
+    );
+    if (!first) return;
+    first.scrollIntoView({ block: "center", behavior: "smooth" });
+    first.focus({ preventScroll: true });
+  }, [errors]);
+
   function build(): ItemDraft | null {
-    const parsed = Number(price);
-    const problem = firstFailure([
-      validateLocalizedText(name, codes, TEXT.name),
-      validateLocalizedText(description, codes, TEXT.description, {
-        optional: true,
-      }),
-      validatePrice(Number.isFinite(parsed) ? parsed : NaN),
-    ]);
+    const parsed = price.trim() === "" ? NaN : Number(price);
 
-    if (!problem.ok) {
-      setShown(problem.message);
-      return null;
-    }
+    const found = {
+      name: messageOf(validateLocalizedText(name, codes, TEXT.name)),
+      description: messageOf(
+        validateLocalizedText(description, codes, TEXT.description, {
+          optional: true,
+        }),
+      ),
+      price: messageOf(validatePrice(Number.isFinite(parsed) ? parsed : NaN)),
+    };
 
-    setShown(null);
+    setErrors(found);
+    // Bumped every attempt, so two identical failures still scroll — without
+    // it, pressing Save twice on the same empty field would change nothing and
+    // the effect would not run.
+    attempt.current += 1;
+
+    if (found.name || found.description || found.price) return null;
     return { name, description, price: parsed, isActive };
   }
 
@@ -113,7 +161,10 @@ export function MenuItemEditor({
     // panel. `flex-1` claims what is left instead, and `min-h-0` is what lets
     // it shrink below its content so the scrolling happens inside.
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
+      <div
+        ref={form}
+        className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl"
+      >
         <div className="flex flex-col gap-lg">
           <LocalizedField
             label={t("menu.name")}
@@ -127,6 +178,7 @@ export function MenuItemEditor({
               ar: t("menu.namePlaceholderAr"),
             }}
             hint={t("menu.nameHint")}
+            error={errors.name}
             maxLength={TEXT.name}
           />
           <LocalizedField
@@ -140,12 +192,17 @@ export function MenuItemEditor({
             multiline
             optional
             hint={t("menu.descriptionHint")}
+            error={errors.description}
             maxLength={TEXT.description}
           />
         </div>
 
         <div className="flex w-full flex-col gap-lg">
-          <Field label={t("menu.price")} hint={t("menu.priceHint")}>
+          <Field
+            label={t("menu.price")}
+            hint={t("menu.priceHint")}
+            error={errors.price}
+          >
             <NumberInput
               min={0}
               step={1}
@@ -168,9 +225,11 @@ export function MenuItemEditor({
           </Field>
         </div>
 
-        {(shown || error) && (
+        {/* Only what belongs to no field — a refusal from the server. Anything
+            about a value appears beside that value. */}
+        {error && (
           <p role="alert" className="text-[13px] font-medium text-danger">
-            {shown ?? error}
+            {error}
           </p>
         )}
       </div>
@@ -205,4 +264,16 @@ export function MenuItemEditor({
       </div>
     </div>
   );
+}
+
+/**
+ * A failure's sentence, or nothing when it passed.
+ *
+ * The validator hands back a key; the screen turns it into words. That split is
+ * what keeps validation messages inside the translation bundle with every other
+ * string, rather than being the one class of user-facing text that never went
+ * through `t()`.
+ */
+function messageOf(result: Valid): string | undefined {
+  return result.ok ? undefined : t(result.key, result.params);
 }
