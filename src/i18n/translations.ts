@@ -159,8 +159,10 @@ const en = {
     imageTooBig: "Images must be under {max} MB.",
     imageTooSmall: "At least {min}px on each side.",
     imageTooLarge: "At most {max}px on each side.",
-    passwordShort: "Use at least {min} characters. Length is what makes it hard to guess.",
-    passwordLong: "At most {max} bytes — anything past that is ignored, not extra.",
+    passwordShort:
+      "Use at least {min} characters. Length is what makes it hard to guess.",
+    passwordLong:
+      "At most {max} bytes — anything past that is ignored, not extra.",
     passwordSpace: "Remove the leading or trailing space.",
     passwordEmail: "Do not put your email address in your password.",
     passwordCommon: "That contains a word an attacker would try first.",
@@ -216,6 +218,26 @@ const en = {
     openMenu: "Menu",
   },
 
+  /**
+   * Reordering, which is mostly announcements.
+   *
+   * A drag says what it is doing by moving things on screen. A keyboard move
+   * has to say it out loud, so these are the whole of the feedback for anyone
+   * not using a pointer — which is why they name the row and its new position
+   * rather than saying "moved".
+   */
+  reorder: {
+    handle: "Reorder {name}",
+    instructions:
+      "Press Enter or Space to pick up, then arrow up and down to move. Enter or Space to drop, Escape to cancel.",
+    grabbed: "{name} picked up. Position {position} of {count}.",
+    movedTo: "{name}, position {position} of {count}.",
+    dropped: "{name} dropped.",
+    cancelled: "Move cancelled.",
+    saved: "Order saved",
+    failed: "Could not save the new order",
+  },
+
   menu: {
     title: "Menu",
     back: "All shops",
@@ -236,6 +258,27 @@ const en = {
     archiveConfirm: "Archive",
     archive: "Archive",
     itemCount: "{count} items",
+
+    // Sections. A section is the heading a customer scans before they read any
+    // item under it, so what it is called is the menu's structure rather than
+    // decoration.
+    sections: "Sections",
+    addSection: "Add a section",
+    sectionTitle: "Section name",
+    sectionTitleHint: "What customers see above the items in it.",
+    sectionAdded: "Section added",
+    sectionRenamed: "Section renamed",
+    sectionArchived: "Section archived",
+    renameSection: "Rename",
+    sectionArchiveTitle: "Archive this section?",
+    sectionArchiveBody:
+      "It disappears from the app immediately. It can be brought back.",
+    // The refusal an operator is most likely to meet, so it says the number and
+    // what to do — not that the action was unavailable.
+    sectionNotEmpty:
+      "This section still holds {count} live item(s). Move or archive them first, or they would disappear from the app without being deleted.",
+    sectionEmpty: "No items yet",
+    saveSection: "Save",
     emptyTitle: "No menu yet",
     emptyBody: "Sections hold the items. This shop has none.",
     failedTitle: "Could not load the menu",

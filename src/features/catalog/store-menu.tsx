@@ -6,19 +6,28 @@ import { useState } from "react";
 import { Button, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
+import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { Toggle } from "@/components/ui/toggle";
 import { Price } from "@/features/reference/price";
 import { t } from "@/i18n/translations";
+import { TEXT } from "@/lib/limits";
+import { validateLocalizedText, type Localized } from "@/lib/validation";
 
-import type { MenuItem, MenuSection } from "./api/menu";
+import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
 import { MenuItemEditor } from "./menu-item-editor";
 import {
   useArchiveMenuItem,
+  useArchiveMenuSection,
   useCreateMenuItem,
+  useCreateMenuSection,
   useMenu,
+  useReorderMenu,
   useUpdateMenuItem,
+  useUpdateMenuSection,
 } from "./use-menu";
+import { useLanguages } from "@/features/reference/use-languages";
 import { useStore } from "./use-stores";
 
 /**
@@ -48,6 +57,49 @@ export function StoreMenu({ storeId }: { storeId: string }) {
   const create = useCreateMenuItem(storeId);
   const update = useUpdateMenuItem(storeId);
   const archive = useArchiveMenuItem(storeId);
+
+  const createSection = useCreateMenuSection(storeId);
+  const renameSection = useUpdateMenuSection(storeId);
+  const archiveSection = useArchiveMenuSection(storeId);
+  const reorder = useReorderMenu(storeId);
+
+  /** Which section is being renamed, or `"new"` while one is being added. */
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+
+  const sections = menu.data ?? [];
+
+  function reorderSections(ids: string[]) {
+    const { next, updates } = applyOrder(sections, ids);
+    reorder.mutate({ table: "menu_sections", updates, next });
+  }
+
+  function reorderItems(sectionId: string, ids: string[]) {
+    const section = sections.find((candidate) => candidate.id === sectionId);
+    if (!section) return;
+
+    const { next: items, updates } = applyOrder(section.items, ids);
+
+    reorder.mutate({
+      table: "menu_items",
+      updates,
+      // The whole menu, with one section's items replaced — the optimistic
+      // update replaces the query's data outright, so it has to be everything
+      // the screen draws, not just the part that moved.
+      next: sections.map((candidate) =>
+        candidate.id === sectionId ? { ...candidate, items } : candidate,
+      ),
+    });
+  }
+
+  const sectionOrder = useReorder({
+    ids: sections.map((section) => section.id),
+    onReorder: reorderSections,
+    labelOf: (id) =>
+      pick(sections.find((section) => section.id === id)?.title ?? {}),
+    // Nothing to reorder while a title is being edited: the fields would be
+    // moving under the cursor.
+    disabled: editingSection !== null,
+  });
 
   /**
    * What the panel is showing, if anything. `itemId: null` means adding.
@@ -137,25 +189,81 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             <EmptyState titleKey="menu.emptyTitle" bodyKey="menu.emptyBody" />
           )}
 
-          {menu.data?.map((section) => (
-            <Section
-              key={section.id}
-              section={section}
-              currencyCode={store.data?.currencyCode ?? ""}
-              openItemId={open?.itemId ?? null}
-              onEdit={(itemId) => setOpen({ sectionId: section.id, itemId })}
-              onAdd={() => setOpen({ sectionId: section.id, itemId: null })}
-              onToggle={(item) =>
-                update.mutate({
-                  id: item.id,
-                  patch: { isActive: !item.isActive },
-                })
-              }
-              onArchive={async (item) => {
-                await archive.mutateAsync(item.id);
-              }}
-            />
-          ))}
+          {sectionOrder.instructions}
+
+          {sectionOrder
+            .ordered(sections, (section) => section.id)
+            .map((section) => (
+              <Section
+                key={section.id}
+                section={section}
+                currencyCode={store.data?.currencyCode ?? ""}
+                openItemId={open?.itemId ?? null}
+                rowProps={sectionOrder.rowProps}
+                handleProps={sectionOrder.handleProps}
+                renaming={editingSection === section.id}
+                onRename={() => setEditingSection(section.id)}
+                onRenamed={(title) =>
+                  renameSection.mutate(
+                    { id: section.id, title },
+                    { onSuccess: () => setEditingSection(null) },
+                  )
+                }
+                onCancelRename={() => setEditingSection(null)}
+                renamePending={renameSection.isPending}
+                onArchiveSection={async () => {
+                  await archiveSection.mutateAsync(section.id);
+                }}
+                onReorderItems={(ids) => reorderItems(section.id, ids)}
+                onEdit={(itemId) => setOpen({ sectionId: section.id, itemId })}
+                onAdd={() => setOpen({ sectionId: section.id, itemId: null })}
+                onToggle={(item) =>
+                  update.mutate({
+                    id: item.id,
+                    patch: { isActive: !item.isActive },
+                  })
+                }
+                onArchive={async (item) => {
+                  await archive.mutateAsync(item.id);
+                }}
+              />
+            ))}
+
+          {/* Adding a section is the bottom of the menu, because that is where
+              a new one goes and where the eye already is after reading it. */}
+          {menu.isSuccess &&
+            (editingSection === "new" ? (
+              <SectionForm
+                pending={createSection.isPending}
+                onSave={(title) =>
+                  createSection.mutate(
+                    { draft: { storeId, title }, sortOrder: sections.length },
+                    { onSuccess: () => setEditingSection(null) },
+                  )
+                }
+                onCancel={() => setEditingSection(null)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingSection("new")}
+                className="flex w-fit items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-soft hover:border-primary hover:text-primary"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  aria-hidden
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                {t("menu.addSection")}
+              </button>
+            ))}
         </div>
       </div>
 
@@ -247,10 +355,31 @@ export function StoreMenu({ storeId }: { storeId: string }) {
   );
 }
 
+type ReorderProps = {
+  rowProps: (
+    id: string,
+    className?: string,
+  ) => {
+    "data-reorder-id": string;
+    style: React.CSSProperties | undefined;
+    className: string;
+  };
+  handleProps: (id: string) => Record<string, unknown>;
+};
+
 function Section({
   section,
   currencyCode,
   openItemId,
+  rowProps,
+  handleProps,
+  renaming,
+  onRename,
+  onRenamed,
+  onCancelRename,
+  renamePending,
+  onArchiveSection,
+  onReorderItems,
   onEdit,
   onAdd,
   onToggle,
@@ -259,35 +388,96 @@ function Section({
   section: MenuSection;
   currencyCode: string;
   openItemId: string | null;
+  renaming: boolean;
+  onRename: () => void;
+  onRenamed: (title: Localized) => void;
+  onCancelRename: () => void;
+  renamePending: boolean;
+  onArchiveSection: () => Promise<void>;
+  onReorderItems: (ids: string[]) => void;
   onEdit: (id: string) => void;
   onAdd: () => void;
   onToggle: (item: MenuItem) => void;
   onArchive: (item: MenuItem) => Promise<void>;
-}) {
+} & ReorderProps) {
   const title = pick(section.title);
 
-  return (
-    <section className="flex flex-col gap-sm">
-      <div className="flex items-center gap-md">
-        <h2 className="text-[18px]">{title}</h2>
-        <span className="text-[13px] text-text-faint">
-          {t("menu.itemCount", { count: section.items.length })}
-        </span>
-      </div>
+  const itemOrder = useReorder({
+    ids: section.items.map((item) => item.id),
+    onReorder: onReorderItems,
+    labelOf: (id) =>
+      pick(section.items.find((item) => item.id === id)?.name ?? {}),
+  });
 
-      {section.items.map((item) => (
-        <ItemRow
-          key={item.id}
-          item={item}
-          currencyCode={currencyCode}
-          // The row the panel is showing is marked, so the form and the list
-          // agree about what is being edited.
-          open={openItemId === item.id}
-          onEdit={() => onEdit(item.id)}
-          onToggle={() => onToggle(item)}
-          onArchive={() => onArchive(item)}
+  const row = rowProps(section.id, "flex flex-col gap-sm");
+
+  return (
+    <section {...row}>
+      {renaming ? (
+        <SectionForm
+          initial={section.title}
+          pending={renamePending}
+          onSave={onRenamed}
+          onCancel={onCancelRename}
         />
-      ))}
+      ) : (
+        <div className="flex items-center gap-md">
+          <button {...handleProps(section.id)}>
+            <GripIcon />
+          </button>
+
+          <h2 className="text-[18px]">{title}</h2>
+          <span className="text-[13px] text-text-faint">
+            {t("menu.itemCount", { count: section.items.length })}
+          </span>
+
+          {/* Pushed to the far end, and quiet. These are the section's own
+              controls and they should not compete with the items under it,
+              which is what the operator is actually reading. */}
+          <div className="ms-auto flex items-center gap-sm">
+            <Button variant="quiet" size="sm" onClick={onRename}>
+              {t("menu.renameSection")}
+            </Button>
+            <ConfirmButton
+              onConfirm={onArchiveSection}
+              titleKey="menu.sectionArchiveTitle"
+              bodyKey="menu.sectionArchiveBody"
+              confirmKey="menu.archiveConfirm"
+              variant="danger"
+              triggerVariant="danger"
+              size="sm"
+            >
+              {t("menu.archive")}
+            </ConfirmButton>
+          </div>
+        </div>
+      )}
+
+      {itemOrder.instructions}
+
+      {section.items.length === 0 && !renaming && (
+        <p className="rounded-md border border-dashed border-border px-lg py-md text-[13px] text-text-faint">
+          {t("menu.sectionEmpty")}
+        </p>
+      )}
+
+      {itemOrder
+        .ordered(section.items, (item) => item.id)
+        .map((item) => (
+          <ItemRow
+            key={item.id}
+            item={item}
+            currencyCode={currencyCode}
+            handleProps={itemOrder.handleProps}
+            rowProps={itemOrder.rowProps}
+            // The row the panel is showing is marked, so the form and the list
+            // agree about what is being edited.
+            open={openItemId === item.id}
+            onEdit={() => onEdit(item.id)}
+            onToggle={() => onToggle(item)}
+            onArchive={() => onArchive(item)}
+          />
+        ))}
 
       {/* At the bottom of the section, not in a header. It is where the eye
           already is after reading the list. */}
@@ -318,6 +508,8 @@ function ItemRow({
   item,
   currencyCode,
   open,
+  rowProps,
+  handleProps,
   onEdit,
   onToggle,
   onArchive,
@@ -328,20 +520,27 @@ function ItemRow({
   onEdit: () => void;
   onToggle: () => void;
   onArchive: () => Promise<void>;
-}) {
+} & ReorderProps) {
+  const row = rowProps(
+    item.id,
+    cx(
+      "flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
+      // Marked, not dimmed — fading a row takes its controls with it, and a
+      // faded button reads as a disabled one.
+      !item.isActive && "border-danger-wash bg-danger-wash/30",
+      open &&
+        "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
+      item.isActive && !open && "border-border",
+      item.isActive && open && "border-active",
+    ),
+  );
+
   return (
-    <div
-      className={cx(
-        "flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
-        // Marked, not dimmed — fading a row takes its controls with it, and a
-        // faded button reads as a disabled one.
-        !item.isActive && "border-danger-wash bg-danger-wash/30",
-        open &&
-          "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
-        item.isActive && !open && "border-border",
-        item.isActive && open && "border-active",
-      )}
-    >
+    <div {...row}>
+      <button {...handleProps(item.id)}>
+        <GripIcon />
+      </button>
+
       {item.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -411,6 +610,76 @@ function ItemRow({
       >
         {t("menu.archive")}
       </ConfirmButton>
+    </div>
+  );
+}
+
+/**
+ * Naming a section, inline.
+ *
+ * ## Why this is not the panel the item editor uses
+ *
+ * An item carries two languages of name, two of description, a price, a switch
+ * and an image; a section carries a name. The panel exists because a form that
+ * large reflows the list it is supposed to sit beside — that reasoning does not
+ * reach a heading with one field per language, and opening a full-height panel
+ * to rename "Starters" would be a bigger interruption than the edit.
+ *
+ * So it edits in place. The section's own items stay visible underneath, which
+ * is the context that says what the heading is naming.
+ *
+ * No slug field, here or anywhere: the trigger from migration 0071 derives one
+ * from the English title and makes it unique within the shop.
+ */
+function SectionForm({
+  initial,
+  pending,
+  onSave,
+  onCancel,
+}: {
+  initial?: Localized;
+  pending: boolean;
+  onSave: (title: Localized) => void;
+  onCancel: () => void;
+}) {
+  const languages = useLanguages();
+  const codes = languages.data?.map((language) => language.code) ?? [];
+
+  const [title, setTitle] = useState<Localized>(initial ?? {});
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  function submit() {
+    const result = validateLocalizedText(title, codes, TEXT.title);
+    if (!result.ok) {
+      setError(t(result.key, result.params));
+      return;
+    }
+    setError(undefined);
+    onSave(title);
+  }
+
+  return (
+    <div className="flex flex-col gap-lg rounded-md border border-active bg-surface p-lg">
+      <LocalizedField
+        label={t("menu.sectionTitle")}
+        value={title}
+        onChange={setTitle}
+        maxLength={TEXT.title}
+        hint={t("menu.sectionTitleHint")}
+        error={error}
+        placeholder={{ en: "Starters", ar: "المقبلات" }}
+      />
+
+      <div className="flex items-center gap-sm">
+        {/* Cancel first, then save — the same order as the item editor, so the
+            button in a given place always does the same thing. */}
+        <Button variant="secondary" onClick={onCancel} disabled={pending}>
+          {t("common.cancel")}
+        </Button>
+        <Button onClick={submit} pending={pending}>
+          {t("menu.saveSection")}
+        </Button>
+      </div>
     </div>
   );
 }

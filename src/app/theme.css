@@ -229,6 +229,29 @@
    * enough to be watched rather than merely noticed, which is what the rail's
    * icon animations are for. */
   --duration-rise: 500ms;
+
+  /* ---------------------------------------------------------------------
+   * Elevation
+   * ---------------------------------------------------------------------
+   *
+   * Three, and the difference between them is a claim about where the thing
+   * is — not how important it is.
+   *
+   * `card` is the app's own (`src/theme/elevation.ts`): a 2px drop with **no
+   * blur**, at 8% ink. The absence of blur is its whole character — a blurred
+   * shadow says the surface is floating, and these are lying on the page. It
+   * reads as a printed edge.
+   *
+   * `raised` and `overlay` do blur, because those things genuinely are off the
+   * page: a row held by the pointer mid-drag, and a panel or dialog over the
+   * whole screen. Blur is what says "this is above, and will come back down".
+   *
+   * They are tokens because the literals were already repeated across five
+   * components, which is where the sixth copy gets a different opacity and
+   * nobody can say which was intended. */
+  --shadow-card: 0 2px 0 rgba(30, 27, 24, 0.08);
+  --shadow-raised: 0 6px 16px rgba(30, 27, 24, 0.16);
+  --shadow-overlay: 0 6px 24px rgba(30, 27, 24, 0.14);
 }
 
 /**

@@ -362,9 +362,7 @@ function ScopeButton({
       onClick={onClick}
       className={cx(
         "rounded-sm px-md py-xs text-[13px] font-semibold whitespace-nowrap",
-        active
-          ? "bg-surface text-text shadow-[0_1px_2px_rgba(30,27,24,0.10)]"
-          : "text-text-soft",
+        active ? "bg-surface text-text shadow-card" : "text-text-soft",
       )}
     >
       {label}

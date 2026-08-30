@@ -50,7 +50,10 @@ export async function POST(request: NextRequest) {
     // Translated here, on the server, because the route answers a request that
     // did not have to come from the form — a client posting directly gets a
     // sentence rather than a key it has no bundle for.
-    return NextResponse.json({ error: t(strong.key, strong.params) }, { status: 400 });
+    return NextResponse.json(
+      { error: t(strong.key, strong.params) },
+      { status: 400 },
+    );
   }
 
   const supabase = anonymousClient();

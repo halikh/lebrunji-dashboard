@@ -49,8 +49,7 @@ import {
  * them is testable without a locale.
  */
 export type Valid =
-  | { ok: true }
-  | { ok: false; key: TranslationKey; params?: Params };
+  { ok: true } | { ok: false; key: TranslationKey; params?: Params };
 
 const OK: Valid = { ok: true };
 const fail = (key: TranslationKey, params?: Params): Valid => ({
@@ -109,7 +108,10 @@ export function validateLocalizedText(
     (code) => (value?.[code] ?? "").trim().length > maxLength,
   );
   if (tooLong.length > 0) {
-    return fail("validation.tooLongIn", { languages: tooLong.join(", "), max: maxLength });
+    return fail("validation.tooLongIn", {
+      languages: tooLong.join(", "),
+      max: maxLength,
+    });
   }
 
   return OK;
@@ -133,8 +135,7 @@ export function validatePrice(
   }
   if (minorUnits < MONEY.min) return fail("validation.priceNegative");
   const max = options.max ?? MONEY.maxUnitPrice;
-  if (minorUnits > max)
-    return fail("validation.priceHuge");
+  if (minorUnits > max) return fail("validation.priceHuge");
   return OK;
 }
 
@@ -176,8 +177,7 @@ export function validatePrepWindow(min: number, max: number): Valid {
     return fail("validation.prepMin", { min: PREP_MINUTES.min });
   if (max > PREP_MINUTES.max)
     return fail("validation.prepMax", { max: PREP_MINUTES.max });
-  if (max < min)
-    return fail("validation.prepOrder");
+  if (max < min) return fail("validation.prepOrder");
   return OK;
 }
 
@@ -195,14 +195,14 @@ export function validateDeliveryBand(
 ): Valid {
   if (!Number.isFinite(upToKm)) return fail("validation.distanceRequired");
   if (upToKm < DELIVERY.minKm) return fail("validation.bandTooSmall");
-  if (upToKm > DELIVERY.maxKm) return fail("validation.bandTooBig", { max: DELIVERY.maxKm });
+  if (upToKm > DELIVERY.maxKm)
+    return fail("validation.bandTooBig", { max: DELIVERY.maxKm });
   // `numeric(5,2)` — a third decimal place would be rounded away on write, and
   // a band that silently becomes a different band is worse than a refusal.
   if (Math.abs(upToKm * 100 - Math.round(upToKm * 100)) > 1e-9) {
     return fail("validation.twoDecimals");
   }
-  if (existing.includes(upToKm))
-    return fail("validation.bandDuplicate");
+  if (existing.includes(upToKm)) return fail("validation.bandDuplicate");
 
   return validatePrice(amountMinorUnits);
 }
@@ -247,7 +247,9 @@ export function validateImage(input: {
     return fail("validation.imageType");
   }
   if (input.bytes > IMAGE.maxBytes) {
-    return fail("validation.imageTooBig", { max: Math.round(IMAGE.maxBytes / 1024 / 1024) });
+    return fail("validation.imageTooBig", {
+      max: Math.round(IMAGE.maxBytes / 1024 / 1024),
+    });
   }
   const { width, height } = input;
   if (width !== undefined && height !== undefined) {

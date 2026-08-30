@@ -148,6 +148,186 @@ export async function archiveMenuItem(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// ---------------------------------------------------------------------------
+// Sections
+// ---------------------------------------------------------------------------
+
+export type MenuSectionDraft = {
+  storeId: string;
+  title: Localized;
+};
+
+/**
+ * Adds a section.
+ *
+ * No `slug`, for the same reason an item has none: the trigger from migration
+ * 0071 derives it from the English title and makes it unique inside the shop,
+ * which a client cannot do without racing another tab.
+ */
+export async function createMenuSection(
+  draft: MenuSectionDraft,
+  sortOrder: number,
+): Promise<void> {
+  const { error } = await getClient().from("menu_sections").insert({
+    store_id: draft.storeId,
+    title: draft.title,
+    sort_order: sortOrder,
+  });
+
+  if (error) throw new Error(friendly(error.message));
+}
+
+export async function updateMenuSection(
+  id: string,
+  patch: { title?: Localized },
+): Promise<void> {
+  const { error } = await getClient()
+    .from("menu_sections")
+    .update({ title: patch.title })
+    .eq("id", id);
+
+  if (error) throw new Error(friendly(error.message));
+}
+
+/**
+ * Archives an empty section.
+ *
+ * **Only an empty one**, and the check is repeated in the database (migration
+ * 0072) rather than living here alone. Soft delete does not cascade — the
+ * items would keep their `deleted_at` of null while their section had one — and
+ * an item in an archived section is in a place neither the dashboard nor the
+ * app will show it. It has not been deleted; it has been mislaid, which is
+ * worse, because nothing reports it.
+ *
+ * So the items move first. The count is read back rather than assumed from the
+ * list on screen, which may be a minute old.
+ */
+export async function archiveMenuSection(id: string): Promise<void> {
+  const client = getClient();
+
+  const { count, error: countError } = await client
+    .from("menu_items")
+    .select("id", { count: "exact", head: true })
+    .eq("menu_section_id", id)
+    .is("deleted_at", null);
+
+  if (countError) throw new Error(countError.message);
+  if (count && count > 0) {
+    throw new Error(t("menu.sectionNotEmpty", { count }));
+  }
+
+  const { error } = await client
+    .from("menu_sections")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) throw new Error(friendly(error.message));
+}
+
+// ---------------------------------------------------------------------------
+// Ordering
+// ---------------------------------------------------------------------------
+
+export type SortUpdate = { id: string; sortOrder: number };
+
+/**
+ * The rows in a new order, and the smallest set of writes that gets them there.
+ *
+ * Positions are rewritten as 0…n rather than shuffled, so the stored order is
+ * always the order on screen and never a set of gaps a later insert has to find
+ * room in.
+ *
+ * ## Why only the rows that moved
+ *
+ * Dragging one row past two others changes three positions, not the whole list.
+ * Writing every row would make a menu of forty items cost forty requests for a
+ * change to three of them — and each of those requests is one more chance for
+ * the half-applied state this cannot make atomic.
+ *
+ * ## Why this is a function rather than two loops in the screen
+ *
+ * Sections and items reorder identically, and the second copy of "which rows
+ * changed" is where an off-by-one lives: it produces a list that looks right
+ * until the page is reloaded, because the rows nobody wrote are still carrying
+ * their old `sort_order` and only the server knows.
+ *
+ * An id in `ids` that names no row is skipped rather than throwing, and skipped
+ * without leaving a gap behind it. It means the list moved under the drag, and
+ * the refetch that follows is what settles it — refusing here would turn a
+ * stale preview into an error dialog.
+ */
+export function applyOrder<T extends { id: string; sortOrder: number }>(
+  rows: T[],
+  ids: string[],
+): { next: T[]; updates: SortUpdate[] } {
+  // Two steps, and the order of them matters. Numbering while filtering lets a
+  // skipped id consume a position, so one unknown id in the middle leaves a
+  // hole at that index and shifts everything below it by one — a list that is
+  // in the right order and numbered wrong, which is the failure this whole
+  // function exists to avoid.
+  const next = ids
+    .flatMap((id) => {
+      const row = rows.find((candidate) => candidate.id === id);
+      return row ? [row] : [];
+    })
+    .map((row, index) => ({ ...row, sortOrder: index }));
+
+  const updates = next.flatMap((row) => {
+    const before = rows.find((candidate) => candidate.id === row.id);
+    return before && before.sortOrder === row.sortOrder
+      ? []
+      : [{ id: row.id, sortOrder: row.sortOrder }];
+  });
+
+  return { next, updates };
+}
+
+/**
+ * Writes a new `sort_order` to each row that needs one.
+ *
+ * ## Why several requests rather than one
+ *
+ * PostgREST's bulk upsert is an `insert … on conflict do update`, so it has to
+ * satisfy the insert first — every not-null column of every row, for a write
+ * that means to touch one integer. The alternative is an RPC, and a
+ * `security definer` function taking a table name is a wider hole than this
+ * fixes.
+ *
+ * ## Why that is acceptable here, stated rather than assumed
+ *
+ * The writes are not atomic, so a dropped connection can leave the list half
+ * reordered. Three things make that a nuisance instead of a fault:
+ *
+ * - **`sort_order` is presentation.** A half-applied order shows the rows in an
+ *   odd sequence. It does not lose a row, mis-price one, or affect an order
+ *   already placed.
+ * - **It is idempotent.** The desired positions are absolute, not relative, so
+ *   the same call can simply be made again — and the next drag rewrites them
+ *   anyway.
+ * - **The list is refetched either way**, on success and on failure. Whatever
+ *   actually landed is what the operator sees, so the screen is never a more
+ *   optimistic story than the database.
+ *
+ * Only the rows whose position actually changed are written, which is usually
+ * the handful between where a row was and where it went.
+ */
+export async function setSortOrder(
+  table: "menu_items" | "menu_sections",
+  updates: SortUpdate[],
+): Promise<void> {
+  if (updates.length === 0) return;
+
+  const client = getClient();
+  const results = await Promise.all(
+    updates.map(({ id, sortOrder }) =>
+      client.from(table).update({ sort_order: sortOrder }).eq("id", id),
+    ),
+  );
+
+  const failure = results.find((result) => result.error);
+  if (failure?.error) throw new Error(friendly(failure.error.message));
+}
+
 /**
  * Turns a constraint violation into a sentence the operator can act on.
  *

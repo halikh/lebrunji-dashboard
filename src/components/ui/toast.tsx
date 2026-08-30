@@ -136,7 +136,7 @@ function ToastRow({
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
       className={cx(
-        "pointer-events-auto flex items-center gap-lg rounded-xl border px-lg py-md shadow-[0_6px_24px_rgba(30,27,24,0.14)]",
+        "pointer-events-auto flex items-center gap-lg rounded-xl border px-lg py-md shadow-overlay",
         KIND_STYLES[toast.kind],
       )}
     >
