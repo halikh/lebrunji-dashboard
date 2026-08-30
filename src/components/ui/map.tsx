@@ -1,6 +1,6 @@
 "use client";
 
-import { t } from "@/i18n/translations";
+import { t, type TranslationKey } from "@/i18n/translations";
 
 import { cx } from "./index";
 
@@ -43,6 +43,7 @@ export function Map({
   latitude,
   longitude,
   label,
+  emptyKey = "map.noPin",
   zoom = 16,
   className,
 }: {
@@ -50,6 +51,16 @@ export function Map({
   longitude: number | null | undefined;
   /** What the pin is, for the frame's accessible name. */
   label: string;
+  /**
+   * What to say when there is no pin.
+   *
+   * The default is written for an order's delivery address, where "no location
+   * saved for this address" is exactly right. On a shop's settings page there
+   * is no address and nothing has been saved yet, so the same sentence is
+   * quietly wrong — it describes a failure where the truth is simply "not
+   * filled in".
+   */
+  emptyKey?: TranslationKey;
   zoom?: number;
   className?: string;
 }) {
@@ -63,7 +74,7 @@ export function Map({
           className,
         )}
       >
-        <span className="text-[13px] text-text-faint">{t("map.noPin")}</span>
+        <span className="text-[13px] text-text-faint">{t(emptyKey)}</span>
       </div>
     );
   }

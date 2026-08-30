@@ -265,6 +265,40 @@ const en = {
     failed: "The upload did not finish. Nothing has been changed.",
   },
 
+  /**
+   * A shop's own settings, as opposed to what it sells.
+   */
+  store: {
+    tab: "Details",
+    name: "Shop name",
+    nameHint: "What customers see at the top of the shop.",
+    imageHint: "The picture on the shop's card in the app.",
+    prepTitle: "Preparation time",
+    prepWindow: "Kitchen takes",
+    // Says what the number is *for*, which the label cannot: this is the range
+    // the app quotes a customer before they order.
+    prepHint: "The range the app quotes with the delivery estimate.",
+    prepTo: "to",
+    minutes: "minutes",
+    locationTitle: "Location",
+    pin: "Coordinates",
+    pinHint:
+      "Paste a Google Maps link, or right-click the shop in Maps and paste the coordinates it copies. Leave empty if you do not have it yet.",
+    pinInvalid:
+      "No location found in that. Paste a Google Maps link, or a pair like 33.8938, 35.5018.",
+    // Named rather than lumped in with "invalid", because it has an obvious
+    // next step and the operator has plainly pasted a real map link.
+    pinShortened:
+      "A shortened link does not carry the coordinates. Open it once in a browser and paste the full link it becomes.",
+    // The consequence, not the omission. An operator who reads "no pin set"
+    // has been told a field is empty; this tells them what it is costing.
+    noPinWarning:
+      "No pin, so deliveries from this shop are charged at the highest distance band — the app cannot work out how far away a customer is.",
+    noPinYet: "No pin yet. Paste the coordinates above to see the shop here.",
+    save: "Save changes",
+    saved: "{name} saved",
+  },
+
   reorder: {
     handle: "Reorder {name}",
     instructions:

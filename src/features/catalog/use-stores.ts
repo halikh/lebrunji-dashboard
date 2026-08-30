@@ -53,8 +53,19 @@ export function useUpdateStore() {
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: (input: { id: string; patch: StorePatch }) =>
-      updateStore(input.id, input.patch),
+    mutationFn: (input: {
+      id: string;
+      patch: StorePatch;
+      /**
+       * Named in the confirmation, when there is one to give.
+       *
+       * Absent for a switch in a row: that already asked before it acted and
+       * the row itself moved, so a toast repeating what is now on screen is
+       * noise. Present for the settings form, where the save is a submission
+       * with no other visible result.
+       */
+      name?: Localized;
+    }) => updateStore(input.id, input.patch),
 
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: storeKeys.all });
@@ -72,6 +83,12 @@ export function useUpdateStore() {
       );
 
       return { snapshot };
+    },
+
+    onSuccess: (_result, input) => {
+      if (input.name) {
+        toast.success(t("store.saved", { name: pickLocalized(input.name) }));
+      }
     },
 
     onError: (error, _input, context) => {

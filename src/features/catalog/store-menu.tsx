@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 import { Button, cx } from "@/components/ui";
@@ -158,33 +157,10 @@ export function StoreMenu({ storeId }: { storeId: string }) {
         : null;
 
   return (
+    // The shop's name and its tabs belong to `StoreScreen`, which draws them
+    // once for both panes. This is the menu itself and the panel beside it.
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
-        <div className="flex shrink-0 flex-col gap-xs border-b border-border bg-surface px-xxl py-lg">
-          <Link
-            href="/catalogue"
-            className="flex w-fit items-center gap-xs text-[13px] font-semibold text-primary hover:underline"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M15 5l-7 7 7 7" />
-            </svg>
-            {t("menu.back")}
-          </Link>
-          <h1 className="text-[24px]">
-            {store.data ? pickLocalized(store.data.name) : ""}
-          </h1>
-        </div>
-
         <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
           {menu.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
