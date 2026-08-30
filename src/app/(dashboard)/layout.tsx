@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         is on a screen too narrow for the rail to show it.
       */}
       <header className="flex items-center justify-between border-b border-border bg-surface px-lg py-sm md:hidden">
-        <Wordmark scale={0.4} />
+        <Wordmark scale={0.5} />
         <SignOutButton />
       </header>
 

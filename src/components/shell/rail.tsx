@@ -44,11 +44,11 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
         // Bottom bar on a phone, left rail from `md` up. One component, because
         // two would be two things to keep in step.
         'order-last w-full flex-row justify-around border-t px-sm py-xs',
-        'md:order-first md:h-full md:w-[92px] md:flex-col md:justify-start md:border-r md:border-t-0 md:px-sm md:py-lg',
+        'md:order-first md:h-full md:w-[124px] md:flex-col md:justify-start md:border-r md:border-t-0 md:px-sm md:py-lg',
       )}
     >
       <div className="hidden md:mb-xl md:flex md:justify-center">
-        <Wordmark scale={0.42} />
+        <Wordmark scale={0.58} />
       </div>
 
       {SECTIONS.map((section) => {
@@ -62,7 +62,7 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
             aria-current={isActive ? 'page' : undefined}
             className={cx(
               'relative flex flex-1 flex-col items-center gap-xxs rounded-md px-xs py-sm',
-              'text-[11px] font-semibold md:flex-none',
+              'text-[11px] font-semibold md:flex-none md:py-md md:text-[12px]',
               isActive ? 'bg-active-wash text-active-ink' : 'text-text-soft hover:bg-neutral-fill',
             )}
           >
@@ -77,7 +77,7 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
                 className={cx(
                   'absolute right-[18px] top-[2px] min-w-[18px] rounded-full px-[5px]',
                   'bg-danger-action text-center text-[11px] font-bold text-on-active',
-                  'md:right-[22px]',
+                  'md:right-[36px] md:top-[6px]',
                 )}
               >
                 {liveOrders}

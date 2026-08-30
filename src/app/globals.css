@@ -114,6 +114,73 @@ summary,
 }
 
 /**
+ * Anything that opens over the page.
+ *
+ * A modal that appears instantly reads as a page change rather than as a layer
+ * over the page — the eye has nothing to follow, so it has to re-find where it
+ * was. A short fade and a small rise say "this is on top of what you were
+ * doing, and it is going away again".
+ *
+ * ## Why this is more than two rules
+ *
+ * A `<dialog>` is `display: none` until it opens, and a property that changes
+ * at the same moment as `display` normally has nothing to animate from. Three
+ * pieces make it work, and all three are load-bearing:
+ *
+ * - `transition-behavior: allow-discrete` lets `display` and `overlay` — both
+ *   discrete properties — participate, so the element stays rendered and on the
+ *   top layer for the length of the *closing* transition instead of vanishing
+ *   at the first frame.
+ * - `@starting-style` gives the browser the state to animate *from* on open.
+ *   Without it the open transition simply does not run; the close one still
+ *   would, which is the confusing half-working version.
+ * - The backdrop is transitioned separately: `::backdrop` is its own box and
+ *   inherits none of this.
+ *
+ * Written here rather than on the component so that every overlay added later
+ * — a side panel, a command palette — gets it without having to remember.
+ */
+dialog {
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+  transition:
+    opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard),
+    overlay var(--duration-base) var(--ease-standard) allow-discrete,
+    display var(--duration-base) var(--ease-standard) allow-discrete;
+}
+
+dialog[open] {
+  opacity: 1;
+  transform: none;
+}
+
+@starting-style {
+  dialog[open] {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+dialog::backdrop {
+  background: color-mix(in oklab, var(--color-ink) 0%, transparent);
+  transition:
+    background var(--duration-base) var(--ease-standard),
+    overlay var(--duration-base) var(--ease-standard) allow-discrete,
+    display var(--duration-base) var(--ease-standard) allow-discrete;
+}
+
+dialog[open]::backdrop {
+  background: color-mix(in oklab, var(--color-ink) 40%, transparent);
+}
+
+@starting-style {
+  dialog[open]::backdrop {
+    background: color-mix(in oklab, var(--color-ink) 0%, transparent);
+  }
+}
+
+/**
  * Respect the setting. The app has `use-reduce-motion.ts` for the same reason:
  * the toast that slides in and the row that animates on advance are pleasant,
  * and they are not information.
@@ -121,7 +188,10 @@ summary,
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after {
+  *::after,
+  /* `*` does not match a backdrop — it is not an element — so the overlay
+     transitions above would survive the setting without this. */
+  ::backdrop {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

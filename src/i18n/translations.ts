@@ -59,6 +59,15 @@ const en = {
       'New orders appear here the moment they are placed, and the dashboard chimes. There is nothing to do right now.',
   },
 
+  confirm: {
+    signOutTitle: 'Sign out?',
+    // Says what happens, not "are you sure". A question with no information in
+    // it is the kind people learn to dismiss without reading.
+    signOutBody:
+      'You will stop receiving new-order alerts on this device until you sign back in.',
+    signOutConfirm: 'Sign out',
+  },
+
   shell: {
     // Every section but the queue is unbuilt. Saying which phase it belongs to
     // is more use than "coming soon", which tells the operator nothing about

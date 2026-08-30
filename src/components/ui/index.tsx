@@ -36,6 +36,23 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 // ---------------------------------------------------------------------------
 
 type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
+type ButtonSize = 'md' | 'sm';
+
+/**
+ * Size is a prop, not something a caller patches on with a class.
+ *
+ * Passing `px-sm` to a button that already says `px-lg` looks like it should
+ * win — it is written later — and it does not. Tailwind emits both, they have
+ * equal specificity, and the one that applies is whichever the stylesheet
+ * happens to order last. So the override is a coin toss that changes when an
+ * unrelated utility is used somewhere else in the app.
+ *
+ * Enumerating the sizes here means there is nothing to override.
+ */
+const BUTTON_SIZES: Record<ButtonSize, string> = {
+  md: 'px-lg py-md text-[15px]',
+  sm: 'px-md py-sm text-[13px]',
+};
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // Coral: the one to press to go on. White on it is 3.1:1 — the design's call,
@@ -50,6 +67,8 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
 
 export function Button({
   variant = 'primary',
+  size = 'md',
+  fullWidth = false,
   pending = false,
   children,
   className,
@@ -57,6 +76,9 @@ export function Button({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** Fills its container. `flex`, not `inline-flex`, so centring actually has room to work. */
+  fullWidth?: boolean;
   pending?: boolean;
 }) {
   return (
@@ -67,9 +89,13 @@ export function Button({
       disabled={disabled || pending}
       aria-busy={pending || undefined}
       className={cx(
-        'inline-flex items-center justify-center gap-sm rounded-md px-lg py-md',
-        'text-[15px] font-semibold',
+        // `items-center justify-center` centres the icon against the label and
+        // the pair against the button. Both matter: a button wide enough to
+        // have spare room will show the difference.
+        'items-center justify-center gap-sm rounded-md font-semibold',
         'disabled:cursor-not-allowed disabled:opacity-60',
+        fullWidth ? 'flex w-full' : 'inline-flex',
+        BUTTON_SIZES[size],
         BUTTON_VARIANTS[variant],
         className,
       )}
