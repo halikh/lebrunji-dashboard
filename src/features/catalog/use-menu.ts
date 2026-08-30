@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToasts } from "@/components/ui/toast";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { SEARCH } from "@/lib/limits";
 import type { Localized } from "@/lib/validation";
 
 import {
@@ -13,6 +14,7 @@ import {
   createMenuItem,
   createMenuSection,
   fetchMenu,
+  searchMenuItems,
   setSortOrder,
   updateMenuItem,
   updateMenuSection,
@@ -27,6 +29,27 @@ export const menuKeys = {
   all: ["menu"] as const,
   store: (storeId: string) => ["menu", storeId] as const,
 };
+
+/**
+ * Items matching a term.
+ *
+ * Disabled below two characters: a one-letter search matches most of a menu,
+ * which is a round trip to tell somebody nothing. `SEARCH.minTerm` is the same
+ * number every other search in the dashboard uses.
+ *
+ * `placeholderData` keeps the previous matches on screen while the next ones
+ * are fetched, so typing does not blink the list empty between keystrokes.
+ */
+export function useMenuSearch(storeId: string, term: string) {
+  const trimmed = term.trim();
+
+  return useQuery({
+    queryKey: [...menuKeys.store(storeId), "search", trimmed],
+    queryFn: () => searchMenuItems(storeId, trimmed),
+    enabled: trimmed.length >= SEARCH.minTerm,
+    placeholderData: (previous) => previous,
+  });
+}
 
 export function useMenu(storeId: string | null) {
   return useQuery({

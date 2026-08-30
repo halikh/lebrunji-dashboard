@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Button, cx } from "@/components/ui";
+import { Button, Input, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedField } from "@/components/ui/localized-field";
@@ -13,7 +13,7 @@ import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Price } from "@/features/reference/price";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
-import { TEXT } from "@/lib/limits";
+import { SEARCH, TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
@@ -24,6 +24,7 @@ import {
   useCreateMenuItem,
   useCreateMenuSection,
   useMenu,
+  useMenuSearch,
   useReorderMenu,
   useUpdateMenuItem,
   useUpdateMenuSection,
@@ -136,6 +137,18 @@ export function StoreMenu({ storeId }: { storeId: string }) {
    */
   const [adding, setAdding] = useState(false);
 
+  /**
+   * The search term, and the mode it puts the screen in.
+   *
+   * Searching and reordering are different jobs on the same list and cannot be
+   * done at once: a position among matches is not a position in the menu, so
+   * dragging while filtered would either mean nothing or write a `sort_order`
+   * the operator never saw. The handles go away and the screen says why.
+   */
+  const [search, setSearch] = useState("");
+  const searching = search.trim().length >= SEARCH.minTerm;
+  const matches = useMenuSearch(storeId, search);
+
   const openSection =
     open?.kind === "item" || open?.sectionId
       ? menu.data?.find((section) => section.id === open.sectionId)
@@ -161,6 +174,38 @@ export function StoreMenu({ storeId }: { storeId: string }) {
     // once for both panes. This is the menu itself and the panel beside it.
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
+        <div className="flex shrink-0 items-center gap-lg px-xxl pt-lg">
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t("menu.search")}
+            aria-label={t("menu.search")}
+            className="w-[280px]"
+          />
+          {searching && (
+            <>
+              <span className="text-[13px] text-text-faint">
+                {t("menu.searchResults", {
+                  count: matches.data?.length ?? 0,
+                })}
+              </span>
+              <Button
+                variant="quiet"
+                size="sm"
+                onClick={() => setSearch("")}
+                className="ms-auto"
+              >
+                {t("menu.searchClear")}
+              </Button>
+            </>
+          )}
+          {!searching && (
+            <span className="text-[12px] text-text-faint">
+              {t("menu.searchHint")}
+            </span>
+          )}
+        </div>
+
         <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
           {menu.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
@@ -191,60 +236,101 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             <EmptyState titleKey="menu.emptyTitle" bodyKey="menu.emptyBody" />
           )}
 
-          {sectionOrder.instructions}
+          {searching ? (
+            <div className="flex flex-col gap-sm">
+              {matches.data?.length === 0 && !matches.isFetching && (
+                <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
+                  {t("menu.searchNone", { term: search.trim() })}
+                </p>
+              )}
 
-          {sectionOrder
-            .ordered(sections, (section) => section.id)
-            .map((section) => (
-              <Section
-                key={section.id}
-                section={section}
-                currencyCode={store.data?.currencyCode ?? ""}
-                openItemId={open?.kind === "item" ? open.itemId : null}
-                renaming={
-                  open?.kind === "section" && open.sectionId === section.id
-                }
-                carried={sectionOrder.movingId === section.id}
-                rowProps={sectionOrder.rowProps}
-                handleProps={sectionOrder.handleProps}
-                onRename={() =>
-                  setOpen({ kind: "section", sectionId: section.id })
-                }
-                onArchiveSection={async () => {
-                  await archiveSection.mutateAsync({
-                    id: section.id,
-                    name: section.title,
-                  });
-                }}
-                onReorderItems={(ids) => reorderItems(section.id, ids)}
-                onEdit={(itemId) =>
-                  setOpen({ kind: "item", sectionId: section.id, itemId })
-                }
-                onAdd={() =>
-                  setOpen({
-                    kind: "item",
-                    sectionId: section.id,
-                    itemId: null,
-                  })
-                }
-                onToggle={(item) =>
-                  update.mutate({
-                    id: item.id,
-                    patch: { isActive: !item.isActive },
-                  })
-                }
-                onArchive={async (item) => {
-                  await archive.mutateAsync({ id: item.id, name: item.name });
-                }}
-              />
-            ))}
+              {matches.data?.map((item) => (
+                <SearchResult
+                  key={item.id}
+                  item={item}
+                  currencyCode={store.data?.currencyCode ?? ""}
+                  sectionTitle={pickLocalized(
+                    sections.find((one) => one.id === item.sectionId)?.title ??
+                      {},
+                  )}
+                  open={open?.kind === "item" && open.itemId === item.id}
+                  onEdit={() =>
+                    setOpen({
+                      kind: "item",
+                      sectionId: item.sectionId,
+                      itemId: item.id,
+                    })
+                  }
+                  onToggle={() =>
+                    update.mutate({
+                      id: item.id,
+                      patch: { isActive: !item.isActive },
+                    })
+                  }
+                  onArchive={async () => {
+                    await archive.mutateAsync({ id: item.id, name: item.name });
+                  }}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          {!searching && sectionOrder.instructions}
+
+          {!searching &&
+            sectionOrder
+              .ordered(sections, (section) => section.id)
+              .map((section) => (
+                <Section
+                  key={section.id}
+                  section={section}
+                  currencyCode={store.data?.currencyCode ?? ""}
+                  openItemId={open?.kind === "item" ? open.itemId : null}
+                  renaming={
+                    open?.kind === "section" && open.sectionId === section.id
+                  }
+                  carried={sectionOrder.movingId === section.id}
+                  rowProps={sectionOrder.rowProps}
+                  handleProps={sectionOrder.handleProps}
+                  onRename={() =>
+                    setOpen({ kind: "section", sectionId: section.id })
+                  }
+                  onArchiveSection={async () => {
+                    await archiveSection.mutateAsync({
+                      id: section.id,
+                      name: section.title,
+                    });
+                  }}
+                  onReorderItems={(ids) => reorderItems(section.id, ids)}
+                  onEdit={(itemId) =>
+                    setOpen({ kind: "item", sectionId: section.id, itemId })
+                  }
+                  onAdd={() =>
+                    setOpen({
+                      kind: "item",
+                      sectionId: section.id,
+                      itemId: null,
+                    })
+                  }
+                  onToggle={(item) =>
+                    update.mutate({
+                      id: item.id,
+                      patch: { isActive: !item.isActive },
+                    })
+                  }
+                  onArchive={async (item) => {
+                    await archive.mutateAsync({ id: item.id, name: item.name });
+                  }}
+                />
+              ))}
 
           {/* Adding a section is the bottom of the menu, because that is where
               a new one goes and where the eye already is after reading it.
               Full width, like the "add an item" button inside each section: a
               row of controls that all mean "add something here" should not be
               three different widths. */}
-          {menu.isSuccess &&
+          {!searching &&
+            menu.isSuccess &&
             (adding ? (
               <SectionForm
                 pending={createSection.isPending}
@@ -865,5 +951,133 @@ function nextSortOrder(section: MenuSection | undefined): number {
       (highest, item) => Math.max(highest, item.sortOrder),
       0,
     ) + 1
+  );
+}
+
+/**
+ * One search result.
+ *
+ * ## Why it is not `ItemRow`
+ *
+ * Two differences, and both are about what a result *is*. It has no drag
+ * handle, because a position among matches is not a position in the menu. And
+ * it says which section it belongs to, because that is the context the list has
+ * stopped providing — a dish's name alone does not say whether it is filed
+ * under the right heading, which is quite often what somebody is searching to
+ * find out.
+ */
+function SearchResult({
+  item,
+  currencyCode,
+  sectionTitle,
+  open,
+  onEdit,
+  onToggle,
+  onArchive,
+}: {
+  item: MenuItem;
+  currencyCode: string;
+  sectionTitle: string;
+  open: boolean;
+  onEdit: () => void;
+  onToggle: () => void;
+  onArchive: () => Promise<void>;
+}) {
+  return (
+    <div
+      className={cx(
+        "flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
+        !item.isActive && "border-danger-wash bg-danger-wash/30",
+        open &&
+          "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
+        item.isActive && !open && "border-border",
+        item.isActive && open && "border-active",
+      )}
+    >
+      <Thumbnail url={item.imageUrl} dim={!item.isActive} />
+
+      <button
+        type="button"
+        onClick={onEdit}
+        className="flex min-w-0 flex-grow flex-col items-start gap-xxs text-left"
+      >
+        <span
+          className={cx(
+            "truncate text-[15px] font-semibold",
+            !item.isActive && "text-text-soft",
+          )}
+        >
+          {pickLocalized(item.name)}
+        </span>
+        <span className="truncate text-[12px] text-text-faint">
+          {sectionTitle}
+        </span>
+      </button>
+
+      <div className="shrink-0">
+        <Price
+          value={item.price}
+          code={currencyCode}
+          align="end"
+          className="text-[15px] font-semibold"
+        />
+      </div>
+
+      <ConfirmToggle
+        on={item.isActive}
+        onChange={onToggle}
+        labelOn={t("menu.live")}
+        labelOff={t("menu.hidden")}
+        params={{ name: pickLocalized(item.name) }}
+        whenTurningOn={{
+          titleKey: "menu.showTitle",
+          bodyKey: "menu.showBody",
+          confirmKey: "menu.showConfirm",
+        }}
+        whenTurningOff={{
+          titleKey: "menu.hideTitle",
+          bodyKey: "menu.hideBody",
+          confirmKey: "menu.hideConfirm",
+        }}
+        className="w-[92px]"
+      />
+
+      <ConfirmButton
+        onConfirm={onArchive}
+        titleKey="menu.archiveTitle"
+        bodyKey="menu.archiveBody"
+        confirmKey="menu.archiveConfirm"
+        params={{ name: pickLocalized(item.name) }}
+        variant="danger"
+        triggerVariant="danger"
+        size="sm"
+      >
+        {t("menu.archive")}
+      </ConfirmButton>
+    </div>
+  );
+}
+
+/** The item's picture, or the space one would take. */
+function Thumbnail({ url, dim }: { url: string | null; dim: boolean }) {
+  if (!url) {
+    return (
+      <div
+        aria-hidden
+        className="size-[44px] shrink-0 rounded-md bg-neutral-fill"
+      />
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      aria-hidden
+      className={cx(
+        "size-[44px] shrink-0 rounded-md object-cover",
+        dim && "opacity-50 grayscale",
+      )}
+    />
   );
 }

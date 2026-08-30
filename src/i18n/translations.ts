@@ -328,6 +328,16 @@ const en = {
     save: "Save hours",
     saved: "Hours saved",
     failedTitle: "Could not load the hours",
+    rightNow: "Right now",
+    openNow: "Open",
+    closedNow: "Closed",
+    // The zone is named, because a time on screen is otherwise only an
+    // assertion about whose clock it came from.
+    beirutTime: "{time} in {zone}",
+    theWeek: "The week",
+    range: "{from}–{to}",
+    unsaved:
+      "This is what you are about to save. The app still has the old hours until you do.",
   },
 
   reorder: {
@@ -375,6 +385,16 @@ const en = {
     archiveConfirm: "Archive",
     archive: "Archive",
     itemCount: "{count} items",
+    search: "Search this menu",
+    // Says where it looks. An operator who has just scrolled past an item and
+    // cannot find it needs to know the search is not limited to what is drawn.
+    searchHint: "Searches every item in this shop, in both languages.",
+    searchResults: "{count} matching",
+    searchNone: "Nothing in this shop matches {term}.",
+    searchClear: "Clear search",
+    // Reordering is off while searching, and saying so beats a handle that
+    // silently does nothing.
+    searchNoDrag: "Clear the search to reorder.",
 
     // Turning an item on or off. Both directions ask, and they ask different
     // things: one publishes, the other withdraws.

@@ -1,5 +1,6 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
+import { PAGE } from "@/lib/limits";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -75,6 +76,58 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
       .map(toItem)
       .sort((a, b) => a.sortOrder - b.sortOrder),
   }));
+}
+
+/**
+ * Items matching a term, across the **whole** shop.
+ *
+ * ## Why this is a query and not a filter
+ *
+ * `fetchMenu` returns every section with its items, so filtering in the browser
+ * would find the same rows today and be a habit that is wrong everywhere else:
+ * on any list that pages, a client-side filter searches *what has been
+ * downloaded*, and quietly cannot find the row on page four. A search that can
+ * only find what you can already see is not a search.
+ *
+ * So it asks the database, and it asks about the columns a person would search
+ * by. `->>` reaches inside the jsonb, and both languages are searched because
+ * an operator who knows an item as كبة should find it by typing كبة.
+ *
+ * ## Why it comes back flat
+ *
+ * Results are items, not sections: what "Charcoal" matches is three dishes, and
+ * grouping three results under three headings is chrome around nothing. It also
+ * makes the mode change honest — a searched list cannot be dragged, because a
+ * position within a set of matches is not a position in the menu.
+ */
+export async function searchMenuItems(
+  storeId: string,
+  term: string,
+): Promise<MenuItem[]> {
+  const like = `%${term.trim()}%`;
+
+  const { data, error } = await getClient()
+    .from("menu_items")
+    .select(
+      `id, menu_section_id, slug, name, description, price,
+       image_url, is_active, sort_order`,
+    )
+    .eq("store_id", storeId)
+    .is("deleted_at", null)
+    .or(
+      [
+        `name->>en.ilike.${like}`,
+        `name->>ar.ilike.${like}`,
+        `description->>en.ilike.${like}`,
+        `slug.ilike.${like}`,
+      ].join(","),
+    )
+    .order("sort_order", { ascending: true })
+    .limit(PAGE.size);
+
+  if (error) throw new Error(`Could not search the menu: ${error.message}`);
+
+  return (data ?? []).map(toItem);
 }
 
 export type MenuItemDraft = {
