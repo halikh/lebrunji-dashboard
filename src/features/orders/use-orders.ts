@@ -293,6 +293,8 @@ export function useAdvanceOrder(statuses?: OrderStatus[]) {
   const advance = useCallback(
     (input: {
       orderId: string;
+      /** The order's own code, so the confirmation says which order moved. */
+      code: string;
       fromSlug: string;
       toSlug: string;
       toName: string;
@@ -304,7 +306,7 @@ export function useAdvanceOrder(statuses?: OrderStatus[]) {
         {
           onSuccess: () => {
             toast.success(
-              t("orders.moved", { status: input.toName }),
+              t("orders.moved", { code: input.code, status: input.toName }),
               input.undoable === false
                 ? undefined
                 : () =>

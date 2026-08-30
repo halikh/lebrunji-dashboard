@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToasts } from "@/components/ui/toast";
+import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import type { Localized } from "@/lib/validation";
 
@@ -51,9 +52,12 @@ export function useCreateMenuItem(storeId: string) {
   return useMutation({
     mutationFn: (input: { draft: MenuItemDraft; sortOrder: number }) =>
       createMenuItem(input.draft, input.sortOrder),
-    onSuccess: () => {
+    // The name comes off the draft that was just saved rather than out of the
+    // refetched list: the toast should say what the operator typed, and it has
+    // to be able to say it before the list has come back.
+    onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
-      toast.success(t("menu.added"));
+      toast.success(t("menu.added", { name: pickLocalized(input.draft.name) }));
     },
   });
 }
@@ -109,10 +113,11 @@ export function useArchiveMenuItem(storeId: string) {
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: (id: string) => archiveMenuItem(id),
-    onSuccess: () => {
+    mutationFn: (input: { id: string; name: Localized }) =>
+      archiveMenuItem(input.id),
+    onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
-      toast.success(t("menu.archived"));
+      toast.success(t("menu.archived", { name: pickLocalized(input.name) }));
     },
     onError: (error) => {
       toast.danger(
@@ -133,9 +138,11 @@ export function useCreateMenuSection(storeId: string) {
   return useMutation({
     mutationFn: (input: { draft: MenuSectionDraft; sortOrder: number }) =>
       createMenuSection(input.draft, input.sortOrder),
-    onSuccess: () => {
+    onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
-      toast.success(t("menu.sectionAdded"));
+      toast.success(
+        t("menu.sectionAdded", { name: pickLocalized(input.draft.title) }),
+      );
     },
     onError: (error) => {
       toast.danger(
@@ -152,9 +159,11 @@ export function useUpdateMenuSection(storeId: string) {
   return useMutation({
     mutationFn: (input: { id: string; title: Localized }) =>
       updateMenuSection(input.id, { title: input.title }),
-    onSuccess: () => {
+    onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
-      toast.success(t("menu.sectionRenamed"));
+      toast.success(
+        t("menu.sectionRenamed", { name: pickLocalized(input.title) }),
+      );
     },
     onError: (error) => {
       toast.danger(
@@ -176,10 +185,13 @@ export function useArchiveMenuSection(storeId: string) {
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: (id: string) => archiveMenuSection(id),
-    onSuccess: () => {
+    mutationFn: (input: { id: string; name: Localized }) =>
+      archiveMenuSection(input.id),
+    onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
-      toast.success(t("menu.sectionArchived"));
+      toast.success(
+        t("menu.sectionArchived", { name: pickLocalized(input.name) }),
+      );
     },
     onError: (error) => {
       toast.danger(

@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToasts } from "@/components/ui/toast";
+import { pickLocalized } from "@/i18n/db-text";
+import type { Localized } from "@/lib/validation";
 import { t } from "@/i18n/translations";
 
 import {
@@ -102,10 +104,13 @@ export function useArchiveStore() {
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: (id: string) => archiveStore(id),
-    onSuccess: () => {
+    mutationFn: (input: { id: string; name: Localized }) =>
+      archiveStore(input.id),
+    onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: storeKeys.all });
-      toast.success(t("catalogue.archived"));
+      toast.success(
+        t("catalogue.archived", { name: pickLocalized(input.name) }),
+      );
     },
     onError: (error) => {
       toast.danger(

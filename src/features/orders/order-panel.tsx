@@ -219,6 +219,7 @@ export function OrderPanel({
                 onClick={() =>
                   advance({
                     orderId: order.data.id,
+                    code: order.data.code,
                     fromSlug: status?.slug ?? "",
                     toSlug: next.slug,
                     toName: next.name,
@@ -235,6 +236,7 @@ export function OrderPanel({
                 onConfirm={() =>
                   advance({
                     orderId: order.data.id,
+                    code: order.data.code,
                     fromSlug: status?.slug ?? "",
                     toSlug: cancelled.slug,
                     toName: cancelled.name,

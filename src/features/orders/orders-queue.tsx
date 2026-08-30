@@ -155,6 +155,7 @@ export function OrdersQueue() {
         event.preventDefault();
         advance({
           orderId: order.id,
+          code: order.code,
           fromSlug: status.slug,
           toSlug: next.slug,
           toName: next.name,
@@ -289,6 +290,7 @@ export function OrdersQueue() {
                 const status = orderStatus(order, statuses.data);
                 advance({
                   orderId: order.id,
+                  code: order.code,
                   fromSlug: status?.slug ?? "",
                   toSlug: to.slug,
                   toName: to.name,

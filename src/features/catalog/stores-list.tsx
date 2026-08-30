@@ -8,6 +8,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui";
+import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
 import type { Store } from "./api/stores";
@@ -101,7 +102,7 @@ export function StoresList() {
             // Awaited and discarded: `ConfirmButton` keeps its dialog open
             // until this settles, and catches a rejection to report inside it.
             onArchive={async () => {
-              await archive.mutateAsync(store.id);
+              await archive.mutateAsync({ id: store.id, name: store.name });
             }}
           />
         ))}
@@ -130,7 +131,7 @@ function StoreRow({
   onToggleFeatured: () => void;
   onArchive: () => Promise<void>;
 }) {
-  const name = pickName(store.name);
+  const name = pickLocalized(store.name);
 
   return (
     <div
@@ -265,12 +266,4 @@ function StoreRow({
       </ConfirmButton>
     </div>
   );
-}
-
-/** One readable name, for a label. Falls back the way `pickLocalized` does. */
-function pickName(name: Record<string, string>): string {
-  for (const candidate of [name.en, ...Object.values(name)]) {
-    if (typeof candidate === "string" && candidate.trim()) return candidate;
-  }
-  return "";
 }

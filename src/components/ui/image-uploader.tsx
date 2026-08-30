@@ -136,11 +136,12 @@ export function ImageUploader({
             >
               {t("images.replace")}
             </Button>
-            {/* Quiet rather than danger: this clears a field, and the picture
-                is not gone until the form is saved. A red button here would
-                claim more finality than the click has. */}
+            {/* Danger, like every other removal in the product. It is the
+                colour that says "this takes something away", and an operator
+                should not have to learn that it means one thing on a row and
+                another inside a form. */}
             <Button
-              variant="quiet"
+              variant="danger"
               size="sm"
               disabled={disabled || busy}
               onClick={() => onChange(null)}

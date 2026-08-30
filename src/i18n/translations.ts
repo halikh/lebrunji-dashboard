@@ -83,7 +83,7 @@ const en = {
     failedBody: "The connection may have dropped. Nothing has been changed.",
     // Named after the step rather than "Saved", so the toast says what the
     // queue now claims — which is the thing the operator would undo.
-    moved: "Moved to {status}",
+    moved: "{code} moved to {status}",
     arrived: "New order",
     incompleteSignup: "Signup not finished",
     live: "Live",
@@ -207,7 +207,8 @@ const en = {
     noMatchBody: "Try part of the name, or clear the search.",
     failedTitle: "Could not load the catalogue",
     failedBody: "The connection may have dropped. Nothing has been changed.",
-    archived: "Shop archived",
+    // Named, like every other confirmation: see the note on `menu.added`.
+    archived: "{name} archived",
     archiveTitle: "Archive this shop?",
     archiveBody:
       "It disappears from the app immediately. Its orders and menu are kept, and it can be brought back.",
@@ -273,8 +274,21 @@ const en = {
     hidden: "Hidden",
     save: "Save",
     saveAndAnother: "Save and add another",
-    added: "Item added",
-    archived: "Item archived",
+    /**
+     * Confirmations name what they happened to.
+     *
+     * "Item archived" is a message about a category of thing. The operator
+     * archived one particular item, usually while working down a list of
+     * similar ones, and the question they have a second later is *which*.
+     * A toast that cannot answer it is a toast they have to verify by
+     * looking — at which point it has cost them more than it saved.
+     *
+     * It matters most when it goes wrong. Archiving the row below the one
+     * you meant is an easy slip and an invisible one, and the name in the
+     * toast is what catches it while the undo is still on screen.
+     */
+    added: "{name} added",
+    archived: "{name} archived",
     archiveTitle: "Archive this item?",
     archiveBody:
       "It disappears from the app immediately. Past orders keep it, and it can be brought back.",
@@ -289,9 +303,11 @@ const en = {
     addSection: "Add a section",
     sectionTitle: "Section name",
     sectionTitleHint: "What customers see above the items in it.",
-    sectionAdded: "Section added",
-    sectionRenamed: "Section renamed",
-    sectionArchived: "Section archived",
+    sectionAdded: "{name} added",
+    // The new name, not the old one: it is what the operator is looking at
+    // in the list, and it confirms the edit landed as typed.
+    sectionRenamed: "Renamed to {name}",
+    sectionArchived: "{name} archived",
     renameSection: "Rename",
     sectionArchiveTitle: "Archive this section?",
     sectionArchiveBody:

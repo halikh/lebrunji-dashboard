@@ -12,6 +12,7 @@ import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { useRevealOnMount } from "@/components/ui/reveal";
 import { Toggle } from "@/components/ui/toggle";
 import { Price } from "@/features/reference/price";
+import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
@@ -103,7 +104,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
     ids: sections.map((section) => section.id),
     onReorder: reorderSections,
     labelOf: (id) =>
-      pick(sections.find((section) => section.id === id)?.title ?? {}),
+      pickLocalized(sections.find((section) => section.id === id)?.title ?? {}),
     // Reordering stays available while the panel is open — it is beside the
     // list, not over it, and moving a section is not an edit to the one being
     // renamed.
@@ -176,7 +177,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             {t("menu.back")}
           </Link>
           <h1 className="text-[24px]">
-            {store.data ? pick(store.data.name) : ""}
+            {store.data ? pickLocalized(store.data.name) : ""}
           </h1>
         </div>
 
@@ -229,7 +230,10 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                   setOpen({ kind: "section", sectionId: section.id })
                 }
                 onArchiveSection={async () => {
-                  await archiveSection.mutateAsync(section.id);
+                  await archiveSection.mutateAsync({
+                    id: section.id,
+                    name: section.title,
+                  });
                 }}
                 onReorderItems={(ids) => reorderItems(section.id, ids)}
                 onEdit={(itemId) =>
@@ -249,7 +253,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                   })
                 }
                 onArchive={async (item) => {
-                  await archive.mutateAsync(item.id);
+                  await archive.mutateAsync({ id: item.id, name: item.name });
                 }}
               />
             ))}
@@ -316,15 +320,15 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                 <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
                   {open.kind === "section"
                     ? t("menu.sections")
-                    : pick(openSection?.title ?? {})}
+                    : pickLocalized(openSection?.title ?? {})}
                 </span>
                 <h2 className="text-[20px]">
                   {open.kind === "section"
                     ? openSection
-                      ? pick(openSection.title)
+                      ? pickLocalized(openSection.title)
                       : t("menu.addSection")
                     : editingItem
-                      ? pick(editingItem.name)
+                      ? pickLocalized(editingItem.name)
                       : t("menu.newItem")}
                 </h2>
               </div>
@@ -464,13 +468,13 @@ function Section({
   onToggle: (item: MenuItem) => void;
   onArchive: (item: MenuItem) => Promise<void>;
 } & ReorderProps) {
-  const title = pick(section.title);
+  const title = pickLocalized(section.title);
 
   const itemOrder = useReorder({
     ids: section.items.map((item) => item.id),
     onReorder: onReorderItems,
     labelOf: (id) =>
-      pick(section.items.find((item) => item.id === id)?.name ?? {}),
+      pickLocalized(section.items.find((item) => item.id === id)?.name ?? {}),
   });
 
   const row = rowProps(section.id, "flex flex-col gap-sm");
@@ -637,10 +641,10 @@ function ItemRow({
             !item.isActive && "text-text-soft",
           )}
         >
-          {pick(item.name)}
+          {pickLocalized(item.name)}
         </span>
         <span className="truncate text-[12px] text-text-faint">
-          {pick(item.description)}
+          {pickLocalized(item.description)}
         </span>
       </button>
 
@@ -816,11 +820,4 @@ function nextSortOrder(section: MenuSection | undefined): number {
       0,
     ) + 1
   );
-}
-
-function pick(value: Record<string, string>): string {
-  for (const candidate of [value.en, ...Object.values(value)]) {
-    if (typeof candidate === "string" && candidate.trim()) return candidate;
-  }
-  return "";
 }
