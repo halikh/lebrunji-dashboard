@@ -299,6 +299,37 @@ const en = {
     saved: "{name} saved",
   },
 
+  /**
+   * A shop's week.
+   *
+   * The days are named in full rather than abbreviated: the column is wide
+   * enough, and "Tue" saves three characters at the cost of a second's reading
+   * on a screen somebody visits twice a year.
+   */
+  hours: {
+    tab: "Hours",
+    sunday: "Sunday",
+    monday: "Monday",
+    tuesday: "Tuesday",
+    wednesday: "Wednesday",
+    thursday: "Thursday",
+    friday: "Friday",
+    saturday: "Saturday",
+    open: "Open",
+    closed: "Closed",
+    closedAllDay: "Closed all day",
+    to: "to",
+    time: "Time",
+    // Named, because a closing time earlier than an opening one looks like a
+    // mistake and is not — a kitchen open until two in the morning is ordinary.
+    overnight: "Closes after midnight",
+    copyToAll: "Give every open day {opens}–{closes}",
+    incomplete: "Every open day needs an opening and a closing time.",
+    save: "Save hours",
+    saved: "Hours saved",
+    failedTitle: "Could not load the hours",
+  },
+
   reorder: {
     handle: "Reorder {name}",
     instructions:

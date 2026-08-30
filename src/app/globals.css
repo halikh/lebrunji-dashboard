@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "./theme.css";
+/* The time picker's own stylesheet, immediately overridden below. A library
+ * component left in its default clothes is the fastest way to make a carefully
+ * transcribed design system look borrowed. */
+@import "react-datepicker/dist/react-datepicker.css";
 
 /**
  * Everything that is a *colour*, a *space* or a *radius* lives in `theme.css`.
@@ -452,4 +456,67 @@ dialog[open]::backdrop {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/**
+ * The time picker, in this project's colours.
+ *
+ * `react-datepicker` is here for one reason — see `components/ui/time-field.tsx`
+ * — and it arrives with a blue-and-grey palette of its own. These rules are the
+ * whole of the visual integration: the popup is a surface like any other, the
+ * selected time is the accent, and the type is the app's.
+ *
+ * Deliberately few. Every rule here is one this project has to maintain against
+ * somebody else's markup, so this covers what is *seen* and leaves the layout
+ * to the library.
+ */
+.react-datepicker {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-overlay);
+  font-family: var(--font-sans);
+}
+
+.react-datepicker__header {
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.react-datepicker-time__header {
+  color: var(--color-text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.react-datepicker__time-container,
+.react-datepicker__time,
+.react-datepicker__time-box {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+.react-datepicker__time-list-item {
+  color: var(--color-text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.react-datepicker__time-list-item--selected {
+  background: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  font-weight: 600;
+}
+
+.react-datepicker__time-list-item:hover {
+  background: var(--color-neutral-fill);
+}
+
+/* The arrow points at an input this project has already given a border and a
+ * radius; the library's default one is a different white on a different grey. */
+.react-datepicker__triangle {
+  display: none;
 }

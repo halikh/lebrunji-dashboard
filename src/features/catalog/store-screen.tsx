@@ -8,6 +8,7 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
 import { StoreDetails } from "./store-details";
+import { StoreHours } from "./store-hours";
 import { StoreMenu } from "./store-menu";
 import { useStore } from "./use-stores";
 
@@ -36,6 +37,7 @@ import { useStore } from "./use-stores";
 const TABS = [
   { key: "menu", labelKey: "menu.title" },
   { key: "details", labelKey: "store.tab" },
+  { key: "hours", labelKey: "hours.tab" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -47,7 +49,9 @@ export function StoreScreen({ storeId }: { storeId: string }) {
   const params = useSearchParams();
 
   const requested = params.get("tab");
-  const tab: TabKey = requested === "details" ? "details" : "menu";
+  const tab: TabKey = TABS.some((one) => one.key === requested)
+    ? (requested as TabKey)
+    : "menu";
 
   function show(next: TabKey) {
     const query = new URLSearchParams(params);
@@ -136,6 +140,9 @@ export function StoreScreen({ storeId }: { storeId: string }) {
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "details" && "hidden")}>
         <StoreDetails storeId={storeId} />
+      </div>
+      <div className={cx("min-h-0 flex-1", tab !== "hours" && "hidden")}>
+        <StoreHours storeId={storeId} />
       </div>
     </div>
   );

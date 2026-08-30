@@ -150,7 +150,13 @@ function Form({ store }: { store: Store }) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // `h-full`, not `flex-1`.
+    //
+    // `flex-1` only means anything inside a flex container, and the tab wrapper
+    // around this is an ordinary block — so the pane grew to fit its content
+    // and pushed the Save row off the bottom of the screen, which is the one
+    // place it must never be.
+    <div className="flex h-full min-h-0 flex-col">
       {/*
         Two columns from `lg`, and the split is by what each thing *wants*, not
         by cutting the form in half.
@@ -168,7 +174,7 @@ function Form({ store }: { store: Store }) {
 
         So: what the shop *is* on the left, where it *is* on the right.
       */}
-      <div className="flex min-h-0 flex-1 flex-col gap-xxl overflow-y-auto p-xxl lg:flex-row lg:overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* The fields scroll; the map does not.
 
             At 420px the map ran past the bottom of the window, so seeing the
@@ -180,7 +186,12 @@ function Form({ store }: { store: Store }) {
             their own scrollbar when they need one, and the map takes exactly
             the height that is left. Stacked on a narrow screen there is one
             scroll again, and the map falls back to a sensible minimum. */}
-        <div className="flex flex-col gap-xxl lg:w-[540px] lg:shrink-0 lg:overflow-y-auto lg:pe-lg">
+        {/* The padding is on the scrolling column, not on the box around it.
+            A scroll container clips what leaves it, and the focus ring is a
+            box-shadow drawn a few pixels *outside* the input — so with the
+            padding one level up, the ring on the first field was sliced down
+            its left edge. Inside the scroller there is room for it. */}
+        <div className="flex flex-col gap-xxl p-xxl lg:w-[540px] lg:shrink-0 lg:overflow-y-auto">
           <section className="flex flex-col gap-lg">
             <LocalizedField
               label={t("store.name")}
@@ -243,7 +254,7 @@ function Form({ store }: { store: Store }) {
         {/* Sticky, so the map stays in view while the fields on the left are
             worked through. It is the reference the other column is edited
             against, not a section that comes after it. */}
-        <section className="flex min-h-0 flex-col gap-lg lg:flex-1">
+        <section className="flex min-h-0 flex-col gap-lg p-xxl pt-0 lg:flex-1 lg:ps-0 lg:pt-xxl">
           <h2 className="text-[17px]">{t("store.locationTitle")}</h2>
 
           {/* Said here, not left to be found on a customer's bill. */}
