@@ -104,9 +104,22 @@ export async function fetchStore(id: string): Promise<Store> {
 
 export type StorePatch = {
   name?: Localized;
+  imageUrl?: string | null;
   isActive?: boolean;
   isFeatured?: boolean;
   sortOrder?: number;
+  prepMinMinutes?: number;
+  prepMaxMinutes?: number;
+  /**
+   * Both together, or neither.
+   *
+   * Half a pin is not a location — a latitude with no longitude is a row that
+   * passes every constraint and means nothing, and `delivery_quote` would treat
+   * it exactly as it treats no pin at all, which is to charge the top band. The
+   * form clears or sets them as a pair.
+   */
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 /**
@@ -126,6 +139,17 @@ export async function updateStore(
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+  // `null` is a value for these three — it is how a picture or a pin is
+  // removed — so what is tested is the key being absent, not the value.
+  if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
+  if (patch.latitude !== undefined) row.latitude = patch.latitude;
+  if (patch.longitude !== undefined) row.longitude = patch.longitude;
+  if (patch.prepMinMinutes !== undefined) {
+    row.prep_min_minutes = patch.prepMinMinutes;
+  }
+  if (patch.prepMaxMinutes !== undefined) {
+    row.prep_max_minutes = patch.prepMaxMinutes;
+  }
 
   const { error } = await getClient().from("stores").update(row).eq("id", id);
   if (error) throw new Error(error.message);

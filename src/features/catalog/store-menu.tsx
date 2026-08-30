@@ -105,6 +105,12 @@ export function StoreMenu({ storeId }: { storeId: string }) {
     onReorder: reorderSections,
     labelOf: (id) =>
       pickLocalized(sections.find((section) => section.id === id)?.title ?? {}),
+    // A section has no surface of its own — it is a heading and some cards
+    // with gaps between them — so carrying one needs a ground, or its header
+    // and its items simply overlay whatever they pass. The cream is the page's
+    // own, so it reads as a slab of the page being lifted rather than as a new
+    // kind of card appearing for the length of a drag.
+    lifted: "relative z-10 rounded-lg bg-background shadow-raised",
     // Reordering stays available while the panel is open — it is beside the
     // list, not over it, and moving a section is not an edit to the one being
     // renamed.

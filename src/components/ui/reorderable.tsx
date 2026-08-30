@@ -118,6 +118,21 @@ type Options = {
   onReorder: (ids: string[]) => void;
   /** What to call a row when announcing a move. */
   labelOf: (id: string) => string;
+  /**
+   * How a row should look while it is being carried.
+   *
+   * The default suits a row that already has a surface of its own — a menu
+   * item, which is a white card. A menu **section** has none: it is a heading
+   * and some cards with gaps between them, so lifting it put a shadow around
+   * nothing and its header simply overlapped whatever it passed. It reads as
+   * content bleeding over content rather than as a block being carried.
+   *
+   * So the lifted look belongs to the list, not to the hook. It must not change
+   * the row's size — padding or a border applied only while dragging would move
+   * every measurement this makes — so it is a background, a radius and a
+   * shadow, and nothing that takes up space.
+   */
+  lifted?: string;
   disabled?: boolean;
 };
 
@@ -125,6 +140,7 @@ export function useReorder({
   ids,
   onReorder,
   labelOf,
+  lifted = "relative z-10 shadow-raised",
   disabled = false,
 }: Options) {
   /**
@@ -182,6 +198,16 @@ export function useReorder({
   const grip = useRef<{ pointerY: number; top: number } | null>(null);
   /** The last pointer position, so the edge-scroll loop knows where it is. */
   const pointerY = useRef(0);
+  /**
+   * Whether the pointer has actually travelled since it went down.
+   *
+   * A section's handle sits in its header, which is very often already within
+   * the edge zone — so without this, grabbing a section near the top or bottom
+   * of the list began scrolling immediately, before the operator had moved at
+   * all. The list ran away from under them and it read as the drag being out of
+   * control, which it was.
+   */
+  const travelled = useRef(false);
   /** The scrolling ancestor the drag happens inside, found once per drag. */
   const scroller = useRef<HTMLElement | null>(null);
   const frames = useRef<number[]>([]);
@@ -319,21 +345,52 @@ export function useReorder({
       // by its own height the moment it swaps past a neighbour: the layout has
       // put it in its new slot while the transform is still measured from the
       // old one.
-      const top = lastTop.current.get(id) ?? grip.current.top;
-      place(
-        node,
-        id,
-        y - grip.current.pointerY + (grip.current.top - top),
-        false,
-      );
+      const slot = lastTop.current.get(id) ?? grip.current.top;
+      const height = node.offsetHeight;
+      let by = y - grip.current.pointerY + (grip.current.top - slot);
 
       const current = orderRef.current;
+
+      // Clamped to the list it belongs to.
+      //
+      // Nothing stopped a row travelling past the ends. With the edge-scroll
+      // pushing the pointer's position ever further down and only two or three
+      // sections to pass, a dragged section ran out of neighbours and simply
+      // kept going — off into empty space below the list, which is what the bug
+      // report showed. A row cannot be dropped outside the list, so it should
+      // not be draggable outside it either.
+      const first = lastTop.current.get(current[0]);
+      const lastId = current[current.length - 1];
+      const lastNode = rowNode(lastId);
+      const lastSlot = lastTop.current.get(lastId);
+      if (first !== undefined && lastSlot !== undefined && lastNode) {
+        const bottom = lastSlot + lastNode.offsetHeight;
+        by = Math.max(first - slot, Math.min(by, bottom - height - slot));
+      }
+
+      place(node, id, by, false);
+
       const from = current.indexOf(id);
 
-      // The first row whose midpoint the pointer has crossed, in the direction
-      // of travel. Stored layout positions, not freshly measured ones: a
-      // neighbour part way through its own animation is somewhere neither here
-      // nor there, and comparing against that makes the target flicker.
+      // ## The row's own edges decide, not the pointer
+      //
+      // Comparing the *pointer* against a neighbour's midpoint works while
+      // every row is the same height, and fails badly once they are not. A menu
+      // section is a header plus all its items — several hundred pixels — so
+      // its neighbour's midpoint is a long way off, and the pointer had to
+      // travel most of a section's height before anything swapped, by which
+      // time the dragged block had visibly ploughed through the one below it.
+      //
+      // Where the dragged row *is* answers the question the operator is
+      // actually asking: its leading edge passing a neighbour's midpoint is the
+      // moment it has taken that place. It is also independent of where within
+      // the row the handle happens to sit.
+      const draggedTop = slot + by;
+      const draggedBottom = draggedTop + height;
+
+      // Stored layout positions, not freshly measured ones: a neighbour part
+      // way through its own animation is somewhere neither here nor there, and
+      // comparing against that makes the target flicker.
       let to = from;
       for (let i = 0; i < current.length; i += 1) {
         if (current[i] === id) continue;
@@ -341,11 +398,11 @@ export function useReorder({
         const otherTop = lastTop.current.get(current[i]);
         if (!other || otherTop === undefined) continue;
         const middle = otherTop + other.offsetHeight / 2;
-        if (i < from && y < middle) {
+        if (i < from && draggedTop < middle) {
           to = i;
           break;
         }
-        if (i > from && y > middle) to = i;
+        if (i > from && draggedBottom > middle) to = i;
       }
 
       if (to !== from) {
@@ -382,7 +439,7 @@ export function useReorder({
 
     let frame = requestAnimationFrame(function tick() {
       const box = scroller.current;
-      if (box) {
+      if (box && travelled.current) {
         const bounds = box.getBoundingClientRect();
         const edge = 64;
         const fromTop = pointerY.current - bounds.top;
@@ -391,9 +448,12 @@ export function useReorder({
         // Proportional to how far into the edge the pointer is, so it creeps at
         // the boundary and moves properly at the very end. A fixed speed is
         // either too slow to be useful or too fast to aim with.
+        // Gentle. This was four times faster and unusable on a list of menu
+        // sections, where each row is several hundred pixels: by the time the
+        // eye found the gap it was aiming for, the list had gone past it.
         let by = 0;
-        if (fromTop < edge) by = -Math.ceil((edge - fromTop) / 4);
-        else if (fromBottom < edge) by = Math.ceil((edge - fromBottom) / 4);
+        if (fromTop < edge) by = -Math.ceil((edge - fromTop) / 8);
+        else if (fromBottom < edge) by = Math.ceil((edge - fromBottom) / 8);
 
         if (by !== 0) {
           const before = box.scrollTop;
@@ -427,6 +487,7 @@ export function useReorder({
 
       scroller.current = scrollerOf(node);
       pointerY.current = event.clientY;
+      travelled.current = false;
       held.current = id;
       grip.current = {
         pointerY: event.clientY + scrolled(),
@@ -444,10 +505,17 @@ export function useReorder({
   const onPointerMove = useCallback(
     (id: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (held.current !== id) return;
+      // A few pixels of slack, so a press that is really a click does not
+      // count as travel and start the list moving.
+      if (
+        Math.abs(event.clientY - (grip.current?.pointerY ?? 0) + scrolled()) > 4
+      ) {
+        travelled.current = true;
+      }
       pointerY.current = event.clientY;
       follow(event.clientY);
     },
-    [follow],
+    [follow, scrolled],
   );
 
   const onPointerUp = useCallback(
@@ -673,13 +741,12 @@ export function useReorder({
       "data-reorder-id": id,
       className: cx(
         className,
-        // Lifted while it is the one being moved, so the eye can follow it over
-        // the rows it is passing. `relative` gives the z-index something to
-        // act on.
-        moving === id && "relative z-10 shadow-raised",
+        // Lifted while it is the one being moved, so the eye can follow it
+        // over the rows it is passing.
+        moving === id && lifted,
       ),
     }),
-    [moving],
+    [lifted, moving],
   );
 
   const handleProps = useCallback(
