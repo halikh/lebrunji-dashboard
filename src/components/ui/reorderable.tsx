@@ -89,26 +89,47 @@ function rowNode(id: string): HTMLElement | null {
 }
 
 /**
- * The scrolling box a row lives in, or null when the page itself scrolls.
+ * Every scrolling box the row sits inside, nearest first.
  *
- * Found per drag rather than passed in: every screen here pins a header and
- * scrolls a list under it, so the box exists, but which element it is depends
- * on the screen — and a hook that demanded a ref for it would make every list
- * wire one up for something the DOM can simply be asked.
+ * ## Why a chain and not just the nearest
+ *
+ * The first version took the nearest scrollable ancestor and scrolled that. It
+ * is right almost always and wrong in the case that matters: **once that box is
+ * at its limit, there is nothing more it can do**, and the drag simply stops
+ * against the edge with the pointer pushing at it. Which is indistinguishable
+ * from the drag having frozen — it was reported as lag, and it is the last
+ * thing anybody would look at, because the row is still following the cursor
+ * perfectly right up until the moment it cannot go any further.
+ *
+ * So the loop walks the chain and scrolls the first box that can still move in
+ * the direction it is asking for. A menu inside a scrolling pane inside a page
+ * hands the drag off outward as each one runs out.
+ *
+ * `documentElement` is on the end because a page that scrolls is still a
+ * scrolling box, and whether it is in the chain is a layout decision this hook
+ * should not have an opinion about.
  */
-function scrollerOf(node: HTMLElement): HTMLElement | null {
+function scrollersOf(node: HTMLElement): HTMLElement[] {
+  const found: HTMLElement[] = [];
   let element = node.parentElement;
+
   while (element) {
     const overflow = getComputedStyle(element).overflowY;
     if (
       (overflow === "auto" || overflow === "scroll") &&
       element.scrollHeight > element.clientHeight
     ) {
-      return element;
+      found.push(element);
     }
     element = element.parentElement;
   }
-  return null;
+
+  const page = document.scrollingElement as HTMLElement | null;
+  if (page && page.scrollHeight > page.clientHeight && !found.includes(page)) {
+    found.push(page);
+  }
+
+  return found;
 }
 
 type Options = {
@@ -229,8 +250,19 @@ export function useReorder({
    * control, which it was.
    */
   const travelled = useRef(false);
-  /** The scrolling ancestor the drag happens inside, found once per drag. */
-  const scroller = useRef<HTMLElement | null>(null);
+  /**
+   * The scrolling boxes this drag is inside, with where each one sits on
+   * screen — taken once, when the drag begins.
+   *
+   * The bounds are cached because the loop needs them every frame, and reading
+   * them fresh is a layout read on a document that had a transform written to
+   * it the frame before: a full re-layout, sixty times a second, whether or not
+   * the pointer had moved. A box does not move while its content scrolls
+   * inside it.
+   */
+  const scrollers = useRef<
+    { element: HTMLElement; top: number; bottom: number }[]
+  >([]);
   const frames = useRef<number[]>([]);
   /** The order as of the last layout, so a render can be asked what changed. */
   const lastOrder = useRef("");
@@ -261,8 +293,13 @@ export function useReorder({
   );
 
   /** How far the container has scrolled, which container coordinates add back. */
+  /**
+   * How far the innermost box has scrolled, which container coordinates add
+   * back. Only the innermost: it is the one the rows are laid out in, and an
+   * outer box scrolling moves the whole list together, rows and all.
+   */
   const scrolled = useCallback(
-    () => scroller.current?.scrollTop ?? window.scrollY,
+    () => scrollers.current[0]?.element.scrollTop ?? window.scrollY,
     [],
   );
 
@@ -311,10 +348,13 @@ export function useReorder({
   const release = useCallback(
     (id: string) => {
       const node = rowNode(id);
-      if (node) place(node, id, 0, true);
+      if (node) {
+        place(node, id, 0, true);
+        node.style.willChange = "";
+      }
       grip.current = null;
       held.current = null;
-      scroller.current = null;
+      scrollers.current = [];
       // Otherwise text selects itself all the way down the page as you drag,
       // and the cursor reverts to an arrow the moment it leaves the handle —
       // which it does immediately, because the row moves out from under it.
@@ -492,30 +532,32 @@ export function useReorder({
     let frame = requestAnimationFrame(function tick() {
       let moved = false;
 
-      const box = scroller.current;
-      if (box && travelled.current) {
-        const bounds = box.getBoundingClientRect();
+      if (travelled.current) {
         const edge = 64;
-        const fromTop = pointerY.current - bounds.top;
-        const fromBottom = bounds.bottom - pointerY.current;
 
-        // Proportional to how far into the edge the pointer is, so it creeps at
-        // the boundary and moves properly at the very end. A fixed speed is
-        // either too slow to be useful or too fast to aim with.
-        // Gentle. This was four times faster and unusable on a list of menu
-        // sections, where each row is several hundred pixels: by the time the
-        // eye found the gap it was aiming for, the list had gone past it.
-        let by = 0;
-        if (fromTop < edge) by = -Math.ceil((edge - fromTop) / 8);
-        else if (fromBottom < edge) by = Math.ceil((edge - fromBottom) / 8);
+        for (const { element, top, bottom } of scrollers.current) {
+          const fromTop = pointerY.current - top;
+          const fromBottom = bottom - pointerY.current;
 
-        if (by !== 0) {
-          const before = box.scrollTop;
-          box.scrollTop += by;
-          // Only when it actually moved. At either end of the list this does
-          // nothing, and re-placing the row for a scroll that did not happen
-          // would fight the pointer.
-          if (box.scrollTop !== before) moved = true;
+          // Proportional to how far into the edge the pointer is, so it creeps
+          // at the boundary and moves properly at the very end. A fixed speed
+          // is either too slow to be useful or too fast to aim with.
+          let by = 0;
+          if (fromTop < edge) by = -Math.ceil((edge - fromTop) / 8);
+          else if (fromBottom < edge) by = Math.ceil((edge - fromBottom) / 8);
+          if (by === 0) continue;
+
+          const before = element.scrollTop;
+          element.scrollTop += by;
+
+          // It moved, so this box is the one handling the edge and the ones
+          // outside it should stay where they are. If it did not, it is at its
+          // limit and the next box out gets the chance — which is the whole
+          // reason this is a chain.
+          if (element.scrollTop !== before) {
+            moved = true;
+            break;
+          }
         }
       }
 
@@ -544,7 +586,10 @@ export function useReorder({
       const node = rowNode(id);
       if (!node) return;
 
-      scroller.current = scrollerOf(node);
+      scrollers.current = scrollersOf(node).map((element) => {
+        const box = element.getBoundingClientRect();
+        return { element, top: box.top, bottom: box.bottom };
+      });
       pointerY.current = event.clientY;
       travelled.current = false;
       held.current = id;
@@ -552,6 +597,19 @@ export function useReorder({
         pointerY: event.clientY + scrolled(),
         top: node.getBoundingClientRect().top + scrolled(),
       };
+      // Its own compositing layer, for the length of the drag.
+      //
+      // Without it the browser **repaints** the row on every frame rather than
+      // moving a layer it has already drawn. On a menu item that is cheap. On a
+      // section — a header, three cards, three photographs, six buttons — it is
+      // not, and the drag stutters in a way no amount of doing less JavaScript
+      // fixes, because the work is in the compositor rather than in the script.
+      //
+      // Set here and cleared on release rather than left in the stylesheet:
+      // `will-change` on every row all the time is the documented way to make a
+      // page slower, not faster.
+      node.style.willChange = "transform";
+
       document.body.style.userSelect = "none";
       document.body.style.cursor = "grabbing";
 
