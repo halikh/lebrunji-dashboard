@@ -25,7 +25,7 @@ export function railItemClass(
     // a column flex container and stretch by default; sign-out sits in a plain
     // block, where a `button` shrinks to its content and sits left. Stating it
     // here means the item looks the same wherever it is put.
-    "group relative flex w-full flex-1 cursor-pointer flex-col items-center gap-xxs rounded-md px-xs py-sm",
+    "group relative flex w-full flex-1 flex-col items-center gap-xxs rounded-md px-xs py-sm",
     "text-[11px] font-semibold md:flex-none md:py-md md:text-[12px]",
     active && "bg-active-wash text-active-ink",
     !active && tone === "default" && "text-text-soft hover:bg-neutral-fill",

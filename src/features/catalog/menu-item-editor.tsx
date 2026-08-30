@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 
-import { Button, Field, Input, cx } from "@/components/ui";
+import { Button, Field, Input } from "@/components/ui";
 import { LocalizedField } from "@/components/ui/localized-field";
+import { Toggle } from "@/components/ui/toggle";
 import { useLanguages } from "@/features/reference/use-languages";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
@@ -140,25 +141,12 @@ export function MenuItemEditor({
             />
           </Field>
 
-          <button
-            type="button"
-            aria-pressed={isActive}
-            onClick={() => setIsActive((current) => !current)}
-            className="flex items-center gap-sm text-[13px] font-semibold text-text-soft"
-          >
-            <span
-              aria-hidden
-              className={cx(
-                "flex h-[22px] w-[38px] items-center rounded-full p-xxs",
-                isActive
-                  ? "justify-end bg-accent"
-                  : "justify-start bg-neutral-fill",
-              )}
-            >
-              <span className="size-[18px] rounded-full bg-surface" />
-            </span>
-            {isActive ? t("menu.live") : t("menu.hidden")}
-          </button>
+          <Toggle
+            on={isActive}
+            onChange={() => setIsActive((current) => !current)}
+            labelOn={t("menu.live")}
+            labelOff={t("menu.hidden")}
+          />
         </div>
       </div>
 

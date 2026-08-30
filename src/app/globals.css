@@ -43,6 +43,38 @@ h4 {
 }
 
 /**
+ * Anything you can press says so.
+ *
+ * A `<button>` gets `cursor: default` from the browser — the arrow, the same as
+ * dead text — and Tailwind's preflight does not change it. So every button in
+ * the app was silently indistinguishable from a label until the pointer was
+ * already over it and nothing happened.
+ *
+ * Set once here rather than as a class on each control, for the same reason the
+ * focus ring is: a rule that has to be remembered on every new component is one
+ * that will be forgotten on the fourth.
+ *
+ * `:disabled` is excluded and given the opposite cursor instead, because a
+ * pointer over a control that will not respond is a small lie — it promises
+ * something the click will not do.
+ */
+button:not(:disabled),
+summary,
+select:not(:disabled),
+label[for],
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"]:not([aria-disabled="true"]),
+a[href] {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/**
  * What moves when something is focused or hovered.
  *
  * Declared on the elements themselves rather than inside `:focus-visible`, and

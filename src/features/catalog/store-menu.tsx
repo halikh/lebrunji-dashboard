@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Toggle } from "@/components/ui/toggle";
 import { useMoney } from "@/features/reference/use-currencies";
 import { t } from "@/i18n/translations";
 
@@ -281,8 +282,12 @@ function ItemRow({
   return (
     <div
       className={cx(
-        "flex items-center gap-lg rounded-md border border-border bg-surface px-lg py-md",
-        !item.isActive && "opacity-60",
+        "flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
+        // Marked, not dimmed — fading the row takes the controls with it, and a
+        // faded button reads as disabled.
+        item.isActive
+          ? "border-border"
+          : "border-danger-wash bg-danger-wash/30",
       )}
     >
       {item.imageUrl ? (
@@ -321,25 +326,13 @@ function ItemRow({
         {format(item.price, currencyCode)}
       </span>
 
-      <button
-        type="button"
-        aria-pressed={item.isActive}
-        onClick={onToggle}
-        aria-label={item.isActive ? t("menu.live") : t("menu.hidden")}
-        className="shrink-0"
-      >
-        <span
-          aria-hidden
-          className={cx(
-            "flex h-[22px] w-[38px] items-center rounded-full p-xxs",
-            item.isActive
-              ? "justify-end bg-accent"
-              : "justify-start bg-neutral-fill",
-          )}
-        >
-          <span className="size-[18px] rounded-full bg-surface" />
-        </span>
-      </button>
+      <Toggle
+        on={item.isActive}
+        onChange={onToggle}
+        labelOn={t("menu.live")}
+        labelOff={t("menu.hidden")}
+        className="w-[92px]"
+      />
 
       <ConfirmButton
         onConfirm={onArchive}
@@ -347,7 +340,7 @@ function ItemRow({
         bodyKey="menu.archiveBody"
         confirmKey="menu.archiveConfirm"
         variant="danger"
-        triggerVariant="danger-quiet"
+        triggerVariant="danger"
         size="sm"
       >
         {t("menu.archive")}

@@ -55,6 +55,10 @@ export function OrderRow({
       aria-label={order.code}
       onClick={onOpen}
       className={cx(
+        // Stated here rather than covered by the global rule: this is a `div`
+        // that happens to be clickable, not a control. The rule deliberately
+        // does not reach for arbitrary elements — a pointer on everything with
+        // an `onClick` would put one on half the page.
         "flex cursor-pointer items-center gap-lg rounded-md border bg-surface px-lg py-md",
         focused
           ? "border-active shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]"

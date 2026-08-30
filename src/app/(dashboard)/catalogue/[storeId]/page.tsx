@@ -1,4 +1,4 @@
-import { StoreMenu } from '@/features/catalog/store-menu';
+import { StoreMenu } from "@/features/catalog/store-menu";
 
 /**
  * A shop's menu.

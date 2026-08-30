@@ -6,6 +6,7 @@ import { useState } from "react";
 import { cx, Input } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui";
 import { t } from "@/i18n/translations";
 
@@ -134,10 +135,20 @@ function StoreRow({
   return (
     <div
       className={cx(
-        "flex items-center gap-lg rounded-md border border-border bg-surface px-lg py-md",
-        // A hidden shop is dimmed rather than removed: it is still a thing the
-        // operator manages, and it must be findable to be put back.
-        !store.isActive && "opacity-60",
+        "flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
+        // A hidden shop is marked, not dimmed.
+        //
+        // Fading the whole row was wrong: it took the controls with it, and a
+        // faded button reads as a disabled one — so the row looked like
+        // something you could not act on, which is the opposite of true. It is
+        // hidden *from customers*, and the operator's job is precisely to act
+        // on it.
+        //
+        // So the *content* mutes and the controls stay full strength, with a
+        // border and a badge carrying the state instead.
+        store.isActive
+          ? "border-border"
+          : "border-danger-wash bg-danger-wash/30",
       )}
     >
       {store.imageUrl ? (
@@ -146,7 +157,10 @@ function StoreRow({
           src={store.imageUrl}
           alt=""
           aria-hidden
-          className="size-[46px] shrink-0 rounded-md object-cover"
+          className={cx(
+            "size-[46px] shrink-0 rounded-md object-cover",
+            !store.isActive && "opacity-50 grayscale",
+          )}
         />
       ) : (
         <div
@@ -157,10 +171,18 @@ function StoreRow({
 
       <div className="flex min-w-0 flex-grow flex-col gap-xxs">
         <div className="flex items-center gap-sm">
-          <span className="truncate text-[15px] font-semibold">{name}</span>
-          {store.isFeatured && (
-            <span className="shrink-0 rounded-full bg-yellow-wash px-sm text-[11px] font-bold text-on-yellow">
-              {t("catalogue.featured")}
+          <span
+            className={cx(
+              "truncate text-[15px] font-semibold",
+              !store.isActive && "text-text-soft",
+            )}
+          >
+            {name}
+          </span>
+          {!store.isActive && (
+            // Said in words, not only in colour and dimness.
+            <span className="shrink-0 rounded-full bg-danger-wash px-sm text-[11px] font-bold text-danger">
+              {t("catalogue.inactive")}
             </span>
           )}
         </div>
@@ -194,14 +216,22 @@ function StoreRow({
       </div>
 
       <Toggle
-        label={store.isActive ? t("catalogue.active") : t("catalogue.inactive")}
         on={store.isActive}
         onChange={onToggleActive}
+        labelOn={t("catalogue.active")}
+        labelOff={t("catalogue.inactive")}
+        className="w-[104px]"
       />
 
-      <Button variant="secondary" size="sm" onClick={onToggleFeatured}>
-        {t("catalogue.featured")}
-      </Button>
+      {/* A switch, not a button. Featured is a *state* the shop is in — a
+          button implied an action with no visible result, and nothing on the
+          row said whether it was on. */}
+      <Toggle
+        on={store.isFeatured}
+        onChange={onToggleFeatured}
+        labelOn={t("catalogue.featured")}
+        className="w-[104px]"
+      />
 
       {/* The menu is what an operator comes to a shop for. A link rather than a
           button: it is a place, so it should be openable in a new tab. */}
@@ -218,52 +248,12 @@ function StoreRow({
         bodyKey="catalogue.archiveBody"
         confirmKey="catalogue.archiveConfirm"
         variant="danger"
-        // Red type, not a red fill: this repeats on every row, and a column of
-        // filled red buttons stops reading as a warning by the fourth one.
-        triggerVariant="danger-quiet"
+        triggerVariant="danger"
         size="sm"
       >
         {t("catalogue.archive")}
       </ConfirmButton>
     </div>
-  );
-}
-
-/**
- * A switch.
- *
- * A real `<button>` with `aria-pressed` rather than a styled checkbox: the
- * state is "on or off", which is what `aria-pressed` says, and a checkbox would
- * announce "checked" — right for a form field being submitted, wrong for a
- * control that acts the moment it is pressed.
- */
-function Toggle({
-  label,
-  on,
-  onChange,
-}: {
-  label: string;
-  on: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onChange}
-      className="flex shrink-0 items-center gap-sm text-[13px] font-semibold text-text-soft"
-    >
-      <span
-        aria-hidden
-        className={cx(
-          "flex h-[22px] w-[38px] items-center rounded-full p-xxs",
-          on ? "justify-end bg-accent" : "justify-start bg-neutral-fill",
-        )}
-      >
-        <span className="size-[18px] rounded-full bg-surface" />
-      </span>
-      <span className="w-[46px] text-left">{label}</span>
-    </button>
   );
 }
 

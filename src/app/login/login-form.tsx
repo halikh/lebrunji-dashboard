@@ -101,6 +101,8 @@ export function LoginForm() {
           />
         </Field>
 
+        {/* Explicit: the global rule matches `label[for]`, and this one wraps
+            its input rather than pointing at it by id. */}
         <label className="flex cursor-pointer items-center gap-sm text-[14px] text-text-soft">
           <input
             type="checkbox"
