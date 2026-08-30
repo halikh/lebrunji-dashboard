@@ -1,5 +1,6 @@
 "use client";
 
+import { useFieldWiring } from "./field";
 import { cx } from "./index";
 
 /**
@@ -40,10 +41,17 @@ export function Toggle({
 }) {
   const label = on ? labelOn : (labelOff ?? labelOn);
 
+  // A switch inside a `Field` is described by that field's hint or error, the
+  // same as any input. Outside one — a switch in a table row — there is nothing
+  // to describe it and the label it carries is the whole of its meaning.
+  const field = useFieldWiring();
+
   return (
     <button
       type="button"
+      id={field?.id}
       aria-pressed={on}
+      aria-describedby={field?.describedBy}
       disabled={disabled}
       onClick={onChange}
       className={cx(

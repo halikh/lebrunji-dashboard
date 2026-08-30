@@ -76,9 +76,8 @@ export function LoginForm() {
 
         <FormError>{error}</FormError>
 
-        <Field id="email" label={t("login.email")}>
+        <Field label={t("login.email")}>
           <Input
-            id="email"
             type="email"
             name="email"
             autoComplete="username"
@@ -89,9 +88,8 @@ export function LoginForm() {
           />
         </Field>
 
-        <Field id="password" label={t("login.password")}>
+        <Field label={t("login.password")}>
           <Input
-            id="password"
             type="password"
             name="password"
             autoComplete="current-password"

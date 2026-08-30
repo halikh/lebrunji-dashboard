@@ -126,6 +126,7 @@ export function MenuItemEditor({
               en: t("menu.namePlaceholder"),
               ar: t("menu.namePlaceholderAr"),
             }}
+            hint={t("menu.nameHint")}
             maxLength={TEXT.name}
           />
           <LocalizedField
@@ -138,14 +139,14 @@ export function MenuItemEditor({
             }}
             multiline
             optional
+            hint={t("menu.descriptionHint")}
             maxLength={TEXT.description}
           />
         </div>
 
         <div className="flex w-full flex-col gap-lg">
-          <Field id="price" label={t("menu.price")}>
+          <Field label={t("menu.price")} hint={t("menu.priceHint")}>
             <NumberInput
-              id="price"
               min={0}
               step={1}
               placeholder={t("menu.pricePlaceholder")}
@@ -154,12 +155,17 @@ export function MenuItemEditor({
             />
           </Field>
 
-          <Toggle
-            on={isActive}
-            onChange={() => setIsActive((current) => !current)}
-            labelOn={t("menu.live")}
-            labelOff={t("menu.hidden")}
-          />
+          <Field
+            label={t("menu.visibility")}
+            hint={isActive ? t("menu.liveHint") : t("menu.hiddenHint")}
+          >
+            <Toggle
+              on={isActive}
+              onChange={() => setIsActive((current) => !current)}
+              labelOn={t("menu.live")}
+              labelOff={t("menu.hidden")}
+            />
+          </Field>
         </div>
 
         {(shown || error) && (

@@ -2,6 +2,7 @@
 
 import type { InputHTMLAttributes, Ref } from "react";
 
+import { useFieldWiring } from "./field";
 import { cx } from "./index";
 
 /**
@@ -31,7 +32,7 @@ import { cx } from "./index";
  * `tabular-nums` stays, so digits keep an even width.
  */
 export function NumberInput({
-  invalid = false,
+  invalid,
   className,
   ref,
   onWheel,
@@ -40,10 +41,14 @@ export function NumberInput({
   invalid?: boolean;
   ref?: Ref<HTMLInputElement>;
 }) {
+  const field = useFieldWiring();
+  const isInvalid = invalid ?? field?.invalid ?? false;
+
   return (
     <input
       {...rest}
       ref={ref}
+      id={rest.id ?? field?.id}
       type="number"
       // `decimal` rather than `numeric`: a price can carry a separator in a
       // currency that has minor units, and a keyboard with no decimal point is
@@ -56,17 +61,15 @@ export function NumberInput({
         event.currentTarget.blur();
         onWheel?.(event);
       }}
-      aria-invalid={invalid || undefined}
-      aria-describedby={
-        invalid && rest.id ? `${rest.id}-error` : rest["aria-describedby"]
-      }
+      aria-invalid={isInvalid || undefined}
+      aria-describedby={rest["aria-describedby"] ?? field?.describedBy}
       className={cx(
         "w-full rounded-md border bg-surface px-md py-md text-[15px] text-text tabular-nums",
         "placeholder:text-text-faint",
         "focus:bg-field-focus",
         // Chrome and Safari draw spinners; Firefox uses `appearance`.
         "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-        invalid ? "border-danger" : "border-border",
+        isInvalid ? "border-danger" : "border-border",
         className,
       )}
     />

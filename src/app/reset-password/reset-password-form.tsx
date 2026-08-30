@@ -140,9 +140,11 @@ export function ResetPasswordForm() {
 
         <FormError>{error}</FormError>
 
-        <Field id="password" label={t("resetPassword.password")}>
+        <Field
+          label={t("resetPassword.password")}
+          hint={t("resetPassword.hint")}
+        >
           <Input
-            id="password"
             type="password"
             autoComplete="new-password"
             required
@@ -152,9 +154,8 @@ export function ResetPasswordForm() {
           />
         </Field>
 
-        <Field id="confirm" label={t("resetPassword.confirm")}>
+        <Field label={t("resetPassword.confirm")}>
           <Input
-            id="confirm"
             type="password"
             autoComplete="new-password"
             required

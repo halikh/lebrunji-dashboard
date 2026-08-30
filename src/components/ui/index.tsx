@@ -31,6 +31,8 @@ import type {
   Ref,
 } from "react";
 
+import { useFieldWiring } from "./field";
+
 /** Joins class names, dropping the falsey ones. */
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -150,54 +152,14 @@ function Spinner() {
 // Field + Input
 // ---------------------------------------------------------------------------
 
-/**
- * A labelled control with room for an error.
- *
- * The error is wired to the input with `aria-describedby` and announced with
- * `role="alert"`, because a message only a sighted person notices is half a
- * message. `htmlFor`/`id` are required rather than optional for the same
- * reason — a placeholder is not a label.
- */
-export function Field({
-  id,
-  label,
-  hint,
-  error,
-  children,
-}: {
-  id: string;
-  label: string;
-  hint?: string;
-  error?: string | null;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-xs">
-      <label htmlFor={id} className="text-[13px] font-semibold text-text-soft">
-        {label}
-      </label>
-      {children}
-      {hint && !error && <p className="text-[13px] text-text-faint">{hint}</p>}
-      {error && (
-        <p
-          id={`${id}-error`}
-          role="alert"
-          className="text-[13px] font-medium text-danger"
-        >
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
 export function Input({
-  invalid = false,
+  invalid,
   padding = "px-md",
   className,
   ref,
   ...rest
 }: InputHTMLAttributes<HTMLInputElement> & {
+  /** Overrides the field's own verdict. Rarely needed. */
   invalid?: boolean;
   /**
    * Horizontal padding, as a prop rather than a class to override.
@@ -213,14 +175,19 @@ export function Input({
   // `forwardRef` wrapper is needed — but the type has to say so.
   ref?: Ref<HTMLInputElement>;
 }) {
+  // Taken from the surrounding `Field` when there is one. Doing this by hand at
+  // each call site is how `aria-describedby` goes missing: nothing looks wrong
+  // on screen without it — the error is drawn, it is simply never read out.
+  const field = useFieldWiring();
+  const isInvalid = invalid ?? field?.invalid ?? false;
+
   return (
     <input
       {...rest}
       ref={ref}
-      aria-invalid={invalid || undefined}
-      aria-describedby={
-        invalid && rest.id ? `${rest.id}-error` : rest["aria-describedby"]
-      }
+      id={rest.id ?? field?.id}
+      aria-invalid={isInvalid || undefined}
+      aria-describedby={rest["aria-describedby"] ?? field?.describedBy}
       className={cx(
         "w-full rounded-md border bg-surface py-md text-[15px] text-text",
         padding,
@@ -233,7 +200,7 @@ export function Input({
         // duplicate and a divergence waiting to happen — the button next to it
         // would have focused differently.
         "focus:bg-field-focus",
-        invalid ? "border-danger" : "border-border",
+        isInvalid ? "border-danger" : "border-border",
         className,
       )}
     />
@@ -291,3 +258,6 @@ export function FormNotice({ children }: { children: ReactNode }) {
     </p>
   );
 }
+
+// Re-exported so a screen imports its form pieces from one place.
+export { Field, useFieldWiring } from "./field";

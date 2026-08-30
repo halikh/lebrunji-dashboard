@@ -47,6 +47,7 @@ export function LocalizedField({
   multiline = false,
   maxLength,
   placeholder,
+  hint,
   error,
   optional = false,
 }: {
@@ -69,6 +70,14 @@ export function LocalizedField({
    * A language with no example gets no placeholder rather than the English one.
    */
   placeholder?: Record<string, string>;
+  /**
+   * Standing advice for the whole field, not per language.
+   *
+   * One sentence under a set of inputs that are the same value in different
+   * words — repeating it per language would say the same thing twice and push
+   * the fields apart.
+   */
+  hint?: string;
   error?: string | null;
   optional?: boolean;
 }) {
@@ -191,14 +200,16 @@ export function LocalizedField({
         <p role="alert" className="text-[13px] font-medium text-danger">
           {error}
         </p>
+      ) : partial ? (
+        // Names the languages rather than saying "incomplete". The operator has
+        // done most of the work; what they need is which box is empty.
+        <p role="alert" className="text-[13px] font-medium text-danger">
+          {t("form.stillNeeded", { languages: missing.join(", ") })}
+        </p>
       ) : (
-        partial && (
-          // Names the languages rather than saying "incomplete". The operator
-          // has done most of the work; what they need is which box is empty.
-          <p role="alert" className="text-[13px] font-medium text-danger">
-            {t("form.stillNeeded", { languages: missing.join(", ") })}
-          </p>
-        )
+        // The same slot as the error, never a second line: showing both means
+        // reading advice about a value already reported as wrong.
+        hint && <p className="text-[13px] text-text-faint">{hint}</p>
       )}
     </div>
   );

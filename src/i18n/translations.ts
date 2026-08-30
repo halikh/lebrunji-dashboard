@@ -183,6 +183,16 @@ const en = {
     // so stops it looking like a field that ignores what you type.
     slugHint: "Used by imports. Filled in from the name.",
     formLabel: "Item details",
+    visibility: "Visibility",
+    // Every helper says something the field does not already say. A hint that
+    // repeats the label is noise, and noise is what teaches people to stop
+    // reading them.
+    nameHint: "What a customer sees on the menu.",
+    descriptionHint:
+      "One line under the name. Leave empty if the name says it.",
+    priceHint: "In the shop's currency, without separators.",
+    liveHint: "Customers can see and order this.",
+    hiddenHint: "Kept, but not shown in the app.",
     newItem: "New item",
     // Placeholders are examples, never labels. Each shows what a good answer
     // looks like for a field whose name is already above it.
@@ -254,6 +264,8 @@ const en = {
     submit: "Save the password",
     mismatch: "Those two do not match.",
     tooShort: "Use at least 12 characters.",
+    // Says the rule before it is broken, not after.
+    hint: "At least 12 characters. Length matters more than symbols.",
     // The recovery link is single-use and time-limited, so this is a normal
     // thing to hit rather than an error worth alarming about.
     expired: "That link has expired. Ask for a new one.",

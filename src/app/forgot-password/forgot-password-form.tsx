@@ -77,9 +77,8 @@ export function ForgotPasswordForm() {
           {t("forgotPassword.subtitle")}
         </p>
 
-        <Field id="email" label={t("login.email")}>
+        <Field label={t("login.email")}>
           <Input
-            id="email"
             type="email"
             name="email"
             autoComplete="username"
