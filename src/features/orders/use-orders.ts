@@ -14,6 +14,7 @@ import {
   setOrderStatus,
   type Order,
   type OrderStatus,
+  type Scope,
 } from "./api/orders";
 
 /**
@@ -27,8 +28,8 @@ export const orderKeys = {
   all: ["orders"] as const,
   statuses: () => ["orders", "statuses"] as const,
   counts: () => ["orders", "counts"] as const,
-  list: (statusSlug: string | null, search: string) =>
-    ["orders", "list", statusSlug, search] as const,
+  list: (scope: Scope, statusSlug: string | null, search: string) =>
+    ["orders", "list", scope, statusSlug, search] as const,
   detail: (id: string) => ["orders", "detail", id] as const,
 };
 
@@ -50,10 +51,22 @@ export function useStatusCounts(statuses: OrderStatus[] | undefined) {
   });
 }
 
-export function useOrders(statusSlug: string | null, search: string) {
+export function useOrders(
+  scope: Scope,
+  statusSlug: string | null,
+  search: string,
+  statuses: OrderStatus[] | undefined,
+) {
   return useQuery({
-    queryKey: orderKeys.list(statusSlug, search),
-    queryFn: () => fetchOrders({ statusSlug, search: search || null }),
+    // `statuses` is not in the key: it is reference data that changes about
+    // never, and putting it there would refetch every list the first time it
+    // loads. It only decides *which* slugs "live" means.
+    queryKey: orderKeys.list(scope, statusSlug, search),
+    queryFn: () =>
+      fetchOrders({ scope, statusSlug, statuses, search: search || null }),
+    // "live" cannot be answered before the statuses are known — without them it
+    // would fall through to an unfiltered list, which is the whole bug.
+    enabled: scope !== "live" || (statuses?.length ?? 0) > 0,
     // A list that blanks on every keystroke is unusable to search with; the
     // previous page stays under the new query until it resolves.
     placeholderData: (previous) => previous,

@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button, cx, Input } from "@/components/ui";
-import { t } from "@/i18n/translations";
+import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone, type StatusTone } from "@/lib/order-status";
 
+import type { Scope } from "./api/orders";
 import { OrderRow } from "./order-row";
 import { useOrderRealtime } from "./use-order-realtime";
 import {
@@ -32,6 +33,13 @@ import {
  * dropped during a rush.
  */
 export function OrdersQueue() {
+  // `live` by default, not `today`.
+  //
+  // A date filter would hide the orders that matter most: one placed at 23:50
+  // last night and still unconfirmed is the most urgent thing on the screen,
+  // and "today" is exactly what would make it invisible. The primary split is
+  // whether an order still needs somebody.
+  const [scope, setScope] = useState<Scope>("live");
   const [statusSlug, setStatusSlug] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [focused, setFocused] = useState(0);
@@ -40,7 +48,7 @@ export function OrdersQueue() {
 
   const statuses = useOrderStatuses();
   const counts = useStatusCounts(statuses.data);
-  const orders = useOrders(statusSlug, search);
+  const orders = useOrders(scope, statusSlug, search, statuses.data);
   const { advance } = useAdvanceOrder();
 
   useOrderRealtime();
@@ -126,7 +134,34 @@ export function OrdersQueue() {
         and `overflow-y-auto`, and this is the other half of that statement.
       */}
       <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-        <h1 className="flex-grow text-[24px]">{t("orders.title")}</h1>
+        <h1 className="text-[24px]">{t("orders.title")}</h1>
+
+        {/* The scope switch sits beside the title rather than among the status
+            tabs, because it is a different question: the tabs ask "at which
+            step", this asks "which orders are we even looking at". */}
+        <div
+          role="group"
+          aria-label={t("orders.title")}
+          className="flex shrink-0 items-center gap-xxs rounded-md bg-neutral-fill p-xxs"
+        >
+          <ScopeButton
+            label={t("orders.scopeLive")}
+            active={scope === "live"}
+            onClick={() => setScope("live")}
+          />
+          <ScopeButton
+            label={t("orders.scopeToday")}
+            active={scope === "today"}
+            onClick={() => setScope("today")}
+          />
+          <ScopeButton
+            label={t("orders.scopeAll")}
+            active={scope === "all"}
+            onClick={() => setScope("all")}
+          />
+        </div>
+
+        <span className="flex-grow" />
         <Input
           ref={searchRef}
           value={search}
@@ -184,8 +219,9 @@ export function OrdersQueue() {
 
         {orders.isSuccess && rows.length === 0 && (
           <EmptyState
-            titleKey={search ? "orders.noMatchTitle" : "orders.emptyTitle"}
-            bodyKey={search ? "orders.noMatchBody" : "orders.emptyBody"}
+            titleKey={search ? "orders.noMatchTitle" : EMPTY[scope].title}
+            bodyKey={search ? "orders.noMatchBody" : EMPTY[scope].body}
+            mood={scope === "live" ? "done" : "waiting"}
           />
         )}
 
@@ -226,6 +262,45 @@ export function OrdersQueue() {
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * "Nothing here" means something different in each scope.
+ *
+ * An empty Live queue is good news — everything is delivered. An empty Today is
+ * a quiet morning. One message for all three would be ambiguous exactly when
+ * the operator is checking whether the screen is broken.
+ */
+const EMPTY: Record<Scope, { title: TranslationKey; body: TranslationKey }> = {
+  live: { title: "orders.liveEmptyTitle", body: "orders.liveEmptyBody" },
+  today: { title: "orders.todayEmptyTitle", body: "orders.todayEmptyBody" },
+  all: { title: "orders.allEmptyTitle", body: "orders.allEmptyBody" },
+};
+
+function ScopeButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cx(
+        "rounded-sm px-md py-xs text-[13px] font-semibold whitespace-nowrap",
+        active
+          ? "bg-surface text-text shadow-[0_1px_2px_rgba(30,27,24,0.10)]"
+          : "text-text-soft",
+      )}
+    >
+      {label}
+    </button>
   );
 }
 

@@ -60,6 +60,18 @@ const en = {
     title: "Orders",
     searchPlaceholder: "Code, name or phone",
     all: "All",
+    scopeLive: "Live",
+    scopeToday: "Today",
+    scopeAll: "All orders",
+    // Says what the scope *is*, because "no orders" on a filtered view is
+    // ambiguous — it could mean the shop is quiet or the filter is wrong.
+    liveEmptyTitle: "Nothing needs you",
+    liveEmptyBody:
+      "Every order has been delivered or cancelled. New ones appear here the moment they are placed, and the dashboard chimes.",
+    todayEmptyTitle: "Nothing today yet",
+    todayEmptyBody: "No orders have been placed since midnight.",
+    allEmptyTitle: "No orders",
+    allEmptyBody: "Nothing has ever been placed.",
     emptyTitle: "Nothing waiting",
     emptyBody:
       "New orders appear here the moment they are placed, and the dashboard chimes. There is nothing to do right now.",

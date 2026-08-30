@@ -88,6 +88,16 @@ export async function fetchOrderStatuses(
   }));
 }
 
+/**
+ * Which orders the queue is looking at.
+ *
+ * Deliberately **not** a date filter with "today" as the default. An order
+ * placed at 23:50 last night and still unconfirmed is the most urgent thing on
+ * the screen, and a date filter is precisely what would hide it. So the primary
+ * split is by whether an order still needs somebody.
+ */
+export type Scope = "live" | "today" | "all";
+
 export type OrderPage = {
   orders: Order[];
   /** Feed back as `before` for the next page; `null` when the list is exhausted. */
@@ -106,19 +116,36 @@ export type OrderPage = {
  * busiest. Served by `orders_placed_at_idx` (migration 0067).
  */
 export async function fetchOrders(options: {
+  scope?: Scope;
   statusSlug?: string | null;
+  /** Every status, so "live" can be derived rather than hardcoded. */
+  statuses?: readonly OrderStatus[];
   search?: string | null;
   before?: string | null;
   limit?: number;
   locale?: string;
 }): Promise<OrderPage> {
   const {
+    scope = "live",
     statusSlug = null,
+    statuses = [],
     search = null,
     before = null,
     limit = 50,
     locale = "en",
   } = options;
+
+  // The scope decides which statuses are in play before the tab narrows it
+  // further. `live` is the set that still needs somebody — read from the data,
+  // never a hardcoded list of slugs, because `order_statuses` exists to be
+  // added to and a new step would silently fall outside a hardcoded set. An
+  // order nobody can see is the worst bug this screen could have.
+  const liveSlugs = liveStatusSlugs(statuses);
+  const filterSlugs = statusSlug
+    ? [statusSlug]
+    : scope === "live" && liveSlugs.length > 0
+      ? liveSlugs
+      : null;
 
   // `!inner` on the status is what makes the tab filter work.
   //
@@ -131,7 +158,7 @@ export async function fetchOrders(options: {
   // An order spanning two shops at different statuses legitimately appears
   // under both tabs. That is the schema's shape and the operator has to act on
   // each leg separately.
-  const embed = statusSlug
+  const embed = filterSlugs
     ? `order_stores!inner ( id, store_id, subtotal,
          stores ( name ),
          order_statuses!inner ( slug, name, progress ) )`
@@ -152,8 +179,16 @@ export async function fetchOrders(options: {
     .limit(limit);
 
   if (before) query = query.lt("placed_at", before);
-  if (statusSlug)
-    query = query.eq("order_stores.order_statuses.slug", statusSlug);
+
+  if (filterSlugs) {
+    query = query.in("order_stores.order_statuses.slug", filterSlugs);
+  }
+
+  if (scope === "today") {
+    // The operator's midnight, not UTC's. A shop that closes at 01:00 would
+    // otherwise find its last two hours of trade filed under tomorrow.
+    query = query.gte("placed_at", startOfLocalDay().toISOString());
+  }
 
   if (search) {
     // The code is what a customer reads out over the phone, and they read out
@@ -346,6 +381,30 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
       };
     }),
   };
+}
+
+/**
+ * The statuses an order can still be moved on from.
+ *
+ * Terminal is derived: `progress: null` is off the path (cancelled), and the
+ * highest `progress` is the end of it (delivered). Everything else is live.
+ *
+ * Derived rather than listed because `order_statuses` is a lookup table
+ * specifically so a merchant can insert a step (migration 0032 says so). A
+ * hardcoded `['ordered', 'confirmed', 'driverSent']` would exclude any new one
+ * from the default view — orders that exist and that nobody is shown.
+ */
+export function liveStatusSlugs(statuses: readonly OrderStatus[]): string[] {
+  const onPath = statuses.filter((s) => s.progress !== null);
+  if (onPath.length === 0) return [];
+
+  const last = Math.max(...onPath.map((s) => s.progress as number));
+  return onPath.filter((s) => (s.progress as number) < last).map((s) => s.slug);
+}
+
+/** Midnight this morning, in the browser's own timezone. */
+export function startOfLocalDay(now = new Date()): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 /**
