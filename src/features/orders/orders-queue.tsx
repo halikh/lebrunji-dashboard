@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
 import { Button, cx, Input } from "@/components/ui";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone, type StatusTone } from "@/lib/order-status";
@@ -53,7 +54,12 @@ export function OrdersQueue() {
 
   useOrderRealtime();
 
-  const rows = useMemo(() => orders.data?.orders ?? [], [orders.data]);
+  // Every page flattened. The pages exist so the fetch can be incremental; the
+  // screen only ever wants one list.
+  const rows = useMemo(
+    () => orders.data?.pages.flatMap((page) => page.orders) ?? [],
+    [orders.data],
+  );
 
   // The focused index has to survive the list changing under it — realtime
   // moves rows in and out constantly, so the stored index can outrun the list.
@@ -246,6 +252,14 @@ export function OrdersQueue() {
             }
           />
         ))}
+
+        {orders.isSuccess && rows.length > 0 && (
+          <InfiniteSentinel
+            hasMore={orders.hasNextPage}
+            loading={orders.isFetchingNextPage}
+            onLoadMore={() => void orders.fetchNextPage()}
+          />
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-xl border-t border-border bg-surface px-xxl py-md text-[12px] text-text-faint">

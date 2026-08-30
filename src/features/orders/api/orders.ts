@@ -1,4 +1,5 @@
 import { getClient } from "@/lib/supabase/client";
+import { startOfBusinessDay } from "@/lib/time";
 
 /**
  * Reading and advancing orders.
@@ -185,9 +186,10 @@ export async function fetchOrders(options: {
   }
 
   if (scope === "today") {
-    // The operator's midnight, not UTC's. A shop that closes at 01:00 would
-    // otherwise find its last two hours of trade filed under tomorrow.
-    query = query.gte("placed_at", startOfLocalDay().toISOString());
+    // Beirut's midnight — not UTC's, and not the machine's. A laptop still set
+    // to another timezone would otherwise show a different day's orders from
+    // the one beside it, and neither would be the shop's.
+    query = query.gte("placed_at", startOfBusinessDay().toISOString());
   }
 
   if (search) {
@@ -400,11 +402,6 @@ export function liveStatusSlugs(statuses: readonly OrderStatus[]): string[] {
 
   const last = Math.max(...onPath.map((s) => s.progress as number));
   return onPath.filter((s) => (s.progress as number) < last).map((s) => s.slug);
-}
-
-/** Midnight this morning, in the browser's own timezone. */
-export function startOfLocalDay(now = new Date()): Date {
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 /**

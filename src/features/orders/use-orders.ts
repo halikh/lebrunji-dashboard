@@ -1,6 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import { useToasts } from "@/components/ui/toast";
@@ -51,24 +56,45 @@ export function useStatusCounts(statuses: OrderStatus[] | undefined) {
   });
 }
 
+/**
+ * The queue, paged.
+ *
+ * `useInfiniteQuery` rather than `useQuery`, because the pages have to
+ * accumulate: the operator scrolls down and keeps what is above. The cursor is
+ * `placed_at` of the last row — keyset, so the database seeks rather than
+ * counting past what it has already returned.
+ *
+ * `getNextPageParam` reads the cursor the fetch returned rather than guessing
+ * from the row count. A guess is wrong on the exact page where the number of
+ * rows happens to equal the limit, which is the common case and therefore the
+ * bug you do not find.
+ */
 export function useOrders(
   scope: Scope,
   statusSlug: string | null,
   search: string,
   statuses: OrderStatus[] | undefined,
 ) {
-  return useQuery({
+  return useInfiniteQuery({
     // `statuses` is not in the key: it is reference data that changes about
     // never, and putting it there would refetch every list the first time it
     // loads. It only decides *which* slugs "live" means.
     queryKey: orderKeys.list(scope, statusSlug, search),
-    queryFn: () =>
-      fetchOrders({ scope, statusSlug, statuses, search: search || null }),
+    queryFn: ({ pageParam }) =>
+      fetchOrders({
+        scope,
+        statusSlug,
+        statuses,
+        search: search || null,
+        before: pageParam,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.cursor,
     // "live" cannot be answered before the statuses are known — without them it
     // would fall through to an unfiltered list, which is the whole bug.
     enabled: scope !== "live" || (statuses?.length ?? 0) > 0,
     // A list that blanks on every keystroke is unusable to search with; the
-    // previous page stays under the new query until it resolves.
+    // previous pages stay under the new query until it resolves.
     placeholderData: (previous) => previous,
   });
 }
@@ -143,18 +169,24 @@ export function useAdvanceOrder() {
 
       const snapshot = queryClient.getQueriesData({ queryKey: orderKeys.all });
 
-      queryClient.setQueriesData<{ orders: Order[] }>(
+      // Across every *page* of every list. An infinite query holds an array of
+      // pages, and patching only the first would leave a scrolled-down operator
+      // watching a row that did not move.
+      queryClient.setQueriesData<{ pages: { orders: Order[] }[] }>(
         { queryKey: ["orders", "list"] },
-        (page) =>
-          page && {
-            ...page,
-            orders: page.orders.map((order) => ({
-              ...order,
-              stores: order.stores.map((store) =>
-                store.id === input.orderStoreId
-                  ? { ...store, statusSlug: input.toSlug }
-                  : store,
-              ),
+        (data) =>
+          data && {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              orders: page.orders.map((order) => ({
+                ...order,
+                stores: order.stores.map((store) =>
+                  store.id === input.orderStoreId
+                    ? { ...store, statusSlug: input.toSlug }
+                    : store,
+                ),
+              })),
             })),
           },
       );

@@ -4,6 +4,7 @@ import { Button, cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
 import { formatMoney } from "@/lib/money";
 import { statusTone } from "@/lib/order-status";
+import { formatRelative } from "@/lib/time";
 
 import type { Order, OrderStatus } from "./api/orders";
 import { nextStatus } from "./use-orders";
@@ -58,7 +59,7 @@ export function OrderRow({
       <div className="flex w-[150px] shrink-0 flex-col gap-xxs">
         <span className="text-[15px] font-bold tabular-nums">{order.code}</span>
         <span className="text-[12px] text-text-faint">
-          {relativeTime(order.placedAt)}
+          {formatRelative(order.placedAt)}
         </span>
       </div>
 
@@ -136,23 +137,4 @@ export function OrderRow({
       </div>
     </div>
   );
-}
-
-/**
- * "2 minutes ago".
- *
- * `Intl.RelativeTimeFormat` rather than a hand-rolled ladder, so it is one
- * string per language rather than five, and so the second language does not
- * arrive needing plural rules written by hand.
- */
-const relative = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-function relativeTime(iso: string): string {
-  const seconds = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
-  const abs = Math.abs(seconds);
-
-  if (abs < 60) return relative.format(Math.round(seconds), "second");
-  if (abs < 3600) return relative.format(Math.round(seconds / 60), "minute");
-  if (abs < 86_400) return relative.format(Math.round(seconds / 3600), "hour");
-  return relative.format(Math.round(seconds / 86_400), "day");
 }
