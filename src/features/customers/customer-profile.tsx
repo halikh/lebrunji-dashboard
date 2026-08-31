@@ -442,6 +442,10 @@ export function CustomerProfile({ id }: { id: string }) {
                   }
                 >
                   <BarChart
+                    // `active` here rather than the overview's `accent`: this
+                    // is about the person in front of you, and the app's accent
+                    // is what says so. The business-wide charts stay green.
+                    tone="active"
                     title={t("customers.chartMonthsAria")}
                     bars={stats.data.months.map((month) => {
                       const code = stats.data.seriesCurrency;
@@ -471,6 +475,9 @@ export function CustomerProfile({ id }: { id: string }) {
 
                 <Block title={t("customers.chartWeekdays")}>
                   <HeatStrip
+                    // The same `info` the overview's hours grid uses — a
+                    // pattern of time reads the same way whoever it is about.
+                    tone="info"
                     title={t("customers.chartWeekdaysAria")}
                     // Rotated to Monday-first here, in the presentation layer.
                     // The stored order is Sunday-first because that is what

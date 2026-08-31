@@ -1039,6 +1039,95 @@ const en = {
     bandLabel: "Up to {km} km",
   },
 
+  content: {
+    title: "Settings",
+    tabHelp: "Help",
+    tabLegal: "Legal",
+    tabPayments: "Payments",
+    tabSteps: "Order steps",
+    failed: "Could not load this. Try again.",
+    save: "Save",
+    saved: "{name} saved",
+    added: "{name} added",
+    removed: "{name} removed",
+    remove: "Remove",
+    removeConfirm: "Remove",
+    visibility: "Visibility",
+    live: "Live",
+    hidden: "Hidden",
+    liveHint: "Customers can see this in the app.",
+    hiddenHint: "It is gone from the app. Nothing else changes.",
+
+    // ---- help --------------------------------------------------------------
+    helpBlurb:
+      "The questions and answers in the app's help screen. Drag to change the order customers read them in.",
+    addTopic: "New question",
+    topicForm: "Help topic",
+    group: "Group",
+    // `group_name` is stored per topic and the app groups by `group_slug`, so a
+    // name edited on one row would split the group. Choosing from what exists
+    // is what keeps that from happening by accident.
+    groupHint:
+      "The heading it sits under. Pick an existing one — a new heading is a migration, so groups stay a short, deliberate list.",
+    pickGroup: "Choose a group",
+    groupRequired: "Every question sits under a heading.",
+    question: "Question",
+    answer: "Answer",
+    showTitle: "Show {name} in the app?",
+    showBody: "Customers see it in the help screen straight away.",
+    showConfirm: "Show it",
+    hideTitle: "Hide {name}?",
+    hideBody: "It disappears from the help screen straight away.",
+    hideConfirm: "Hide it",
+    removeTopicTitle: "Remove {name}?",
+    // Unlike every catalogue row, this is a real delete: `help_topics` has no
+    // `deleted_at`, so there is nothing to bring back.
+    removeTopicBody:
+      "This cannot be undone — a help topic is deleted outright rather than archived. Hide it instead if you might want it back.",
+
+    // ---- legal -------------------------------------------------------------
+    legalBlurb:
+      "The privacy policy and terms, section by section. The order is the document, so dragging a section rewrites it.",
+    document: {
+      privacy: "Privacy policy",
+      terms: "Terms of service",
+    },
+    addSection: "New section",
+    sectionForm: "Document section",
+    sectionTitle: "Heading",
+    sectionBody: "Text",
+    removeSectionTitle: "Remove {name}?",
+    removeSectionBody:
+      "This cannot be undone — the section is deleted outright rather than archived.",
+
+    // ---- payments ----------------------------------------------------------
+    // There is one row and no gateway anywhere in the codebase, so the tab
+    // renames what is there rather than offering to add anything.
+    paymentsBlurb:
+      "How customers pay. There is one method and no payment gateway in this product, so this is what it is called rather than what is accepted.",
+    methodName: "Name",
+    methodDetail: "Description",
+    enabled: "Accepted",
+    disabled: "Not accepted",
+    enableTitle: "Accept {name} again?",
+    enableBody: "Customers can choose it at checkout straight away.",
+    enableConfirm: "Accept it",
+    disableTitle: "Stop accepting {name}?",
+    // Not a presentation change: it is the only way to pay.
+    disableBody:
+      "This is the only payment method, so turning it off leaves customers with no way to check out.",
+    disableConfirm: "Stop accepting it",
+
+    // ---- order steps -------------------------------------------------------
+    stepsBlurb:
+      "What a customer is told at each step of an order. The steps themselves — which comes first, which ends an order — are set by migration, because changing them changes how the business runs rather than how it reads.",
+    stepName: "Name",
+    timelineTitle: "Timeline heading",
+    timelineDetail: "Timeline detail",
+    step: "Step {at}",
+    offPath: "Ends the order",
+  },
+
   reorder: {
     handle: "Reorder {name}",
     instructions:

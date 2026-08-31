@@ -4,6 +4,11 @@ import { useState } from "react";
 
 import { Button, Input, cx } from "@/components/ui";
 import { ROW } from "@/components/ui/row";
+import {
+  StickyAddBar,
+  StickyAddTop,
+  useStickyAdd,
+} from "@/components/ui/sticky-add";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Field } from "@/components/ui/field";
@@ -82,6 +87,17 @@ export function CategoriesList() {
    */
   const [open, setOpen] = useState<string | null>(null);
 
+  /**
+   * The pinned "add" bar.
+   *
+   * Suppressed while searching — there is no list position for a new row to
+   * join — and while the panel is open, where a second way to open it would be
+   * a button that closes the form somebody is filling in.
+   */
+  const { attachTop, attachAddButton, showAddBar } = useStickyAdd(
+    !searching && open === null,
+  );
+
   const rows = categories.data ?? [];
   const editing = rows.find((row) => row.id === open) ?? null;
 
@@ -98,7 +114,7 @@ export function CategoriesList() {
 
   return (
     <div className="relative flex h-full">
-      <div className="flex min-w-0 flex-grow flex-col">
+      <div className="relative flex min-w-0 flex-grow flex-col">
         {/* The same bar the shops have — same border, same padding, same place
             for the box — so moving between the two tabs is not relearning
             where the search is. */}
@@ -118,7 +134,9 @@ export function CategoriesList() {
           />
         </div>
 
-        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+          <StickyAddTop attach={attachTop} />
+
           {categories.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (
@@ -183,12 +201,25 @@ export function CategoriesList() {
             </p>
           )}
 
+          {/* Where a new row actually goes: the end of the list. The pinned
+              bar below is a shortcut to this one, and only exists while this
+              one is out of sight. */}
           {categories.isSuccess && !searching && (
-            <Button fullWidth className="mt-lg" onClick={() => setOpen("new")}>
-              {t("categories.add")}
-            </Button>
+            <div ref={attachAddButton} className="mt-lg">
+              <Button fullWidth onClick={() => setOpen("new")}>
+                {t("categories.add")}
+              </Button>
+            </div>
           )}
         </div>
+
+        {categories.isSuccess && (
+          <StickyAddBar visible={showAddBar}>
+            <Button fullWidth onClick={() => setOpen("new")}>
+              {t("categories.add")}
+            </Button>
+          </StickyAddBar>
+        )}
       </div>
 
       <Panel
@@ -297,7 +328,7 @@ function Row({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col items-start gap-xxs text-left"
+        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
       >
         <span className="truncate text-[15px] font-semibold">
           {pickLocalized(category.name)}

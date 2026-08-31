@@ -8,7 +8,11 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
-import { useOnScreen } from "@/components/ui/on-screen";
+import {
+  StickyAddBar,
+  StickyAddTop,
+  useStickyAdd,
+} from "@/components/ui/sticky-add";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { useRevealOnMount } from "@/components/ui/reveal";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
@@ -162,25 +166,10 @@ export function StoreMenu({ storeId }: { storeId: string }) {
    * where a new section is going to appear — and a menu that does not fit gets
    * the bar so the action is not several screens away. Never both at once.
    */
-  const [addButtonRef, addButtonOnScreen] = useOnScreen<HTMLDivElement>();
-  /**
-   * A marker at the very top of the list, watched to tell whether the operator
-   * has scrolled at all.
-   *
-   * Two conditions decide the pinned bar, and each removes a different kind of
-   * clutter. It stays away **at the top**, where the menu is being read rather
-   * than built and a floating bar is a strip of chrome over the first section.
-   * And it stays away **at the bottom**, where the real button is already in
-   * view — the two are never on screen together.
-   *
-   * Sentinels rather than a scroll listener: the question is only ever "can
-   * this be seen", which is what an `IntersectionObserver` answers without
-   * running anything on every frame of a scroll.
-   */
-  const [topRef, atTop] = useOnScreen<HTMLDivElement>();
+  const { attachTop, attachAddButton, showAddBar } = useStickyAdd(
+    !adding && !searching,
+  );
 
-  /** Scrolled away from the top, and the real button is not in view. */
-  const showAddBar = !adding && !atTop && !addButtonOnScreen;
   const matches = useMenuSearch(storeId, search);
 
   const openSection =
@@ -256,7 +245,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
         </div>
 
         <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
-          <div ref={topRef} aria-hidden className="h-px shrink-0" />
+          <StickyAddTop attach={attachTop} />
           {menu.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (
@@ -463,7 +452,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
               the real button; the pinned one below is a shortcut to it that
               only exists while this one is out of sight. */}
           {!searching && menu.isSuccess && !adding && (
-            <div ref={addButtonRef}>
+            <div ref={attachAddButton}>
               <Button fullWidth onClick={() => setAdding(true)}>
                 {t("menu.addSection")}
               </Button>
@@ -480,35 +469,12 @@ export function StoreMenu({ storeId }: { storeId: string }) {
 
             Hidden while searching, because there is no menu on screen for a new
             section to join. */}
-        {/* Always rendered while the menu is; it slides rather than appears.
-            Mounting and unmounting it would make the bar blink into existence
-            mid-scroll, and — because it was a flex sibling — take a strip of
-            height with it each time, shunting the list up and down.
-
-            So it is absolute: it lies over the bottom of the list instead of
-            shrinking it, which is what a floating action bar should do anyway.
-            Nothing under it is lost, because it hides exactly when the end of
-            the list comes into view.
-
-            `inert` while hidden, so a bar that is off screen and unreadable is
-            not still in the tab order — an invisible control that can be
-            focused is worse than one that is simply absent. */}
-        {!searching && menu.isSuccess && (
-          <div
-            inert={!showAddBar}
-            aria-hidden={!showAddBar}
-            className={cx(
-              "absolute inset-x-0 bottom-0 z-10 flex items-center border-t border-border bg-surface p-lg",
-              "transition-[transform,opacity] duration-[var(--duration-control)] ease-[var(--ease-arrive)]",
-              showAddBar
-                ? "translate-y-0 opacity-100"
-                : "pointer-events-none translate-y-full opacity-0",
-            )}
-          >
+        {menu.isSuccess && (
+          <StickyAddBar visible={showAddBar}>
             <Button fullWidth onClick={() => setAdding(true)}>
               {t("menu.addSection")}
             </Button>
-          </div>
+          </StickyAddBar>
         )}
       </div>
 
@@ -883,7 +849,7 @@ function ItemRow({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col items-start gap-xxs text-left"
+        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
       >
         <span
           className={cx(
@@ -1146,7 +1112,7 @@ function SearchResult({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col items-start gap-xxs text-left"
+        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
       >
         <span
           className={cx(

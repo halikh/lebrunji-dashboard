@@ -11,7 +11,11 @@ import { DateField } from "@/components/ui/date-field";
 import { Field } from "@/components/ui/field";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { NumberInput } from "@/components/ui/number-input";
-import { useOnScreen } from "@/components/ui/on-screen";
+import {
+  StickyAddBar,
+  StickyAddTop,
+  useStickyAdd,
+} from "@/components/ui/sticky-add";
 import { Panel } from "@/components/ui/panel";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import {
@@ -99,21 +103,10 @@ export function PromotionsList() {
   const editing = rows.find((row) => row.id === open) ?? null;
 
   /**
-   * The pinned bar's two sentinels — the same pattern the menu's "Add a
-   * section" uses, and for the same reason.
-   *
-   * It stays away **at the top**, where the list is being read rather than
-   * added to and a floating bar is a strip of chrome over the first row. And it
-   * stays away **at the bottom**, where the real button is already in view. The
-   * two are never on screen together.
-   *
-   * Sentinels rather than a scroll listener: the question is only ever "can
-   * this be seen", which an `IntersectionObserver` answers without running
-   * anything on every frame of a scroll.
+   * The pinned "add" bar — see `useStickyAdd` for why there are two
+   * buttons and why they are never on screen together.
    */
-  const [addButtonRef, addButtonOnScreen] = useOnScreen<HTMLDivElement>();
-  const [topRef, atTop] = useOnScreen<HTMLDivElement>();
-  const showAddBar = !searching && !atTop && !addButtonOnScreen;
+  const { attachTop, attachAddButton, showAddBar } = useStickyAdd(!searching);
 
   const order = useReorder({
     ids: rows.map((row) => row.id),
@@ -158,7 +151,7 @@ export function PromotionsList() {
         </div>
 
         <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-          <div ref={topRef} aria-hidden className="h-px shrink-0" />
+          <StickyAddTop attach={attachTop} />
 
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("promotions.searchHint")}
@@ -219,7 +212,7 @@ export function PromotionsList() {
               also the lowest priority. The pinned bar below is a shortcut to
               this one, and only exists while this one is out of sight. */}
           {promotions.isSuccess && !searching && (
-            <div ref={addButtonRef} className="mt-lg">
+            <div ref={attachAddButton} className="mt-lg">
               <Button fullWidth onClick={() => setOpen("new")}>
                 {t("promotions.add")}
               </Button>
@@ -227,31 +220,12 @@ export function PromotionsList() {
           )}
         </div>
 
-        {/* Always rendered while the list is; it slides rather than appears.
-            Mounting and unmounting it would make the bar blink into existence
-            mid-scroll and take a strip of height with it each time, shunting
-            the list up and down. Absolute, so it lies over the bottom of the
-            list rather than shrinking it — and nothing under it is lost,
-            because it hides exactly when the end of the list comes into view.
-
-            `inert` while hidden: a control that is off screen and unreadable
-            must not still be in the tab order. */}
-        {promotions.isSuccess && !searching && (
-          <div
-            inert={!showAddBar}
-            aria-hidden={!showAddBar}
-            className={cx(
-              "absolute inset-x-0 bottom-0 z-10 flex items-center border-t border-border bg-surface p-lg",
-              "transition-[transform,opacity] duration-[var(--duration-control)] ease-[var(--ease-arrive)]",
-              showAddBar
-                ? "translate-y-0 opacity-100"
-                : "pointer-events-none translate-y-full opacity-0",
-            )}
-          >
+        {promotions.isSuccess && (
+          <StickyAddBar visible={showAddBar}>
             <Button fullWidth onClick={() => setOpen("new")}>
               {t("promotions.add")}
             </Button>
-          </div>
+          </StickyAddBar>
         )}
       </div>
 
@@ -383,7 +357,7 @@ function Row({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col items-start gap-xxs text-left"
+        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
       >
         <span className="truncate text-[15px] font-semibold">
           {promotion.slug}

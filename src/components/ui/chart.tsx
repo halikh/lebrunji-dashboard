@@ -20,6 +20,39 @@ import { cx } from "./index";
  * operators cannot read at all, and the same information in words costs a line.
  */
 
+/**
+ * The colours a chart may be drawn in.
+ *
+ * ## Why charts get the whole ramp when controls do not
+ *
+ * The palette reserves blue for *what you press* and red for alarm, and that
+ * discipline is what makes both mean something. A chart is neither: nothing on
+ * it is clickable and nothing on it is a warning, so the reservation does not
+ * apply — and having six charts in one coral would waste the one screen where
+ * colour is carrying information rather than decorating it.
+ *
+ * ## Each is chosen for what the chart is about, not for variety
+ *
+ * Money uses `accent`, which is the palette's "going well". Volume uses `sun`.
+ * Patterns of time use `info`, because a heat map is a shape rather than a
+ * judgement. `active` is kept for the charts about *this* — the customer in
+ * front of you — so a profile reads as the app's accent and the business-wide
+ * overview does not.
+ *
+ * Referenced as CSS variables, never Tailwind class names: a class assembled at
+ * runtime is one Tailwind never sees in the source and therefore never
+ * generates, and the bar comes out transparent with no error anywhere.
+ */
+export type ChartTone = "accent" | "sun" | "info" | "active" | "primary";
+
+const TONE: Record<ChartTone, { fill: string; wash: string }> = {
+  accent: { fill: "var(--color-accent)", wash: "var(--color-accent-wash)" },
+  sun: { fill: "var(--color-yellow)", wash: "var(--color-yellow-wash)" },
+  info: { fill: "var(--color-info)", wash: "var(--color-info-wash)" },
+  active: { fill: "var(--color-active)", wash: "var(--color-active-wash)" },
+  primary: { fill: "var(--color-primary)", wash: "var(--color-primary-wash)" },
+};
+
 export type Bar = {
   /** Sorts and identifies. */
   key: string;
@@ -58,15 +91,18 @@ export type Bar = {
 export function BarChart({
   bars,
   title,
+  tone = "active",
   height = 120,
   className,
 }: {
   bars: readonly Bar[];
   /** Names the whole chart, for assistive technology. */
   title: string;
+  tone?: ChartTone;
   height?: number;
   className?: string;
 }) {
+  const colour = TONE[tone];
   // The ghosts are in the scale too. Scaling to the current period alone would
   // make a bad month look like a good one whenever the previous period was
   // taller — the comparison would then be drawn to two different rulers.
@@ -105,13 +141,22 @@ export function BarChart({
                   />
                 )}
                 <div
-                  className={cx(
-                    "absolute inset-x-[22%] bottom-0 rounded-t-sm",
-                    bar.value > 0 ? "bg-active" : "bg-transparent",
-                  )}
-                  // A zero still draws a hairline: absent bars and zero bars
-                  // look identical otherwise, and only one of them is a fact.
-                  style={{ height: `${Math.max(share * 100, 1.5)}%` }}
+                  className="absolute inset-x-[22%] bottom-0 rounded-t-sm"
+                  style={{
+                    // A zero still draws a hairline: absent bars and zero bars
+                    // look identical otherwise, and only one of them is a fact.
+                    height: `${Math.max(share * 100, 1.5)}%`,
+                    // The best bucket in the range is drawn at full strength
+                    // and the rest a shade back. It costs nothing and it
+                    // answers "when was our best day" without anybody
+                    // comparing heights by eye.
+                    background:
+                      bar.value === 0
+                        ? "var(--color-border)"
+                        : bar.value === max
+                          ? colour.fill
+                          : `color-mix(in srgb, ${colour.fill} 72%, var(--color-surface))`,
+                  }}
                 />
               </div>
             </div>
@@ -153,13 +198,16 @@ export function BarChart({
 export function HeatStrip({
   cells,
   title,
+  tone = "info",
   className,
 }: {
   cells: readonly { key: string; label: string; value: number }[];
   title: string;
+  tone?: ChartTone;
   className?: string;
 }) {
   const max = Math.max(1, ...cells.map((cell) => cell.value));
+  const colour = TONE[tone];
 
   return (
     <figure className={cx("flex flex-col gap-xs", className)}>
@@ -179,8 +227,8 @@ export function HeatStrip({
                 background:
                   cell.value === 0
                     ? "var(--color-neutral-fill)"
-                    : `color-mix(in srgb, var(--color-active) ${Math.round(
-                        15 + (cell.value / max) * 55,
+                    : `color-mix(in srgb, ${colour.fill} ${Math.round(
+                        18 + (cell.value / max) * 62,
                       )}%, var(--color-surface))`,
               }}
             >
@@ -215,13 +263,30 @@ export function HeatStrip({
 export function HBarList({
   rows,
   title,
+  tone = "active",
   className,
 }: {
-  rows: readonly { key: string; label: string; value: number; note: string }[];
+  rows: readonly {
+    key: string;
+    label: string;
+    value: number;
+    note: string;
+    /**
+     * A colour for this row alone, as a CSS value.
+     *
+     * For the one chart where the rows are not interchangeable: the order
+     * funnel's bars *are* statuses, so each wears the colour it wears in the
+     * queue and on the overview's tiles. Anywhere else a colour per row would
+     * be decoration pretending to be information.
+     */
+    fill?: string;
+  }[];
   title: string;
+  tone?: ChartTone;
   className?: string;
 }) {
   const max = Math.max(1, ...rows.map((row) => row.value));
+  const colour = TONE[tone];
 
   return (
     <ul aria-label={title} className={cx("flex flex-col gap-sm", className)}>
@@ -233,12 +298,15 @@ export function HBarList({
               {row.note}
             </span>
           </div>
-          <div className="h-[6px] w-full overflow-hidden rounded-sm bg-neutral-fill">
+          <div className="h-[8px] w-full overflow-hidden rounded-sm bg-neutral-fill">
             <div
-              className="h-full rounded-sm bg-active"
-              // A hairline for a real zero, so an empty row still reads as a
-              // row rather than as a rendering fault.
-              style={{ width: `${Math.max((row.value / max) * 100, 1)}%` }}
+              className="h-full rounded-sm"
+              style={{
+                // A hairline for a real zero, so an empty row still reads as a
+                // row rather than as a rendering fault.
+                width: `${Math.max((row.value / max) * 100, 1)}%`,
+                background: row.fill ?? colour.fill,
+              }}
             />
           </div>
         </li>
@@ -268,14 +336,17 @@ export function HeatGrid({
   values,
   dayLabels,
   title,
+  tone = "info",
   className,
 }: {
   values: readonly (readonly number[])[];
   dayLabels: readonly string[];
   title: string;
+  tone?: ChartTone;
   className?: string;
 }) {
   const max = Math.max(1, ...values.flatMap((row) => [...row]));
+  const colour = TONE[tone];
   const rows = [1, 2, 3, 4, 5, 6, 0];
 
   return (
@@ -302,7 +373,7 @@ export function HeatGrid({
                       background:
                         value === 0
                           ? "var(--color-neutral-fill)"
-                          : `color-mix(in srgb, var(--color-active) ${Math.round(
+                          : `color-mix(in srgb, ${colour.fill} ${Math.round(
                               18 + (value / max) * 62,
                             )}%, var(--color-surface))`,
                     }}

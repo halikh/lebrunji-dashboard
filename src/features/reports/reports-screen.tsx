@@ -77,6 +77,13 @@ export function ReportsScreen() {
 
   const { format, currencies } = useMoney();
 
+  // The funnel comes back keyed on slugs; the readable names are already
+  // loaded for the tiles above. Showing `driver-sent` to an operator when the
+  // product calls it "On the way" is a gap nobody would guess is cosmetic.
+  const statusNames = new Map(
+    (statuses.data ?? []).map((status) => [status.slug, status.name]),
+  );
+
   function show(next: number) {
     const query = new URLSearchParams(params);
     if (next === 30) query.delete("days");
@@ -296,6 +303,10 @@ export function ReportsScreen() {
                   <Card title={t("reports.chartRevenue")}>
                     <BarChart
                       height={160}
+                      // Money is `accent` — the palette's "going well" — and
+                      // the tallest bar is drawn at full strength, so "our best
+                      // day" is answered without comparing heights by eye.
+                      tone="accent"
                       title={t("reports.chartRevenueAria")}
                       bars={stats.data.daily.map((day, index) => ({
                         key: day.day,
@@ -320,6 +331,9 @@ export function ReportsScreen() {
 
                   <Card title={t("reports.chartHours")}>
                     <HeatGrid
+                      // A shape, not a verdict: `info` reads as information
+                      // rather than as good or bad news about a Tuesday.
+                      tone="info"
                       title={t("reports.chartHoursAria")}
                       dayLabels={WEEKDAYS}
                       values={hourlyGrid(stats.data.hourly)}
@@ -331,6 +345,9 @@ export function ReportsScreen() {
                       <Empty />
                     ) : (
                       <HBarList
+                        // Volume, not money — `sun` keeps it visibly a
+                        // different question from the two revenue charts.
+                        tone="sun"
                         title={t("reports.chartItemsAria")}
                         rows={stats.data.topItems.map((item) => ({
                           key: item.menuItemId,
@@ -350,6 +367,10 @@ export function ReportsScreen() {
                       <Empty />
                     ) : (
                       <HBarList
+                        // Money, so it wears the same colour as the revenue
+                        // bars: two charts answering the same question in two
+                        // colours would imply they were about different things.
+                        tone="accent"
                         title={t("reports.chartStoresAria")}
                         rows={stats.data.topStores.map((store) => ({
                           key: store.storeId,
@@ -367,11 +388,17 @@ export function ReportsScreen() {
                     ) : (
                       <HBarList
                         title={t("reports.chartFunnelAria")}
+                        // The only chart where a colour per row is information:
+                        // these bars *are* statuses, so each wears the colour it
+                        // wears in the queue and on the tiles above. A funnel in
+                        // one flat colour makes the reader match names to a
+                        // legend they have to hold in their head.
                         rows={stats.data.funnel.map((step) => ({
                           key: step.slug,
-                          label: step.slug,
+                          label: statusNames.get(step.slug) ?? step.slug,
                           value: step.count,
                           note: String(step.count),
+                          fill: statusTone(step.slug).dot,
                         }))}
                       />
                     )}
@@ -382,6 +409,9 @@ export function ReportsScreen() {
                       <Empty />
                     ) : (
                       <HBarList
+                        // The ladder is its own subject — neither revenue in
+                        // general nor volume — so it gets its own colour.
+                        tone="primary"
                         title={t("reports.chartBandsAria")}
                         rows={stats.data.deliveryBands.map((band) => ({
                           key: String(band.upToKm),

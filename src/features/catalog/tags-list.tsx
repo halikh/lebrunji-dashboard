@@ -4,6 +4,11 @@ import { useState } from "react";
 
 import { Button, Input, cx } from "@/components/ui";
 import { ROW } from "@/components/ui/row";
+import {
+  StickyAddBar,
+  StickyAddTop,
+  useStickyAdd,
+} from "@/components/ui/sticky-add";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Field } from "@/components/ui/field";
@@ -78,6 +83,17 @@ export function TagsList() {
    */
   const [open, setOpen] = useState<string | null>(null);
 
+  /**
+   * The pinned "add" bar.
+   *
+   * Suppressed while searching — there is no list position for a new row to
+   * join — and while the panel is open, where a second way to open it would be
+   * a button that closes the form somebody is filling in.
+   */
+  const { attachTop, attachAddButton, showAddBar } = useStickyAdd(
+    !searching && open === null,
+  );
+
   const rows = tags.data ?? [];
   const editing = rows.find((row) => row.id === open) ?? null;
 
@@ -94,7 +110,7 @@ export function TagsList() {
 
   return (
     <div className="relative flex h-full">
-      <div className="flex min-w-0 flex-grow flex-col">
+      <div className="relative flex min-w-0 flex-grow flex-col">
         {/* The same bar as the shops and the categories — same border, same
             padding, same place for the box — so moving between tabs is not
             relearning where the search is. */}
@@ -114,7 +130,9 @@ export function TagsList() {
           />
         </div>
 
-        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+          <StickyAddTop attach={attachTop} />
+
           {/* What the list is for, said once at the top. A vocabulary screen
               with no explanation reads as a settings table; the sentence is
               what makes "Popular" here and a chip on a phone the same thing. */}
@@ -174,12 +192,25 @@ export function TagsList() {
             </p>
           )}
 
+          {/* Where a new row actually goes: the end of the list. The pinned
+              bar below is a shortcut to this one, and only exists while this
+              one is out of sight. */}
           {tags.isSuccess && !searching && (
-            <Button fullWidth className="mt-lg" onClick={() => setOpen("new")}>
-              {t("tags.add")}
-            </Button>
+            <div ref={attachAddButton} className="mt-lg">
+              <Button fullWidth onClick={() => setOpen("new")}>
+                {t("tags.add")}
+              </Button>
+            </div>
           )}
         </div>
+
+        {tags.isSuccess && (
+          <StickyAddBar visible={showAddBar}>
+            <Button fullWidth onClick={() => setOpen("new")}>
+              {t("tags.add")}
+            </Button>
+          </StickyAddBar>
+        )}
       </div>
 
       <Panel
