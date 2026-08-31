@@ -10,10 +10,12 @@ import { t } from "@/i18n/translations";
 import {
   archiveStore,
   fetchStore,
+  createStore,
   fetchStores,
   updateStore,
   type Store,
   type StorePatch,
+  type StoreDraft,
 } from "./api/stores";
 
 export const storeKeys = {
@@ -34,6 +36,42 @@ export function useStores(search: string) {
     queryKey: storeKeys.list(search),
     queryFn: () => fetchStores({ search: search || null }),
     placeholderData: (previous) => previous,
+  });
+}
+
+/**
+ * Adds a shop.
+ *
+ * **Not optimistic**, unlike the edits below. There is no row to move: an
+ * optimistic insert would put a shop on the list that has no id yet, and the
+ * wizard navigates straight to its menu on success — which needs the real one.
+ *
+ * The whole store list is invalidated rather than patched, because the insert
+ * also assigns a slug (in the trigger) and a sort order this client only
+ * proposed; refetching is how the screen learns what was actually written.
+ */
+export function useCreateStore() {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  return useMutation({
+    mutationFn: (input: {
+      draft: StoreDraft;
+      countryId: string;
+      sortOrder: number;
+      name: Localized;
+    }) => createStore(input.draft, input.countryId, input.sortOrder),
+
+    onSuccess: (_id, input) => {
+      void queryClient.invalidateQueries({ queryKey: storeKeys.all });
+      toast.success(t("store.created", { name: pickLocalized(input.name) }));
+    },
+
+    onError: (error) => {
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      );
+    },
   });
 }
 

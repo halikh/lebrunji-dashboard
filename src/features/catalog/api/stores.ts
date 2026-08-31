@@ -1,4 +1,5 @@
 import { getClient } from "@/lib/supabase/client";
+import { t } from "@/i18n/translations";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -100,6 +101,103 @@ export async function fetchStore(id: string): Promise<Store> {
 
   if (error) throw new Error(`Could not read the shop: ${error.message}`);
   return toStore(data);
+}
+
+export type StoreDraft = {
+  name: Localized;
+  categoryId: string;
+  currencyCode: string;
+  imageUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  prepMinMinutes: number;
+  prepMaxMinutes: number;
+  isActive: boolean;
+};
+
+/**
+ * The country a new shop belongs to.
+ *
+ * `stores.country_id` is `not null` with no default, so an insert has to supply
+ * one — and the wizard deliberately does not ask. `countries` is reference data
+ * with one row, added by migration, carrying `is_default` behind the
+ * `countries_single_default` partial unique index; asking an operator to pick
+ * from a list of one is a step that only ever has one answer.
+ *
+ * It is read rather than hardcoded, so the day a second country is seeded this
+ * becomes a real question in one place instead of a wrong constant in another.
+ *
+ * **Only the id.** `0001` gave this table `default_currency_code` and
+ * `default_language_code`, and `0027` dropped both — so a country no longer
+ * carries a currency to seed a shop with, and asking for one here is a request
+ * for a column that does not exist. The wizard seeds its currency from
+ * `currencies` instead, which is where the answer actually lives.
+ */
+export async function fetchDefaultCountry(): Promise<{ id: string }> {
+  const { data, error } = await getClient()
+    .from("countries")
+    .select("id")
+    .eq("is_default", true)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(t("store.noDefaultCountry"));
+
+  return { id: data.id as string };
+}
+
+/**
+ * Adds a shop, and returns its id so the caller can go straight to its menu.
+ *
+ * ## What the wizard does not ask for
+ *
+ * - **`slug`** — `0071`'s trigger derives it from the English name inside the
+ *   insert's own transaction, which is the only way to make it unique without
+ *   racing another tab.
+ * - **`country_id`** — see `fetchDefaultCountry` above.
+ * - **`sort_order`** — the end of the list. Where a shop goes is a question the
+ *   caller can answer and the database cannot, and "last" is the only answer
+ *   that does not silently reorder somebody else's catalogue.
+ * - **`is_featured`** — always false. Featuring is a claim made to every
+ *   customer on the home screen, and it belongs to the deliberate, confirmed
+ *   switch on the list rather than to a checkbox on a creation form somebody is
+ *   filling in for the first time.
+ *
+ * ## It is created hidden by default
+ *
+ * A shop with no menu, no hours and no pin is not a shop a customer should be
+ * able to find. The wizard offers the switch and defaults it off, so going live
+ * is something the operator does once the shop is actually set up — rather than
+ * something they have to remember to undo.
+ */
+export async function createStore(
+  draft: StoreDraft,
+  countryId: string,
+  sortOrder: number,
+): Promise<string> {
+  const { data, error } = await getClient()
+    .from("stores")
+    .insert({
+      name: draft.name,
+      category_id: draft.categoryId,
+      country_id: countryId,
+      currency_code: draft.currencyCode,
+      image_url: draft.imageUrl,
+      // Both or neither. Half a pin is a row that passes every constraint and
+      // means nothing.
+      latitude: draft.latitude,
+      longitude: draft.longitude,
+      prep_min_minutes: draft.prepMinMinutes,
+      prep_max_minutes: draft.prepMaxMinutes,
+      is_active: draft.isActive,
+      is_featured: false,
+      sort_order: sortOrder,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(friendly(error.message));
+  return data.id as string;
 }
 
 export type StorePatch = {
@@ -215,4 +313,13 @@ function pick(value: unknown): string {
  */
 function normalise(input: string): string {
   return input.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Turns a constraint violation into a sentence the operator can act on. */
+function friendly(message: string): string {
+  if (message.includes("slug")) return t("dbError.duplicateSlug");
+  if (message.includes("_locales")) return t("dbError.missingLanguage");
+  if (message.includes("_len")) return t("dbError.tooLong");
+  if (message.includes("prep")) return t("store.prepBackwards");
+  return message;
 }

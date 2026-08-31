@@ -3,6 +3,8 @@ import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
 import type { Localized } from "@/lib/validation";
 
+import { setItemTags } from "./tags";
+
 /**
  * A store's menu: sections holding items.
  *
@@ -30,6 +32,15 @@ export type MenuItem = {
   imageUrl: string | null;
   isActive: boolean;
   sortOrder: number;
+  /**
+   * The tags on this dish, as ids into the vocabulary.
+   *
+   * Ids rather than rows: a tag's name, colour and position are properties of
+   * the vocabulary and change on the Tags tab, so holding a copy here would
+   * mean a dish showing the name a tag had when the menu was last fetched.
+   * `useTagVocabulary` is the one place those are read from.
+   */
+  tagIds: string[];
 };
 
 export type MenuSection = {
@@ -54,7 +65,8 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
     .select(
       `id, slug, title, sort_order,
        menu_items ( id, menu_section_id, slug, name, description, price,
-                    image_url, is_active, sort_order, deleted_at )`,
+                    image_url, is_active, sort_order, deleted_at,
+                    menu_item_tag_links ( menu_item_tag_id ) )`,
     )
     .eq("store_id", storeId)
     .is("deleted_at", null)
@@ -156,7 +168,8 @@ async function itemsInSections(sectionIds: string[]): Promise<MenuItem[]> {
     .from("menu_items")
     .select(
       `id, menu_section_id, slug, name, description, price,
-       image_url, is_active, sort_order`,
+       image_url, is_active, sort_order,
+       menu_item_tag_links ( menu_item_tag_id )`,
     )
     .in("menu_section_id", sectionIds)
     .is("deleted_at", null)
@@ -217,7 +230,8 @@ async function searchMenuItems(
     .from("menu_items")
     .select(
       `id, menu_section_id, slug, name, description, price,
-       image_url, is_active, sort_order`,
+       image_url, is_active, sort_order,
+       menu_item_tag_links ( menu_item_tag_id )`,
     )
     .eq("store_id", storeId)
     .is("deleted_at", null)
@@ -245,6 +259,8 @@ export type MenuItemDraft = {
   price: number;
   isActive: boolean;
   imageUrl: string | null;
+  /** Ids from the tag vocabulary. Empty is a valid answer, not a missing one. */
+  tagIds: string[];
 };
 
 /**
@@ -259,21 +275,33 @@ export async function createMenuItem(
   draft: MenuItemDraft,
   sortOrder: number,
 ): Promise<void> {
-  const { error } = await getClient().from("menu_items").insert({
-    store_id: draft.storeId,
-    menu_section_id: draft.sectionId,
-    // No `slug`. The trigger from migration 0070 derives it from the English
-    // name and makes it unique inside the shop — which a client cannot do
-    // without racing another tab.
-    name: draft.name,
-    description: draft.description,
-    price: draft.price,
-    is_active: draft.isActive,
-    image_url: draft.imageUrl,
-    sort_order: sortOrder,
-  });
+  const { data, error } = await getClient()
+    .from("menu_items")
+    .insert({
+      store_id: draft.storeId,
+      menu_section_id: draft.sectionId,
+      // No `slug`. The trigger from migration 0070 derives it from the English
+      // name and makes it unique inside the shop — which a client cannot do
+      // without racing another tab.
+      name: draft.name,
+      description: draft.description,
+      price: draft.price,
+      is_active: draft.isActive,
+      image_url: draft.imageUrl,
+      sort_order: sortOrder,
+    })
+    // The id comes back because the links need something to point at. It is
+    // also the reason the tags are a second request: `menu_item_tag_links`
+    // references a row that does not exist until this one returns.
+    .select("id")
+    .single();
 
   if (error) throw new Error(friendly(error.message));
+
+  // A dish saved with no tags is the common case and costs nothing here.
+  if (draft.tagIds.length > 0) {
+    await setItemTags(data.id as string, draft.tagIds);
+  }
 }
 
 export type MenuItemPatch = Partial<
@@ -296,11 +324,22 @@ export async function updateMenuItem(
   if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 
-  const { error } = await getClient()
-    .from("menu_items")
-    .update(row)
-    .eq("id", id);
-  if (error) throw new Error(friendly(error.message));
+  // A patch may be tags only — a reorder is not, and neither is a switch — so
+  // an empty row is a valid update with nothing to write rather than a bug.
+  if (Object.keys(row).length > 0) {
+    const { error } = await getClient()
+      .from("menu_items")
+      .update(row)
+      .eq("id", id);
+    if (error) throw new Error(friendly(error.message));
+  }
+
+  // After the row, deliberately. If the links fail, the dish is saved and its
+  // tags are stale — which the operator can see and fix. The other order would
+  // leave tags pointing at a dish whose name and price were never written.
+  if (patch.tagIds !== undefined) {
+    await setItemTags(id, patch.tagIds);
+  }
 }
 
 /** Soft, like everything with a `deleted_at`: order lines reference items. */
@@ -529,6 +568,13 @@ function toItem(row: Record<string, unknown>): MenuItem {
     imageUrl: (row.image_url as string | null) ?? null,
     isActive: row.is_active as boolean,
     sortOrder: row.sort_order as number,
+    // An embed with nothing in it comes back as `[]`, so an untagged dish and
+    // a dish whose links were not asked for look identical here. Every read
+    // that reaches `toItem` selects them, which is what makes the empty array
+    // mean "no tags" rather than "not loaded".
+    tagIds: asArray(row.menu_item_tag_links).map(
+      (link) => link.menu_item_tag_id as string,
+    ),
   };
 }
 

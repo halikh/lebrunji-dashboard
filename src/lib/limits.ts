@@ -36,6 +36,14 @@ export const TEXT = {
   description: 500,
   /** `menu_sections.title`, `option_groups.title`. */
   title: 80,
+  /**
+   * `menu_item_tags.name` — a chip beside a dish's name on a phone.
+   *
+   * Far shorter than a name, and it has to be: the chip sits *next to* the
+   * thing it qualifies, so anything long stops being a label and starts taking
+   * the dish's own line. Twenty-four is already wider than most dish names.
+   */
+  tag: 24,
   /** `order_statuses.name` — appears on a timeline dot. */
   statusName: 40,
   statusTimelineTitle: 80,

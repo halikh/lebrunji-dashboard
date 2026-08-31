@@ -8,6 +8,10 @@ import {
   startOfBusinessDay,
   startOfBusinessDayPlus,
   toWallClock,
+  businessMonthKey,
+  businessWeekday,
+  recentMonthKeys,
+  formatMonthKey,
 } from "./time";
 
 /**
@@ -236,5 +240,84 @@ describe("formatting", () => {
   it("shows the Beirut date", () => {
     // 22:30 UTC is already the 15th in Beirut.
     expect(formatDate("2026-01-14T22:30:00Z")).toBe("15 Jan 2026");
+  });
+});
+
+/**
+ * Bucketing an order into a month or a weekday.
+ *
+ * These are the shape of thing that is correct for ten months and quietly an
+ * hour — or a whole day — out for the other two: an order placed just after
+ * Beirut midnight belongs to *this* day, and the machine's zone would file it
+ * under the previous one. That failure is invisible on a laptop set to Beirut,
+ * which is the only laptop anybody tests on.
+ */
+describe("businessMonthKey", () => {
+  it("uses Beirut's month, not UTC's", () => {
+    // 31 Aug 2026 22:30 UTC is 01:30 on 1 September in Beirut (UTC+3).
+    expect(businessMonthKey("2026-08-31T22:30:00Z")).toBe("2026-09");
+  });
+
+  it("keeps a mid-month instant in its own month", () => {
+    expect(businessMonthKey("2026-08-15T09:00:00Z")).toBe("2026-08");
+  });
+
+  it("pads the month, so the keys sort as strings", () => {
+    expect(businessMonthKey("2026-01-15T09:00:00Z")).toBe("2026-01");
+  });
+
+  it("crosses the year in Beirut, not in UTC", () => {
+    // 31 Dec 2026 22:30 UTC is 00:30 on 1 January in Beirut (UTC+2 in winter).
+    expect(businessMonthKey("2026-12-31T22:30:00Z")).toBe("2027-01");
+  });
+});
+
+describe("businessWeekday", () => {
+  it("is Sunday-zero, matching the stored day_of_week", () => {
+    // 30 August 2026 is a Sunday.
+    expect(businessWeekday("2026-08-30T09:00:00Z")).toBe(0);
+  });
+
+  it("puts a late-night order on the Beirut day, not the UTC one", () => {
+    // Friday 21:30 UTC is Saturday 00:30 in Beirut. A kitchen open past
+    // midnight is the whole reason this matters.
+    expect(businessWeekday("2026-08-28T21:30:00Z")).toBe(6);
+  });
+
+  it("does not shift an ordinary daytime instant", () => {
+    // Monday 31 August 2026, midday.
+    expect(businessWeekday("2026-08-31T09:00:00Z")).toBe(1);
+  });
+});
+
+describe("recentMonthKeys", () => {
+  it("walks months rather than subtracting days", () => {
+    // Twelve 30-day steps back from March would land in the wrong month by the
+    // fifth one. Stepping the month never does.
+    const keys = recentMonthKeys(4, new Date("2026-03-15T09:00:00Z"));
+    expect(keys).toEqual(["2025-12", "2026-01", "2026-02", "2026-03"]);
+  });
+
+  it("ends on the current Beirut month, oldest first", () => {
+    const keys = recentMonthKeys(12, new Date("2026-08-31T09:00:00Z"));
+    expect(keys).toHaveLength(12);
+    expect(keys[11]).toBe("2026-08");
+    expect(keys[0]).toBe("2025-09");
+  });
+
+  it("uses Beirut's month at the boundary", () => {
+    // 22:30 UTC on the last day of August is already September in Beirut.
+    const keys = recentMonthKeys(1, new Date("2026-08-31T22:30:00Z"));
+    expect(keys).toEqual(["2026-09"]);
+  });
+});
+
+describe("formatMonthKey", () => {
+  it("renders a key as a short label", () => {
+    expect(formatMonthKey("2026-08")).toBe("Aug 26");
+  });
+
+  it("survives a key it does not recognise rather than rendering undefined", () => {
+    expect(formatMonthKey("2026-13")).toBe("13 26");
   });
 });

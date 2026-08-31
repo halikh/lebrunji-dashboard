@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 
 import { Button, Input, cx } from "@/components/ui";
+import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedField } from "@/components/ui/localized-field";
@@ -19,6 +20,7 @@ import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
 import { MenuItemEditor } from "./menu-item-editor";
+import { ItemTags } from "./tag-chip";
 import {
   useArchiveMenuItem,
   useArchiveMenuSection,
@@ -841,7 +843,7 @@ function ItemRow({
   const row = rowProps(
     item.id,
     cx(
-      "flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
+      ROW,
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
       !item.isActive && "border-danger-wash bg-danger-wash/30",
@@ -894,6 +896,10 @@ function ItemRow({
         <span className="truncate text-[12px] text-text-faint">
           {pickLocalized(item.description)}
         </span>
+        {/* What a customer sees on the dish, shown where the operator is
+            already looking. Without it, checking which dishes carry "Spicy"
+            means opening every one of them. */}
+        <ItemTags ids={item.tagIds} />
       </button>
 
       {/* Set in the shop's own currency, shown in both: the price the merchant
@@ -1127,7 +1133,7 @@ function SearchResult({
   return (
     <div
       className={cx(
-        "flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
+        ROW,
         !item.isActive && "border-danger-wash bg-danger-wash/30",
         open &&
           "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
@@ -1153,6 +1159,7 @@ function SearchResult({
         <span className="truncate text-[12px] text-text-faint">
           {sectionTitle}
         </span>
+        <ItemTags ids={item.tagIds} />
       </button>
 
       <div className="shrink-0">

@@ -37,15 +37,16 @@ import {
  * "no orders" is exactly the wrong thing to tell somebody whose connection just
  * dropped during a rush.
  */
+/**
+ * The scopes a URL may name.
+ *
+ * Validated rather than cast: `?scope=nonsense` should show the live queue, not
+ * send a value the fetch has no branch for. A hand-edited URL is the one input
+ * this screen cannot vet at the source.
+ */
+const SCOPES: Scope[] = ["live", "today", "all"];
+
 export function OrdersQueue() {
-  // `live` by default, not `today`.
-  //
-  // A date filter would hide the orders that matter most: one placed at 23:50
-  // last night and still unconfirmed is the most urgent thing on the screen,
-  // and "today" is exactly what would make it invisible. The primary split is
-  // whether an order still needs somebody.
-  const [scope, setScope] = useState<Scope>("live");
-  const [statusSlug, setStatusSlug] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [focused, setFocused] = useState(0);
 
@@ -61,6 +62,53 @@ export function OrdersQueue() {
   const pathname = usePathname();
   const params = useSearchParams();
   const openOrderId = params.get("order");
+
+  /**
+   * The scope and the status tab live in the URL, not in local state.
+   *
+   * The plan's rule for every screen here — *filters, ranges, search and the
+   * open panel all live in the URL, so any view can be bookmarked, reloaded or
+   * sent to someone* — and this screen was the one that did not follow it.
+   *
+   * It became load-bearing when the overview started linking at a status:
+   * `/?status=confirmed` from a "needs you now" tile renders the queue and
+   * quietly applies no filter, because the state it needs to reach only exists
+   * inside this component. A link that silently does nothing is worse than no
+   * link — the operator reads the number, clicks it, and is shown everything.
+   *
+   * `live` is still the default, and for the reason it always was: a date
+   * filter would hide the orders that matter most, since one placed at 23:50
+   * last night and still unconfirmed is the most urgent thing on the screen.
+   * The primary split is whether an order still needs somebody.
+   */
+  const scope: Scope = SCOPES.includes(params.get("scope") as Scope)
+    ? (params.get("scope") as Scope)
+    : "live";
+  const statusSlug = params.get("status");
+
+  /** One writer for both, so the two can never disagree about the query. */
+  const setParam = useCallback(
+    (key: string, value: string | null, fallback: string | null) => {
+      const next = new URLSearchParams(params);
+      if (value === null || value === fallback) next.delete(key);
+      else next.set(key, value);
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    },
+    [params, pathname, router],
+  );
+
+  const setScope = useCallback(
+    (next: Scope) => setParam("scope", next, "live"),
+    [setParam],
+  );
+
+  const setStatusSlug = useCallback(
+    (next: string | null) => setParam("status", next, null),
+    [setParam],
+  );
 
   const setOpenOrderId = useCallback(
     (id: string | null) => {

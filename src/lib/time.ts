@@ -234,6 +234,90 @@ export function formatDateTime(instant: Date | string): string {
 }
 
 /**
+ * Which Beirut month an instant fell in, as `2026-08`.
+ *
+ * A sortable, comparable key for bucketing a history into months — and it has
+ * to be Beirut's month, not the machine's. An order placed at 01:00 on the 1st
+ * of September in Beirut is still August for anyone whose computer is on UTC,
+ * and a chart built from that shows a month's trade sliding into the one before
+ * it. Twice a year, at the DST changes, it would slide differently.
+ */
+export function businessMonthKey(instant: Date | string): string {
+  const clock = toWallClock(asDate(instant));
+  return `${clock.year}-${String(clock.month).padStart(2, "0")}`;
+}
+
+/**
+ * Which day of the week an instant fell on **in Beirut**, `0` Sunday to `6`.
+ *
+ * `Date#getDay` answers for the machine, which is the bug this exists to avoid:
+ * a kitchen taking an order at 00:30 on Saturday in Beirut is still Friday in
+ * London, so a "when do they order" chart drawn on a laptop that travelled puts
+ * every late-night order on the wrong bar.
+ *
+ * The wall clock is read first and *then* treated as UTC, purely to borrow
+ * `getUTCDay`'s calendar arithmetic — the numbers going in are already Beirut's,
+ * so nothing about the machine's zone can reach the answer.
+ *
+ * Sunday-first because that is what `store_hours.day_of_week` stores and what
+ * `Date#getDay` returns; screens that show Monday first do that in the
+ * presentation layer, deliberately keeping the two orders separate.
+ */
+export function businessWeekday(instant: Date | string): number {
+  const clock = toWallClock(asDate(instant));
+  return new Date(Date.UTC(clock.year, clock.month - 1, clock.day)).getUTCDay();
+}
+
+/**
+ * The last `count` Beirut months, oldest first, as `2026-08` keys.
+ *
+ * Walks backwards a month at a time from today's Beirut month rather than
+ * subtracting 30 days, which drifts: twelve 30-day steps is 360 days and lands
+ * in the wrong month by the fifth one.
+ */
+export function recentMonthKeys(
+  count: number,
+  now: Date = new Date(),
+): string[] {
+  const clock = toWallClock(now);
+  const keys: string[] = [];
+
+  let year = clock.year;
+  let month = clock.month;
+
+  for (let step = 0; step < count; step += 1) {
+    keys.push(`${year}-${String(month).padStart(2, "0")}`);
+    month -= 1;
+    if (month === 0) {
+      month = 12;
+      year -= 1;
+    }
+  }
+
+  return keys.reverse();
+}
+
+/** `Aug 26` — a month key as a chart label. */
+export function formatMonthKey(key: string): string {
+  const [year, month] = key.split("-");
+  const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  return `${MONTHS[Number(month) - 1] ?? month} ${year.slice(2)}`;
+}
+
+/**
  * `2 minutes ago`.
  *
  * Timezone-free by nature — the distance between two instants is the same

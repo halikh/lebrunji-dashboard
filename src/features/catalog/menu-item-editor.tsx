@@ -6,10 +6,14 @@ import { Button, Field } from "@/components/ui";
 import { NumberInput } from "@/components/ui/number-input";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Toggle } from "@/components/ui/toggle";
+import { MultiSelect } from "@/components/ui/select";
 import { ImageUploader } from "@/components/ui/image-uploader";
 
 import { ItemOptions } from "./item-options";
+import { TagChip } from "./tag-chip";
+import { useTagVocabulary } from "./use-tags";
 import { useLanguages } from "@/features/reference/use-languages";
+import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
 import type { Localized } from "@/lib/validation";
@@ -27,6 +31,15 @@ export type ItemDraft = {
   isActive: boolean;
   /** A Storage URL, or null for no picture. */
   imageUrl: string | null;
+  /**
+   * The chips this dish carries, as ids into the shared vocabulary.
+   *
+   * The vocabulary is edited on the catalogue's Tags tab, not here — a tag is a
+   * property of the whole app, and a form that could invent one would be four
+   * spellings of "Spicy" waiting to happen. This form only says which of the
+   * existing ones apply.
+   */
+  tagIds: string[];
 };
 
 /**
@@ -97,6 +110,9 @@ export function MenuItemEditor({
   const [imageUrl, setImageUrl] = useState<string | null>(
     initial?.imageUrl ?? null,
   );
+  const [tagIds, setTagIds] = useState<string[]>(initial?.tagIds ?? []);
+
+  const tags = useTagVocabulary();
 
   /**
    * One message per field, not one for the form.
@@ -164,7 +180,7 @@ export function MenuItemEditor({
     attempt.current += 1;
 
     if (found.name || found.description || found.price) return null;
-    return { name, description, price: parsed, isActive, imageUrl };
+    return { name, description, price: parsed, isActive, imageUrl, tagIds };
   }
 
   return (
@@ -224,6 +240,34 @@ export function MenuItemEditor({
               placeholder={t("menu.pricePlaceholder")}
               value={price}
               onChange={(event) => setPrice(event.target.value)}
+            />
+          </Field>
+
+          {/* Beside the price rather than down with the options, because a tag
+              is part of what the dish *is* — the same kind of fact as its name
+              — whereas the options are a set of questions it asks. */}
+          <Field
+            label={t("tags.itemLabel")}
+            hint={
+              tags.isSuccess && tags.data.length === 0
+                ? t("tags.itemNone")
+                : t("tags.itemHint")
+            }
+          >
+            <MultiSelect
+              value={tagIds}
+              onChange={setTagIds}
+              placeholder={t("tags.itemPlaceholder")}
+              disabled={pending || !tags.isSuccess}
+              options={(tags.data ?? []).map((tag) => ({
+                value: tag.id,
+                // The label is what typing filters on and what a screen reader
+                // reads; the chip is what the eye picks out of a list of five.
+                label: pickLocalized(tag.name),
+                render: (
+                  <TagChip tone={tag.tone} label={pickLocalized(tag.name)} />
+                ),
+              }))}
             />
           </Field>
 

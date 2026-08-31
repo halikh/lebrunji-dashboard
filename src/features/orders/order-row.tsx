@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, cx } from "@/components/ui";
+import { ROW } from "@/components/ui/row";
 import { t } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
 import { formatRelative } from "@/lib/time";
@@ -59,7 +60,7 @@ export function OrderRow({
         // that happens to be clickable, not a control. The rule deliberately
         // does not reach for arbitrary elements — a pointer on everything with
         // an `onClick` would put one on half the page.
-        "flex cursor-pointer items-center gap-lg rounded-md border bg-surface px-lg py-md",
+        ROW,
         focused
           ? "border-active shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]"
           : "border-border",

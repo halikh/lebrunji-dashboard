@@ -8,6 +8,7 @@ import { t } from "@/i18n/translations";
 import { CategoriesList } from "./categories-list";
 import { PromotionsList } from "./promotions-list";
 import { StoresList } from "./stores-list";
+import { TagsList } from "./tags-list";
 
 /**
  * The catalogue: the shops, and the categories they sit in.
@@ -24,6 +25,11 @@ import { StoresList } from "./stores-list";
  * handful of times a year, and promotions are the third thing the home screen
  * is made of — a card, a tile, a shop — so all three belong on one errand.
  *
+ * Tags joined them last, and belong here for the same reason categories do:
+ * a tag is a property of the catalogue as a whole rather than of one shop, so
+ * it has no home on a shop's own screen. It is edited on the same errand as
+ * everything else that is true across every menu at once.
+ *
  * ## The tab lives in the URL
  *
  * `?tab=categories`, so the view can be linked and reloaded — the same rule the
@@ -36,6 +42,7 @@ const TABS = [
   { key: "shops", labelKey: "catalogue.stores" },
   { key: "categories", labelKey: "categories.tab" },
   { key: "promotions", labelKey: "promotions.tab" },
+  { key: "tags", labelKey: "tags.tab" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -118,6 +125,9 @@ export function CatalogueScreen() {
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "promotions" && "hidden")}>
         <PromotionsList />
+      </div>
+      <div className={cx("min-h-0 flex-1", tab !== "tags" && "hidden")}>
+        <TagsList />
       </div>
     </div>
   );

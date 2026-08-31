@@ -57,6 +57,131 @@ const en = {
     skipToContent: "Skip to content",
   },
 
+  customers: {
+    title: "Customers",
+    search: "Search by name or phone number",
+    failedTitle: "Could not load the customers",
+
+    // The filter tabs. "Not active" covers two very different situations, and
+    // collapsing them would hide the one that is reversible.
+    tabAll: "All",
+    tabActive: "Active",
+    tabSuspended: "Suspended",
+    tabClosed: "Closed",
+
+    backToList: "All customers",
+    tabOverview: "Overview",
+    statsFailed: "Could not total their orders.",
+    ordersFailed: "Could not load their orders.",
+    promotionsFailed: "Could not load their promotions.",
+
+    promotions: "Promotions used",
+    noPromotions: "No promotion has ever come off one of their orders.",
+    savedTotal: "Saved in total",
+    // A redemption predating 0016's `label` column, or one written without
+    // one. Naming it beats a blank row, which reads as a rendering fault.
+    unnamedPromotion: "Unnamed promotion",
+
+    summary: "Summary",
+    tileOrders: "Orders",
+    tileSpent: "Spent ({code})",
+    tileSaved: "Saved ({code})",
+
+    chartMonths: "Orders by month",
+    chartMonthsMoney: "Spend by month ({code})",
+    chartMonthsAria:
+      "The last twelve months, oldest first. A flat bar is a month with no orders.",
+    chartMonthTitle: "{month}: {orders} order(s)",
+    chartMonthTitleMoney: "{month}: {orders} order(s), {amount}",
+    chartWeekdays: "When they order",
+    chartWeekdaysAria: "Orders per day of the week, in Beirut time.",
+    tileFirst: "First order",
+    tileLast: "Last order",
+    never: "Never",
+    // The cap is the assumption, made visible: quietly under-reporting a
+    // lifetime figure is worse than saying it is a floor.
+    statsTruncated:
+      "This customer has more orders than these figures cover, so the totals are a minimum.",
+
+    // `users.name = ''` is how the schema records "signed in, never finished
+    // setup". Naming it makes it a status; a blank makes the row look broken.
+    incomplete: "Signup not finished",
+
+    joined: "Joined {when}",
+    orderCount: "{count} order(s)",
+    noOrders: "No orders yet",
+    activeLabel: "Active",
+    suspendedLabel: "Suspended",
+    closedLabel: "Closed",
+
+    emptyTitle: "No customers yet",
+    emptyBody: "They appear here the first time somebody signs in on the app.",
+    noneTitle: "Nobody matches that",
+    noneBody: "Try part of the name, or the last few digits of the number.",
+
+    contact: "Contact",
+    copyPhone: "Copy phone number",
+    addresses: "Addresses",
+    noAddresses: "No addresses saved.",
+    unlabelled: "Address",
+    defaultAddress: "Default",
+    // What the map draws when there is no pin, and the warning beside it. Two
+    // strings because they say different things: one is the empty frame, the
+    // other is the consequence.
+    noPin: "No pin saved for this address",
+    noPinWarning:
+      "With no pin, delivery here is charged at the top band — the fee is an overcharge, not an estimate.",
+
+    preferences: "Preferences",
+    // In the header, where they qualify the account rather than being a
+    // section somebody navigates to. Labelled inline, because two bare values
+    // side by side would not say which is which.
+    prefLanguage: "Reads the app in {value}",
+    prefCurrency: "Prices shown in {value}",
+    language: "Language",
+    currency: "Currency",
+    notSet: "Not set",
+    // Null is a real answer, not a missing one — 0028 says so explicitly.
+    shopsOwn: "Each shop's own",
+
+    orders: "Orders",
+    moreOrders:
+      "Showing {shown} of {total}. The rest are on the orders screen.",
+
+    suspend: "Suspend",
+    suspendTitle: "Suspend {name}?",
+    suspendBody:
+      "They are signed out on every device and cannot sign back in until you lift it. Their account, orders and addresses are all kept.",
+    suspendConfirm: "Suspend",
+    suspended: "{name} suspended",
+
+    reinstate: "Lift suspension",
+    reinstateTitle: "Let {name} back in?",
+    reinstateBody:
+      "They can sign in again from the app. They are not signed in automatically — reopening the door is not walking them through it.",
+    reinstateConfirm: "Lift it",
+    reinstated: "{name} can sign in again",
+
+    close: "Close account",
+    closeTitle: "Close {name}'s account for good?",
+    // The asymmetry is the whole reason this is separate from suspension, so
+    // the dialog leads with it.
+    closeBody:
+      "This cannot be undone. {phone} is released, so if they sign up again they get a brand new account rather than this one back. Their past orders are kept, because an order is a financial record.",
+    closeConfirm: "Close the account",
+    closed: "{name}'s account is closed",
+    closedNote:
+      "This account was closed on {when}. The phone number has been released and it cannot be reopened.",
+
+    // Refusals from the RPCs, as sentences.
+    notPermitted: "Your account is not allowed to do that.",
+    alreadyClosed:
+      "That account has been closed. A closed account cannot be reopened.",
+    gone: "That customer no longer exists.",
+    isOperator:
+      "That account belongs to an operator, so it cannot be closed from here.",
+  },
+
   orders: {
     title: "Orders",
     searchPlaceholder: "Code, name or phone",
@@ -269,6 +394,64 @@ const en = {
    * A shop's own settings, as opposed to what it sells.
    */
   store: {
+    // ---- adding one (the wizard) ------------------------------------------
+    add: "New",
+    create: "Create the shop",
+    back: "Back",
+    next: "Next",
+    stepOf: "Step {step} of {total}",
+    // Two or three words each: the strip is a map of what is coming, not a
+    // second set of headings competing with the one on screen.
+    shortName: "Name",
+    shortPlacement: "Placement",
+    shortLocation: "Location",
+    shortTiming: "Timing",
+    created: "{name} added — set up its menu next",
+
+    stepName: "What is it called?",
+    stepNameBlurb:
+      "The name customers see, in each language, and the picture on its card.",
+    stepPlacement: "Where does it belong, and what does it price in?",
+    stepPlacementBlurb:
+      "The category decides which tile customers find it under. The currency is what every price on its menu means.",
+    stepLocation: "Where is it?",
+    stepLocationBlurb:
+      "Paste a Google Maps link or a pair of coordinates. This is what delivery is charged from.",
+    stepTiming: "How long does it take, and is it open for business?",
+    stepTimingBlurb:
+      "The preparation window drives the delivery estimate a customer is shown.",
+
+    category: "Category",
+    categoryHint: "The tile customers find it under on the home screen.",
+    pickCategory: "Choose a category",
+    categoryRequired: "Every shop belongs to a category.",
+
+    currency: "Currency",
+    // Not a preference: changing it later reprices nothing — the numbers stay
+    // and simply mean something else.
+    currencyHint:
+      "Every price on its menu is in this. Changing it later does not convert anything.",
+    pickCurrency: "Choose a currency",
+    currencyRequired: "A shop has to price in something.",
+
+    prep: "Preparation time",
+    prepMin: "Fastest, in minutes",
+    prepMax: "Slowest, in minutes",
+    prepBackwards: "The slowest time has to be at least the fastest one.",
+
+    visibility: "Visibility",
+    live: "Live",
+    hidden: "Hidden",
+    liveHint: "Customers can find and order from it straight away.",
+    // Off by default on a new shop, and the hint says why rather than leaving
+    // it to be discovered.
+    hiddenHintNew:
+      "Recommended for now — it has no menu or opening hours yet. Turn it on from the shops list when it is ready.",
+
+    mapEmpty: "No pin yet — paste a link or coordinates above.",
+    noDefaultCountry:
+      "No default country is set up, so a shop cannot be created. That is a database seed, not a setting on this screen.",
+
     tab: "Details",
     name: "Shop name",
     nameHint: "What customers see at the top of the shop.",
@@ -424,6 +607,68 @@ const en = {
     searchNone: "No category matches {term}.",
     formLabel: "Category details",
     failedTitle: "Could not load the categories",
+  },
+
+  tags: {
+    tab: "Tags",
+    blurb:
+      "The chips a dish can carry. One vocabulary for the whole app — a tag means the same thing on every menu, which is what makes it worth having instead of typing the word on each dish.",
+    add: "New tag",
+    name: "Name",
+    nameHint: "Short. It sits beside a dish's name, not under it.",
+    toneLabel: "Colour",
+    toneHint:
+      "Pick the chip, not the colour — each option shows what the tag will look like in the app.",
+    tones: {
+      neutral: "Plain",
+      accent: "Green",
+      yellow: "Yellow",
+      active: "Coral",
+      info: "Purple",
+    },
+    previewPlaceholder: "Your tag",
+    visibility: "Visibility",
+    live: "Live",
+    hidden: "Hidden",
+    liveHint: "Customers see this chip on every dish that carries it.",
+    hiddenHint:
+      "The chip is gone from the app. The dishes keep it, so switching this back on restores it to all of them.",
+    save: "Save tag",
+    added: "{name} added",
+    saved: "{name} saved",
+    archived: "{name} archived",
+    archive: "Archive",
+    archiveTitle: "Archive {name}?",
+    archiveBody:
+      "The chip disappears from {count} dish(es) immediately. Nothing else changes — the dishes keep the tag, so bringing it back restores it to all of them.",
+    archiveConfirm: "Archive",
+    // A count on the row is what turns "retire this" from a guess into a
+    // decision. Zero is said in words rather than as "0 dishes", because
+    // "unused" is the thing the operator is scanning for.
+    unused: "Not on any dish yet",
+    usedBy: "On {count} dish(es)",
+    showTitle: "Show {name} to customers?",
+    showBody:
+      "The chip appears on all {count} dish(es) that carry it, straight away.",
+    showConfirm: "Show it",
+    hideTitle: "Hide {name} from customers?",
+    hideBody:
+      "The chip disappears from all {count} dish(es) straight away. They keep the tag, so this is reversible in one click.",
+    hideConfirm: "Hide it",
+    search: "Search tags",
+    searchNoDrag: "Clear the search to change the order.",
+    searchNone: "No tag matches {term}.",
+    formLabel: "Tag details",
+    failedTitle: "Could not load the tags",
+    // The order is a property of the vocabulary, not of a dish — worth saying,
+    // because "why is Spicy first here" is otherwise a per-dish question.
+    itemLabel: "Tags",
+    itemHint:
+      "The chips shown on this dish. Their order comes from the Tags tab, so it is the same on every dish.",
+    itemPlaceholder: "Add a tag",
+    itemNone: "No tags have been set up yet. Add some on the Tags tab.",
+    unknownTone: "That is not a colour a tag can be drawn in.",
+    alreadyOnDish: "This dish already carries that tag.",
   },
 
   options: {
@@ -591,15 +836,99 @@ const en = {
    */
   promotions: {
     tab: "Promotions",
-    // Said once, at the top, rather than left to be discovered.
-    artworkOnly:
-      "A promotion is the artwork alone — any wording belongs in the image. These cards do not change what anything costs.",
     add: "New promotion",
     name: "Reference",
     nameHint:
       "Your own label for it, never shown to a customer. Cannot be changed later.",
     nameRequired: "Give it a name so you can find it again.",
     imageHint: "The card as it appears on the home screen. Wide, not square.",
+
+    search: "Search promotions",
+    // The slug is the only text a promotion has: 0013 dropped the label,
+    // headline and note columns because the card is artwork. Worth saying, or
+    // the operator searches for wording that lives inside a picture.
+    searchHint:
+      "Searches the reference you gave each promotion — the card itself is artwork, so there is no wording to search.",
+    searchNoDrag: "Clear the search to change the order.",
+    searchNone: "No promotion matches {term}.",
+
+    // ---- what it takes off -------------------------------------------------
+    discountSection: "The discount",
+    kind: "Kind",
+    kindHint: "What comes off the bill.",
+    kinds: {
+      percentage: "Percentage off",
+      fixedAmount: "Amount off",
+      freeDelivery: "Free delivery",
+    },
+    kindNotes: {
+      percentage: "of the food",
+      fixedAmount: "off the food",
+      freeDelivery: "whatever the fee is",
+    },
+    percentLabel: "Percentage",
+    percentHint:
+      "Of the food only — a promotion should not quietly pay the courier.",
+    percentTooBig: "A percentage over 100 would pay the customer.",
+    amountLabel: "Amount off",
+    // The real hazard, said plainly. `discounts` has no currency column, so the
+    // number is compared against whatever the order happens to be priced in.
+    amountHint:
+      "A plain number, without separators — the line below shows what it comes to. A promotion carries no currency of its own, so if you ever run shops pricing in two currencies, this same figure applies to both and you want one promotion per currency.",
+    valueRequired: "Say how much comes off.",
+    valueOutOfRange: "That amount is outside what a discount can be.",
+    minSubtotal: "Minimum spend",
+    minSubtotalHint:
+      "Below this the promotion does not apply. Leave empty for no minimum.",
+    noMinimum: "No minimum",
+    maxDiscount: "Most it can take off",
+    maxDiscountHint:
+      "A ceiling on the percentage, so a large basket cannot run away with it. Leave empty for none.",
+    noCeiling: "No ceiling",
+
+    // ---- who gets it -------------------------------------------------------
+    whoSection: "Who gets it",
+    appliesTo: "Applies to",
+    appliesToHint:
+      "Narrowing it means the basket has to contain something matching. The discount still comes off the whole subtotal.",
+    scopes: {
+      order: "Every order",
+      store: "Orders from certain shops",
+      category: "Orders from certain categories",
+      menuItem: "Orders containing certain dishes",
+    },
+    // Hand-written SQL can attach scopes of several types at once. The form
+    // cannot show that, so it says so and refuses to touch them.
+    scopesMixed:
+      "This promotion was set up with several kinds of scope at once, which this form cannot show. Saving will leave its scopes exactly as they are.",
+    targetsRequired:
+      "Choose at least one, or set this back to Every order — a narrowed promotion with nothing chosen applies to everything.",
+    pickShops: "Shops",
+    pickShopsPlaceholder: "Add a shop",
+    pickCategories: "Categories",
+    pickCategoriesPlaceholder: "Add a category",
+    pickDishes: "Dishes",
+    pickDishesHint:
+      "The shop's name is shown beside each, so two dishes with the same name are told apart.",
+    pickDishesPlaceholder: "Search for a dish",
+    typeToFindDishes: "Start typing to find a dish.",
+    noDishes: "No dish matches {term}.",
+    firstOrderLabel: "New customers",
+    firstOrderHint:
+      "Only for somebody who has never ordered before. Cancelled orders count — it is about who they are, not about what survived.",
+    firstOrderOn: "First order only",
+    firstOrderOff: "Anyone",
+    perUser: "Times one customer can use it",
+    perUserHint: "Leave empty for no limit.",
+    totalCap: "Times it can be used in total",
+    totalCapHint: "Leave empty for no limit.",
+    totalCapHintUsed: "Used {count} time(s) so far. Leave empty for no limit.",
+    noLimit: "No limit",
+    capsPositive:
+      "A limit of zero would switch it off — leave it empty instead.",
+
+    // ---- when --------------------------------------------------------------
+    whenSection: "When",
     startsAt: "Starts",
     startsHint: "Leave empty to start as soon as it is switched on.",
     endsAt: "Ends",
@@ -620,12 +949,24 @@ const en = {
     archive: "Archive",
     archiveTitle: "Archive {name}?",
     archiveBody:
-      "The card disappears from the app immediately. It can be brought back.",
+      "The card disappears from the app immediately and it stops discounting anything. It can be brought back.",
     archiveConfirm: "Archive",
     thisBanner: "this promotion",
 
-    // The window in words. A banner can be switched on and invisible, which is
-    // the state worth naming: nothing else on screen would say so.
+    // ---- summaries ---------------------------------------------------------
+    preview: "In the app: {summary}.",
+    summaryPercent: "{value}% off the food",
+    summaryFixed: "{amount} off the food",
+    summaryFreeDelivery: "Free delivery",
+    summaryOver: "over {amount}",
+    summaryFirstOrder: "first order only",
+    summaryScoped: "{count} scope(s)",
+    summaryIncomplete: "No amount set yet",
+    redeemed: "{count} used",
+    redeemedOf: "{count} of {cap} used",
+
+    // The window in words. A promotion can be switched on and invisible, which
+    // is the state worth naming: nothing else on screen would say so.
     always: "Runs until you switch it off",
     between: "{from} to {to}",
     until: "Until {to}",
@@ -634,12 +975,68 @@ const en = {
     ended: "Switched on, but its dates have passed",
 
     showTitle: "Show {name} on the home screen?",
-    showBody: "It appears straight away, as long as today is inside its dates.",
+    showBody:
+      "It appears straight away, as long as today is inside its dates — and it starts coming off bills.",
     showConfirm: "Show it",
     hideTitle: "Hide {name}?",
-    hideBody: "The card disappears from the home screen straight away.",
+    hideBody:
+      "The card disappears from the home screen straight away and it stops discounting anything.",
     hideConfirm: "Hide it",
     formLabel: "Promotion details",
+  },
+
+  reports: {
+    title: "Overview",
+
+    // Deliberately not date-filtered: an order still unconfirmed from Tuesday
+    // is not Tuesday's business, it is the most urgent thing on the screen.
+    needsYou: "Needs you now",
+    needsYouNote: "Every order still waiting, whatever day it arrived",
+    countsFailed: "Could not count the open orders.",
+
+    performance: "How we are doing",
+    range7: "7 days",
+    range30: "30 days",
+    range90: "90 days",
+    rangeNote: "{from} to {to}, Beirut time",
+    failedTitle: "Could not load the figures",
+    nothingYet: "Nothing in this range yet.",
+
+    tileRevenue: "Revenue",
+    tileOrders: "Orders",
+    tileAverage: "Average order",
+    tileDelivery: "Delivery fees",
+    // A percentage against zero is infinite and means "we started", so it is
+    // named rather than computed.
+    fromNothing: "up from nothing",
+    flat: "no change",
+    discountsGiven: "Promotions cost",
+    cancelled: "{count} cancelled",
+
+    chartRevenue: "Revenue by day",
+    chartRevenueAria:
+      "Revenue for each day in the range, with the previous period behind it.",
+    chartRevenueTitle: "{day}: {orders} order(s), {amount}",
+    ghostNote: "The grey bars are the period before this one.",
+
+    chartHours: "When we are busy",
+    chartHoursAria:
+      "Orders by hour of the day and day of the week, in Beirut time.",
+
+    chartItems: "What sells",
+    chartItemsAria: "The ten dishes sold most often in this range.",
+    sold: "{count} sold",
+
+    chartStores: "Which shops earn",
+    chartStoresAria: "The ten shops by revenue in this range.",
+
+    chartFunnel: "Where orders stand",
+    chartFunnelAria:
+      "How many shop portions are at each step, including cancelled ones.",
+
+    chartBands: "What each delivery band collected",
+    chartBandsAria: "Delivery fees collected, by distance band.",
+    bandLabel: "Up to {km} km",
   },
 
   reorder: {

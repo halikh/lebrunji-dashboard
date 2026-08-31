@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button, Input, cx } from "@/components/ui";
+import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Field } from "@/components/ui/field";
@@ -276,7 +277,7 @@ function Row({
   const row = rowProps(
     category.id,
     cx(
-      "flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
+      ROW,
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
       !category.isActive && "border-danger-wash bg-danger-wash/30",

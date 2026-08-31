@@ -4,12 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { cx, Input } from "@/components/ui";
+import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Button } from "@/components/ui";
 import { pickLocalized } from "@/i18n/db-text";
+import { Panel } from "@/components/ui/panel";
 import { t } from "@/i18n/translations";
+
+import { StoreWizard } from "./store-wizard";
 
 import type { Store } from "./api/stores";
 import { useArchiveStore, useStores, useUpdateStore } from "./use-stores";
@@ -35,87 +39,148 @@ export function StoresList() {
 
   const rows = stores.data?.stores ?? [];
 
+  /**
+   * Whether the add-a-shop wizard is open.
+   *
+   * Local state rather than the URL, unlike every filter here: a half-filled
+   * wizard is not a view somebody should be able to link to or land back on
+   * after a reload, because the state that made it meaningful is gone.
+   */
+  const [adding, setAdding] = useState(false);
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-        <h1 className="flex-grow text-[24px]">{t("catalogue.stores")}</h1>
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder={t("catalogue.searchPlaceholder")}
-          aria-label={t("catalogue.searchPlaceholder")}
-          className="w-[260px]"
-        />
-      </div>
+    // A row, not a column: the panel is a *sibling* of the list, which is what
+    // makes it open beside it. Nested inside the column it becomes another
+    // block in the stack and lands under the rows — the same shape the
+    // categories, tags and promotions lists already use.
+    <div className="relative flex h-full">
+      <div className="flex min-w-0 flex-grow flex-col">
+        <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
+          <h1 className="flex-grow text-[24px]">{t("catalogue.stores")}</h1>
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t("catalogue.searchPlaceholder")}
+            aria-label={t("catalogue.searchPlaceholder")}
+            className="w-[260px]"
+          />
+          <Button onClick={() => setAdding(true)}>{t("store.add")}</Button>
+        </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-        {stores.isPending && (
-          <div aria-hidden className="flex flex-col gap-sm">
-            {[0, 1, 2, 3].map((row) => (
-              <div
-                key={row}
-                className="h-[74px] rounded-md border border-border bg-surface opacity-60"
-              />
-            ))}
-          </div>
-        )}
-
-        {stores.isError && (
-          <div className="flex flex-col items-center gap-lg py-huge text-center">
-            <div className="flex flex-col gap-xs">
-              <h2 className="text-[18px]">{t("catalogue.failedTitle")}</h2>
-              <p className="text-[14px] text-text-soft">
-                {t("catalogue.failedBody")}
-              </p>
+        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+          {stores.isPending && (
+            <div aria-hidden className="flex flex-col gap-sm">
+              {[0, 1, 2, 3].map((row) => (
+                <div
+                  key={row}
+                  className="h-[74px] rounded-md border border-border bg-surface opacity-60"
+                />
+              ))}
             </div>
-            <Button variant="secondary" onClick={() => void stores.refetch()}>
-              {t("common.retry")}
-            </Button>
-          </div>
-        )}
+          )}
 
-        {stores.isSuccess && rows.length === 0 && (
-          <EmptyState
-            titleKey={
-              search ? "catalogue.noMatchTitle" : "catalogue.emptyTitle"
-            }
-            bodyKey={search ? "catalogue.noMatchBody" : "catalogue.emptyBody"}
-          />
-        )}
+          {stores.isError && (
+            <div className="flex flex-col items-center gap-lg py-huge text-center">
+              <div className="flex flex-col gap-xs">
+                <h2 className="text-[18px]">{t("catalogue.failedTitle")}</h2>
+                <p className="text-[14px] text-text-soft">
+                  {t("catalogue.failedBody")}
+                </p>
+              </div>
+              <Button variant="secondary" onClick={() => void stores.refetch()}>
+                {t("common.retry")}
+              </Button>
+            </div>
+          )}
 
-        {rows.map((store) => (
-          <StoreRow
-            key={store.id}
-            store={store}
-            onToggleActive={() =>
-              update.mutate({
-                id: store.id,
-                patch: { isActive: !store.isActive },
-              })
-            }
-            onToggleFeatured={() =>
-              update.mutate({
-                id: store.id,
-                patch: { isFeatured: !store.isFeatured },
-              })
-            }
-            // Awaited and discarded: `ConfirmButton` keeps its dialog open
-            // until this settles, and catches a rejection to report inside it.
-            onArchive={async () => {
-              await archive.mutateAsync({ id: store.id, name: store.name });
-            }}
-          />
-        ))}
+          {stores.isSuccess && rows.length === 0 && (
+            <EmptyState
+              titleKey={
+                search ? "catalogue.noMatchTitle" : "catalogue.emptyTitle"
+              }
+              bodyKey={search ? "catalogue.noMatchBody" : "catalogue.emptyBody"}
+            />
+          )}
 
-        {/* Said out loud rather than silently truncating. A catalogue that is
+          {rows.map((store) => (
+            <StoreRow
+              key={store.id}
+              store={store}
+              onToggleActive={() =>
+                update.mutate({
+                  id: store.id,
+                  patch: { isActive: !store.isActive },
+                })
+              }
+              onToggleFeatured={() =>
+                update.mutate({
+                  id: store.id,
+                  patch: { isFeatured: !store.isFeatured },
+                })
+              }
+              // Awaited and discarded: `ConfirmButton` keeps its dialog open
+              // until this settles, and catches a rejection to report inside it.
+              onArchive={async () => {
+                await archive.mutateAsync({ id: store.id, name: store.name });
+              }}
+            />
+          ))}
+
+          {/* Said out loud rather than silently truncating. A catalogue that is
             quietly missing shops is the kind of wrong nobody notices until a
             customer asks why they cannot find one. */}
-        {stores.data?.truncated && (
-          <p role="status" className="px-md py-lg text-[13px] text-text-faint">
-            {t("catalogue.truncated")}
-          </p>
-        )}
+          {stores.data?.truncated && (
+            <p
+              role="status"
+              className="px-md py-lg text-[13px] text-text-faint"
+            >
+              {t("catalogue.truncated")}
+            </p>
+          )}
+        </div>
       </div>
+
+      <Panel
+        open={adding}
+        onClose={() => setAdding(false)}
+        label={t("store.add")}
+      >
+        {adding && (
+          <>
+            <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
+              <h2 className="flex-grow text-[20px]">{t("store.add")}</h2>
+              <button
+                type="button"
+                onClick={() => setAdding(false)}
+                aria-label={t("common.close")}
+                className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft hover:bg-neutral-fill lg:flex"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  aria-hidden
+                >
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+
+            <StoreWizard
+              // Keyed on being opened, so cancelling and reopening starts a
+              // fresh shop rather than resuming a half-filled one nobody
+              // expected to come back.
+              key={String(adding)}
+              sortOrder={stores.data?.stores.length ?? 0}
+              onClose={() => setAdding(false)}
+            />
+          </>
+        )}
+      </Panel>
     </div>
   );
 }
@@ -137,7 +202,7 @@ function StoreRow({
     <div
       className={cx(
         // `relative`, so the name's stretched hit area is bounded by the row.
-        "relative flex items-center gap-lg rounded-md border bg-surface px-lg py-md",
+        ROW,
         // A hidden shop is marked, not dimmed.
         //
         // Fading the whole row was wrong: it took the controls with it, and a
