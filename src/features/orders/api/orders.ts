@@ -32,6 +32,8 @@ export type OrderStore = {
 export type OrderLine = {
   id: string;
   orderStoreId: string;
+  /** Which dish this was, for offering a substitute that is not the same one. */
+  menuItemId: string;
   name: string;
   /**
    * Today's picture, not a snapshot.
@@ -44,6 +46,21 @@ export type OrderLine = {
    */
   imageUrl: string | null;
   quantity: number;
+  /**
+   * How many are actually coming, when that is not what was ordered.
+   *
+   * `null` is the ordinary case and means "as ordered" — which is why it is a
+   * separate column rather than an edit to `quantity`. `quantity` is the
+   * snapshot of what the customer asked for and must stay readable after the
+   * fact; this is what the kitchen could fill. `0` is a line that is not coming
+   * at all, and it stays on the receipt struck through, because a vanished line
+   * tells the customer nothing.
+   */
+  fulfilledQuantity: number | null;
+  /** The line this one arrived instead of, for a substitution. */
+  replacesLineId: string | null;
+  /** Why this line differs. See migration 0082 for the vocabulary. */
+  amendmentReason: string | null;
   unitPrice: number;
   note: string | null;
   options: string[];
@@ -53,6 +70,13 @@ export type Order = {
   id: string;
   code: string;
   placedAt: string;
+  /**
+   * When the order was last changed after being placed, if it ever was.
+   *
+   * On the header rather than worked out from the lines, so the queue can mark
+   * an amended order without fetching them.
+   */
+  amendedAt: string | null;
   /**
    * Who placed it, so a receipt can lead to their profile.
    *
@@ -200,7 +224,7 @@ export async function fetchOrders(options: {
     .from("orders")
     .select(
       `id, code, placed_at, address_line, courier_note, currency_code,
-       subtotal, delivery_fee, discount, total,
+       subtotal, delivery_fee, discount, total, amended_at,
        user_id,
        users:user_id ( name, phone ),
        ${embed}`,
@@ -252,14 +276,15 @@ export async function fetchOrder(
     .from("orders")
     .select(
       `id, code, placed_at, address_line, courier_note, currency_code,
-       subtotal, delivery_fee, discount, total,
+       subtotal, delivery_fee, discount, total, amended_at,
        user_id,
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal,
          stores ( name, image_url ),
          order_statuses ( slug, name, progress ),
-         order_lines ( id, name, quantity, unit_price, note,
+         order_lines ( id, menu_item_id, name, quantity, unit_price, note,
+           fulfilled_quantity, replaces_line_id, amendment_reason,
            menu_items ( image_url ),
            order_line_options ( item_options ( name ) ) ) )`,
     )
@@ -276,10 +301,14 @@ export async function fetchOrder(
       lines.push({
         id: line.id as string,
         orderStoreId: store.id as string,
+        menuItemId: line.menu_item_id as string,
         // The snapshot taken at purchase, not today's name: this is a record of
         // what was sold, and the item may since have been renamed or deleted.
         name: localized(line.name, locale),
         quantity: line.quantity as number,
+        fulfilledQuantity: (line.fulfilled_quantity as number | null) ?? null,
+        replacesLineId: (line.replaces_line_id as string | null) ?? null,
+        amendmentReason: (line.amendment_reason as string | null) ?? null,
         unitPrice: line.unit_price as number,
         note: (line.note as string | null) ?? null,
         imageUrl:
@@ -440,6 +469,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
   return {
     id: row.id as string,
     code: row.code as string,
+    amendedAt: (row.amended_at as string | null) ?? null,
     placedAt: row.placed_at as string,
     // An account that never finished setup has an empty name — that is the flag
     // the app routes on. Rendering it blank would read as a data fault.

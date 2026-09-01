@@ -15,6 +15,7 @@ import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { ROW } from "@/components/ui/row";
 import { Select } from "@/components/ui/select";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
+
 import { Toggle } from "@/components/ui/toggle";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
@@ -131,7 +132,7 @@ export function SettingsScreen() {
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "steps" && "hidden")}>
         <StepsTab />
-      </div>{" "}
+      </div>
     </div>
   );
 }

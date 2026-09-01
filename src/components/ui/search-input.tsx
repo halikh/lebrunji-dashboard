@@ -34,6 +34,22 @@ import { Input, cx } from "./index";
  * input, and a click landing on it rather than in the field would be a box that
  * does not focus where you pressed.
  *
+ * ## It takes the slack in its row, by default
+ *
+ * Every header this sits in is a title, a search box and a button, and the
+ * search is the only one of the three whose useful width is not decided by its
+ * own content: a title is as wide as its word and a button as wide as its verb,
+ * while a search box is where a shop name, a dish or a pasted order code gets
+ * typed and read back. Left to size itself it came out a stub with half the bar
+ * empty beside it — on the widest screens, the ones with the most room to give.
+ *
+ * So it grows here rather than at nine call sites, which is also what stops the
+ * six lists from each ending up a slightly different width. `min-w-0` with it,
+ * because a flex child refuses to shrink below its content otherwise and the
+ * button beside it is what gets pushed off a narrow screen.
+ *
+ * A screen that genuinely wants a fixed width passes one; nothing does today.
+ *
  * ## `padding` rather than a class
  *
  * `Input` takes its horizontal padding as a prop for a stated reason —
@@ -56,7 +72,7 @@ export function SearchInput({
   ref?: Ref<HTMLInputElement>;
 }) {
   return (
-    <div className={cx("relative", className)}>
+    <div className={cx("relative min-w-0 flex-grow", className)}>
       <span
         aria-hidden
         className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-md text-text-faint"

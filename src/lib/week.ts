@@ -1,3 +1,5 @@
+import { businessWeekday, toWallClock } from "./time";
+
 /**
  * Reading a shop's week back: is it open, and what does the timetable say.
  *
@@ -120,4 +122,32 @@ export function summarise(week: DayWindow[], order: readonly number[]): Span[] {
   }
 
   return spans;
+}
+
+/**
+ * Is this week open **now**, in Beirut?
+ *
+ * `isOpenAt` takes a day and a time and is deliberately pure — it is what the
+ * hours editor asks about a draft, and about hypothetical moments. This is the
+ * one question the rest of the product actually has, and it is asked in three
+ * places about drivers alone: the badge on a row, the filter tabs, and which
+ * names the dispatch dialog offers.
+ *
+ * It lives here rather than being written out three times because the two
+ * lines it wraps are both easy to get wrong in a way nothing catches. The
+ * weekday and the time have to come from the **same** wall clock — reading
+ * `getDay()` and then formatting the time separately can straddle midnight and
+ * ask about Tuesday's rota at 23:59 on Monday — and both have to be Beirut's,
+ * not the machine's, or a laptop that travelled shows a different rota from
+ * the one beside it.
+ */
+export function isOpenNow(week: DayWindow[], now: Date = new Date()): boolean {
+  const clock = toWallClock(now);
+  return isOpenAt(
+    week,
+    // `businessWeekday` reads the same instant, so the day and the time below
+    // cannot come from two sides of a midnight.
+    businessWeekday(now),
+    `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`,
+  );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Button, cx } from "@/components/ui";
 import { Copyable } from "@/components/ui/copyable";
@@ -8,7 +9,11 @@ import { t } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
 import { formatDayAndTime } from "@/lib/time";
 
+import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
+import type { TranslationKey } from "@/i18n/translations";
+
 import { OrderActions, OrderBody } from "./order-detail";
+import { OrderHistory } from "./order-history";
 import { orderStatus, useOrder, useOrderStatuses } from "./use-orders";
 
 /**
@@ -35,9 +40,37 @@ import { orderStatus, useOrder, useOrderStatuses } from "./use-orders";
  * arrived at from a link has none — so the one thing it has to say before
  * anything else is where this order stands.
  */
+type TabKey = "details" | "history";
+
+const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
+  { key: "details", labelKey: "history.tabDetails" },
+  { key: "history", labelKey: "history.tabHistory" },
+];
+
 export function OrderScreen({ id }: { id: string }) {
   const statuses = useOrderStatuses();
   const order = useOrder(id);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+
+  // In the URL, like every other filter in the dashboard, so a link can point
+  // straight at the history — which is what the panel's link does.
+  const requested = params.get("tab");
+  const tab: TabKey = TABS.some((one) => one.key === requested)
+    ? (requested as TabKey)
+    : "details";
+
+  function show(next: TabKey) {
+    const query = new URLSearchParams(params);
+    if (next === "details") query.delete("tab");
+    else query.set("tab", next);
+    const search = query.toString();
+    router.replace(search ? `${pathname}?${search}` : pathname, {
+      scroll: false,
+    });
+  }
 
   if (order.isPending) {
     return (
@@ -123,13 +156,47 @@ export function OrderScreen({ id }: { id: string }) {
             </span>
           )}
         </div>
+        {/* Chapters of one order, so `SectionTab` rather than `FilterTab` —
+            the same distinction the store screen and the customer profile
+            draw. The receipt is what somebody reads a hundred times a day;
+            the history is read rarely and almost always because something has
+            gone wrong, so it is a tab away rather than pushing the money down
+            the page on every ordinary reading. */}
+        <div role="tablist" className="-mb-px flex gap-lg pt-md">
+          {TABS.map(({ key, labelKey }) => (
+            <SectionTab
+              key={key}
+              label={t(labelKey)}
+              active={tab === key}
+              onClick={() => show(key)}
+              onKeyDown={tabArrowHandler(
+                TABS.map((one) => one.key),
+                tab,
+                show,
+              )}
+            />
+          ))}
+        </div>
       </header>
 
       {/* Full width. The page exists because a 420px panel is cramped for
           reading a bag's worth of lines back to somebody on the phone, and
-          capping it here would have given most of that room straight back. */}
+          capping it here would have given most of that room straight back.
+
+          Siblings rather than one swapped child, so a half-scrolled receipt
+          survives a look at the history and back. */}
       <div className="flex min-h-0 flex-grow flex-col overflow-y-auto">
-        <OrderBody order={order.data} from={"page"} />
+        <div className={cx("flex flex-col", tab !== "details" && "hidden")}>
+          <OrderBody order={order.data} from={"page"} />
+        </div>
+        <div
+          className={cx(
+            "flex min-h-0 flex-grow flex-col",
+            tab !== "history" && "hidden",
+          )}
+        >
+          <OrderHistory order={order.data} />
+        </div>
       </div>
 
       <OrderActions order={order.data} statuses={statuses.data} />

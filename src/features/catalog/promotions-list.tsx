@@ -126,7 +126,7 @@ export function PromotionsList() {
         {/* The same bar as the shops, categories and tags — same border, same
             padding, same place for the box. */}
         <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h1 className="flex-grow self-center text-[24px]">
+          <h1 className="shrink-0 self-center text-[24px]">
             {t("promotions.tab")}
           </h1>
           {/* The rule under the box, always — not a warning that appears
@@ -536,6 +536,10 @@ function Editor({
         value: dish.id,
         label: dish.label,
       }))}
+      // The shop the saved dishes belong to, so reopening lands on the right
+      // menu rather than asking the operator to pick it again to see what is
+      // already chosen.
+      initialDishStoreId={dishes.data?.[0]?.storeId ?? null}
       pending={pending}
       onSave={onSave}
       onCancel={onCancel}
@@ -547,6 +551,7 @@ function Form({
   initial,
   shape,
   initialDishes,
+  initialDishStoreId,
   pending,
   onSave,
   onCancel,
@@ -554,6 +559,7 @@ function Form({
   initial?: Promotion;
   shape: ScopeShape;
   initialDishes: SelectOption[];
+  initialDishStoreId: string | null;
   pending: boolean;
   onSave: (draft: PromotionDraft) => void;
   onCancel: () => void;
@@ -608,6 +614,21 @@ function Form({
       : [],
   );
   const [dishes, setDishes] = useState<SelectOption[]>(initialDishes);
+
+  /**
+   * Which shop's menu the dish picker is searching.
+   *
+   * Not persisted with the promotion — `discount_scopes` stores the dishes, and
+   * which shop they came from is derivable from them. It is a step in the
+   * asking, not part of the answer.
+   *
+   * Seeded from the first dish already attached, so reopening a saved
+   * promotion lands on the right menu rather than making the operator pick the
+   * shop again to see what is already chosen.
+   */
+  const [dishStoreId, setDishStoreId] = useState<string>(
+    initialDishStoreId ?? "",
+  );
 
   const [errors, setErrors] = useState<{
     name?: string;
@@ -836,29 +857,67 @@ function Form({
           )}
 
           {shape.kind === "single" && scopeType === "menuItem" && (
-            <Field
-              label={t("promotions.pickDishes")}
-              hint={t("promotions.pickDishesHint")}
-            >
-              <AsyncMultiSelect
-                value={dishes}
-                onChange={setDishes}
-                loadOptions={async (input) => {
-                  const found = await searchDishes(input);
-                  return found.map((dish) => ({
-                    value: dish.id,
-                    label: dish.label,
-                  }));
-                }}
-                placeholder={t("promotions.pickDishesPlaceholder")}
-                disabled={pending}
-                noOptionsMessage={(input) =>
-                  input
-                    ? t("promotions.noDishes", { term: input })
-                    : t("promotions.typeToFindDishes")
-                }
-              />
-            </Field>
+            <>
+              {/* The shop first, then its dishes.
+                  Searching every menu at once looked convenient and was not: a
+                  dozen shops sell something called "Hummus", so the list came
+                  back as near-identical names told apart only by a shop in grey
+                  after them — and picking the wrong one attaches the promotion
+                  to another merchant's dish, which nothing downstream
+                  questions.
+                  The same move the options tab makes: narrow the set before
+                  anything is chosen. */}
+              <Field label={t("promotions.pickDishShop")}>
+                <Select
+                  value={dishStoreId}
+                  onChange={(value) => {
+                    setDishStoreId(value);
+                    // Dishes already chosen belong to the previous shop, and a
+                    // promotion holding two shops' dishes under a single-shop
+                    // question is a scope nobody intended. Cleared out loud
+                    // rather than left to be noticed on the bill.
+                    setDishes([]);
+                  }}
+                  options={(stores.data?.stores ?? []).map((store) => ({
+                    value: store.id,
+                    label: pickLocalized(store.name),
+                  }))}
+                  placeholder={t("promotions.pickDishShopPlaceholder")}
+                  disabled={pending || !stores.isSuccess}
+                />
+              </Field>
+
+              <Field
+                label={t("promotions.pickDishes")}
+                hint={t("promotions.pickDishesHint")}
+              >
+                <AsyncMultiSelect
+                  value={dishes}
+                  onChange={setDishes}
+                  loadOptions={async (input) => {
+                    if (!dishStoreId) return [];
+                    const found = await searchDishes(input, dishStoreId);
+                    return found.map((dish) => ({
+                      value: dish.id,
+                      label: dish.label,
+                    }));
+                  }}
+                  placeholder={t("promotions.pickDishesPlaceholder")}
+                  // Nothing to search until a shop is chosen. Disabled rather
+                  // than hidden: the field appearing out of nowhere after the
+                  // select is answered is a layout jump, and the operator
+                  // should be able to see what the next step is.
+                  disabled={pending || !dishStoreId}
+                  noOptionsMessage={(input) =>
+                    !dishStoreId
+                      ? t("promotions.pickShopFirst")
+                      : input
+                        ? t("promotions.noDishes", { term: input })
+                        : t("promotions.typeToFindDishes")
+                  }
+                />
+              </Field>
+            </>
           )}
 
           <Field

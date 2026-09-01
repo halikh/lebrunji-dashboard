@@ -70,6 +70,20 @@
   --color-mint-tint: #cdeee0;
   --color-mint-deep: #0d6f4c;
 
+  /**
+   * WhatsApp's own green, and the one colour here that is not the app's.
+   *
+   * A button that opens WhatsApp is recognised by this before it is read —
+   * which is worth more than palette purity on a control the operator reaches
+   * for under time pressure. It is a *brand* colour like the mark's red, so it
+   * follows the same rule: nothing else in the product is painted in it, and it
+   * appears only on the controls that hand off to that application.
+   */
+  --color-whatsapp: #25d366;
+  --color-whatsapp-deep: #128c4a;
+  --color-whatsapp-wash: #dcf8e8;
+  --color-on-whatsapp: #ffffff;
+
   --color-grape: #6c4bf5;
   --color-grape-tint: #ddd6ff;
 

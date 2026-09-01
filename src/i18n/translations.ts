@@ -51,6 +51,7 @@ const en = {
     catalogue: "Catalogue",
     pricing: "Pricing",
     customers: "Customers",
+    drivers: "Drivers",
     reports: "Reports",
     settings: "Settings",
     account: "Your account",
@@ -184,6 +185,178 @@ const en = {
     gone: "That customer no longer exists.",
     isOperator:
       "That account belongs to an operator, so it cannot be closed from here.",
+  },
+
+  /**
+   * Handing an order to a driver, over WhatsApp.
+   *
+   * These are the only strings in the product that leave it — they are read on
+   * somebody else's phone, in a chat, by a person who has never seen the
+   * dashboard. So they say the whole thing rather than relying on a column
+   * heading: "Collect $12.40", not "Total".
+   */
+  dispatch: {
+    // The button on the receipt, and the dialog it opens.
+    open: "Send to driver",
+    title: "Send {code} to a driver",
+    blurb:
+      "Opens WhatsApp with the whole order written out. Check the number before you send it — it carries the customer’s address.",
+    send: "Send",
+    opensWhatsApp:
+      "Opens in WhatsApp. Nothing is sent until you press send there.",
+    noDrivers: "No driver on the books yet.",
+    addDriver: "Add one",
+
+    heading: "New delivery — {code}",
+    placed: "Ordered {when}",
+    customer: "Customer: {name}",
+    phone: "Phone: {phone}",
+    address: "Address: {address}",
+    map: "Map: {url}",
+    note: "Note for you: {note}",
+    from: "From {store}:",
+    lineNote: "note: {note}",
+    subtotal: "Items: {amount}",
+    delivery: "Delivery: {amount}",
+    discount: "Discount: -{amount}",
+    // Cash on delivery is the only payment method, so the total *is* what the
+    // driver collects. Saying "total" would leave them to work that out.
+    collect: "Collect on delivery: {amount}",
+    // The rate had not loaded, so no figure here would be trustworthy. Better
+    // to say so than to send a number that might be wrong by a hundredfold.
+    amountUnknown: "Amount: see the dashboard.",
+  },
+
+  drivers: {
+    title: "Drivers",
+    blurb:
+      "Who an order can be handed to. They never see the dashboard — the details go to them on WhatsApp.",
+    search: "Search by name or number",
+    tabAll: "All",
+    // The wizard.
+    stepDetails: "Who they are",
+    stepHours: "When they work",
+    next: "Next",
+    back: "Back",
+    finish: "Add driver",
+
+    // The week. Whether somebody is taking orders is read from it rather than
+    // switched by hand — see migration 0084.
+    working: "Working",
+    dayOff: "Day off",
+    onShift: "Taking orders",
+    offShift: "Off shift",
+    // Shown only while an override is in force. Without it, an exception made
+    // for one evening quietly becomes this driver's permanent state.
+    followRota: "Back to their hours",
+    overrideOn: "Taking orders tonight, outside their hours.",
+    overrideOff: "Not taking orders tonight, inside their hours.",
+    noWeek:
+      "No working days set, so this driver is never offered for an order.",
+    hoursTitle: "When they work",
+    hoursSaved: "Hours saved",
+    saveHours: "Save hours",
+    discardHours: "Discard changes",
+
+    // The profile.
+    tabOverview: "Overview",
+    tabShift: "Shift",
+
+    tabActive: "Taking orders",
+    tabOff: "Off shift",
+    searchNone: "Nothing matches {term}",
+
+    // The profile.
+    edit: "Edit",
+    copyPhone: "Copy the driver’s number",
+    notFound: "No such driver.",
+    backToList: "All drivers",
+    profileHandovers: "Orders handed over",
+    profileNone: "Nothing handed to them yet.",
+    // Said plainly, because the screen would otherwise be read as a delivery
+    // record. WhatsApp tells the dashboard nothing back — see migration 0083.
+    profileCaveat:
+      "This is when the chat was opened, not when the order arrived. The status is what says that.",
+    handedAt: "Handed over {when}",
+    statTotal: "Orders",
+    statThisWeek: "This week",
+    add: "New driver",
+    name: "Name",
+    namePlaceholder: "Ali",
+    phone: "WhatsApp number",
+    // The example is the shape that works: country code, no plus, no zero.
+    phonePlaceholder: "96170123456",
+    phoneHint:
+      "With the country code and no +. This is the number the order is sent to.",
+    active: "Taking orders",
+    inactive: "Off shift",
+    saved: "{name} saved",
+    added: "{name} added",
+    archived: "{name} archived",
+    archiveTitle: "Archive {name}?",
+    archiveBody:
+      "They stop appearing on orders. Their number is kept, so switching them back on later does not mean typing it again.",
+    archiveConfirm: "Archive driver",
+    duplicatePhone: "That number already belongs to another driver.",
+    badPhone: "That does not look like a phone number with a country code.",
+    empty: "No drivers yet.",
+  },
+
+  /**
+   * Changing an order the kitchen cannot fill as placed.
+   *
+   * The vocabulary is deliberately about *what is coming*, not about deleting.
+   * An operator on the phone says "we can only send two" — not "I am removing a
+   * unit" — and the screen should use the sentence they are already speaking.
+   */
+  amend: {
+    open: "Something missing?",
+    title: "Change {code}",
+    blurb:
+      "Ring the customer first. What you record here is what they agreed to — the order keeps its place and its delivery.",
+    coming: "Coming",
+    ordered: "of {count} ordered",
+    instead: "Instead send",
+    nothing: "Nothing",
+    note: "What happened",
+    noteHint:
+      "For whoever reads this order next. The customer does not see it.",
+    notePlaceholder: "Called Rana — no kibbeh left, took the sfiha instead",
+    newTotal: "New total",
+    // Said before it is committed, because it is the surprising part: the
+    // customer's order shrank and their delivery fee did not.
+    feesStand: "Delivery and any discount stay as they were.",
+    confirm: "Save the change",
+    done: "{code} updated",
+
+    // On the receipt, once it has happened.
+    changed: "Changed after ordering",
+    outOfStock: "Out of stock — not coming",
+    short: "Only {count} available",
+    replacedBy: "Replaced",
+    substituteFor: "Instead of {name}",
+  },
+
+  /**
+   * What happened to an order after it was placed.
+   *
+   * Read rarely, and almost always because something has gone wrong — so the
+   * wording is factual rather than reassuring. Somebody on this tab is
+   * reconstructing events for a customer who is disputing them.
+   */
+  history: {
+    tabDetails: "Details",
+    // "Activity", not "Change history": it carries hand-overs as well as
+    // amendments, and a name that only covers half of what is on a screen is
+    // the reason somebody does not look there for the other half.
+    tabHistory: "Activity",
+    open: "Activity",
+    amended: "Order changed",
+    handedTo: "Handed to",
+    // The same limit the driver's page states. WhatsApp tells the dashboard
+    // nothing back — see migration 0083.
+    caveat: "This is when the chat was opened, not when it arrived.",
+    nothing: "Nothing has happened to this order since it was placed.",
   },
 
   orders: {
@@ -393,6 +566,10 @@ const en = {
     remove: "Remove",
     uploading: "Uploading…",
     notSignedIn: "Your session has expired. Sign in again.",
+    // The signed URL outlived its fifteen minutes, or was altered on the way.
+    // Both are fixed by asking for another one, which is what choosing the
+    // file again does.
+    linkExpired: "That upload link expired. Choose the file again.",
     notAllowed: "This account is not allowed to upload images.",
     failed: "The upload did not finish. Nothing has been changed.",
   },
@@ -923,6 +1100,13 @@ const en = {
     pickShopsPlaceholder: "Add a shop",
     pickCategories: "Categories",
     pickCategoriesPlaceholder: "Add a category",
+    // The shop, asked before the dishes. A dozen shops sell a "Hummus", so a
+    // catalogue-wide dish search returns near-identical names told apart only
+    // by a shop in grey — and the wrong pick attaches the promotion to another
+    // merchant's dish.
+    pickDishShop: "Which shop",
+    pickDishShopPlaceholder: "Choose a shop",
+    pickShopFirst: "Choose a shop first.",
     pickDishes: "Dishes",
     pickDishesHint:
       "The shop's name is shown beside each, so two dishes with the same name are told apart.",

@@ -285,13 +285,14 @@ export function OrdersQueue() {
             />
           </div>
 
-          <span className="flex-grow" />
+          {/* No spacer before it: the box itself takes the room between the
+              scopes and the end of the bar, so there is one thing deciding the
+              width rather than a strut and a fixed number that disagree. */}
           <SearchInput
             ref={searchRef}
             value={search}
             onChange={setSearch}
             placeholder={t("orders.searchPlaceholder")}
-            className="w-[280px]"
           />
         </div>
 

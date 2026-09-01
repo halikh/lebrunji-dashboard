@@ -702,14 +702,20 @@ function AddressCard({ address }: { address: CustomerAddress }) {
 
       {/* The map is why the addresses are in the wide column. A line of text is
           an address somebody typed; the pin is where a courier is actually
-          sent, and the two disagree more often than anyone expects. */}
-      <PinMap
-        latitude={address.latitude}
-        longitude={address.longitude}
-        label={address.label ?? address.line}
-        emptyKey="customers.noPin"
-        className="h-[180px] w-full rounded-md"
-      />
+          sent, and the two disagree more often than anyone expects.
+
+          No pin, no map. An empty 180px placeholder saying "no location saved"
+          is a large piece of furniture carrying one sentence — and the warning
+          below already says the same thing, in red, with the consequence
+          attached. Two of them is one too many. */}
+      {address.latitude !== null && (
+        <PinMap
+          latitude={address.latitude}
+          longitude={address.longitude}
+          label={address.label ?? address.line}
+          className="h-[180px] w-full rounded-md"
+        />
+      )}
 
       {/* An address with no pin falls to the top delivery band —
           `delivery_fee_for_km` treats an unknown distance that way — so it

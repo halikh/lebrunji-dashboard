@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
-import { Button } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Copyable } from "@/components/ui/copyable";
 import { Map } from "@/components/ui/map";
@@ -19,6 +20,9 @@ import type { Order, OrderLine, OrderStore, OrderStatus } from "./api/orders";
  * for them per row would be a join nobody reads.
  */
 type OrderWithLines = Order & { lines: OrderLine[] };
+
+import { AmendOrder } from "./amend-order";
+import { DispatchModal, WhatsAppMark } from "./dispatch-modal";
 import { nextStatus, orderStatus, useAdvanceOrder } from "./use-orders";
 
 /**
@@ -186,70 +190,154 @@ export function OrderActions({
   order,
   statuses,
 }: {
-  order: Order;
+  // The lines as well as the header: the dispatch message below is the whole
+  // order, not a summary of it.
+  order: OrderWithLines;
   statuses: OrderStatus[] | undefined;
 }) {
   const { advance } = useAdvanceOrder(statuses);
+  const [amending, setAmending] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
 
   const cancelled = statuses?.find((status) => status.progress === null);
   const status = orderStatus(order, statuses);
   const next = status ? nextStatus(statuses, status.slug) : null;
 
-  if (!next) return null;
+  /**
+   * Whether the order can still be changed.
+   *
+   * Not "is it terminal". An order that has left the kitchen cannot be amended
+   * in any useful sense — the bag is packed and on a scooter, and a screen that
+   * offers to remove a dish from it is offering something nobody can carry out.
+   * So the control goes away one step earlier than Cancel does.
+   *
+   * **Derived from `progress`, never from a slug.** `order_statuses` is a
+   * lookup table precisely so a merchant can insert a step (`0032` says so),
+   * and a hardcoded list of "amendable" slugs would silently exclude any new
+   * one — which is the same failure that would hide orders from the queue. The
+   * rule instead is structural: amending is possible while **more than one move
+   * remains**, because the last remaining move is always the one that ends the
+   * order.
+   *
+   * Hidden rather than disabled. A disabled button is a promise the screen
+   * cannot keep, and there is nothing the operator could do to re-enable it —
+   * it is not off because of something they have not done yet, it is off
+   * because the moment has passed.
+   */
+  const path = (statuses ?? []).filter((one) => one.progress !== null);
+  const here = status?.progress ?? null;
+  const movesLeft =
+    here === null
+      ? 0
+      : path.filter((one) => (one.progress as number) > here).length;
+  const amendable = movesLeft > 1;
 
   return (
-    <div className="flex shrink-0 items-center gap-sm border-t border-border p-xxl">
-      {/* `flex-grow`, not `w-full`. `fullWidth` makes the button
+    <div className="flex shrink-0 flex-col gap-sm border-t border-border p-xxl">
+      {/* One row, both secondary. Neither is the thing the operator came here
+          to press — that is the status button below — and a dispatch control
+          that took a full-width row of its own was spending the panel's most
+          valuable space on something done once per order.
+
+          Dispatch stays whatever the status is: a driver is told about an order
+          being cooked, and told again about one already on its way, so taking
+          it away at the end would remove it exactly when somebody is chasing a
+          late delivery. Amending does not — see `amendable`. */}
+      <div className="flex items-center gap-sm">
+        {/* WhatsApp's own green, so the control that hands off to it is
+            recognised before it is read — which matters on a button reached
+            for under time pressure. Restricted to controls that open that
+            application, like the brand red is restricted to the mark. */}
+        <Button
+          size="sm"
+          onClick={() => setDispatching(true)}
+          className="border-whatsapp bg-whatsapp text-on-whatsapp hover:bg-whatsapp-deep"
+        >
+          <WhatsAppMark size={14} />
+          {t("dispatch.open")}
+        </Button>
+        {amendable && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setAmending(true)}
+          >
+            {t("amend.open")}
+          </Button>
+        )}
+      </div>
+
+      {dispatching && (
+        <DispatchModal
+          order={order}
+          lines={order.lines}
+          onClose={() => setDispatching(false)}
+        />
+      )}
+
+      {amending && (
+        <AmendOrder
+          order={order}
+          lines={order.lines}
+          onClose={() => setAmending(false)}
+        />
+      )}
+
+      {next && (
+        <div className="flex items-center gap-sm">
+          {/* `flex-grow`, not `w-full`. `fullWidth` makes the button
           `w-full`, which took the whole row and pushed Cancel off the
           edge of the panel — visibly gone, on the one action here that
           cannot be undone. Growing into what is left leaves room for
           it. */}
-      <span className="flex min-w-0 flex-grow">
-        <Button
-          fullWidth
-          style={{
-            background: statusTone(next.slug).fill,
-            color: statusTone(next.slug).onFill,
-          }}
-          onClick={() =>
-            advance({
-              orderId: order.id,
-              code: order.code,
-              fromSlug: status?.slug ?? "",
-              toSlug: next.slug,
-              toName: next.name,
-              undoable: next.progress !== null,
-            })
-          }
-        >
-          {next.name}
-        </Button>
-      </span>
+          <span className="flex min-w-0 flex-grow">
+            <Button
+              fullWidth
+              style={{
+                background: statusTone(next.slug).fill,
+                color: statusTone(next.slug).onFill,
+              }}
+              onClick={() =>
+                advance({
+                  orderId: order.id,
+                  code: order.code,
+                  fromSlug: status?.slug ?? "",
+                  toSlug: next.slug,
+                  toName: next.name,
+                  undoable: next.progress !== null,
+                })
+              }
+            >
+              {next.name}
+            </Button>
+          </span>
 
-      {cancelled && (
-        <ConfirmButton
-          onConfirm={() =>
-            advance({
-              orderId: order.id,
-              code: order.code,
-              fromSlug: status?.slug ?? "",
-              toSlug: cancelled.slug,
-              toName: cancelled.name,
-              undoable: false,
-            })
-          }
-          titleKey="orders.cancelTitle"
-          bodyKey="orders.cancelBody"
-          confirmKey="orders.cancelConfirm"
-          variant="danger"
-          // Filled danger rather than a quiet link. It is a real action
-          // with a real cost, and a text link beside a filled button
-          // reads as a footnote — which is the wrong weight for the one
-          // thing here that cannot be undone.
-          triggerVariant="danger"
-        >
-          {t("orders.cancel")}
-        </ConfirmButton>
+          {cancelled && (
+            <ConfirmButton
+              onConfirm={() =>
+                advance({
+                  orderId: order.id,
+                  code: order.code,
+                  fromSlug: status?.slug ?? "",
+                  toSlug: cancelled.slug,
+                  toName: cancelled.name,
+                  undoable: false,
+                })
+              }
+              titleKey="orders.cancelTitle"
+              bodyKey="orders.cancelBody"
+              confirmKey="orders.cancelConfirm"
+              variant="danger"
+              // Filled danger rather than a quiet link. It is a real action
+              // with a real cost, and a text link beside a filled button
+              // reads as a footnote — which is the wrong weight for the one
+              // thing here that cannot be undone.
+              triggerVariant="danger"
+            >
+              {t("orders.cancel")}
+            </ConfirmButton>
+          )}
+        </div>
       )}
     </div>
   );
@@ -287,30 +375,71 @@ function StoreSection({
       </div>
 
       <div className="flex flex-col gap-md">
-        {lines.map((line) => (
-          <div key={line.id} className="flex items-start gap-md text-[14px]">
-            <Thumbnail src={line.imageUrl} size={44} />
-            <span className="w-[26px] shrink-0 pt-xs font-bold text-text-soft tabular-nums">
-              {t("orders.quantity", { count: line.quantity })}
-            </span>
-            <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-              <span className="font-semibold">{line.name}</span>
-              {(line.options.length > 0 || line.note) && (
-                <span className="text-[12px] text-text-faint">
-                  {[...line.options, line.note].filter(Boolean).join(" · ")}
+        {lines.map((line) => {
+          // What is actually coming. `null` is the ordinary case and means the
+          // line is untouched — which is why the strike-through and the note
+          // below appear only when somebody has changed something.
+          const coming = line.fulfilledQuantity ?? line.quantity;
+          const gone = coming === 0;
+          const changed = line.fulfilledQuantity !== null;
+
+          return (
+            <div key={line.id} className="flex items-start gap-md text-[14px]">
+              <Thumbnail src={line.imageUrl} size={44} />
+              <span
+                className={cx(
+                  "w-[26px] shrink-0 pt-xs font-bold tabular-nums",
+                  gone ? "text-text-faint" : "text-text-soft",
+                )}
+              >
+                {t("orders.quantity", { count: coming })}
+              </span>
+              <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+                {/* Struck through rather than removed. "We could not bring your
+                    kibbeh" is something the customer needs to see, and a line
+                    that simply vanished from the receipt says nothing at all —
+                    it reads as an order that was always smaller. */}
+                <span
+                  className={cx(
+                    "font-semibold",
+                    gone && "text-text-faint line-through",
+                  )}
+                >
+                  {line.name}
                 </span>
-              )}
+                {(line.options.length > 0 || line.note) && (
+                  <span className="text-[12px] text-text-faint">
+                    {[...line.options, line.note].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+                {changed && (
+                  <span className="text-[12px] font-semibold text-danger">
+                    {gone
+                      ? t("amend.outOfStock")
+                      : t("amend.short", { count: coming })}
+                  </span>
+                )}
+                {line.amendmentReason === "substitute" && (
+                  <span className="text-[12px] font-semibold text-active-ink">
+                    {t("amend.substituteFor", {
+                      name:
+                        lines.find((one) => one.id === line.replacesLineId)
+                          ?.name ?? "",
+                    })}
+                  </span>
+                )}
+              </div>
+              <div className="shrink-0 pt-xs">
+                <Price
+                  value={line.unitPrice * coming}
+                  code={currencyCode}
+                  align="end"
+                  className={cx("font-semibold", gone && "opacity-50")}
+                />
+              </div>
             </div>
-            <div className="shrink-0 pt-xs">
-              <Price
-                value={line.unitPrice * line.quantity}
-                code={currencyCode}
-                align="end"
-                className="font-semibold"
-              />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -328,7 +457,7 @@ function StoreSection({
  * pointing anywhere, and `next/image` would need every one of those hosts
  * declared in the config before it would load them at all.
  */
-function Thumbnail({
+export function Thumbnail({
   src,
   size,
   rounded = false,

@@ -105,6 +105,41 @@ export function OrderPanel({
                 </svg>
                 {t("orders.openPage")}
               </Link>
+
+              {/* Straight to the history rather than to the page's first tab.
+                  Somebody following this link has a question about what
+                  happened — landing them on the receipt they were already
+                  reading would cost a second click for nothing.
+
+                  Quieter than the link above it: opening the full page is the
+                  ordinary next step, and this is the one you take when
+                  something has gone wrong. */}
+              <Link
+                href={`/orders/${order.data.id}?tab=history`}
+                className="flex items-center gap-xs text-[12px] font-semibold text-active-ink hover:underline"
+              >
+                {/* A clock with its hand turned back — the icon for "what has
+                    happened to this", drawn in the same 24-unit geometry as the
+                    rest of the set rather than fetched. Coral, because coral is
+                    where you *are* in this palette and this link leads to
+                    another face of the order already open. */}
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M12 8v4l3 2" />
+                </svg>
+                {t("history.open")}
+              </Link>
             </div>
             <button
               type="button"

@@ -376,10 +376,15 @@ export async function setPromotionOrder(
 // Scope targets
 // ---------------------------------------------------------------------------
 
-export type ScopeTarget = { id: string; label: string };
+export type ScopeTarget = {
+  id: string;
+  /** Which shop's menu it is on. Absent on rows read without it. */
+  storeId?: string;
+  label: string;
+};
 
 /**
- * Dishes matching a term, across every shop — for the async picker.
+ * Dishes matching a term, within one shop — for the async picker.
  *
  * Async because this is the one unbounded set on the screen. Shops and
  * categories are tens of rows and load whole; dishes are the case that gets
@@ -391,12 +396,30 @@ export type ScopeTarget = { id: string; label: string };
  * discount applied at the wrong restaurant, which nothing on the screen would
  * afterwards reveal.
  */
-export async function searchDishes(term: string): Promise<ScopeTarget[]> {
+export async function searchDishes(
+  term: string,
+  /**
+   * Which shop to look in. Required by the form rather than optional here.
+   *
+   * Searching every menu in the catalogue was the original behaviour and it is
+   * wrong in a way that only shows up on a real catalogue: a dozen shops sell
+   * something called "Hummus", so the operator gets a list of near-identical
+   * names distinguished only by a shop in grey after them — and picking the
+   * wrong one attaches a promotion to another merchant's dish, which nothing
+   * downstream would question.
+   *
+   * Narrowing by shop first turns that into a short list of things that can
+   * only mean one dish. It is the same move the options tab makes: a section,
+   * then a dish, because forty becomes six before anything is chosen.
+   */
+  storeId: string,
+): Promise<ScopeTarget[]> {
   const cleaned = term.trim();
 
   let query = getClient()
     .from("menu_items")
     .select("id, name, stores!inner ( name, deleted_at )")
+    .eq("store_id", storeId)
     .is("deleted_at", null)
     .is("stores.deleted_at", null)
     .order("sort_order", { ascending: true })
@@ -437,13 +460,17 @@ export async function fetchDishesByIds(
 
   const { data, error } = await getClient()
     .from("menu_items")
-    .select("id, name, stores ( name )")
+    .select("id, store_id, name, stores ( name )")
     .in("id", ids as string[]);
 
   if (error) throw new Error(`Could not read dishes: ${error.message}`);
 
   return (data ?? []).map((row) => ({
     id: row.id as string,
+    // Carried so the form can reopen on the right shop's menu. Which shop the
+    // dishes came from is derivable from the dishes themselves, so it is not
+    // stored on the promotion — this is where it is derived.
+    storeId: row.store_id as string,
     label: dishLabel(row),
   }));
 }

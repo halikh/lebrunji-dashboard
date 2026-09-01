@@ -85,7 +85,28 @@ export async function proxy(request: NextRequest) {
  * how somebody *becomes* signed in — gating them behind being signed in would
  * be a loop.
  */
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password", "/auth"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/auth",
+  /*
+   * Pictures, read by the customer app with no session at all. The route
+   * checks the key's shape and streams one object; there is nothing here to
+   * gate. It also happens to be excluded by the matcher below, because keys end
+   * in an image extension — but relying on that would make this route public by
+   * accident, and the next key format would quietly break it.
+   */
+  "/i",
+  /*
+   * Endpoints that answer for themselves. `/api/images` decides who may upload
+   * (`requireOperator`) and says so with a status code — and a redirect here
+   * would replace that with a 200 and a page of HTML, which `fetch` follows
+   * happily and the uploader then tries to parse as JSON. An expired session
+   * would read as "the upload is broken" rather than "sign in again".
+   */
+  "/api",
+];
 
 export const config = {
   matcher: [

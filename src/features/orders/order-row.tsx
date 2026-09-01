@@ -56,10 +56,13 @@ export function OrderRow({
       aria-label={order.code}
       onClick={onOpen}
       className={cx(
-        // Stated here rather than covered by the global rule: this is a `div`
-        // that happens to be clickable, not a control. The rule deliberately
-        // does not reach for arbitrary elements — a pointer on everything with
-        // an `onClick` would put one on half the page.
+        // `cursor-pointer` stated here rather than left to the global rule:
+        // that rule covers elements which *are* controls, and this is a `div`
+        // that happens to be clickable — a rule broad enough to catch every
+        // `onClick` would put a pointer on half the page. The comment said all
+        // this and the class was never actually written, so every row in the
+        // busiest list in the product showed a plain arrow.
+        "cursor-pointer",
         ROW,
         focused
           ? "border-active shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]"

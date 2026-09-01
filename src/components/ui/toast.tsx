@@ -172,12 +172,50 @@ function ToastRow({
         KIND_STYLES[toast.kind],
       )}
     >
-      <span className="text-[14px] font-medium">{toast.message}</span>
+      <span className="min-w-0 flex-grow text-[14px] font-medium">
+        {toast.message}
+      </span>
       {toast.undo && (
         <Button variant="quiet" size="sm" pending={undoing} onClick={undo}>
           {t("common.undo")}
         </Button>
       )}
+
+      {/*
+        A way out that is not waiting.
+
+        Toasts dismiss themselves, and hovering one *pauses* that clock — which
+        is right for reading and wrong for clearing. Three confirmations stacked
+        over the row somebody is trying to press are a wall that gets thicker
+        the more they lean towards it, because the pointer that reaches for the
+        list passes over the toasts and stops them expiring.
+
+        So there is a button. It is quiet, because dismissing is not the point
+        of a toast and a loud control here would compete with Undo — which is
+        the one thing on this row worth pressing.
+      */}
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label={t("common.close")}
+        className={cx(
+          "-me-sm flex size-[24px] shrink-0 items-center justify-center rounded-full",
+          "text-text-faint transition-colors hover:bg-neutral-fill hover:text-text",
+        )}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          aria-hidden
+        >
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
     </div>
   );
 }

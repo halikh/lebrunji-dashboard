@@ -20,6 +20,7 @@ export type IconName =
   | "catalogue"
   | "pricing"
   | "customers"
+  | "drivers"
   | "reports"
   | "settings"
   | "sign-out";
@@ -42,6 +43,11 @@ export const SECTIONS: readonly Section[] = [
     phase: 6,
     icon: "customers",
   },
+  // Beside customers rather than under settings, because it is the same kind of
+  // thing: a list of people, searched by name or number, each with a page. It
+  // started as a settings tab and outgrew it the moment a driver had a history
+  // worth reading.
+  { href: "/drivers", labelKey: "nav.drivers", phase: null, icon: "drivers" },
   { href: "/reports", labelKey: "nav.reports", phase: 6, icon: "reports" },
   { href: "/settings", labelKey: "nav.settings", phase: 7, icon: "settings" },
 ];

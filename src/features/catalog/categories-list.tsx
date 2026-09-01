@@ -105,7 +105,7 @@ export function CategoriesList() {
             for the box — so moving between the two tabs is not relearning
             where the search is. */}
         <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h1 className="flex-grow self-center text-[24px]">
+          <h1 className="shrink-0 self-center text-[24px]">
             {t("categories.tab")}
           </h1>
           {/* The rule under the box, always — not a warning that appears

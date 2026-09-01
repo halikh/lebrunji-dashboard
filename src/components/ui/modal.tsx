@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { t } from "@/i18n/translations";
+
 import { cx } from "./index";
 
 /**
@@ -86,11 +88,50 @@ export function Modal({
         // The open/close transition and the backdrop's colour are in
         // `globals.css`, on `dialog` — so every overlay added later gets them
         // without having to remember, and there is one place they are tuned.
-        "m-auto w-[min(420px,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-xxl",
+        // `relative`, so the close button above can sit in its corner.
+        "relative m-auto w-[min(420px,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-xxl",
         "text-text",
         className,
       )}
     >
+      {/*
+        A close button, on every dialog, in the corner the side panel puts its
+        own — so shutting an overlay is the same gesture wherever it opened.
+
+        Escape and a click on the backdrop already close it, and neither is
+        discoverable: one is a keyboard convention and the other is a habit
+        people who have been burned by it do not have. A visible affordance is
+        what makes the dialog closable for somebody who has never met either.
+
+        Absolutely positioned rather than in the flow, because the dialog's
+        content is written by the caller and the button must not push a heading
+        sideways to make room for itself. `z-10` puts it over a header that
+        paints a background of its own.
+      */}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t("common.close")}
+        className={cx(
+          "absolute end-lg top-lg z-10 flex size-[30px] items-center justify-center",
+          "rounded-full border border-border bg-surface text-text-soft",
+          "transition-colors hover:border-active hover:text-text",
+        )}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          aria-hidden
+        >
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+
       {children}
     </dialog>
   );

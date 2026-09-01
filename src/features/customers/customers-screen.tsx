@@ -132,15 +132,16 @@ export function CustomersScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-        <h1 className="text-[24px]">{t("customers.title")}</h1>
-        <span className="flex-grow" />
-        {/* The one screen where the box is the point, so it is wider than a
-            filter would be. */}
+        <h1 className="shrink-0 text-[24px]">{t("customers.title")}</h1>
+        {/* The one screen where the box *is* the point — a customer is found by
+            typing, not by scrolling — so it starts right after the heading and
+            runs to the end of the bar. A strut pushing it to the right left the
+            widest gap on the screen exactly where the most-used control was
+            meant to be. */}
         <SearchInput
           value={search}
           onChange={setSearch}
           placeholder={t("customers.search")}
-          className="w-[340px]"
         />
       </div>
 

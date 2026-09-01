@@ -205,7 +205,6 @@ export function StoreMenu({ storeId }: { storeId: string }) {
               value={search}
               onChange={setSearch}
               placeholder={t("menu.search")}
-              className="w-[280px]"
             />
             {/* Beside the search rather than at the end of the list. The
                 header does not scroll, so this is reachable on a menu of any

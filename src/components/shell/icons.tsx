@@ -107,6 +107,22 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   // A door with an arrow leaving it. The arrow points out, which is the half
   // that carries the meaning — a door alone reads as "enter" just as easily —
+  // A scooter, because that is the thing that turns up. The wheels are their
+  // own group so they can roll on hover — the part that moves is the part that
+  // carries the meaning, as everywhere else in this set.
+  drivers: (
+    <>
+      <g data-anim="roll">
+        <circle cx="5.5" cy="17.5" r="2.5" />
+        <circle cx="18.5" cy="17.5" r="2.5" />
+      </g>
+      <path d="M8 17.5h8" />
+      <path d="M18.5 17.5V11a2 2 0 0 0-2-2H14" />
+      <path d="M5.5 17.5 9 8h3" />
+      <path d="M13 5h2a1 1 0 0 1 1 1v3" />
+    </>
+  ),
+
   // and on hover it goes.
   "sign-out": (
     <>
