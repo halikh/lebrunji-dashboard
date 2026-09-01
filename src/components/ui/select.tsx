@@ -164,6 +164,15 @@ function paletteStyles<M extends boolean>(
     placeholder: (base) => ({
       ...base,
       color: "var(--color-text-faint)",
+      // One line, always. A placeholder is a hint about what to type, and a
+      // hint that wraps to two lines makes the control taller than every field
+      // beside it — so a control the operator has not touched yet is the one
+      // thing breaking the row. Narrower than its text, it clips with an
+      // ellipsis rather than reflowing the layout around it.
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      maxWidth: "calc(100% - var(--spacing-sm))",
     }),
     input: (base) => ({
       ...base,

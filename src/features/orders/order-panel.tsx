@@ -1,27 +1,18 @@
 "use client";
 
+import Link from "next/link";
+
 import { Button } from "@/components/ui";
-import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Copyable } from "@/components/ui/copyable";
-import { Map } from "@/components/ui/map";
 import { Panel } from "@/components/ui/panel";
-import { Price } from "@/features/reference/price";
 import { t } from "@/i18n/translations";
-import { formatPhone } from "@/lib/phone";
-import { statusTone } from "@/lib/order-status";
 import { formatDayAndTime } from "@/lib/time";
 
-import type { OrderLine, OrderStore } from "./api/orders";
-import {
-  nextStatus,
-  orderStatus,
-  useAdvanceOrder,
-  useOrder,
-  useOrderStatuses,
-} from "./use-orders";
+import { OrderActions, OrderBody, PanelSkeleton } from "./order-detail";
+import { useOrder, useOrderStatuses } from "./use-orders";
 
 /**
- * The receipt: one order, opened beside the queue.
+ * The receipt, opened beside the queue.
  *
  * The queue carries what is needed to *triage*; this carries what is needed to
  * *act* — the number to ring, the note the courier has to read, the pictures to
@@ -29,6 +20,17 @@ import {
  *
  * It never replaces the queue. Advancing must not cost the operator their place
  * in the list, which is the whole reason this is a panel and not a page.
+ *
+ * ## And there is also a page
+ *
+ * `/orders/<id>` renders the same receipt with room around it. The panel is for
+ * working *through* orders; the page is for sending one to somebody, opening it
+ * in a second tab, or reading it without a list moving beside it. The link at
+ * the top is how you get from one to the other — small and quiet, because it is
+ * a way out of the thing you are already doing rather than the thing to do.
+ *
+ * Both render `OrderBody` and `OrderActions`, so a field added to the receipt
+ * cannot appear in one and not the other.
  */
 export function OrderPanel({
   orderId,
@@ -39,11 +41,6 @@ export function OrderPanel({
 }) {
   const statuses = useOrderStatuses();
   const order = useOrder(orderId);
-  const { advance } = useAdvanceOrder(statuses.data);
-
-  const cancelled = statuses.data?.find((status) => status.progress === null);
-  const status = order.data ? orderStatus(order.data, statuses.data) : null;
-  const next = status ? nextStatus(statuses.data, status.slug) : null;
 
   return (
     <Panel
@@ -80,6 +77,34 @@ export function OrderPanel({
               <span className="text-[13px] text-text-faint">
                 {t("orders.placed")} {formatDayAndTime(order.data.placedAt)}
               </span>
+
+              {/* The way out to the full page. Quiet and small: it leaves the
+                  screen the operator is working on, which is almost never what
+                  they want next — but when it is, hunting for it is worse. */}
+              <Link
+                href={`/orders/${order.data.id}`}
+                className="flex w-fit items-center gap-xs text-[13px] font-semibold text-primary hover:underline"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  {/* A box with an arrow leaving it — the conventional mark for
+                      "this goes somewhere else", which is precisely what
+                      distinguishes it from every other link on the panel. */}
+                  <path d="M14 4h6v6" />
+                  <path d="M20 4l-8 8" />
+                  <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+                </svg>
+                {t("orders.openPage")}
+              </Link>
             </div>
             <button
               type="button"
@@ -102,331 +127,10 @@ export function OrderPanel({
             </button>
           </div>
 
-          <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
-            <section className="flex flex-col gap-sm">
-              <SectionTitle>{t("orders.customer")}</SectionTitle>
-              <div className="flex flex-wrap items-baseline gap-md">
-                <span className="text-[15px] font-semibold">
-                  {order.data.customerName || t("orders.incompleteSignup")}
-                </span>
-                {order.data.customerPhone ? (
-                  // Both: tap to ring, copy to paste into a courier app. The
-                  // two are separate gestures on purpose — a number that dialled
-                  // when somebody meant to copy it is a call to a customer at
-                  // eleven at night.
-                  <Copyable
-                    value={formatPhone(order.data.customerPhone)}
-                    href={`tel:${formatPhone(order.data.customerPhone)}`}
-                    label={t("orders.copyPhone")}
-                    className="text-[14px]"
-                  />
-                ) : (
-                  <span className="text-[13px] text-text-faint">
-                    {t("orders.noPhone")}
-                  </span>
-                )}
-              </div>
-            </section>
-
-            <section className="flex flex-col gap-sm">
-              <SectionTitle>{t("orders.address")}</SectionTitle>
-              {/* The snapshot written at checkout, not the customer's current
-                  address — this is what was agreed, and it must not change
-                  under a delivery because somebody edited their address book. */}
-              <p className="text-[14px] leading-relaxed">
-                {order.data.addressLine}
-              </p>
-              {order.data.courierNote && (
-                <div className="rounded-md bg-yellow-wash px-md py-md text-[13px] leading-relaxed">
-                  <strong className="font-semibold">
-                    {t("orders.courierNote")}
-                  </strong>
-                  {order.data.courierNote}
-                </div>
-              )}
-              {/* The pin comes from `addresses`, which the order references —
-                  it is never snapshotted, so this is where the customer's pin
-                  is *now*. Good enough to find a door, not evidence. */}
-              <Map
-                latitude={order.data.latitude}
-                longitude={order.data.longitude}
-                label={t("orders.locationLabel", {
-                  name: order.data.addressLine,
-                })}
-              />
-            </section>
-
-            {order.data.stores.map((store) => (
-              <StoreSection
-                key={store.id}
-                store={store}
-                lines={order.data.lines.filter(
-                  (line) => line.orderStoreId === store.id,
-                )}
-                currencyCode={order.data.currencyCode}
-              />
-            ))}
-
-            <div className="flex flex-col gap-sm border-t border-border pt-lg text-[14px]">
-              <Money
-                label={t("orders.subtotal")}
-                value={order.data.subtotal}
-                code={order.data.currencyCode}
-              />
-              <Money
-                label={t("orders.delivery")}
-                value={order.data.deliveryFee}
-                code={order.data.currencyCode}
-              />
-              {order.data.discount > 0 && (
-                <Money
-                  label={t("orders.discount")}
-                  value={-order.data.discount}
-                  code={order.data.currencyCode}
-                />
-              )}
-              <div className="flex items-baseline justify-between pt-xs">
-                <span className="text-[16px] font-bold">
-                  {t("orders.total")}
-                </span>
-                <Price
-                  value={order.data.total}
-                  code={order.data.currencyCode}
-                  align="end"
-                  className="text-[16px] font-bold"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/*
-            One button, for the whole order. A customer who ordered from two
-            shops placed one order, and "half confirmed" is not a state anybody
-            outside the schema can act on.
-
-            Cancel is the only action here with a confirmation, and for a
-            structural reason: it is terminal, the function refuses to move off
-            it, so there is no undo to offer — and undo is what every other move
-            gets.
-          */}
-          <div className="flex shrink-0 items-center gap-sm border-t border-border p-xxl">
-            {/* `flex-grow`, not `w-full`. `fullWidth` makes the button
-                `w-full`, which took the whole row and pushed Cancel off the
-                edge of the panel — visibly gone, on the one action here that
-                cannot be undone. Growing into what is left leaves room for
-                it. */}
-            {next && (
-              <span className="flex min-w-0 flex-grow">
-                <Button
-                  fullWidth
-                  style={{
-                    background: statusTone(next.slug).fill,
-                    color: statusTone(next.slug).onFill,
-                  }}
-                  onClick={() =>
-                    advance({
-                      orderId: order.data.id,
-                      code: order.data.code,
-                      fromSlug: status?.slug ?? "",
-                      toSlug: next.slug,
-                      toName: next.name,
-                      undoable: next.progress !== null,
-                    })
-                  }
-                >
-                  {next.name}
-                </Button>
-              </span>
-            )}
-
-            {cancelled && next && (
-              <ConfirmButton
-                onConfirm={() =>
-                  advance({
-                    orderId: order.data.id,
-                    code: order.data.code,
-                    fromSlug: status?.slug ?? "",
-                    toSlug: cancelled.slug,
-                    toName: cancelled.name,
-                    undoable: false,
-                  })
-                }
-                titleKey="orders.cancelTitle"
-                bodyKey="orders.cancelBody"
-                confirmKey="orders.cancelConfirm"
-                variant="danger"
-                // Filled danger rather than a quiet link. It is a real action
-                // with a real cost, and a text link beside a filled button
-                // reads as a footnote — which is the wrong weight for the one
-                // thing here that cannot be undone.
-                triggerVariant="danger"
-              >
-                {t("orders.cancel")}
-              </ConfirmButton>
-            )}
-          </div>
+          <OrderBody order={order.data} from={"panel"} />
+          <OrderActions order={order.data} statuses={statuses.data} />
         </>
       )}
     </Panel>
-  );
-}
-
-/**
- * One shop's part of the receipt.
- *
- * The store name is a heading rather than a label — with two shops on an order,
- * it is what tells the operator which bag they are looking at, and it has to be
- * findable while glancing between a screen and a counter.
- */
-function StoreSection({
-  store,
-  lines,
-  currencyCode,
-}: {
-  store: OrderStore;
-  lines: OrderLine[];
-  currencyCode: string;
-}) {
-  const tone = statusTone(store.statusSlug);
-
-  return (
-    <section className="flex flex-col gap-md">
-      <div className="flex items-center gap-md">
-        <Thumbnail src={store.storeImageUrl} size={38} rounded />
-        <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-          <h3 className="truncate text-[17px]">{store.storeName}</h3>
-          <span
-            className="flex items-center gap-sm text-[12px] font-semibold"
-            style={{ color: tone.ink }}
-          >
-            <span
-              aria-hidden
-              className="size-[7px] shrink-0 rounded-full"
-              style={{ background: tone.dot }}
-            />
-            {store.statusName}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-md">
-        {lines.map((line) => (
-          <div key={line.id} className="flex items-start gap-md text-[14px]">
-            <Thumbnail src={line.imageUrl} size={44} />
-            <span className="w-[26px] shrink-0 pt-xs font-bold text-text-soft tabular-nums">
-              {t("orders.quantity", { count: line.quantity })}
-            </span>
-            <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-              <span className="font-semibold">{line.name}</span>
-              {(line.options.length > 0 || line.note) && (
-                <span className="text-[12px] text-text-faint">
-                  {[...line.options, line.note].filter(Boolean).join(" · ")}
-                </span>
-              )}
-            </div>
-            <div className="shrink-0 pt-xs">
-              <Price
-                value={line.unitPrice * line.quantity}
-                code={currencyCode}
-                align="end"
-                className="font-semibold"
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/**
- * A picture, or a placeholder that is obviously one.
- *
- * `image_url` is nullable everywhere it appears, and an item deleted since the
- * order was placed has none at all — so the absent case is normal rather than
- * exceptional. A plain `<img>` with a broken source would render the browser's
- * torn-page icon, which reads as a fault.
- *
- * `<img>` rather than `next/image`: these are arbitrary URLs a merchant typed,
- * pointing anywhere, and `next/image` would need every one of those hosts
- * declared in the config before it would load them at all.
- */
-function Thumbnail({
-  src,
-  size,
-  rounded = false,
-}: {
-  src: string | null;
-  size: number;
-  rounded?: boolean;
-}) {
-  const style = { width: size, height: size, borderRadius: rounded ? 999 : 14 };
-
-  if (!src) {
-    return (
-      <div aria-hidden className="shrink-0 bg-neutral-fill" style={style} />
-    );
-  }
-
-  return (
-    // A plain `<img>`, and the rule is overridden rather than obeyed: these are
-    // arbitrary URLs a merchant typed, pointing at any host. `next/image`
-    // refuses a host that is not declared in `next.config`, so it would turn
-    // every picture into a configuration change — and the optimisation it
-    // offers is worth nothing on a 44px thumbnail.
-    //
-    // Decorative: the name is right beside it in text, so announcing the
-    // picture too would read the item twice.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt=""
-      aria-hidden
-      className="shrink-0 object-cover"
-      style={style}
-    />
-  );
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
-      {children}
-    </h3>
-  );
-}
-
-/**
- * One line of the breakdown.
- *
- * `items-baseline` rather than centred: the two labels and the two primary
- * figures sit on one line whether or not a converted figure hangs below, so the
- * column of amounts reads straight down even when a rate is missing for one.
- */
-function Money({
-  label,
-  value,
-  code,
-}: {
-  label: string;
-  value: number;
-  code: string;
-}) {
-  return (
-    <div className="flex items-baseline justify-between text-text-soft">
-      <span>{label}</span>
-      <Price value={value} code={code} align="end" />
-    </div>
-  );
-}
-
-function PanelSkeleton() {
-  return (
-    <div aria-hidden className="flex flex-col gap-lg p-xxl">
-      <div className="h-[24px] w-[180px] rounded-sm bg-neutral-fill" />
-      <div className="h-[14px] w-[120px] rounded-sm bg-neutral-fill" />
-      <div className="mt-lg h-[60px] rounded-md bg-neutral-fill" />
-      <div className="h-[200px] rounded-md bg-neutral-fill" />
-    </div>
   );
 }

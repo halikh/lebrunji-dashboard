@@ -71,6 +71,9 @@ const en = {
     tabClosed: "Closed",
 
     backToList: "All customers",
+    // `{code}` is empty when the code did not survive the trip — the link still
+    // says where it goes, which is more than a blank would.
+    backToOrder: "Order {code}",
     tabOverview: "Overview",
     statsFailed: "Could not total their orders.",
     ordersFailed: "Could not load their orders.",
@@ -219,6 +222,8 @@ const en = {
     keyboardUndo: "undo the last move",
     keyboardSearch: "search",
     loadMore: "Load older orders",
+    openPage: "Open the full page",
+    backToQueue: "All orders",
     panelLabel: "Order detail",
     placed: "Placed",
     customer: "Customer",
@@ -1010,6 +1015,41 @@ const en = {
     range7: "7 days",
     range30: "30 days",
     range90: "90 days",
+    rangeClear: "Back to presets",
+
+    exportLabel: "Export",
+    exportChoose: "Choose a format",
+    exporting: "Preparing…",
+    rangePlaceholder: "Pick a date range",
+    export: {
+      csv: "CSV",
+      xlsx: "Excel",
+      pdf: "PDF",
+    },
+    // The browser's own print dialogue is what writes the PDF — see `export.ts`
+    // on why, and this is the one way it can fail that is worth explaining.
+    printBlocked:
+      "Your browser blocked the print window. Allow pop-ups for this site and try again.",
+
+    sheetSummary: "Summary",
+    sheetDaily: "By day",
+    sheetItems: "What sells",
+    sheetStores: "Shops",
+    sheetHours: "When we are busy",
+    colMetric: "Figure",
+    colValue: "Value",
+    // The stored integer, so a spreadsheet can compute — labelled so nobody
+    // reads it as the amount.
+    colRaw: "Raw (minor units)",
+    colDay: "Day",
+    colOrders: "Orders",
+    colRevenue: "Revenue",
+    colItem: "Dish",
+    colStore: "Shop",
+    colQuantity: "Sold",
+    colWeekday: "Day",
+    colHour: "Hour",
+    colCancelled: "Cancelled",
     rangeNote: "{from} to {to}, Beirut time",
     failedTitle: "Could not load the figures",
     nothingYet: "Nothing in this range yet.",

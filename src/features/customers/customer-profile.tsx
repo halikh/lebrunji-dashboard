@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 
 import { Button, cx } from "@/components/ui";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Copyable } from "@/components/ui/copyable";
 import { Avatar } from "@/components/ui/avatar";
+import { OrderPanel } from "@/features/orders/order-panel";
 import { BarChart, HeatStrip } from "@/components/ui/chart";
 import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
@@ -87,6 +88,22 @@ const TABS: { key: ProfileTab; labelKey: TranslationKey }[] = [
 
 type ProfileTab = "overview" | "orders" | "addresses" | "promotions";
 
+/** What a uuid looks like. Anything else is not an order this can link to. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * An order code, or nothing.
+ *
+ * The code arrives in the URL as a label rather than being fetched, which saves
+ * a round trip for four words of chrome — and means it is a string somebody
+ * else could have written. It is only ever rendered as text, so the risk is not
+ * injection but nonsense: this keeps it to the shape a code actually has, and
+ * an unrecognisable one becomes an empty label rather than whatever was pasted.
+ */
+function label(code: string | null): string {
+  return code && /^#?[A-Za-z0-9-]{1,32}$/.test(code) ? code : "";
+}
+
 export function CustomerProfile({ id }: { id: string }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -118,6 +135,61 @@ export function CustomerProfile({ id }: { id: string }) {
   const orders = useCustomerOrders(id);
   const redemptions = useCustomerRedemptions(id);
   const { format } = useMoney();
+
+  /**
+   * The order whose receipt is open, over this page.
+   *
+   * In the URL rather than in state, like every other panel here: a view can be
+   * reloaded or sent, and Back closes the receipt instead of leaving the
+   * customer entirely.
+   *
+   * It opens **here** rather than navigating to the queue, which is what these
+   * rows used to do. Sending somebody to a different screen to read one line of
+   * a history they are already looking at loses their tab, their scroll and
+   * their place in it.
+   */
+  const openOrder = params.get("order");
+
+  /**
+   * Where "back" goes.
+   *
+   * A profile reached from an order should lead back to *that order* — the
+   * operator was reading a receipt, followed the customer's name to check their
+   * history, and wants to return to what they were doing. Sending them to the
+   * customers list instead is the same wrong answer a browser Back button would
+   * be right about, and this link is what they will press.
+   *
+   * Only an id is accepted, and the path is built here: a return *URL* taken
+   * from a query parameter is a destination somebody else chooses.
+   */
+  const fromOrder = params.get("fromOrder");
+  const fromQueue = params.get("fromQueue");
+  const back = UUID.test(fromOrder ?? "")
+    ? {
+        href: `/orders/${fromOrder}`,
+        // Named, because a page has no list behind it to go "back" to — and
+        // the code is what the operator was reading a second ago.
+        label: t("customers.backToOrder", { code: label(params.get("code")) }),
+      }
+    : UUID.test(fromQueue ?? "")
+      ? // Where the panel was open, still open. Exactly the link the order's
+        // own page offers, so leaving a receipt lands in the same place from
+        // either side of it.
+        { href: `/orders?order=${fromQueue}`, label: t("orders.backToQueue") }
+      : { href: "/customers", label: t("customers.backToList") };
+
+  const setOpenOrder = useCallback(
+    (orderId: string | null) => {
+      const query = new URLSearchParams(params);
+      if (orderId) query.set("order", orderId);
+      else query.delete("order");
+      const search = query.toString();
+      router.replace(search ? `${pathname}?${search}` : pathname, {
+        scroll: false,
+      });
+    },
+    [params, pathname, router],
+  );
 
   const setActive = useSetCustomerActive();
   const close = useCloseCustomerAccount();
@@ -177,7 +249,7 @@ export function CustomerProfile({ id }: { id: string }) {
             and hover all matching, because two spellings of "go up a level"
             are two things to recognise. */}
         <Link
-          href="/customers"
+          href={back.href}
           className="flex w-fit items-center gap-xs text-[13px] font-semibold text-primary hover:underline"
         >
           <svg
@@ -193,7 +265,7 @@ export function CustomerProfile({ id }: { id: string }) {
           >
             <path d="M15 5l-7 7 7 7" />
           </svg>
-          {t("customers.backToList")}
+          {back.label}
         </Link>
 
         <div className="flex flex-wrap items-center gap-lg">
@@ -528,7 +600,7 @@ export function CustomerProfile({ id }: { id: string }) {
             )}
 
             {orderRows.map((order) => (
-              <OrderRow key={order.id} order={order} />
+              <OrderRow key={order.id} order={order} onOpen={setOpenOrder} />
             ))}
 
             {orders.isSuccess && orderRows.length > 0 && (
@@ -592,7 +664,11 @@ export function CustomerProfile({ id }: { id: string }) {
                 </p>
                 <ul className="flex flex-col gap-sm">
                   {redemptions.data.map((one) => (
-                    <RedemptionRow key={one.id} redemption={one} />
+                    <RedemptionRow
+                      key={one.id}
+                      redemption={one}
+                      onOpen={setOpenOrder}
+                    />
                   ))}
                 </ul>
               </>
@@ -600,6 +676,10 @@ export function CustomerProfile({ id }: { id: string }) {
           </div>
         </div>
       </div>
+
+      {/* The queue's own receipt, opened over the profile. Same component, so
+          a field added there appears here without anybody remembering to. */}
+      <OrderPanel orderId={openOrder} onClose={() => setOpenOrder(null)} />
     </div>
   );
 }
@@ -641,18 +721,27 @@ function AddressCard({ address }: { address: CustomerAddress }) {
   );
 }
 
-function OrderRow({ order }: { order: CustomerOrder }) {
+function OrderRow({
+  order,
+  onOpen,
+}: {
+  order: CustomerOrder;
+  onOpen: (id: string) => void;
+}) {
   return (
     <li className={cx(ROW, "border-border")}>
       <span className="flex min-w-0 flex-grow flex-col gap-xxs">
-        {/* Straight to the order in the queue, with the panel open on it —
-            which is the thing the operator wants next, every time. */}
-        <Link
-          href={`/?order=${order.id}`}
-          className="truncate tabular-nums text-[13px] font-semibold after:absolute after:inset-0"
+        {/* Opens the receipt **over this page**, rather than sending the
+            operator to the queue. They are already looking at this customer's
+            history; navigating away to read one line of it loses their tab,
+            their scroll and their place in it. */}
+        <button
+          type="button"
+          onClick={() => onOpen(order.id)}
+          className="truncate text-start tabular-nums text-[13px] font-semibold after:absolute after:inset-0"
         >
           {order.code}
-        </Link>
+        </button>
         <span className="truncate text-[12px] text-text-faint">
           {order.addressLine}
         </span>
@@ -713,7 +802,13 @@ function OrderRow({ order }: { order: CustomerOrder }) {
  */
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-function RedemptionRow({ redemption }: { redemption: CustomerRedemption }) {
+function RedemptionRow({
+  redemption,
+  onOpen,
+}: {
+  redemption: CustomerRedemption;
+  onOpen: (id: string) => void;
+}) {
   return (
     <li className={cx(ROW, "border-border")}>
       <span className="flex min-w-0 flex-grow flex-col gap-xxs">
@@ -725,12 +820,13 @@ function RedemptionRow({ redemption }: { redemption: CustomerRedemption }) {
         <span className="truncate text-[13px] font-semibold">
           {redemption.label || t("customers.unnamedPromotion")}
         </span>
-        <Link
-          href={`/?order=${redemption.orderId}`}
-          className="truncate tabular-nums text-[12px] text-text-faint after:absolute after:inset-0"
+        <button
+          type="button"
+          onClick={() => onOpen(redemption.orderId)}
+          className="truncate text-start tabular-nums text-[12px] text-text-faint after:absolute after:inset-0"
         >
           {redemption.orderCode}
-        </Link>
+        </button>
       </span>
 
       <span className="shrink-0 text-[12px] text-text-faint">

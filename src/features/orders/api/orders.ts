@@ -53,6 +53,13 @@ export type Order = {
   id: string;
   code: string;
   placedAt: string;
+  /**
+   * Who placed it, so a receipt can lead to their profile.
+   *
+   * `orders.user_id` rather than a lookup by name: two customers can share a
+   * name, and a link that guessed would open the wrong person's history.
+   */
+  customerId: string;
   customerName: string;
   customerPhone: string;
   addressLine: string;
@@ -194,6 +201,7 @@ export async function fetchOrders(options: {
     .select(
       `id, code, placed_at, address_line, courier_note, currency_code,
        subtotal, delivery_fee, discount, total,
+       user_id,
        users:user_id ( name, phone ),
        ${embed}`,
     )
@@ -245,6 +253,7 @@ export async function fetchOrder(
     .select(
       `id, code, placed_at, address_line, courier_note, currency_code,
        subtotal, delivery_fee, discount, total,
+       user_id,
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal,
@@ -434,6 +443,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     placedAt: row.placed_at as string,
     // An account that never finished setup has an empty name — that is the flag
     // the app routes on. Rendering it blank would read as a data fault.
+    customerId: row.user_id as string,
     customerName: ((user?.name as string) ?? "").trim(),
     customerPhone: (user?.phone as string) ?? "",
     addressLine: row.address_line as string,

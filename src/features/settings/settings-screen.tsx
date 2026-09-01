@@ -10,6 +10,7 @@ import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
+import { PanelHeader } from "@/components/ui/panel-header";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { ROW } from "@/components/ui/row";
 import { Select } from "@/components/ui/select";
@@ -275,27 +276,38 @@ function HelpTab() {
         label={t("content.topicForm")}
       >
         {open && (
-          <HelpEditor
-            key={open}
-            initial={editing ?? undefined}
-            groups={rows}
-            pending={create.isPending || update.isPending}
-            onSave={(draft) => {
-              const name = pickLocalized(draft.question);
-              if (editing) {
-                update.mutate(
-                  { id: editing.id, patch: draft, name },
-                  { onSuccess: () => setOpen(null) },
-                );
-              } else {
-                create.mutate(
-                  { draft, sortOrder: rows.length, name },
-                  { onSuccess: () => setOpen(null) },
-                );
+          <>
+            <PanelHeader
+              title={
+                editing
+                  ? pickLocalized(editing.question)
+                  : t("content.addTopic")
               }
-            }}
-            onCancel={() => setOpen(null)}
-          />
+              onClose={() => setOpen(null)}
+            />
+
+            <HelpEditor
+              key={open}
+              initial={editing ?? undefined}
+              groups={rows}
+              pending={create.isPending || update.isPending}
+              onSave={(draft) => {
+                const name = pickLocalized(draft.question);
+                if (editing) {
+                  update.mutate(
+                    { id: editing.id, patch: draft, name },
+                    { onSuccess: () => setOpen(null) },
+                  );
+                } else {
+                  create.mutate(
+                    { draft, sortOrder: rows.length, name },
+                    { onSuccess: () => setOpen(null) },
+                  );
+                }
+              }}
+              onCancel={() => setOpen(null)}
+            />
+          </>
         )}
       </Panel>
     </div>
@@ -658,30 +670,39 @@ function LegalTab() {
         label={t("content.sectionForm")}
       >
         {open && (
-          <PolicyEditor
-            key={`${document}-${open}`}
-            initial={editing ?? undefined}
-            pending={create.isPending || update.isPending}
-            onSave={(draft) => {
-              const name = pickLocalized(draft.title);
-              if (editing) {
-                update.mutate(
-                  { id: editing.id, patch: draft, name },
-                  { onSuccess: () => setOpen(null) },
-                );
-              } else {
-                create.mutate(
-                  {
-                    draft: { ...draft, document },
-                    sortOrder: rows.length,
-                    name,
-                  },
-                  { onSuccess: () => setOpen(null) },
-                );
+          <>
+            <PanelHeader
+              title={
+                editing ? pickLocalized(editing.title) : t("content.addSection")
               }
-            }}
-            onCancel={() => setOpen(null)}
-          />
+              onClose={() => setOpen(null)}
+            />
+
+            <PolicyEditor
+              key={`${document}-${open}`}
+              initial={editing ?? undefined}
+              pending={create.isPending || update.isPending}
+              onSave={(draft) => {
+                const name = pickLocalized(draft.title);
+                if (editing) {
+                  update.mutate(
+                    { id: editing.id, patch: draft, name },
+                    { onSuccess: () => setOpen(null) },
+                  );
+                } else {
+                  create.mutate(
+                    {
+                      draft: { ...draft, document },
+                      sortOrder: rows.length,
+                      name,
+                    },
+                    { onSuccess: () => setOpen(null) },
+                  );
+                }
+              }}
+              onCancel={() => setOpen(null)}
+            />
+          </>
         )}
       </Panel>
     </div>

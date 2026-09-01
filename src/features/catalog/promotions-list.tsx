@@ -14,6 +14,7 @@ import { ImageUploader } from "@/components/ui/image-uploader";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Panel } from "@/components/ui/panel";
+import { PanelHeader } from "@/components/ui/panel-header";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import {
   AsyncMultiSelect,
@@ -212,30 +213,10 @@ export function PromotionsList() {
       >
         {open && (
           <>
-            <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
-              <h2 className="flex-grow text-[20px]">
-                {editing ? editing.slug : t("promotions.add")}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOpen(null)}
-                aria-label={t("common.close")}
-                className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft hover:bg-neutral-fill lg:flex"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  aria-hidden
-                >
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
+            <PanelHeader
+              title={editing ? editing.slug : t("promotions.add")}
+              onClose={() => setOpen(null)}
+            />
 
             <Editor
               key={open}

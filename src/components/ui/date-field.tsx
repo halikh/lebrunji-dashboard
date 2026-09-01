@@ -118,3 +118,88 @@ function toInstant(date: Date | null): string | null {
     minute: date.getMinutes(),
   }).toISOString();
 }
+
+/**
+ * Two dates as one control, for a range of **whole days**.
+ *
+ * ## Why not two `DateField`s
+ *
+ * Two boxes ask the same question twice and answer neither: a from and a to
+ * that mean nothing apart are shown apart, each with its own calendar, so the
+ * one thing a person is actually choosing — the *span* — is never on screen.
+ * `react-datepicker` has a range mode, and in it the calendar shades the days
+ * between as they are picked, which is the whole point: the answer is visible
+ * while it is being given.
+ *
+ * ## No time of day here, deliberately
+ *
+ * Unlike `DateField` this picks *calendar days*, because a report's range is
+ * days — "1 to 31 August", not "from 00:00 on the 1st". The instants it hands
+ * back are each day's Beirut midnight, and the caller decides what the far end
+ * means (`customRange` makes it inclusive by taking the following midnight).
+ * Offering a time here would let somebody set a range ending at 14:30 and get a
+ * half-day nobody asked for.
+ *
+ * The conversion is `DateField`'s, for `DateField`'s reasons: the `Date` the
+ * picker works in is a carrier for three numbers, never a moment.
+ */
+export function DateRangeField({
+  from,
+  to,
+  onChange,
+  disabled = false,
+  className,
+}: {
+  /** ISO instants, or null while a range is half-chosen. */
+  from: string | null;
+  to: string | null;
+  onChange: (from: string | null, to: string | null) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const field = useFieldWiring();
+
+  return (
+    <div className="flex flex-col gap-xxs">
+      <DatePicker
+        id={field?.id}
+        selectsRange
+        startDate={toLocalCarrier(from) ?? undefined}
+        endDate={toLocalCarrier(to) ?? undefined}
+        onChange={(dates) => {
+          // In range mode the picker hands back a pair, and the second is null
+          // until the second click. That half-state is passed straight on
+          // rather than swallowed: it is what lets the screen keep showing the
+          // preset until a whole range exists.
+          const [start, end] = dates as [Date | null, Date | null];
+          onChange(toStartOfDay(start), toStartOfDay(end));
+        }}
+        disabled={disabled}
+        monthsShown={2}
+        dateFormat="dd MMM yyyy"
+        placeholderText={t("reports.rangePlaceholder")}
+        isClearable
+        aria-describedby={field?.describedBy}
+        className={cx(
+          "w-[260px] rounded-md border border-border bg-surface px-md py-sm text-[14px] tabular-nums",
+          className,
+        )}
+        wrapperClassName="shrink-0"
+        popperPlacement="bottom-start"
+      />
+      <span className="ps-md text-[11px] text-text-faint">
+        {t("promotions.inZone", { zone: BUSINESS_TIMEZONE })}
+      </span>
+    </div>
+  );
+}
+
+/** A picked day as the instant Beirut's clock struck midnight on it. */
+function toStartOfDay(date: Date | null): string | null {
+  if (!date) return null;
+  return fromWallClock({
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+  }).toISOString();
+}

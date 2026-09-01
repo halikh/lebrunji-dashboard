@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Button, cx } from "@/components/ui";
 import { BarChart, HBarList, HeatGrid } from "@/components/ui/chart";
+import { DateRangeField } from "@/components/ui/date-field";
+import { Select } from "@/components/ui/select";
+import { useToasts } from "@/components/ui/toast";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { Price } from "@/features/reference/price";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -16,10 +19,17 @@ import {
 import { pickLocalized } from "@/i18n/db-text";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
-import { formatDate } from "@/lib/time";
+import { formatDate, toWallClock } from "@/lib/time";
 
 import type { Stats } from "./api/stats";
-import { businessRange, previousRange, useStats } from "./use-stats";
+import {
+  businessRange,
+  customRange,
+  previousOf,
+  previousRange,
+  useStats,
+} from "./use-stats";
+import { exportReport, type ExportFormat } from "./export";
 
 /**
  * The overview.
@@ -62,11 +72,27 @@ export function ReportsScreen() {
   const pathname = usePathname();
   const params = useSearchParams();
 
+  /**
+   * The range, which is either a count of days back or two picked dates.
+   *
+   * Both live in the URL — `?days=30`, or `?from=&to=` — so a view can be
+   * linked, reloaded or sent, and so "the last 30 days" stays a *relative*
+   * range that means something different tomorrow while a picked range does
+   * not. Collapsing the presets into two dates would have lost that.
+   */
+  const from = params.get("from");
+  const to = params.get("to");
+  const picked = Boolean(from && to);
+
   const requested = Number(params.get("days"));
   const days = RANGES.some((one) => one.days === requested) ? requested : 30;
 
-  const current = businessRange(days);
-  const before = previousRange(days);
+  const current = picked
+    ? customRange(from as string, to as string)
+    : businessRange(days);
+  const before = picked
+    ? previousOf(current.from, current.to)
+    : previousRange(days);
 
   const stats = useStats(current.from, current.to);
   const prior = useStats(before.from, before.to);
@@ -76,6 +102,8 @@ export function ReportsScreen() {
   const counts = useStatusCounts(statuses.data, "all");
 
   const { format, currencies } = useMoney();
+  const toast = useToasts();
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
 
   // The funnel comes back keyed on slugs; the readable names are already
   // loaded for the tiles above. Showing `driver-sent` to an operator when the
@@ -84,10 +112,70 @@ export function ReportsScreen() {
     (statuses.data ?? []).map((status) => [status.slug, status.name]),
   );
 
+  /**
+   * Builds and hands over a file.
+   *
+   * The dates in the filename are the *inclusive* range the screen shows, not
+   * the half-open one the query used — a file called `…-to-2026-09-01` for a
+   * report ending on 31 August would be wrong in the one place somebody reads
+   * it months later.
+   */
+  async function run(option: ExportFormat) {
+    if (!stats.data) return;
+    setExporting(option);
+    try {
+      await exportReport(
+        option,
+        stats.data,
+        currencies?.find((one) => one.code === code),
+        {
+          from: toDayKey(current.from),
+          to: toDayKey(new Date(current.to.getTime() - 1)),
+        },
+      );
+    } catch (error) {
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      );
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  /** A preset. Clears any picked dates — the two cannot both be in force. */
   function show(next: number) {
     const query = new URLSearchParams(params);
+    query.delete("from");
+    query.delete("to");
     if (next === 30) query.delete("days");
     else query.set("days", String(next));
+    const search = query.toString();
+    router.replace(search ? `${pathname}?${search}` : pathname, {
+      scroll: false,
+    });
+  }
+
+  /**
+   * A picked range, whole or half.
+   *
+   * The picker reports after the first click with no end yet, and that
+   * half-state is written rather than swallowed: the screen keeps showing the
+   * preset until both ends exist, so nothing queries a range with one end
+   * missing and the charts do not blank while somebody is mid-choice.
+   *
+   * Clearing the control sends two nulls, which is how a range goes away.
+   */
+  function pick(start: string | null, end: string | null) {
+    const query = new URLSearchParams(params);
+    for (const [key, value] of [
+      ["from", start],
+      ["to", end],
+    ] as const) {
+      if (value) query.set(key, value);
+      else query.delete(key);
+    }
+    // A picked range replaces the preset rather than sitting beside it.
+    if (query.get("from") && query.get("to")) query.delete("days");
     const search = query.toString();
     router.replace(search ? `${pathname}?${search}` : pathname, {
       scroll: false,
@@ -179,20 +267,83 @@ export function ReportsScreen() {
                 {t("reports.performance")}
               </h2>
 
-              <div role="tablist" className="-mb-px flex gap-lg">
-                {RANGES.map(({ days: option, labelKey }) => (
-                  <SectionTab
-                    key={option}
-                    label={t(labelKey)}
-                    active={days === option}
-                    onClick={() => show(option)}
-                    onKeyDown={tabArrowHandler(
-                      RANGES.map((one) => one.days),
-                      days,
-                      show,
-                    )}
-                  />
-                ))}
+              <div className="flex flex-wrap items-center gap-lg">
+                <div role="tablist" className="-mb-px flex gap-lg">
+                  {RANGES.map(({ days: option, labelKey }) => (
+                    <SectionTab
+                      key={option}
+                      label={t(labelKey)}
+                      active={!picked && days === option}
+                      onClick={() => show(option)}
+                      onKeyDown={tabArrowHandler(
+                        RANGES.map((one) => one.days),
+                        days,
+                        show,
+                      )}
+                    />
+                  ))}
+                </div>
+
+                {/* A picker rather than a fourth tab that reveals one: the
+                    presets and a picked range are the same question answered
+                    two ways, and hiding one behind the other means a click
+                    before you can even see what is on offer.
+
+                    One control for both ends, because a from and a to mean
+                    nothing apart — the calendar shades the days between as they
+                    are chosen, so the span is visible while it is being picked.
+
+                    What it hands back is a Beirut wall clock reduced to a
+                    calendar day — which day an instant falls on has a different
+                    answer in every timezone, and this is a report about a shop
+                    in Lebanon. */}
+                <div className="flex items-center gap-sm">
+                  <DateRangeField from={from} to={to} onChange={pick} />
+                  {picked && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => show(30)}
+                    >
+                      {t("reports.rangeClear")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Beside the range, because what it exports *is* the range —
+                putting it anywhere else would invite the question of which
+                period a file covers.
+
+                One control rather than three buttons: the formats are not three
+                things to do, they are one thing done in a choice of format, and
+                three equal buttons say otherwise. Disabled until the figures
+                are in — a spreadsheet built from a half-loaded report is worse
+                than no button, because it looks like an answer.
+
+                The value is always empty. Choosing a format is an *action*, not
+                a setting, and a select left showing "Excel" afterwards would
+                claim a state the screen does not have. */}
+            <div className="flex flex-wrap items-center gap-sm">
+              <span className="text-[13px] text-text-soft">
+                {t("reports.exportLabel")}
+              </span>
+              <div className="w-[190px]">
+                <Select
+                  value=""
+                  onChange={(option) => void run(option as ExportFormat)}
+                  options={FORMATS.map((option) => ({
+                    value: option,
+                    label: t(`reports.export.${option}` as const),
+                  }))}
+                  placeholder={
+                    exporting
+                      ? t("reports.exporting")
+                      : t("reports.exportChoose")
+                  }
+                  disabled={!stats.isSuccess || exporting !== null}
+                />
               </div>
             </div>
 
@@ -431,6 +582,21 @@ export function ReportsScreen() {
     </div>
   );
 }
+
+/**
+ * A Beirut calendar day as `YYYY-MM-DD`, for filenames and headings.
+ *
+ * `businessMonthKey`'s day-level sibling. Not `toISOString().slice(0, 10)`,
+ * which is UTC's day — and would name a file after the wrong date for anything
+ * in the first two or three hours of a Beirut morning.
+ */
+function toDayKey(instant: Date): string {
+  const clock = toWallClock(instant);
+  return `${clock.year}-${String(clock.month).padStart(2, "0")}-${String(clock.day).padStart(2, "0")}`;
+}
+
+/** What the report can be written as. Order is the order they are offered in. */
+const FORMATS: ExportFormat[] = ["csv", "xlsx", "pdf"];
 
 /** Sunday-first, matching the stored index. Rotated for reading in `HeatGrid`. */
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
