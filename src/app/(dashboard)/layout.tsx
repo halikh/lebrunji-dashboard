@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { Wordmark } from "@/components/brand/wordmark";
 import { SignOutButton } from "@/components/sign-out-button";
-import { Rail } from "@/components/shell/rail";
+import { LiveRail } from "@/components/shell/live-rail";
 import { Providers } from "@/app/providers";
 import { t } from "@/i18n/translations";
 
@@ -61,7 +61,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <SignOutButton />
         </header>
 
-        <Rail />
+        <LiveRail />
 
         {/*
           `min-h-0` is what makes the inner scroll areas work.

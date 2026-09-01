@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Button, Field } from "@/components/ui";
-import { NumberInput } from "@/components/ui/number-input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Toggle } from "@/components/ui/toggle";
 import { MultiSelect } from "@/components/ui/select";
@@ -12,6 +12,7 @@ import { ImageUploader } from "@/components/ui/image-uploader";
 import { ItemOptions } from "./item-options";
 import { TagChip } from "./tag-chip";
 import { useTagVocabulary } from "./use-tags";
+import { useMoney } from "@/features/reference/use-currencies";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -100,6 +101,9 @@ export function MenuItemEditor({
   onCancel: () => void;
 }) {
   const languages = useLanguages();
+  // A dish is priced in its shop's currency, and the shop's currency is the
+  // base one — the ladder and every discount are written in it too.
+  const { baseDecimals: decimals } = useMoney();
 
   const [name, setName] = useState<Localized>(initial?.name ?? {});
   const [description, setDescription] = useState<Localized>(
@@ -234,12 +238,17 @@ export function MenuItemEditor({
             hint={t("menu.priceHint")}
             error={errors.price}
           >
-            <NumberInput
-              min={0}
-              step={1}
+            {/* Typed as a person would say it — `18.75`, not `1875`. The
+                conversion to minor units is `MoneyInput`'s, so the operator
+                adding forty dishes in an afternoon is not doing it forty
+                times. */}
+            <MoneyInput
+              value={price.trim() === "" ? null : Number(price)}
+              onChange={(minor) =>
+                setPrice(minor === null ? "" : String(minor))
+              }
+              decimalDigits={decimals}
               placeholder={t("menu.pricePlaceholder")}
-              value={price}
-              onChange={(event) => setPrice(event.target.value)}
             />
           </Field>
 

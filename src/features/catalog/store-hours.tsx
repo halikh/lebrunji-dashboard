@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import type { ReactNode } from "react";
 
 import { Button, cx } from "@/components/ui";
 import { Toggle } from "@/components/ui/toggle";
@@ -298,20 +299,6 @@ function Grid({
             })}
           </div>
 
-          {template && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={copyDown}
-              className="w-fit"
-            >
-              {t("hours.copyToAll", {
-                opens: template.opensAt,
-                closes: template.closesAt,
-              })}
-            </Button>
-          )}
-
           {error && (
             <p role="alert" className="text-[13px] font-medium text-danger">
               {error}
@@ -319,7 +306,28 @@ function Grid({
           )}
         </div>
 
-        <Summary week={week} dirty={dirty} />
+        <Summary week={week} dirty={dirty}>
+          {/* Beside the week it rewrites, not under the grid it reads from.
+              The summary is where an operator *notices* that six days should
+              match Monday — that is the whole reason the panel exists — so the
+              control that acts on the noticing belongs next to it. */}
+          {template && (
+            // Blue, which the palette reserves for what you act on. Grey read
+            // as one more line of the summary it sits under — and this is the
+            // only thing in that panel that does anything.
+            <Button
+              variant="primary-quiet"
+              size="sm"
+              onClick={copyDown}
+              fullWidth
+            >
+              {t("hours.copyToAll", {
+                opens: template.opensAt,
+                closes: template.closesAt,
+              })}
+            </Button>
+          )}
+        </Summary>
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
@@ -361,7 +369,16 @@ function toWindows(week: Draft[]): DayWindow[] {
  * doing, and an operator on a laptop still set to another zone would otherwise
  * be told about a different hour of a different day.
  */
-function Summary({ week, dirty }: { week: Draft[]; dirty: boolean }) {
+function Summary({
+  week,
+  dirty,
+  children,
+}: {
+  week: Draft[];
+  dirty: boolean;
+  /** Rendered under "Right now" — see the call site. */
+  children?: ReactNode;
+}) {
   const windows = toWindows(week);
   const now = toWallClock(new Date());
 
@@ -406,6 +423,8 @@ function Summary({ week, dirty }: { week: Draft[]; dirty: boolean }) {
         <span className="text-[12px] text-text-faint">
           {t("hours.beirutTime", { time, zone: BUSINESS_TIMEZONE })}
         </span>
+
+        {children}
       </div>
 
       <div className="flex flex-col gap-xs border-t border-border pt-lg">

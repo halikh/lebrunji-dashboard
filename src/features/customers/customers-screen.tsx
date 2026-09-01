@@ -4,13 +4,16 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { Button, Input, cx } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
+import { Avatar } from "@/components/ui/avatar";
+import { SearchInput } from "@/components/ui/search-input";
 import { ROW } from "@/components/ui/row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
 import { FilterTab, tabArrowHandler, type TabTone } from "@/components/ui/tab";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
+import { formatPhone } from "@/lib/phone";
 import { formatDate } from "@/lib/time";
 
 import type { Customer, CustomerScope } from "./api/customers";
@@ -131,14 +134,12 @@ export function CustomersScreen() {
       <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
         <h1 className="text-[24px]">{t("customers.title")}</h1>
         <span className="flex-grow" />
-        <Input
+        {/* The one screen where the box is the point, so it is wider than a
+            filter would be. */}
+        <SearchInput
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={setSearch}
           placeholder={t("customers.search")}
-          aria-label={t("customers.search")}
-          // The one screen where the box is the point, so it opens focused and
-          // it is wider than a filter would be.
-          autoFocus
           className="w-[340px]"
         />
       </div>
@@ -248,6 +249,8 @@ function Row({ customer }: { customer: Customer }) {
         "hover:border-active",
       )}
     >
+      <Avatar id={customer.id} name={customer.name} />
+
       <span className="flex min-w-0 flex-grow flex-col gap-xxs">
         <Link
           href={`/customers/${customer.id}`}
@@ -259,7 +262,7 @@ function Row({ customer }: { customer: Customer }) {
           {nameOf(customer)}
         </Link>
         <span className="truncate tabular-nums text-[12px] text-text-faint">
-          {customer.phone}
+          {formatPhone(customer.phone)}
         </span>
       </span>
 

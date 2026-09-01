@@ -53,16 +53,33 @@ export function unlock() {
 }
 
 /**
- * Two notes, rising.
+ * Three notes, rising, with the last one held.
  *
- * Rising rather than falling because a falling pair is the shape every
+ * ## Rising, and high
+ *
+ * Rising rather than falling because a falling figure is the shape every
  * operating system uses for an error, and this is not one — it is work
- * arriving. A fifth apart (E5 to B5) so the two notes are obviously one sound
- * rather than two events.
+ * arriving. The notes climb a fourth at a time (B5 → E6 → A6) so the three are
+ * obviously one sound rather than three events.
  *
- * Sine waves at a low gain, with an envelope: a bare oscillator switched on and
- * off clicks at both ends, which is the part that makes a synthesised tone
- * sound cheap.
+ * High on purpose, and higher than the two-note version this replaces. The
+ * chime has to carry across a room with a kitchen in it, and the frequencies a
+ * busy room masks worst are the low ones — a deeper tone is the one that gets
+ * lost under a fan and a conversation. It is also the band the ear is most
+ * sensitive to, which is why the gain goes *down* as the pitch goes up: equal
+ * amplitude at 1760 Hz is not equal loudness, and a top note at the same gain
+ * as the bottom one is the part that makes a chime shrill.
+ *
+ * ## Long enough to be noticed, not long enough to be in the way
+ *
+ * A little under a second, most of it the held final note. The point of the
+ * length is that the sound survives being started while somebody is mid-
+ * sentence: a 0.4-second blip that lands under a spoken word is gone before
+ * anyone can turn toward it. The tail decays rather than stopping, so it fades
+ * out of a conversation instead of cutting off in it.
+ *
+ * Sine waves with an envelope: a bare oscillator switched on and off clicks at
+ * both ends, which is the part that makes a synthesised tone sound cheap.
  */
 export function chime() {
   const ctx = audioContext();
@@ -74,8 +91,12 @@ export function chime() {
   if (ctx.state === "suspended") void ctx.resume().catch(() => {});
 
   try {
-    note(ctx, 659.25, ctx.currentTime, 0.16);
-    note(ctx, 987.77, ctx.currentTime + 0.13, 0.28);
+    const at = ctx.currentTime;
+    // Overlapping slightly rather than butted end to end, so the figure reads
+    // as one gesture. The peaks fall as the pitch climbs — see above.
+    note(ctx, 987.77, at, 0.22, 0.1); // B5
+    note(ctx, 1318.51, at + 0.16, 0.24, 0.085); // E6
+    note(ctx, 1760.0, at + 0.32, 0.62, 0.07); // A6, held
   } catch {
     // A closed or refused context. Nothing to do and nothing to report.
   }
@@ -86,6 +107,7 @@ function note(
   frequency: number,
   start: number,
   duration: number,
+  peak: number,
 ) {
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -95,7 +117,8 @@ function note(
 
   // Quiet. This fires in a room where people are working, and a chime that
   // makes anyone jump gets turned off, at which point it protects nothing.
-  const peak = 0.09;
+  // The caller sets it per note, because the ear hears a high tone as louder
+  // than a low one at the same amplitude.
   gain.gain.setValueAtTime(0.0001, start);
   gain.gain.exponentialRampToValueAtTime(peak, start + 0.012);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);

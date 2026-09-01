@@ -81,6 +81,7 @@ export function ForgotPasswordForm() {
           <Input
             type="email"
             name="email"
+            placeholder={t("login.emailPlaceholder")}
             autoComplete="username"
             required
             autoFocus

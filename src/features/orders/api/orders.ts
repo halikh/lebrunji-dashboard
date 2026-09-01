@@ -473,6 +473,48 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
  * hardcoded `['ordered', 'confirmed', 'driverSent']` would exclude any new one
  * from the default view — orders that exist and that nobody is shown.
  */
+/**
+ * How many orders still need somebody, for the rail's badge.
+ *
+ * ## One request, and a count of *orders*
+ *
+ * Not `fetchStatusCounts` summed. That returns a count per status, and an order
+ * spanning two shops at two different steps is counted under both — so adding
+ * them up reports more orders than exist, on the one number that is on screen
+ * all day. Filtering `orders` by an `!inner` embed counts orders, once each,
+ * however many shops are on them.
+ *
+ * A `head` request, so nothing is transferred: the badge wants a number, and
+ * the plan's rule is that a count is never a select whose rows are counted in
+ * the browser.
+ *
+ * ## "Live" is read from the data
+ *
+ * `liveStatusSlugs` derives it from `progress` rather than a hardcoded list of
+ * slugs, because `order_statuses` exists to be added to and a new step would
+ * silently fall outside a hardcoded set. An order nobody can see is the worst
+ * bug this screen could have, and a badge that undercounts is the quiet version
+ * of it.
+ */
+export async function fetchLiveOrderCount(
+  statuses: readonly OrderStatus[],
+): Promise<number> {
+  const slugs = liveStatusSlugs(statuses);
+  if (slugs.length === 0) return 0;
+
+  const { count, error } = await getClient()
+    .from("orders")
+    .select("id, order_stores!inner(order_statuses!inner(slug))", {
+      count: "exact",
+      head: true,
+    })
+    .is("deleted_at", null)
+    .in("order_stores.order_statuses.slug", slugs);
+
+  if (error) throw new Error(`Could not count live orders: ${error.message}`);
+  return count ?? 0;
+}
+
 export function liveStatusSlugs(statuses: readonly OrderStatus[]): string[] {
   const onPath = statuses.filter((s) => s.progress !== null);
   if (onPath.length === 0) return [];

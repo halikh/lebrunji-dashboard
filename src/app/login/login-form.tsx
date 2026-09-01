@@ -80,6 +80,7 @@ export function LoginForm() {
           <Input
             type="email"
             name="email"
+            placeholder={t("login.emailPlaceholder")}
             autoComplete="username"
             required
             autoFocus
@@ -92,6 +93,7 @@ export function LoginForm() {
           <Input
             type="password"
             name="password"
+            placeholder={t("login.passwordPlaceholder")}
             autoComplete="current-password"
             required
             value={password}

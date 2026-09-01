@@ -8,6 +8,7 @@ import { Button, cx } from "@/components/ui";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Copyable } from "@/components/ui/copyable";
+import { Avatar } from "@/components/ui/avatar";
 import { BarChart, HeatStrip } from "@/components/ui/chart";
 import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
@@ -19,6 +20,7 @@ import { Price } from "@/features/reference/price";
 import { useMoney } from "@/features/reference/use-currencies";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
+import { formatPhone } from "@/lib/phone";
 import { formatDate, formatDateTime, formatMonthKey } from "@/lib/time";
 
 import type {
@@ -195,6 +197,10 @@ export function CustomerProfile({ id }: { id: string }) {
         </Link>
 
         <div className="flex flex-wrap items-center gap-lg">
+          {/* The same colour this customer wears on the list, because it is
+              hashed from their id rather than picked at render. */}
+          <Avatar id={row.id} name={row.name} size={52} />
+
           {/* Everything that identifies the person, in one column, read
               downward: who they are, how to reach them, since when, whether
               the account works, and how they read the app.
@@ -219,8 +225,8 @@ export function CustomerProfile({ id }: { id: string }) {
                 them — and copyable, because half the time they are reading it
                 into something else. */}
             <Copyable
-              value={row.phone}
-              href={`tel:${row.phone}`}
+              value={formatPhone(row.phone)}
+              href={`tel:${formatPhone(row.phone)}`}
               label={t("customers.copyPhone")}
             />
 
@@ -292,7 +298,7 @@ export function CustomerProfile({ id }: { id: string }) {
                 titleKey="customers.closeTitle"
                 bodyKey="customers.closeBody"
                 confirmKey="customers.closeConfirm"
-                params={{ name, phone: row.phone }}
+                params={{ name, phone: formatPhone(row.phone) }}
                 variant="danger"
                 triggerVariant="danger"
                 size="sm"

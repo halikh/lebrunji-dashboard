@@ -38,6 +38,14 @@ export type ConvertibleCurrency = Currency & {
    * The pricing currency's own row is 1. Set by hand — see migration 0028.
    */
   rate: number;
+  /**
+   * The currency every other rate is quoted against.
+   *
+   * Exactly one row has it, enforced by a partial unique index (0080).
+   * It is also what `delivery_rates.amount` and a discount's stated
+   * amounts are denominated in.
+   */
+  isBase?: boolean;
   /** When the rate was last set, ISO — for showing how fresh a conversion is. */
   rateUpdatedAt?: string | null;
 };

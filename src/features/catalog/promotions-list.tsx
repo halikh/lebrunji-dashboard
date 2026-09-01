@@ -4,18 +4,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { Button, Input, cx } from "@/components/ui";
+import { SearchInput } from "@/components/ui/search-input";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { DateField } from "@/components/ui/date-field";
 import { Field } from "@/components/ui/field";
 import { ImageUploader } from "@/components/ui/image-uploader";
+import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
-import {
-  StickyAddBar,
-  StickyAddTop,
-  useStickyAdd,
-} from "@/components/ui/sticky-add";
 import { Panel } from "@/components/ui/panel";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import {
@@ -26,7 +23,6 @@ import {
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { useMoney } from "@/features/reference/use-currencies";
-import { Price } from "@/features/reference/price";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
@@ -102,12 +98,6 @@ export function PromotionsList() {
   const rows = promotions.data ?? [];
   const editing = rows.find((row) => row.id === open) ?? null;
 
-  /**
-   * The pinned "add" bar — see `useStickyAdd` for why there are two
-   * buttons and why they are never on screen together.
-   */
-  const { attachTop, attachAddButton, showAddBar } = useStickyAdd(!searching);
-
   const order = useReorder({
     ids: rows.map((row) => row.id),
     onReorder: (ids) => {
@@ -131,32 +121,38 @@ export function PromotionsList() {
 
   return (
     <div className="relative flex h-full">
-      <div className="relative flex min-w-0 flex-grow flex-col">
+      <div className="flex min-w-0 flex-grow flex-col">
         {/* The same bar as the shops, categories and tags — same border, same
             padding, same place for the box. */}
-        <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h1 className="flex-grow text-[24px]">{t("promotions.tab")}</h1>
-          {searching && (
-            <span className="text-[13px] text-text-faint">
-              {t("promotions.searchNoDrag")}
+        <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
+          <h1 className="flex-grow self-center text-[24px]">
+            {t("promotions.tab")}
+          </h1>
+          {/* The rule under the box, always — not a warning that appears
+              once somebody has already typed. A handle that stops working is
+              confusing at the moment it stops; the sentence is only useful
+              before that. */}
+          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder={t("promotions.search")}
+            />
+            <span className="ps-md text-[12px] text-text-faint">
+              {t("promotions.reorderHint")}
             </span>
-          )}
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t("promotions.search")}
-            aria-label={t("promotions.search")}
-            className="w-[260px]"
-          />
+          </div>
+          {/* Beside the search, as on the shops tab. The list keeps its own
+              button at the end — that is where a new row appears, and the two
+              are never on screen together — but a header button is what makes
+              "add one" reachable without reading the list first. */}
+          <Button onClick={() => setOpen("new")}>{t("promotions.add")}</Button>
         </div>
 
         <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-          <StickyAddTop attach={attachTop} />
-
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("promotions.searchHint")}
           </p>
-
           {promotions.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1].map((row) => (
@@ -167,7 +163,6 @@ export function PromotionsList() {
               ))}
             </div>
           )}
-
           {promotions.isError && (
             <p role="alert" className="text-[13px] font-medium text-danger">
               {promotions.error instanceof Error
@@ -175,9 +170,7 @@ export function PromotionsList() {
                 : t("common.somethingWentWrong")}
             </p>
           )}
-
           {order.instructions}
-
           {order
             .ordered(rows, (row) => row.id)
             .map((row) => (
@@ -201,32 +194,15 @@ export function PromotionsList() {
                 }}
               />
             ))}
-
           {searching && rows.length === 0 && (
             <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
               {t("promotions.searchNone", { term: search.trim() })}
             </p>
           )}
-
           {/* Where a new promotion actually goes: the end of the list, which is
               also the lowest priority. The pinned bar below is a shortcut to
-              this one, and only exists while this one is out of sight. */}
-          {promotions.isSuccess && !searching && (
-            <div ref={attachAddButton} className="mt-lg">
-              <Button fullWidth onClick={() => setOpen("new")}>
-                {t("promotions.add")}
-              </Button>
-            </div>
-          )}
+              this one, and only exists while this one is out of sight. */}{" "}
         </div>
-
-        {promotions.isSuccess && (
-          <StickyAddBar visible={showAddBar}>
-            <Button fullWidth onClick={() => setOpen("new")}>
-              {t("promotions.add")}
-            </Button>
-          </StickyAddBar>
-        )}
       </div>
 
       <Panel
@@ -310,8 +286,10 @@ function Row({
   onToggleActive: () => void;
   onArchive: () => Promise<void>;
 } & ReorderProps) {
-  const { format, currencies } = useMoney();
-  const code = currencies?.[0]?.code ?? "";
+  const { format, baseCode } = useMoney();
+  // The currency a stated amount is written in. `0080` made this a column the
+  // database enforces, so it is read rather than assumed to be the first row.
+  const code = baseCode;
 
   const row = rowProps(
     promotion.id,
@@ -599,8 +577,10 @@ function Form({
   onSave: (draft: PromotionDraft) => void;
   onCancel: () => void;
 }) {
-  const { format, currencies } = useMoney();
-  const code = currencies?.[0]?.code ?? "";
+  const { format, baseCode, baseDecimals } = useMoney();
+  // The currency a stated amount is written in. `0080` made this a column the
+  // database enforces, so it is read rather than assumed to be the first row.
+  const code = baseCode;
 
   const stores = useStores("");
   const categories = useCategories("");
@@ -770,16 +750,16 @@ function Form({
               hint={
                 kind === "percentage"
                   ? t("promotions.percentHint")
-                  : t("promotions.amountHint")
+                  : t("promotions.amountHint", { code })
               }
               error={errors.value}
             >
               <Amount
                 value={value}
                 onChange={setValue}
-                code={code}
+                decimalDigits={baseDecimals}
                 max={kind === "percentage" ? 100 : undefined}
-                placeholder={kind === "percentage" ? "20" : "500"}
+                placeholder={kind === "percentage" ? "20" : "5.00"}
                 // A percentage is not money, so it gets no echo — showing
                 // "$0.20" under a field reading 20 would be worse than nothing.
                 money={kind !== "percentage"}
@@ -789,12 +769,12 @@ function Form({
 
           <Field
             label={t("promotions.minSubtotal")}
-            hint={t("promotions.minSubtotalHint")}
+            hint={t("promotions.minSubtotalHint", { code })}
           >
             <Amount
               value={minSubtotal}
               onChange={setMinSubtotal}
-              code={code}
+              decimalDigits={baseDecimals}
               placeholder={t("promotions.noMinimum")}
               money
             />
@@ -807,12 +787,12 @@ function Form({
           {kind === "percentage" && (
             <Field
               label={t("promotions.maxDiscount")}
-              hint={t("promotions.maxDiscountHint")}
+              hint={t("promotions.maxDiscountHint", { code })}
             >
               <Amount
                 value={maxDiscount}
                 onChange={setMaxDiscount}
-                code={code}
+                decimalDigits={baseDecimals}
                 placeholder={t("promotions.noCeiling")}
                 money
               />
@@ -981,14 +961,27 @@ function Form({
         {/* What the promotion comes to, assembled from the fields above. The
             settings are individually clear and jointly hard to hold in your
             head — "20%, minimum $25, capped at $10, first order only" is four
-            numbers whose combined effect nobody should have to simulate. */}
-        <p className="rounded-md border border-border bg-surface px-lg py-md text-[13px] text-text-soft">
-          {describeDraft(
-            { kind, value, minSubtotal, firstOrderOnly },
-            format,
-            code,
-          )}
-        </p>
+            numbers whose combined effect nobody should have to simulate.
+
+            **Not drawn as a field.** A white ground inside a bordered, rounded
+            box is the exact shape of every `Input` on the panel, so a line that
+            is only ever read looked like one more thing to fill in — at the
+            bottom of a form, which is where somebody is checking they have
+            filled everything in. A tinted ground with no border says "this is
+            the answer, not another question", and the label says whose answer
+            it is. */}
+        <div className="flex flex-col gap-xxs rounded-md bg-accent-wash px-lg py-md">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+            {t("promotions.previewLabel")}
+          </span>
+          <p className="text-[14px] font-semibold text-text">
+            {describeDraft(
+              { kind, value, minSubtotal, firstOrderOnly },
+              format,
+              code,
+            )}
+          </p>
+        </div>
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
@@ -1017,28 +1010,38 @@ function Form({
  * once the field holds a number, because a currency symbol under an empty box
  * is a claim that something has been set.
  */
+/**
+ * A number, or an amount.
+ *
+ * A percentage is a plain number and is typed as one. An **amount** goes
+ * through `MoneyInput`, which takes what a person would say and stores minor
+ * units — so this field asks for `25`, not `2500`, and the operator is not
+ * doing the database's arithmetic on the screen where a factor of a hundred is
+ * a factor of a hundred off somebody's bill.
+ *
+ * The value is still carried as a string, because the form holds every field
+ * that way and an empty box has to stay distinguishable from a zero: `null` is
+ * "no minimum", `0` is "a minimum every basket clears", and
+ * `discounts_caps_positive` refuses the second where the first was meant.
+ */
 function Amount({
   value,
   onChange,
-  code,
+  decimalDigits,
   placeholder,
   max,
   money,
 }: {
   value: string;
   onChange: (value: string) => void;
-  code: string;
+  decimalDigits: number;
   placeholder?: string;
   max?: number;
   /** Off for a percentage, which is a number and not an amount. */
   money?: boolean;
 }) {
-  const parsed = Number(value);
-  const show =
-    money && value.trim() !== "" && Number.isFinite(parsed) && parsed > 0;
-
-  return (
-    <div className="flex flex-col gap-xs">
+  if (!money) {
+    return (
       <NumberInput
         min={0}
         max={max}
@@ -1047,12 +1050,18 @@ function Amount({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
       />
-      {show && (
-        <span className="ps-md">
-          <Price value={parsed} code={code} className="text-[13px]" />
-        </span>
-      )}
-    </div>
+    );
+  }
+
+  const parsed = value.trim() === "" ? null : Number(value);
+
+  return (
+    <MoneyInput
+      value={parsed !== null && Number.isFinite(parsed) ? parsed : null}
+      onChange={(minor) => onChange(minor === null ? "" : String(minor))}
+      decimalDigits={decimalDigits}
+      placeholder={placeholder}
+    />
   );
 }
 

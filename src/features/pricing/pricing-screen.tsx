@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field } from "@/components/ui/field";
+import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { reveal } from "@/components/ui/reveal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -339,7 +340,18 @@ function Conversions({
 function Ladder() {
   const ladder = useLadder();
   const save = useSaveLadder();
-  const { format, currencies } = useMoney();
+  const { convertTo, secondaryCode, baseCode, baseDecimals } = useMoney();
+
+  /**
+   * A band in the other active currency, or nothing.
+   *
+   * Absent rather than approximate, the same rule `Price` follows: a figure
+   * quietly converted at a rate of 1 is a number somebody would read out.
+   */
+  function other(amount: number): string | null {
+    const to = baseCode ? secondaryCode(baseCode) : null;
+    return to && baseCode ? convertTo(amount, baseCode, to) : null;
+  }
 
   const [draft, setDraft] = useState<Band[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -349,10 +361,9 @@ function Ladder() {
   const dirty =
     draft !== null && JSON.stringify(draft) !== JSON.stringify(saved);
 
-  // The base currency is what an amount here is in — the same units as an order
-  // total. Falls back to the bare number until the reference data lands.
-  const baseCode =
-    currencies?.find((one) => Number(one.rate) === 1)?.code ?? "";
+  // What an amount here is in. Read from `currencies.is_base` through
+  // `useMoney` rather than inferred from `rate === 1` — see the note there.
+  // Falls back to the bare number until the reference data lands.
 
   function edit(index: number, patch: Partial<Band>) {
     setDraft(
@@ -440,6 +451,16 @@ function Ladder() {
           <p className="ps-md text-[14px] text-text-soft">
             {t("pricing.ladderBody")}
           </p>
+          {/* What the numbers are denominated in, and what happens on a shop
+              that prices in something else. Said out loud because it used not
+              to be true: before `0080` the fee was added to a subtotal without
+              converting, so a shop pricing in lira charged a hundredth of what
+              was meant and nothing anywhere said so. */}
+          {baseCode && (
+            <p className="ps-md text-[13px] text-text-faint">
+              {t("pricing.ladderCurrency", { code: baseCode })}
+            </p>
+          )}
         </div>
 
         {ladder.isPending && (
@@ -501,19 +522,19 @@ function Ladder() {
 
                 <Field
                   label={t("pricing.fee")}
+                  // What it comes to in the *other* currency. The field itself
+                  // now shows the amount as anybody would say it, so echoing
+                  // the same figure back underneath would be the same number
+                  // twice — what is worth saying is what a customer paying in
+                  // lira is charged.
                   hint={
-                    baseCode
-                      ? format(band.amount, baseCode)
-                      : t("pricing.minor")
+                    baseCode ? (other(band.amount) ?? undefined) : undefined
                   }
                 >
-                  <NumberInput
-                    value={String(band.amount)}
-                    onChange={(event) =>
-                      edit(index, { amount: Number(event.target.value) })
-                    }
-                    min={0}
-                    className="w-[140px]"
+                  <MoneyInput
+                    value={band.amount}
+                    onChange={(amount) => edit(index, { amount: amount ?? 0 })}
+                    decimalDigits={baseDecimals}
                   />
                 </Field>
 

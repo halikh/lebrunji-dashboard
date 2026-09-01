@@ -4,8 +4,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import { useUndoLast } from "@/components/ui/toast";
 import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
-import { Button, cx, Input } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
+import { SearchInput } from "@/components/ui/search-input";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone, type StatusTone } from "@/lib/order-status";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -13,7 +15,6 @@ import { useMoney } from "@/features/reference/use-currencies";
 import type { Scope } from "./api/orders";
 import { OrderPanel } from "./order-panel";
 import { OrderRow } from "./order-row";
-import { useOrderRealtime } from "./use-order-realtime";
 import {
   nextStatus,
   orderStatus,
@@ -128,8 +129,11 @@ export function OrdersQueue() {
   const orders = useOrders(scope, statusSlug, search, statuses.data);
   const { advance } = useAdvanceOrder(statuses.data);
   const { format } = useMoney();
+  const undoLast = useUndoLast();
 
-  useOrderRealtime();
+  // The order subscription is opened once, in the shell — see `LiveRail`. It
+  // used to be here, which meant a new order arriving while the operator was on
+  // any other screen made no sound at all.
 
   // Every page flattened. The pages exist so the fetch can be incremental; the
   // screen only ever wants one list.
@@ -160,6 +164,20 @@ export function OrdersQueue() {
         if (event.key === "Escape") target.blur();
         return;
       }
+      // Undo, before the guard below turns every modified key away.
+      //
+      // ⌘Z is what everyone tries, and the toast is the only thing that knows
+      // whether there is anything to undo — so the keystroke is only swallowed
+      // when something actually happened. Nothing to undo leaves ⌘Z as ⌘Z.
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        event.key.toLowerCase() === "z"
+      ) {
+        if (undoLast()) event.preventDefault();
+        return;
+      }
+
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       if (event.key === "Escape" && openOrderId) {
@@ -214,7 +232,15 @@ export function OrdersQueue() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [rows, active, statuses.data, advance, openOrderId, setOpenOrderId]);
+  }, [
+    rows,
+    active,
+    statuses.data,
+    advance,
+    openOrderId,
+    setOpenOrderId,
+    undoLast,
+  ]);
 
   return (
     // The queue and the panel side by side. `relative` so the panel can cover
@@ -260,12 +286,11 @@ export function OrdersQueue() {
           </div>
 
           <span className="flex-grow" />
-          <Input
+          <SearchInput
             ref={searchRef}
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={setSearch}
             placeholder={t("orders.searchPlaceholder")}
-            aria-label={t("orders.searchPlaceholder")}
             className="w-[280px]"
           />
         </div>
@@ -370,6 +395,9 @@ export function OrdersQueue() {
           </span>
           <span className="flex items-center gap-sm">
             <Key label="/" /> {t("orders.keyboardSearch")}
+          </span>
+          <span className="flex items-center gap-xs">
+            <Key label="⌘Z" /> {t("orders.keyboardUndo")}
           </span>
           <span className="ml-auto flex items-center gap-sm">
             <span aria-hidden className="size-[7px] rounded-full bg-accent" />

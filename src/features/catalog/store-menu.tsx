@@ -2,17 +2,13 @@
 
 import { useId, useState } from "react";
 
-import { Button, Input, cx } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
+import { SearchInput } from "@/components/ui/search-input";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
-import {
-  StickyAddBar,
-  StickyAddTop,
-  useStickyAdd,
-} from "@/components/ui/sticky-add";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { useRevealOnMount } from "@/components/ui/reveal";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
@@ -166,10 +162,6 @@ export function StoreMenu({ storeId }: { storeId: string }) {
    * where a new section is going to appear — and a menu that does not fit gets
    * the bar so the action is not several screens away. Never both at once.
    */
-  const { attachTop, attachAddButton, showAddBar } = useStickyAdd(
-    !adding && !searching,
-  );
-
   const matches = useMenuSearch(storeId, search);
 
   const openSection =
@@ -209,14 +201,20 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             found less than they expected. */}
         <div className="flex shrink-0 flex-col gap-xs px-xxl pt-lg">
           <div className="flex items-center gap-lg">
-            <Input
+            <SearchInput
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={setSearch}
               placeholder={t("menu.search")}
-              aria-label={t("menu.search")}
-              aria-describedby={searchHintId}
               className="w-[280px]"
             />
+            {/* Beside the search rather than at the end of the list. The
+                header does not scroll, so this is reachable on a menu of any
+                length — which is what the pinned bar used to be for. */}
+            {menu.isSuccess && !adding && (
+              <Button onClick={() => setAdding(true)}>
+                {t("menu.addSection")}
+              </Button>
+            )}
             {searching && (
               <>
                 <span className="text-[13px] text-text-faint">
@@ -243,9 +241,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             {t("menu.searchHint")}
           </span>
         </div>
-
         <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
-          <StickyAddTop attach={attachTop} />
           {menu.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (
@@ -447,19 +443,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
               onCancel={() => setAdding(false)}
             />
           )}
-
-          {/* Where a new section actually goes: the end of the list. This is
-              the real button; the pinned one below is a shortcut to it that
-              only exists while this one is out of sight. */}
-          {!searching && menu.isSuccess && !adding && (
-            <div ref={attachAddButton}>
-              <Button fullWidth onClick={() => setAdding(true)}>
-                {t("menu.addSection")}
-              </Button>
-            </div>
-          )}
         </div>
-
         {/* The same action, within reach.
             A menu runs to several screens, and scrolling to the bottom to add a
             section is a cost paid over and over on the day a shop is set up —
@@ -468,14 +452,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             it does not need and the two are never on screen together.
 
             Hidden while searching, because there is no menu on screen for a new
-            section to join. */}
-        {menu.isSuccess && (
-          <StickyAddBar visible={showAddBar}>
-            <Button fullWidth onClick={() => setAdding(true)}>
-              {t("menu.addSection")}
-            </Button>
-          </StickyAddBar>
-        )}
+            section to join. */}{" "}
       </div>
 
       <Panel

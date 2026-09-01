@@ -71,9 +71,19 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
                 // The count is on the icon, but the meaning is in the label —
                 // a bare "3" read aloud is not information.
                 aria-label={`${liveOrders} ${t("nav.liveOrders")}`}
+                // Sun, not red.
+                //
+                // Red is the palette's alarm, and orders waiting are not an
+                // alarm — they are the ordinary state of a working shop. A
+                // badge that is red all day is a badge that stops being read,
+                // and it spends the one colour reserved for something being
+                // wrong on something being normal.
+                //
+                // `on-yellow` is ink rather than white: sun is a light ground,
+                // and white on it fails contrast at eleven pixels.
                 className={cx(
                   "absolute right-[18px] top-[2px] min-w-[18px] rounded-full px-[5px]",
-                  "bg-danger-action text-center text-[11px] font-bold text-on-active",
+                  "bg-yellow text-center text-[11px] font-bold text-on-yellow",
                   "md:right-[36px] md:top-[6px]",
                 )}
               >
@@ -88,6 +98,16 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
           instead — a seventh item there would crowd the six and put it a
           thumb-width from Orders. */}
       <div className="hidden w-full md:mt-auto md:block">
+        {/* Account-level, like sign-out beneath it — not a seventh section.
+            The rail's six are the business; these two are the operator. */}
+        <Link
+          href="/account"
+          aria-current={pathname === "/account" ? "page" : undefined}
+          className={railItemClass({ active: pathname === "/account" })}
+        >
+          <Icon name="customers" />
+          {t("nav.account")}
+        </Link>
         <SignOutButton />
       </div>
     </nav>

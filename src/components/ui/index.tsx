@@ -125,7 +125,14 @@ export function Button({
         // `items-center justify-center` centres the icon against the label and
         // the pair against the button. Both matter: a button wide enough to
         // have spare room will show the difference.
-        "items-center justify-center gap-sm rounded-md font-semibold",
+        // A label never wraps, and a button never shrinks below it.
+        //
+        // "New category" beside a `flex-grow` search box wrapped onto two
+        // lines and made the button twice as tall as everything around it.
+        // Wrapping is the wrong answer for a control whose whole job is one
+        // short verb: it is the *field* that should give up width, not the
+        // action. `shrink-0` is what says so in a flex row.
+        "shrink-0 items-center justify-center gap-sm whitespace-nowrap rounded-md font-semibold",
         "disabled:cursor-not-allowed disabled:opacity-60",
         fullWidth ? "flex w-full" : "inline-flex",
         BUTTON_SIZES[size],

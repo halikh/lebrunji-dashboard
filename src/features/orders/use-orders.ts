@@ -16,6 +16,7 @@ import {
   fetchOrder,
   fetchOrderStatuses,
   fetchOrders,
+  fetchLiveOrderCount,
   fetchStatusCounts,
   type Order,
   type OrderStatus,
@@ -58,6 +59,24 @@ export function useOrderStatuses() {
  * `all` is deliberately not scoped by date, so its counts are the whole
  * history. That is the question that tab asks.
  */
+/**
+ * The rail's badge.
+ *
+ * Kept a little stale on purpose: the realtime subscription invalidates it the
+ * moment an order arrives, so polling it hard would only add requests to a
+ * number that is already pushed. `enabled` waits for the statuses, because
+ * "live" cannot be answered before they are known and an unfiltered count would
+ * be every order ever placed.
+ */
+export function useLiveOrderCount(statuses: OrderStatus[] | undefined) {
+  return useQuery({
+    queryKey: [...orderKeys.all, "live-total"] as const,
+    queryFn: () => fetchLiveOrderCount(statuses ?? []),
+    enabled: (statuses?.length ?? 0) > 0,
+    staleTime: 60_000,
+  });
+}
+
 export function useStatusCounts(
   statuses: OrderStatus[] | undefined,
   scope: Scope,

@@ -4,17 +4,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { Button, cx } from "@/components/ui";
+import { SearchInput } from "@/components/ui/search-input";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
-import {
-  StickyAddBar,
-  StickyAddTop,
-  useStickyAdd,
-} from "@/components/ui/sticky-add";
 import { ROW } from "@/components/ui/row";
 import { Select } from "@/components/ui/select";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
@@ -23,7 +19,7 @@ import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
-import { TEXT } from "@/lib/limits";
+import { SEARCH, TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { applyOrder } from "../catalog/api/menu";
@@ -121,7 +117,6 @@ export function SettingsScreen() {
           ))}
         </div>
       </div>
-
       {/* Siblings rather than one swapped child, so a half-scrolled document
           survives a look at the FAQ and back. */}
       <div className={cx("min-h-0 flex-1", tab !== "help" && "hidden")}>
@@ -135,7 +130,7 @@ export function SettingsScreen() {
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "steps" && "hidden")}>
         <StepsTab />
-      </div>
+      </div>{" "}
     </div>
   );
 }
@@ -155,7 +150,18 @@ export function SettingsScreen() {
  * that looks like a caching problem. The form edits the group as a group.
  */
 function HelpTab() {
-  const topics = useHelpTopics();
+  /**
+   * The term, and the mode it puts the list in.
+   *
+   * Searching and reordering are different jobs on one list and cannot both be
+   * on: a position among matches is not a position in the FAQ, so dragging
+   * while filtered would write a `sort_order` nobody chose. The handles go away
+   * and the list says why.
+   */
+  const [search, setSearch] = useState("");
+  const searching = search.trim().length >= SEARCH.minTerm;
+
+  const topics = useHelpTopics(searching ? search : "");
   const create = useCreateHelpTopic();
   const update = useUpdateHelpTopic();
   const remove = useDeleteHelpTopic();
@@ -166,14 +172,6 @@ function HelpTab() {
   const rows = topics.data ?? [];
   const editing = rows.find((row) => row.id === open) ?? null;
 
-  /**
-   * The pinned "add" bar — see `useStickyAdd` for why there are two
-   * buttons and why they are never on screen together.
-   */
-  const { attachTop, attachAddButton, showAddBar } = useStickyAdd(
-    open === null,
-  );
-
   const order = useReorder({
     ids: rows.map((row) => row.id),
     onReorder: (ids) => {
@@ -182,14 +180,37 @@ function HelpTab() {
     },
     labelOf: (id) =>
       pickLocalized(rows.find((row) => row.id === id)?.question ?? {}),
+    disabled: searching,
   });
 
   return (
     <div className="relative flex h-full">
-      <div className="relative flex min-w-0 flex-grow flex-col">
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-          <StickyAddTop attach={attachTop} />
+      <div className="flex min-w-0 flex-grow flex-col">
+        {/* The same bar every list here carries: search on the right, the add
+            button beside it. The header does not scroll, so this is the one
+            copy of "add one" — no in-list button and no pinned bar, which were
+            two more ways to reach an action that is now always visible. */}
+        <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
+          {/* The field takes the slack. These two bars have no title to hold
+              it — unlike the catalogue's, where the heading grows — so a fixed
+              width left a stretch of empty white between the search and the
+              button, which reads as something missing rather than as space. */}
+          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder={t("content.searchHelp")}
+            />
+            <span className="ps-md text-[12px] text-text-faint">
+              {t("content.reorderHint")}
+            </span>
+          </div>
+          <Button onClick={() => setOpen("new")}>
+            {t("content.addTopic")}
+          </Button>
+        </div>
 
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("content.helpBlurb")}
           </p>
@@ -212,6 +233,12 @@ function HelpTab() {
           )}
 
           {order.instructions}
+
+          {searching && rows.length === 0 && (
+            <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
+              {t("content.searchNone", { term: search.trim() })}
+            </p>
+          )}
 
           {order
             .ordered(rows, (row) => row.id)
@@ -239,26 +266,7 @@ function HelpTab() {
                 }}
               />
             ))}
-
-          {/* Where a new question actually goes: the end of the list. The
-              pinned bar below is a shortcut to this one, and only exists while
-              this one is out of sight. */}
-          {topics.isSuccess && (
-            <div ref={attachAddButton} className="mt-lg">
-              <Button fullWidth onClick={() => setOpen("new")}>
-                {t("content.addTopic")}
-              </Button>
-            </div>
-          )}
         </div>
-
-        {topics.isSuccess && (
-          <StickyAddBar visible={showAddBar}>
-            <Button fullWidth onClick={() => setOpen("new")}>
-              {t("content.addTopic")}
-            </Button>
-          </StickyAddBar>
-        )}
       </div>
 
       <Panel
@@ -539,7 +547,10 @@ function HelpEditor({
 function LegalTab() {
   const [document, setDocument] = useState<PolicyDocument>("privacy");
 
-  const sections = usePolicySections(document);
+  const [search, setSearch] = useState("");
+  const searching = search.trim().length >= SEARCH.minTerm;
+
+  const sections = usePolicySections(document, searching ? search : "");
   const create = useCreatePolicySection(document);
   const update = useUpdatePolicySection(document);
   const remove = useDeletePolicySection(document);
@@ -550,14 +561,6 @@ function LegalTab() {
   const rows = sections.data ?? [];
   const editing = rows.find((row) => row.id === open) ?? null;
 
-  /**
-   * The pinned "add" bar — see `useStickyAdd` for why there are two
-   * buttons and why they are never on screen together.
-   */
-  const { attachTop, attachAddButton, showAddBar } = useStickyAdd(
-    open === null,
-  );
-
   const order = useReorder({
     ids: rows.map((row) => row.id),
     onReorder: (ids) => {
@@ -566,19 +569,23 @@ function LegalTab() {
     },
     labelOf: (id) =>
       pickLocalized(rows.find((row) => row.id === id)?.title ?? {}),
+    disabled: searching,
   });
 
   return (
     <div className="relative flex h-full">
-      <div className="relative flex min-w-0 flex-grow flex-col">
-        <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <div className="w-[240px]">
+      <div className="flex min-w-0 flex-grow flex-col">
+        <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
+          <div className="w-[240px] shrink-0">
             <Select
               value={document}
               onChange={(next) => {
                 setDocument(next as PolicyDocument);
-                // The open section belongs to the document being left.
+                // The open section belongs to the document being left, and so
+                // does the search — a term that matched in privacy has no
+                // standing in terms.
                 setOpen(null);
+                setSearch("");
               }}
               options={POLICY_DOCUMENTS.map((one) => ({
                 value: one,
@@ -586,11 +593,24 @@ function LegalTab() {
               }))}
             />
           </div>
+
+          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder={t("content.searchLegal")}
+            />
+            <span className="ps-md text-[12px] text-text-faint">
+              {t("content.reorderHint")}
+            </span>
+          </div>
+
+          <Button onClick={() => setOpen("new")}>
+            {t("content.addSection")}
+          </Button>
         </div>
 
         <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-          <StickyAddTop attach={attachTop} />
-
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("content.legalBlurb")}
           </p>
@@ -602,6 +622,12 @@ function LegalTab() {
           )}
 
           {order.instructions}
+
+          {searching && rows.length === 0 && (
+            <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
+              {t("content.searchNone", { term: search.trim() })}
+            </p>
+          )}
 
           {order
             .ordered(rows, (row) => row.id)
@@ -623,23 +649,7 @@ function LegalTab() {
                 }}
               />
             ))}
-
-          {sections.isSuccess && (
-            <div ref={attachAddButton} className="mt-lg">
-              <Button fullWidth onClick={() => setOpen("new")}>
-                {t("content.addSection")}
-              </Button>
-            </div>
-          )}
         </div>
-
-        {sections.isSuccess && (
-          <StickyAddBar visible={showAddBar}>
-            <Button fullWidth onClick={() => setOpen("new")}>
-              {t("content.addSection")}
-            </Button>
-          </StickyAddBar>
-        )}
       </div>
 
       <Panel
@@ -1033,6 +1043,7 @@ function StepsTab() {
                       at: path.findIndex((one) => one.id === current.id) + 1,
                     })
               }
+              badgeTone={statusTone(current.slug)}
               fields={[
                 {
                   key: "name",
@@ -1153,6 +1164,7 @@ function InlineEditor({
   codes,
   title,
   badge,
+  badgeTone,
   fields,
   pending,
   onSave,
@@ -1161,6 +1173,19 @@ function InlineEditor({
   codes: string[];
   title: string;
   badge?: string;
+  /**
+   * The colour the badge wears, as CSS values.
+   *
+   * Only the order steps pass one: their badge names a *status*, and a status
+   * has a colour everywhere else in the product — the strip above, the queue's
+   * tabs, the chips on a customer's orders. A grey "Step 2" beside a coloured
+   * "Confirmed" is the same fact drawn two ways on one screen.
+   *
+   * No dot here, unlike the chips elsewhere. The strip directly above already
+   * carries one per step and is doing the colour-blind work for this screen; a
+   * second dot on the same status a line below is repetition, not redundancy.
+   */
+  badgeTone?: { wash: string; ink: string; dot: string };
   fields: {
     key: string;
     label: string;
@@ -1206,7 +1231,17 @@ function InlineEditor({
           {title}
         </h2>
         {badge && (
-          <span className="shrink-0 rounded-sm bg-neutral-fill px-sm py-[2px] text-[11px] font-semibold text-text-soft">
+          <span
+            style={
+              badgeTone
+                ? { background: badgeTone.wash, color: badgeTone.ink }
+                : undefined
+            }
+            className={cx(
+              "flex shrink-0 items-center gap-xs rounded-sm px-sm py-[2px] text-[11px] font-semibold",
+              !badgeTone && "bg-neutral-fill text-text-soft",
+            )}
+          >
             {badge}
           </span>
         )}

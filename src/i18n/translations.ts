@@ -53,6 +53,7 @@ const en = {
     customers: "Customers",
     reports: "Reports",
     settings: "Settings",
+    account: "Your account",
     liveOrders: "orders needing attention",
     skipToContent: "Skip to content",
   },
@@ -215,6 +216,7 @@ const en = {
     keyboardMove: "move",
     keyboardAdvance: "advance",
     keyboardOpen: "receipt",
+    keyboardUndo: "undo the last move",
     keyboardSearch: "search",
     loadMore: "Load older orders",
     panelLabel: "Order detail",
@@ -395,8 +397,8 @@ const en = {
    */
   store: {
     // ---- adding one (the wizard) ------------------------------------------
-    add: "New",
-    create: "Create the shop",
+    add: "New store",
+    create: "Create the store",
     back: "Back",
     next: "Next",
     stepOf: "Step {step} of {total}",
@@ -603,7 +605,10 @@ const en = {
     searchHint: "Drag the tiles to change the order customers see them in.",
     // Reordering is off while filtered, and saying so beats a handle that
     // silently does nothing.
-    searchNoDrag: "Clear the search to change the order.",
+    // Stated always, not only once dragging has already stopped working:
+    // a handle that does nothing is confusing at the moment it does
+    // nothing, and the sentence only helps before that.
+    reorderHint: "Drag the rows to reorder. Searching turns that off.",
     searchNone: "No category matches {term}.",
     formLabel: "Category details",
     failedTitle: "Could not load the categories",
@@ -656,7 +661,7 @@ const en = {
       "The chip disappears from all {count} dish(es) straight away. They keep the tag, so this is reversible in one click.",
     hideConfirm: "Hide it",
     search: "Search tags",
-    searchNoDrag: "Clear the search to change the order.",
+    reorderHint: "Drag the rows to reorder. Searching turns that off.",
     searchNone: "No tag matches {term}.",
     formLabel: "Tag details",
     failedTitle: "Could not load the tags",
@@ -781,9 +786,15 @@ const en = {
     ladderTitle: "Delivery ladder",
     ladderBody:
       "What delivery costs by distance. Each row is the top of a band, and the largest is also how far you deliver.",
+    // Said out loud because it used not to be true, and the failure was silent:
+    // an unconverted fee on a shop pricing in another currency is delivery for
+    // roughly nothing.
+    ladderCurrency:
+      "Priced in {code}. A shop that prices in another currency charges the converted amount, at the rate you set on the Exchange rate tab.",
     upTo: "Up to (km)",
     fee: "Fee",
-    minor: "In the smallest unit of the currency.",
+    minor:
+      "In the smallest unit of {code} — 100 is one whole unit when it has two decimal places.",
     isRadius: "Delivery radius",
     // What the label means, in consequences. Two of them, and neither is
     // visible anywhere else in the dashboard.
@@ -849,7 +860,7 @@ const en = {
     // the operator searches for wording that lives inside a picture.
     searchHint:
       "Searches the reference you gave each promotion — the card itself is artwork, so there is no wording to search.",
-    searchNoDrag: "Clear the search to change the order.",
+    reorderHint: "Drag the rows to reorder. Searching turns that off.",
     searchNone: "No promotion matches {term}.",
 
     // ---- what it takes off -------------------------------------------------
@@ -874,16 +885,16 @@ const en = {
     // The real hazard, said plainly. `discounts` has no currency column, so the
     // number is compared against whatever the order happens to be priced in.
     amountHint:
-      "A plain number, without separators — the line below shows what it comes to. A promotion carries no currency of its own, so if you ever run shops pricing in two currencies, this same figure applies to both and you want one promotion per currency.",
+      "In {code}, without separators — the line below shows what it comes to. A shop pricing in another currency takes off the converted amount, at the rate you set on the Pricing screen.",
     valueRequired: "Say how much comes off.",
     valueOutOfRange: "That amount is outside what a discount can be.",
     minSubtotal: "Minimum spend",
     minSubtotalHint:
-      "Below this the promotion does not apply. Leave empty for no minimum.",
+      "In {code}. Below this the promotion does not apply — and it is compared after conversion, so it means the same amount of money whatever a shop prices in. Leave empty for no minimum.",
     noMinimum: "No minimum",
     maxDiscount: "Most it can take off",
     maxDiscountHint:
-      "A ceiling on the percentage, so a large basket cannot run away with it. Leave empty for none.",
+      "In {code}. A ceiling on the percentage, so a large basket cannot run away with it. Leave empty for none.",
     noCeiling: "No ceiling",
 
     // ---- who gets it -------------------------------------------------------
@@ -954,7 +965,8 @@ const en = {
     thisBanner: "this promotion",
 
     // ---- summaries ---------------------------------------------------------
-    preview: "In the app: {summary}.",
+    previewLabel: "In the app",
+    preview: "{summary}",
     summaryPercent: "{value}% off the food",
     summaryFixed: "{amount} off the food",
     summaryFreeDelivery: "Free delivery",
@@ -1039,6 +1051,40 @@ const en = {
     bandLabel: "Up to {km} km",
   },
 
+  account: {
+    title: "Your account",
+    blurb:
+      "Your own sign-in. Both changes ask for your current password — a signed-in session is exactly what an unattended laptop already has, so it cannot be the proof for a change that outlives it.",
+    signedInAs: "Signed in as",
+    failed: "Could not read your account.",
+
+    currentPassword: "Current password",
+    currentHint: "Proves it is you, and not a session somebody walked up to.",
+    currentRequired: "Enter your current password.",
+    wrongPassword: "That is not your current password.",
+
+    passwordTitle: "Change your password",
+    passwordBlurb:
+      "You stay signed in on this device. Other devices are signed out, because the tokens they hold were issued to the old password.",
+    newPassword: "New password",
+    newPasswordHint: "At least {min} characters. Length beats punctuation.",
+    confirmPassword: "New password again",
+    confirmMismatch: "The two do not match.",
+    changePassword: "Change password",
+    passwordChanged: "Your password is changed",
+
+    emailTitle: "Change your email",
+    // The honest description: it does not change until the link is followed.
+    emailBlurb:
+      "This is where password-reset links go. We send a confirmation to the new address first, and nothing changes until you follow it — so keep the old inbox until you have.",
+    newEmail: "New email",
+    newEmailHint: "You will need to open a link sent to this address.",
+    emailInvalid: "That does not look like an email address.",
+    changeEmail: "Send the confirmation",
+    emailPending:
+      "Check the new inbox — the change lands when you follow the link",
+  },
+
   content: {
     title: "Settings",
     tabHelp: "Help",
@@ -1046,6 +1092,10 @@ const en = {
     tabPayments: "Payments",
     tabSteps: "Order steps",
     failed: "Could not load this. Try again.",
+    searchHelp: "Search questions",
+    searchLegal: "Search this document",
+    reorderHint: "Drag the rows to reorder. Searching turns that off.",
+    searchNone: "Nothing matches {term}.",
     save: "Save",
     saved: "{name} saved",
     added: "{name} added",
@@ -1276,6 +1326,14 @@ const en = {
     title: "Sign in",
     subtitle: "Operations for Lebrunji.",
     email: "Email",
+    // An example, per the rule every other field here follows — a placeholder
+    // that repeats the label is noise, and noise is what teaches people to
+    // stop reading them.
+    emailPlaceholder: "you@lebrunji.com",
+    // Not an example. A password field is the one place a specimen value would
+    // be a suggestion, so this is the *shape* of the input instead: masked, and
+    // saying nothing about what to type.
+    passwordPlaceholder: "••••••••••••",
     password: "Password",
     rememberMe: "Keep me signed in on this device",
     submit: "Sign in",

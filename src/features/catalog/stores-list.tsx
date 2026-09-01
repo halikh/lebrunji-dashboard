@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { cx, Input } from "@/components/ui";
+import { cx } from "@/components/ui";
+import { SearchInput } from "@/components/ui/search-input";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -56,13 +57,11 @@ export function StoresList() {
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
         <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h1 className="flex-grow text-[24px]">{t("catalogue.stores")}</h1>
-          <Input
+          <h1 className="shrink-0 text-[24px]">{t("catalogue.stores")}</h1>
+          <SearchInput
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={setSearch}
             placeholder={t("catalogue.searchPlaceholder")}
-            aria-label={t("catalogue.searchPlaceholder")}
-            className="w-[260px]"
           />
           <Button onClick={() => setAdding(true)}>{t("store.add")}</Button>
         </div>

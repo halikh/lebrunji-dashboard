@@ -7,6 +7,7 @@ import { Map } from "@/components/ui/map";
 import { Panel } from "@/components/ui/panel";
 import { Price } from "@/features/reference/price";
 import { t } from "@/i18n/translations";
+import { formatPhone } from "@/lib/phone";
 import { statusTone } from "@/lib/order-status";
 import { formatDayAndTime } from "@/lib/time";
 
@@ -114,8 +115,8 @@ export function OrderPanel({
                   // when somebody meant to copy it is a call to a customer at
                   // eleven at night.
                   <Copyable
-                    value={order.data.customerPhone}
-                    href={`tel:${order.data.customerPhone}`}
+                    value={formatPhone(order.data.customerPhone)}
+                    href={`tel:${formatPhone(order.data.customerPhone)}`}
                     label={t("orders.copyPhone")}
                     className="text-[14px]"
                   />
@@ -209,26 +210,33 @@ export function OrderPanel({
             gets.
           */}
           <div className="flex shrink-0 items-center gap-sm border-t border-border p-xxl">
+            {/* `flex-grow`, not `w-full`. `fullWidth` makes the button
+                `w-full`, which took the whole row and pushed Cancel off the
+                edge of the panel — visibly gone, on the one action here that
+                cannot be undone. Growing into what is left leaves room for
+                it. */}
             {next && (
-              <Button
-                fullWidth
-                style={{
-                  background: statusTone(next.slug).fill,
-                  color: statusTone(next.slug).onFill,
-                }}
-                onClick={() =>
-                  advance({
-                    orderId: order.data.id,
-                    code: order.data.code,
-                    fromSlug: status?.slug ?? "",
-                    toSlug: next.slug,
-                    toName: next.name,
-                    undoable: next.progress !== null,
-                  })
-                }
-              >
-                {next.name}
-              </Button>
+              <span className="flex min-w-0 flex-grow">
+                <Button
+                  fullWidth
+                  style={{
+                    background: statusTone(next.slug).fill,
+                    color: statusTone(next.slug).onFill,
+                  }}
+                  onClick={() =>
+                    advance({
+                      orderId: order.data.id,
+                      code: order.data.code,
+                      fromSlug: status?.slug ?? "",
+                      toSlug: next.slug,
+                      toName: next.name,
+                      undoable: next.progress !== null,
+                    })
+                  }
+                >
+                  {next.name}
+                </Button>
+              </span>
             )}
 
             {cancelled && next && (

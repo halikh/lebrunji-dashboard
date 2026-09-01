@@ -30,8 +30,11 @@ import {
 
 export const contentKeys = {
   help: ["content", "help"] as const,
+  helpList: (search: string) => ["content", "help", search] as const,
   policy: (document: PolicyDocument) =>
     ["content", "policy", document] as const,
+  policyList: (document: PolicyDocument, search: string) =>
+    ["content", "policy", document, search] as const,
   payments: ["content", "payments"] as const,
   statuses: ["content", "statuses"] as const,
 };
@@ -44,19 +47,27 @@ export const contentKeys = {
  */
 const SETTLED = { staleTime: 5 * 60_000 };
 
-export function useHelpTopics() {
+export function useHelpTopics(search = "") {
+  const term = search.trim();
+
   return useQuery({
-    queryKey: contentKeys.help,
-    queryFn: fetchHelpTopics,
+    queryKey: contentKeys.helpList(term),
+    queryFn: () => fetchHelpTopics(term),
     ...SETTLED,
+    // The rows on screen stay while the next ones are fetched, so typing does
+    // not blink the list empty between keystrokes.
+    placeholderData: (previous) => previous,
   });
 }
 
-export function usePolicySections(document: PolicyDocument) {
+export function usePolicySections(document: PolicyDocument, search = "") {
+  const term = search.trim();
+
   return useQuery({
-    queryKey: contentKeys.policy(document),
-    queryFn: () => fetchPolicySections(document),
+    queryKey: contentKeys.policyList(document, term),
+    queryFn: () => fetchPolicySections(document, term),
     ...SETTLED,
+    placeholderData: (previous) => previous,
   });
 }
 

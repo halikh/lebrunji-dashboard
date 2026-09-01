@@ -50,14 +50,44 @@ export type HelpTopic = {
   isActive: boolean;
 };
 
-export async function fetchHelpTopics(): Promise<HelpTopic[]> {
-  const { data, error } = await getClient()
+/**
+ * Every topic, or the ones matching a term.
+ *
+ * The term goes into the query rather than filtering the rows already here.
+ * This list is short enough that either would find the same thing today, and
+ * that is exactly why it is worth doing properly: a client-side filter is a
+ * habit that is wrong on every list that pages, where it searches what has been
+ * *downloaded* and silently cannot find the rest.
+ *
+ * Both languages, and the answer as well as the question — somebody looking for
+ * the topic that mentions refunds is searching for a word in the body of it.
+ */
+export async function fetchHelpTopics(
+  search?: string | null,
+): Promise<HelpTopic[]> {
+  let query = getClient()
     .from("help_topics")
     .select(
       "id, slug, group_slug, group_name, question, answer, sort_order, is_active",
     )
     .order("sort_order", { ascending: true })
     .limit(CAP);
+
+  const term = search?.trim();
+  if (term) {
+    const like = `%${term}%`;
+    query = query.or(
+      [
+        `question->>en.ilike.${like}`,
+        `question->>ar.ilike.${like}`,
+        `answer->>en.ilike.${like}`,
+        `answer->>ar.ilike.${like}`,
+        `group_name->>en.ilike.${like}`,
+      ].join(","),
+    );
+  }
+
+  const { data, error } = await query;
 
   if (error)
     throw new Error(`Could not read the help topics: ${error.message}`);
@@ -174,15 +204,38 @@ export type PolicySection = {
   sortOrder: number;
 };
 
+/**
+ * One document's sections, or the ones matching a term.
+ *
+ * Scoped to the document as well as the term: a heading may legitimately appear
+ * in both privacy and terms, and a search that crossed between them would offer
+ * to edit a section of the document nobody is looking at.
+ */
 export async function fetchPolicySections(
   document: PolicyDocument,
+  search?: string | null,
 ): Promise<PolicySection[]> {
-  const { data, error } = await getClient()
+  let query = getClient()
     .from("policy_sections")
     .select("id, slug, document, title, body, sort_order")
     .eq("document", document)
     .order("sort_order", { ascending: true })
     .limit(CAP);
+
+  const term = search?.trim();
+  if (term) {
+    const like = `%${term}%`;
+    query = query.or(
+      [
+        `title->>en.ilike.${like}`,
+        `title->>ar.ilike.${like}`,
+        `body->>en.ilike.${like}`,
+        `body->>ar.ilike.${like}`,
+      ].join(","),
+    );
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(`Could not read the document: ${error.message}`);
 

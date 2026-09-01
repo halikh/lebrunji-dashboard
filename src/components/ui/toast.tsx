@@ -51,6 +51,14 @@ type Show = (toast: Omit<Toast, "id">) => void;
 
 const ToastContext = createContext<Show | null>(null);
 
+/**
+ * Runs the newest undoable toast's undo. See `useUndoLast`.
+ *
+ * Separate from `ToastContext` so a component that only shows toasts does not
+ * re-render when the undoable one changes.
+ */
+const UndoContext = createContext<(() => boolean) | null>(null);
+
 /** How long a toast stays. Long enough to reach Undo without hurrying. */
 const LIFETIME_MS = 7000;
 
@@ -71,25 +79,49 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /**
+   * The newest toast that carries an undo, run and dismissed.
+   *
+   * Newest rather than "the one that was undoable when you pressed": three
+   * toasts can be on screen and ⌘Z should reverse the last thing done, which is
+   * the one at the bottom of the stack.
+   *
+   * Read out of state inside the setter rather than from a captured `toasts`,
+   * so the callback stays stable and cannot act on a list one render old.
+   */
+  const undoLast = useCallback(() => {
+    let ran = false;
+    setToasts((current) => {
+      const target = [...current].reverse().find((toast) => toast.undo);
+      if (!target) return current;
+      ran = true;
+      void target.undo?.();
+      return current.filter((toast) => toast.id !== target.id);
+    });
+    return ran;
+  }, []);
+
   return (
     <ToastContext.Provider value={show}>
-      {children}
-      <div
-        // `polite`, not `assertive`: these report something that already
-        // happened. Assertive interrupts whatever a screen reader is saying,
-        // which for a toast every few minutes is hostile.
-        role="status"
-        aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-sm p-lg"
-      >
-        {toasts.map((toast) => (
-          <ToastRow
-            key={toast.id}
-            toast={toast}
-            onDismiss={() => dismiss(toast.id)}
-          />
-        ))}
-      </div>
+      <UndoContext.Provider value={undoLast}>
+        {children}
+        <div
+          // `polite`, not `assertive`: these report something that already
+          // happened. Assertive interrupts whatever a screen reader is saying,
+          // which for a toast every few minutes is hostile.
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-sm p-lg"
+        >
+          {toasts.map((toast) => (
+            <ToastRow
+              key={toast.id}
+              toast={toast}
+              onDismiss={() => dismiss(toast.id)}
+            />
+          ))}
+        </div>
+      </UndoContext.Provider>
     </ToastContext.Provider>
   );
 }
@@ -161,6 +193,28 @@ export function useToast(): Show {
   const show = useContext(ToastContext);
   if (!show) throw new Error("useToast must be used inside <ToastProvider>");
   return show;
+}
+
+/**
+ * Runs the newest toast's undo, if there is one to run.
+ *
+ * ## Why the shortcut lives here and not on the queue
+ *
+ * The toast already *is* the record of what can be undone: it holds the
+ * callback, and it expires. A screen keeping its own "last action" would have
+ * to expire it in step, and the failure when the two drift is the worst kind —
+ * ⌘Z reversing something the operator was no longer being offered, several
+ * actions after the fact.
+ *
+ * Returns whether anything happened, so a caller can decide whether to swallow
+ * the keystroke or let the browser have it. Nothing to undo means ⌘Z should
+ * still be ⌘Z.
+ */
+export function useUndoLast() {
+  const undoLast = useContext(UndoContext);
+  if (!undoLast)
+    throw new Error("useUndoLast must be used inside <ToastProvider>");
+  return undoLast;
 }
 
 /** Stable helpers, so callers do not rebuild the object shape each time. */

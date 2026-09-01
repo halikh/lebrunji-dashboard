@@ -136,7 +136,12 @@ function paletteStyles<M extends boolean>(
     control: (base, state) => ({
       ...base,
       minHeight: "auto",
-      padding: "var(--spacing-xs) var(--spacing-xs)",
+      // No vertical padding here: it all lives on `valueContainer` below, so
+      // the control's height is `md` above and below the text — exactly what
+      // `Input` gets from `py-md`. Split across both, a select came out
+      // shorter than the field beside it, which is visible the moment the two
+      // sit in one bar and invisible everywhere else.
+      padding: "0 var(--spacing-xs)",
       borderRadius: "var(--radius-md)",
       backgroundColor: "var(--color-surface)",
       borderColor: isInvalid ? "var(--color-danger)" : "var(--color-border)",
@@ -150,9 +155,10 @@ function paletteStyles<M extends boolean>(
     }),
     valueContainer: (base) => ({
       ...base,
-      // The same inset an `Input` gives its text, so the label above lines
-      // up with the value rather than with the border.
-      padding: "var(--spacing-xs) var(--spacing-md)",
+      // The same insets an `Input` gives its text — `py-md px-md` — so a select
+      // matches the height of a field beside it, and its label lines up with
+      // the value rather than with the border.
+      padding: "var(--spacing-md) var(--spacing-md)",
     }),
     singleValue: (base) => ({ ...base, color: "var(--color-text)" }),
     placeholder: (base) => ({

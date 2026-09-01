@@ -2,13 +2,9 @@
 
 import { useState } from "react";
 
-import { Button, Input, cx } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
+import { SearchInput } from "@/components/ui/search-input";
 import { ROW } from "@/components/ui/row";
-import {
-  StickyAddBar,
-  StickyAddTop,
-  useStickyAdd,
-} from "@/components/ui/sticky-add";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Field } from "@/components/ui/field";
@@ -87,17 +83,6 @@ export function CategoriesList() {
    */
   const [open, setOpen] = useState<string | null>(null);
 
-  /**
-   * The pinned "add" bar.
-   *
-   * Suppressed while searching — there is no list position for a new row to
-   * join — and while the panel is open, where a second way to open it would be
-   * a button that closes the form somebody is filling in.
-   */
-  const { attachTop, attachAddButton, showAddBar } = useStickyAdd(
-    !searching && open === null,
-  );
-
   const rows = categories.data ?? [];
   const editing = rows.find((row) => row.id === open) ?? null;
 
@@ -114,29 +99,36 @@ export function CategoriesList() {
 
   return (
     <div className="relative flex h-full">
-      <div className="relative flex min-w-0 flex-grow flex-col">
+      <div className="flex min-w-0 flex-grow flex-col">
         {/* The same bar the shops have — same border, same padding, same place
             for the box — so moving between the two tabs is not relearning
             where the search is. */}
-        <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h1 className="flex-grow text-[24px]">{t("categories.tab")}</h1>
-          {searching && (
-            <span className="text-[13px] text-text-faint">
-              {t("categories.searchNoDrag")}
+        <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
+          <h1 className="flex-grow self-center text-[24px]">
+            {t("categories.tab")}
+          </h1>
+          {/* The rule under the box, always — not a warning that appears
+              once somebody has already typed. A handle that stops working is
+              confusing at the moment it stops; the sentence is only useful
+              before that. */}
+          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder={t("categories.search")}
+            />
+            <span className="ps-md text-[12px] text-text-faint">
+              {t("categories.reorderHint")}
             </span>
-          )}
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t("categories.search")}
-            aria-label={t("categories.search")}
-            className="w-[260px]"
-          />
+          </div>
+          {/* Beside the search, as on the shops tab. The list keeps its own
+              button at the end — that is where a new row appears — and the
+              pinned bar is the third way to reach the same action while the
+              end of the list is out of sight. */}
+          <Button onClick={() => setOpen("new")}>{t("categories.add")}</Button>
         </div>
 
         <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-          <StickyAddTop attach={attachTop} />
-
           {categories.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (
@@ -200,26 +192,7 @@ export function CategoriesList() {
               {t("categories.searchNone", { term: search.trim() })}
             </p>
           )}
-
-          {/* Where a new row actually goes: the end of the list. The pinned
-              bar below is a shortcut to this one, and only exists while this
-              one is out of sight. */}
-          {categories.isSuccess && !searching && (
-            <div ref={attachAddButton} className="mt-lg">
-              <Button fullWidth onClick={() => setOpen("new")}>
-                {t("categories.add")}
-              </Button>
-            </div>
-          )}
         </div>
-
-        {categories.isSuccess && (
-          <StickyAddBar visible={showAddBar}>
-            <Button fullWidth onClick={() => setOpen("new")}>
-              {t("categories.add")}
-            </Button>
-          </StickyAddBar>
-        )}
       </div>
 
       <Panel

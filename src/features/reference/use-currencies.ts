@@ -75,5 +75,30 @@ export function useMoney() {
     [rows],
   );
 
-  return { format, convertTo, secondaryCode, currencies: rows };
+  /**
+   * The currency the delivery ladder and discount amounts are written in.
+   *
+   * One place, reading the column the database enforces — rather than each
+   * screen inferring it from `rate === 1`, which was two inferences of one
+   * fact and would disagree the moment a second rate was set to 1.
+   */
+  const baseCode = rows?.find((one) => one.isBase)?.code ?? "";
+
+  /**
+   * How many decimal places the base currency has — 2 for USD, 0 for LBP.
+   *
+   * `MoneyInput` needs it to turn what somebody types into minor units, and it
+   * defaults to 2 only until the reference data lands. Reading it here rather
+   * than per screen keeps the answer in the same place as `baseCode`.
+   */
+  const baseDecimals = rows?.find((one) => one.isBase)?.decimalDigits ?? 2;
+
+  return {
+    format,
+    convertTo,
+    secondaryCode,
+    baseCode,
+    baseDecimals,
+    currencies: rows,
+  };
 }
