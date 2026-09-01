@@ -143,43 +143,86 @@ export function fromWallClock(
 }
 
 /**
- * Midnight in Beirut, as an instant.
+ * When the business day begins, on Beirut's clock.
  *
- * This is the day boundary the whole dashboard uses. Called with an instant, it
- * returns the start of *that* Beirut day — so it is correct for any moment, not
- * only for now.
+ * Orders are taken 08:00 → 02:00, so a "day" here is a **shift**, not a
+ * calendar date: an order placed at 00:40 belongs to the evening that has not
+ * finished yet, and filing it under the date the clock has just rolled over to
+ * is the difference between a night's takings and two half-nights.
+ *
+ * That failure is quiet and it lands on the busiest hours. Under a midnight
+ * boundary, the "Today" queue empties at midnight while the kitchen is still
+ * cooking; an order that arrives at 00:10 and is still unconfirmed appears to
+ * be from a different day than the one before it; and the revenue chart shows
+ * every late night split across two bars.
+ *
+ * One number, in one place, because it is the sort of thing that would
+ * otherwise be an `8` in five files.
  */
-export function startOfBusinessDay(instant: Date = new Date()): Date {
+export const BUSINESS_DAY_STARTS_AT = 8;
+
+/**
+ * Which shift an instant belongs to, as a calendar date.
+ *
+ * Everything else in this section is built on it. Before 08:00 the shift is
+ * still yesterday's — subtracting the start hour from the wall clock and then
+ * taking the date says exactly that, and says it once.
+ *
+ * The subtraction is done on the **wall clock**, not on the instant, and the
+ * difference matters twice a year: on the day the clocks go back, subtracting
+ * eight hours from an instant crosses a 25-hour day and lands an hour out.
+ * Rolling the numbers through `Date.UTC` is calendar arithmetic on values that
+ * are already Beirut's, so nothing about offsets or the machine's zone reaches
+ * the answer.
+ */
+function shiftDate(instant: Date): { year: number; month: number; day: number } {
   const clock = toWallClock(instant);
-  return fromWallClock({
-    year: clock.year,
-    month: clock.month,
-    day: clock.day,
-  });
+  const rolled = new Date(
+    Date.UTC(
+      clock.year,
+      clock.month - 1,
+      clock.day,
+      clock.hour - BUSINESS_DAY_STARTS_AT,
+    ),
+  );
+  return {
+    year: rolled.getUTCFullYear(),
+    month: rolled.getUTCMonth() + 1,
+    day: rolled.getUTCDate(),
+  };
 }
 
-/** The instant `days` after the start of the business day containing `instant`. */
+/**
+ * The start of the shift containing `instant` — 08:00 Beirut on its day.
+ *
+ * This is the day boundary the whole dashboard uses. Called with an instant it
+ * answers for *that* shift, so it is correct for any moment, not only for now.
+ */
+export function startOfBusinessDay(instant: Date = new Date()): Date {
+  return fromWallClock({ ...shiftDate(instant), hour: BUSINESS_DAY_STARTS_AT });
+}
+
+/** The instant `days` shifts after the one containing `instant`. */
 export function startOfBusinessDayPlus(
   days: number,
   instant: Date = new Date(),
 ): Date {
-  const clock = toWallClock(instant);
+  const date = shiftDate(instant);
   // Through `Date.UTC` so month and year roll over correctly — `day + 1` on the
   // 31st is not the 32nd.
-  const rolled = new Date(
-    Date.UTC(clock.year, clock.month - 1, clock.day + days),
-  );
+  const rolled = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
   return fromWallClock({
     year: rolled.getUTCFullYear(),
     month: rolled.getUTCMonth() + 1,
     day: rolled.getUTCDate(),
+    hour: BUSINESS_DAY_STARTS_AT,
   });
 }
 
-/** Whether two instants fall on the same Beirut day. */
+/** Whether two instants fall in the same shift. */
 export function isSameBusinessDay(a: Date, b: Date): boolean {
-  const first = toWallClock(a);
-  const second = toWallClock(b);
+  const first = shiftDate(a);
+  const second = shiftDate(b);
   return (
     first.year === second.year &&
     first.month === second.month &&
@@ -243,17 +286,22 @@ export function formatDateTime(instant: Date | string): string {
  * it. Twice a year, at the DST changes, it would slide differently.
  */
 export function businessMonthKey(instant: Date | string): string {
-  const clock = toWallClock(asDate(instant));
-  return `${clock.year}-${String(clock.month).padStart(2, "0")}`;
+  // The *shift's* month, so a 00:40 order on the 1st counts towards the month
+  // whose evening it was part of rather than the one that had just begun.
+  const date = shiftDate(asDate(instant));
+  return `${date.year}-${String(date.month).padStart(2, "0")}`;
 }
 
 /**
  * Which day of the week an instant fell on **in Beirut**, `0` Sunday to `6`.
  *
- * `Date#getDay` answers for the machine, which is the bug this exists to avoid:
- * a kitchen taking an order at 00:30 on Saturday in Beirut is still Friday in
- * London, so a "when do they order" chart drawn on a laptop that travelled puts
- * every late-night order on the wrong bar.
+ * The **shift's** weekday, not the calendar's: an order at 00:30 on Saturday
+ * belongs to Friday night's trade, which is what a "when are we busy" chart is
+ * being read to find.
+ *
+ * `Date#getDay` answers for the machine, which is the other half of the same
+ * bug: 00:30 Saturday in Beirut is still Friday in London, so a chart drawn on
+ * a laptop that travelled puts every late order on a different wrong bar.
  *
  * The wall clock is read first and *then* treated as UTC, purely to borrow
  * `getUTCDay`'s calendar arithmetic — the numbers going in are already Beirut's,
@@ -264,8 +312,8 @@ export function businessMonthKey(instant: Date | string): string {
  * presentation layer, deliberately keeping the two orders separate.
  */
 export function businessWeekday(instant: Date | string): number {
-  const clock = toWallClock(asDate(instant));
-  return new Date(Date.UTC(clock.year, clock.month - 1, clock.day)).getUTCDay();
+  const date = shiftDate(asDate(instant));
+  return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
 }
 
 /**
@@ -279,11 +327,11 @@ export function recentMonthKeys(
   count: number,
   now: Date = new Date(),
 ): string[] {
-  const clock = toWallClock(now);
+  const date = shiftDate(now);
   const keys: string[] = [];
 
-  let year = clock.year;
-  let month = clock.month;
+  let year = date.year;
+  let month = date.month;
 
   for (let step = 0; step < count; step += 1) {
     keys.push(`${year}-${String(month).padStart(2, "0")}`);

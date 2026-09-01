@@ -174,13 +174,6 @@ export function CategoriesList() {
                     patch: { isActive: !row.isActive },
                   });
                 }}
-                onToggleFeatured={() => {
-                  setOpen(null);
-                  update.mutate({
-                    id: row.id,
-                    patch: { isFeatured: !row.isFeatured },
-                  });
-                }}
                 onArchive={async () => {
                   setOpen(null);
                   await archive.mutateAsync({ id: row.id, name: row.name });
@@ -251,14 +244,12 @@ function Row({
   handleProps,
   onEdit,
   onToggleActive,
-  onToggleFeatured,
   onArchive,
 }: {
   category: Category;
   open: boolean;
   onEdit: () => void;
   onToggleActive: () => void;
-  onToggleFeatured: () => void;
   onArchive: () => Promise<void>;
 } & ReorderProps) {
   const row = rowProps(
@@ -315,23 +306,6 @@ function Row({
           }}
           className="w-[104px]"
         />
-        <ConfirmToggle
-          on={category.isFeatured}
-          onChange={onToggleFeatured}
-          labelOn={t("categories.featured")}
-          params={{ name: pickLocalized(category.name) }}
-          whenTurningOn={{
-            titleKey: "categories.featureTitle",
-            bodyKey: "categories.featureBody",
-            confirmKey: "categories.featureConfirm",
-          }}
-          whenTurningOff={{
-            titleKey: "categories.unfeatureTitle",
-            bodyKey: "categories.unfeatureBody",
-            confirmKey: "categories.unfeatureConfirm",
-          }}
-          className="w-[104px]"
-        />
       </div>
 
       <ConfirmButton
@@ -369,7 +343,6 @@ function Editor({
   const [tagline, setTagline] = useState<Localized>(initial?.tagline ?? {});
   const [kindId, setKindId] = useState(initial?.kindId ?? "");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
-  const [isFeatured, setIsFeatured] = useState(initial?.isFeatured ?? false);
   const [hasMenuNav, setHasMenuNav] = useState(initial?.hasMenuNav ?? true);
 
   const [errors, setErrors] = useState<{ name?: string; kind?: string }>({});
@@ -392,7 +365,6 @@ function Editor({
       tagline,
       kindId,
       isActive,
-      isFeatured,
       hasMenuNav,
     });
   }
@@ -446,17 +418,6 @@ function Editor({
             onChange={() => setIsActive((current) => !current)}
             labelOn={t("categories.live")}
             labelOff={t("categories.hidden")}
-          />
-        </Field>
-
-        <Field
-          label={t("categories.featuredLabel")}
-          hint={t("categories.featuredHint")}
-        >
-          <Toggle
-            on={isFeatured}
-            onChange={() => setIsFeatured((current) => !current)}
-            labelOn={t("categories.featured")}
           />
         </Field>
 

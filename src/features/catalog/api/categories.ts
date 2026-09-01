@@ -18,11 +18,12 @@ import type { Localized } from "@/lib/validation";
  * loads. So reordering here is not decoration; it is the only thing that
  * decides what a customer sees first.
  *
- * ## `is_featured` is nullable, and that is not an accident
+ * ## And it is now the only thing that decides
  *
- * A null reads as "not featured", and the app sorts with `nullsFirst: false` to
- * keep it that way. The dashboard writes a real boolean so the column stops
- * accumulating a third state nobody meant.
+ * `is_featured` used to promote a category ahead of the drag order. Migration
+ * 0086 dropped it: two levers on one outcome have to be read together to
+ * predict anything, and this one was set on a row whose effect showed up on
+ * another screen. Dragging shows the result while it happens; a switch did not.
  */
 
 export type CategoryKind = {
@@ -37,7 +38,6 @@ export type Category = {
   name: Localized;
   tagline: Localized;
   isActive: boolean;
-  isFeatured: boolean;
   /**
    * Whether a shop in this category shows its menu's section tabs.
    *
@@ -50,7 +50,7 @@ export type Category = {
 };
 
 const COLUMNS = `id, slug, category_kind_id, name, tagline,
-   is_active, is_featured, has_menu_nav, sort_order`;
+   is_active, has_menu_nav, sort_order`;
 
 /**
  * There is no picture, deliberately.
@@ -107,9 +107,6 @@ export async function fetchCategories(
     name: (row.name as Localized) ?? {},
     tagline: (row.tagline as Localized) ?? {},
     isActive: row.is_active as boolean,
-    // Null is "not featured" — the app sorts it last deliberately. Read as a
-    // real boolean here so nothing downstream has to keep remembering that.
-    isFeatured: Boolean(row.is_featured),
     hasMenuNav: row.has_menu_nav as boolean,
     sortOrder: row.sort_order as number,
   }));
@@ -135,7 +132,6 @@ export type CategoryDraft = {
   name: Localized;
   tagline: Localized;
   isActive: boolean;
-  isFeatured: boolean;
   hasMenuNav: boolean;
 };
 
@@ -148,7 +144,6 @@ export async function createCategory(
     name: draft.name,
     tagline: draft.tagline,
     is_active: draft.isActive,
-    is_featured: draft.isFeatured,
     has_menu_nav: draft.hasMenuNav,
     sort_order: sortOrder,
     // No `slug`: the trigger from migration 0071 derives one from the English
@@ -169,7 +164,6 @@ export async function updateCategory(
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.tagline !== undefined) row.tagline = patch.tagline;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
-  if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
   if (patch.hasMenuNav !== undefined) row.has_menu_nav = patch.hasMenuNav;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 

@@ -160,27 +160,40 @@ describe("fromWallClock", () => {
 });
 
 describe("startOfBusinessDay", () => {
-  it("is Beirut midnight for the day containing the instant", () => {
+  it("is 08:00 Beirut on the day of the shift, not midnight", () => {
+    // 11:00 Beirut in winter (UTC+2), so the shift began three hours earlier.
     const midMorning = new Date("2026-01-15T09:00:00Z");
     expect(startOfBusinessDay(midMorning).toISOString()).toBe(
-      "2026-01-14T22:00:00.000Z",
+      "2026-01-15T06:00:00.000Z",
     );
   });
 
-  it("treats 00:30 Beirut as the start of that day, not the end of the last", () => {
-    // A shop closing at 01:00. Its final orders must land in the day that has
-    // just begun, which is what the operator will be looking at in the morning.
+  it("puts a late-night order in the shift that has not finished", () => {
+    // 00:30 on the 15th in Beirut. The kitchen closes at 02:00, so this belongs
+    // to the *14th's* trade — filing it under the 15th is what split every late
+    // night across two days.
     const lateTrade = new Date("2026-01-14T22:30:00Z");
-    expect(startOfBusinessDay(lateTrade).toISOString()).toBe(
-      "2026-01-14T22:00:00.000Z",
-    );
     expect(toWallClock(lateTrade).day).toBe(15);
+    expect(startOfBusinessDay(lateTrade).toISOString()).toBe(
+      "2026-01-14T06:00:00.000Z",
+    );
+  });
+
+  it("starts the new shift at 08:00, not before", () => {
+    // 07:59 Beirut is still yesterday's shift; 08:00 is today's.
+    expect(
+      startOfBusinessDay(new Date("2026-01-15T05:59:00Z")).toISOString(),
+    ).toBe("2026-01-14T06:00:00.000Z");
+    expect(
+      startOfBusinessDay(new Date("2026-01-15T06:00:00Z")).toISOString(),
+    ).toBe("2026-01-15T06:00:00.000Z");
   });
 
   it("shifts with the season", () => {
+    // Summer is UTC+3, so 08:00 Beirut is 05:00Z rather than 06:00Z.
     expect(
       startOfBusinessDay(new Date("2026-07-15T09:00:00Z")).toISOString(),
-    ).toBe("2026-07-14T21:00:00.000Z");
+    ).toBe("2026-07-15T05:00:00.000Z");
   });
 });
 
@@ -221,11 +234,23 @@ describe("isSameBusinessDay", () => {
     ).toBe(true);
   });
 
-  it("is false across a Beirut midnight that is not a UTC one", () => {
+  it("keeps a night together across midnight", () => {
+    // 23:30 and 00:30 in Beirut — either side of the calendar boundary, and
+    // the same shift. This is the whole reason the boundary is 08:00.
     expect(
       isSameBusinessDay(
         new Date("2026-01-15T21:30:00Z"),
         new Date("2026-01-15T22:30:00Z"),
+      ),
+    ).toBe(true);
+  });
+
+  it("is false across the 08:00 boundary", () => {
+    // 07:30 and 08:30 Beirut on the same date: two shifts, one date.
+    expect(
+      isSameBusinessDay(
+        new Date("2026-01-15T05:30:00Z"),
+        new Date("2026-01-15T06:30:00Z"),
       ),
     ).toBe(false);
   });
@@ -253,9 +278,10 @@ describe("formatting", () => {
  * which is the only laptop anybody tests on.
  */
 describe("businessMonthKey", () => {
-  it("uses Beirut's month, not UTC's", () => {
-    // 31 Aug 2026 22:30 UTC is 01:30 on 1 September in Beirut (UTC+3).
-    expect(businessMonthKey("2026-08-31T22:30:00Z")).toBe("2026-09");
+  it("counts a late night towards the month whose evening it was", () => {
+    // 31 Aug 22:30 UTC is 01:30 on 1 September in Beirut — and it is the 31st's
+    // trade, because the shift began on the 31st and has not ended.
+    expect(businessMonthKey("2026-08-31T22:30:00Z")).toBe("2026-08");
   });
 
   it("keeps a mid-month instant in its own month", () => {
@@ -266,9 +292,11 @@ describe("businessMonthKey", () => {
     expect(businessMonthKey("2026-01-15T09:00:00Z")).toBe("2026-01");
   });
 
-  it("crosses the year in Beirut, not in UTC", () => {
-    // 31 Dec 2026 22:30 UTC is 00:30 on 1 January in Beirut (UTC+2 in winter).
-    expect(businessMonthKey("2026-12-31T22:30:00Z")).toBe("2027-01");
+  it("crosses the year on the shift, not on the clock", () => {
+    // 00:30 on 1 January in Beirut is still New Year's Eve trade.
+    expect(businessMonthKey("2026-12-31T22:30:00Z")).toBe("2026-12");
+    // 09:00 on 1 January is the new year's first shift.
+    expect(businessMonthKey("2027-01-01T07:00:00Z")).toBe("2027-01");
   });
 });
 
@@ -278,10 +306,11 @@ describe("businessWeekday", () => {
     expect(businessWeekday("2026-08-30T09:00:00Z")).toBe(0);
   });
 
-  it("puts a late-night order on the Beirut day, not the UTC one", () => {
-    // Friday 21:30 UTC is Saturday 00:30 in Beirut. A kitchen open past
-    // midnight is the whole reason this matters.
-    expect(businessWeekday("2026-08-28T21:30:00Z")).toBe(6);
+  it("puts a late-night order on the night it belongs to", () => {
+    // Friday 21:30 UTC is Saturday 00:30 in Beirut — and it is Friday night's
+    // trade. A "when are we busy" chart that put it on Saturday would move the
+    // busiest hours of the week onto the wrong bar.
+    expect(businessWeekday("2026-08-28T21:30:00Z")).toBe(5);
   });
 
   it("does not shift an ordinary daytime instant", () => {
@@ -305,10 +334,10 @@ describe("recentMonthKeys", () => {
     expect(keys[0]).toBe("2025-09");
   });
 
-  it("uses Beirut's month at the boundary", () => {
-    // 22:30 UTC on the last day of August is already September in Beirut.
+  it("uses the shift's month at the boundary", () => {
+    // 01:30 on 1 September in Beirut, which is still the 31st's shift.
     const keys = recentMonthKeys(1, new Date("2026-08-31T22:30:00Z"));
-    expect(keys).toEqual(["2026-09"]);
+    expect(keys).toEqual(["2026-08"]);
   });
 });
 

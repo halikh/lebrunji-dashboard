@@ -9,10 +9,8 @@ import { Copyable } from "@/components/ui/copyable";
 import { Panel } from "@/components/ui/panel";
 import { PanelHeader } from "@/components/ui/panel-header";
 import { ROW } from "@/components/ui/row";
-import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { Toggle } from "@/components/ui/toggle";
-import { t, type TranslationKey } from "@/i18n/translations";
-import type { DayHours } from "@/features/catalog/api/hours";
+import { t } from "@/i18n/translations";
 import { Price } from "@/features/reference/price";
 import { statusTone } from "@/lib/order-status";
 import { formatPhone } from "@/lib/phone";
@@ -20,7 +18,6 @@ import { formatDayAndTime, startOfBusinessDayPlus } from "@/lib/time";
 
 import { isOverridden, isTakingOrders, type Courier } from "./api/couriers";
 import { DriverEditor } from "./drivers-screen";
-import { HoursGrid } from "./hours-grid";
 import { useCourier, useDispatches, useSaveCourier } from "./use-couriers";
 
 /**
@@ -33,16 +30,15 @@ import { useCourier, useDispatches, useSaveCourier } from "./use-couriers";
  * grows and a rota seven rows tall, and squeezing either into 420px would make
  * the part somebody came to read the smallest thing on the screen.
  *
- * ## Two tabs, because they are two errands
+ ## One page, and the rota is not on it
  *
- * *Overview* answers "who is this and what have they done" — read when
- * something has gone wrong with an order. *Shift* answers "when do they work" —
- * read when a rota changes. In one column the rota sits between the person and
- * their orders, so every visit of the first kind scrolls past fourteen time
- * pickers to reach the thing it came for.
+ * The week briefly had a tab here. It is edited in the same side form as the
+ * name and the number — one week editor rather than two that drift — and a tab
+ * carrying a second copy was a second place for a rota to be half-saved.
  *
- * Chapters of one subject, so `SectionTab` rather than `FilterTab` — the same
- * distinction the store screen, the customer profile and the order page draw.
+ * What stays is the state the rota *produces*: the switch under the name says
+ * whether they are taking orders now, which is the question this page is opened
+ * to answer.
  *
  * ## What the history actually claims
  *
@@ -53,23 +49,12 @@ import { useCourier, useDispatches, useSaveCourier } from "./use-couriers";
  * while working out who had an order that went missing.
  */
 
-type TabKey = "overview" | "shift";
-
-const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
-  { key: "overview", labelKey: "drivers.tabOverview" },
-  { key: "shift", labelKey: "drivers.tabShift" },
-];
-
 export function DriverProfile({ id }: { id: string }) {
   const courier = useCourier(id);
   const dispatches = useDispatches(id);
   const save = useSaveCourier();
 
-  const [tab, setTab] = useState<TabKey>("overview");
   const [editing, setEditing] = useState(false);
-
-  /** The week being edited. `null` while nothing has been touched. */
-  const [draft, setDraft] = useState<DayHours[] | null>(null);
 
   const rows = dispatches.data ?? [];
 
@@ -77,24 +62,6 @@ export function DriverProfile({ id }: { id: string }) {
   // query's `data` is still there: it is `Courier | null | undefined` and
   // TypeScript cannot follow that into a callback.
   const driver = courier.data ?? null;
-
-  /**
-   * Whether the draft actually differs from what is stored.
-   *
-   * `draft !== null` was the test, and it was wrong in the way that annoys:
-   * switching a day on and straight back off left Save and Cancel on screen,
-   * offering to write a week identical to the one already saved. Comparing the
-   * values means the buttons appear when there is something to save and leave
-   * again when there is not.
-   *
-   * Compared as JSON because the shape is small, flat, and sorted at every
-   * point it is built — a field-by-field walk would be more code for the same
-   * answer.
-   */
-  const dirty =
-    driver !== null &&
-    draft !== null &&
-    JSON.stringify(draft) !== JSON.stringify(driver.hours);
 
   if (courier.isSuccess && !driver) {
     return (
@@ -113,7 +80,7 @@ export function DriverProfile({ id }: { id: string }) {
   return (
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
-        <div className="flex shrink-0 flex-col gap-lg border-b border-border bg-surface px-xxl pt-lg">
+        <div className="flex shrink-0 flex-col gap-lg border-b border-border bg-surface px-xxl py-lg">
           <Back />
 
           {driver && (
@@ -157,170 +124,79 @@ export function DriverProfile({ id }: { id: string }) {
               </Button>
             </div>
           )}
-
-          <div role="tablist" className="-mb-px flex gap-lg">
-            {TABS.map(({ key, labelKey }) => (
-              <SectionTab
-                key={key}
-                label={t(labelKey)}
-                active={tab === key}
-                onClick={() => setTab(key)}
-                onKeyDown={tabArrowHandler(
-                  TABS.map((one) => one.key),
-                  tab,
-                  setTab,
-                )}
-              />
-            ))}
-          </div>
         </div>
 
-        {tab === "overview" ? (
-          <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
-            <div className="flex flex-wrap gap-lg">
-              <Stat label={t("drivers.statTotal")} value={rows.length} />
-              <Stat label={t("drivers.statThisWeek")} value={thisWeek} />
-            </div>
+        {/* Outside the header, so the white surface stops at the rule and the
+            page's own ground carries the content — the same separation every
+            other screen has between the bar that identifies a record and the
+            record itself. */}
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+          <div className="flex flex-wrap gap-lg">
+            <Stat label={t("drivers.statTotal")} value={rows.length} />
+            <Stat label={t("drivers.statThisWeek")} value={thisWeek} />
+          </div>
 
-            {/* Nothing handed over yet means no section at all. A heading, a
-                caveat about what the rows mean, and a line saying there are no
-                rows is three pieces of furniture around an absence — and the
-                caveat explains a distinction that has not come up yet. */}
-            {rows.length > 0 && (
-              <section className="flex flex-col gap-sm">
-                <h2 className="text-[17px]">{t("drivers.profileHandovers")}</h2>
-                <p className="pb-sm text-[12px] text-text-faint">
-                  {t("drivers.profileCaveat")}
+          {/* Nothing handed over yet means no section at all. A heading, a
+              caveat about what the rows mean, and a line saying there are no
+              rows is three pieces of furniture around an absence — and the
+              caveat explains a distinction that has not come up yet. */}
+          {rows.length > 0 && (
+            <section className="flex flex-col gap-sm">
+              <h2 className="text-[17px]">{t("drivers.profileHandovers")}</h2>
+              <p className="pb-sm text-[12px] text-text-faint">
+                {t("drivers.profileCaveat")}
+              </p>
+
+              {dispatches.isError && (
+                <p role="alert" className="text-[13px] font-medium text-danger">
+                  {t("content.failed")}
                 </p>
+              )}
 
-                {dispatches.isError && (
-                  <p
-                    role="alert"
-                    className="text-[13px] font-medium text-danger"
-                  >
-                    {t("content.failed")}
-                  </p>
-                )}
+              {rows.map((row) => {
+                const tone = statusTone(row.statusSlug);
 
-                {rows.map((row) => {
-                  const tone = statusTone(row.statusSlug);
-
-                  return (
-                    <div key={row.id} className={cx(ROW, "border-border")}>
-                      <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-                        <Link
-                          href={`/orders/${row.orderId}`}
-                          className="truncate text-[15px] font-semibold after:absolute after:inset-0"
-                        >
-                          {row.orderCode}
-                        </Link>
-                        <span className="truncate text-[12px] text-text-faint">
-                          {t("drivers.handedAt", {
-                            when: formatDayAndTime(row.dispatchedAt),
-                          })}
-                        </span>
-                      </div>
-
-                      <span
-                        className="relative z-10 flex shrink-0 items-center gap-sm text-[12px] font-semibold"
-                        style={{ color: tone.ink }}
+                return (
+                  <div key={row.id} className={cx(ROW, "border-border")}>
+                    <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+                      <Link
+                        href={`/orders/${row.orderId}`}
+                        className="truncate text-[15px] font-semibold after:absolute after:inset-0"
                       >
-                        <span
-                          aria-hidden
-                          className="size-[7px] shrink-0 rounded-full"
-                          style={{ background: tone.dot }}
-                        />
-                        {row.statusName}
-                      </span>
-
-                      <span className="relative z-10 shrink-0">
-                        <Price
-                          value={row.orderTotal}
-                          code={row.currencyCode}
-                          align="end"
-                        />
+                        {row.orderCode}
+                      </Link>
+                      <span className="truncate text-[12px] text-text-faint">
+                        {t("drivers.handedAt", {
+                          when: formatDayAndTime(row.dispatchedAt),
+                        })}
                       </span>
                     </div>
-                  );
-                })}
-              </section>
-            )}
-          </div>
-        ) : (
-          driver && (
-            // A column that scrolls with a bar pinned under it, so Save is in
-            // the same place whatever the rota looks like — a seven-row grid
-            // puts it below the fold otherwise, on the one screen where the
-            // whole point is that the change lands.
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
-                {/* Editable, with its own Save. A grid rendered read-only would
-                  be seven switches and fourteen pickers that do nothing, which
-                  is the control-with-no-effect this codebase keeps arguing
-                  against — and the page a driver's hours are checked on is the
-                  obvious place to correct them.
 
-                  `key` on the stored week re-seeds the draft when a save lands
-                  from anywhere else, rather than leaving a stale one that would
-                  overwrite the newer value. */}
-                <HoursGrid
-                  key={JSON.stringify(driver.hours)}
-                  week={draft ?? driver.hours}
-                  onChange={setDraft}
-                />
-              </div>
+                    <span
+                      className="relative z-10 flex shrink-0 items-center gap-sm text-[12px] font-semibold"
+                      style={{ color: tone.ink }}
+                    >
+                      <span
+                        aria-hidden
+                        className="size-[7px] shrink-0 rounded-full"
+                        style={{ background: tone.dot }}
+                      />
+                      {row.statusName}
+                    </span>
 
-              {/* End-aligned, and Save is always here.
-                  A primary action that appears only once something is dirty is
-                  a button that moves — the operator learns where it is, changes
-                  a time, and it is somewhere else. Disabled says "there is
-                  nothing to save yet", which is a different and more useful
-                  message than absence.
-
-                  Discard is the one that comes and goes, because it genuinely
-                  has nothing to do until there is a change. "Discard changes"
-                  rather than "Cancel": Cancel beside a Save on a page nobody
-                  navigated into reads as "leave", and what it actually does is
-                  throw away edits. */}
-              <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
-                {dirty && (
-                  // Blue and quiet, not a second filled button. Discarding is
-                  // not a peer of saving — it is the way back, and the palette
-                  // says blue is what you press while the filled control is
-                  // the thing you came to do. Two solid buttons side by side
-                  // ask the operator to read both before pressing either.
-                  <Button
-                    variant="quiet"
-                    onClick={() => setDraft(null)}
-                    className="text-primary"
-                  >
-                    {t("drivers.discardHours")}
-                  </Button>
-                )}
-                <Button
-                  disabled={!dirty}
-                  pending={save.isPending}
-                  onClick={() =>
-                    save.mutate(
-                      {
-                        id: driver.id,
-                        draft: {
-                          name: driver.name,
-                          phone: driver.phone,
-                          hours: draft ?? [],
-                        },
-                        name: driver.name,
-                      },
-                      { onSuccess: () => setDraft(null) },
-                    )
-                  }
-                >
-                  {t("drivers.saveHours")}
-                </Button>
-              </div>
-            </div>
-          )
-        )}
+                    <span className="relative z-10 shrink-0">
+                      <Price
+                        value={row.orderTotal}
+                        code={row.currencyCode}
+                        align="end"
+                      />
+                    </span>
+                  </div>
+                );
+              })}
+            </section>
+          )}
+        </div>
       </div>
 
       <Panel
