@@ -197,7 +197,7 @@ const en = {
    */
   dispatch: {
     // The button on the receipt, and the dialog it opens.
-    open: "Send to driver",
+    open: "Notify",
     title: "Send {code}",
     blurb:
       "Opens WhatsApp with the order written out. Check the number before you send it.",
@@ -235,7 +235,7 @@ const en = {
     kitchenHeading: "New order — {code}",
     kitchenFor: "For: {name}",
     kitchenFooter: "Sent to {store}. Reply here if anything is unavailable.",
-    kitchenSend: "Send to shop",
+    kitchenSend: "Send",
     kitchenTitle: "Send {code} to the kitchen",
     kitchenBlurb:
       "Each shop gets only its own items. No address, no phone number and no total — the driver carries those.",
