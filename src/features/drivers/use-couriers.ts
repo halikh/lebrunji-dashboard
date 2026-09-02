@@ -6,7 +6,7 @@ import { useToasts } from "@/components/ui/toast";
 import { t } from "@/i18n/translations";
 
 import {
-  archiveCourier,
+  setCourierActive,
   createCourier,
   fetchCourier,
   fetchCouriers,
@@ -125,15 +125,26 @@ export function useSaveCourier() {
   });
 }
 
-export function useArchiveCourier() {
+export function useSetCourierActive() {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: ({ id }: { id: string; name: string }) => archiveCourier(id),
+    mutationFn: ({
+      id,
+      active,
+    }: {
+      id: string;
+      active: boolean;
+      name: string;
+    }) => setCourierActive(id, active),
     onSuccess: (_result, variables) => {
       void queryClient.invalidateQueries({ queryKey: courierKeys.all });
-      toast.success(t("drivers.archived", { name: variables.name }));
+      toast.success(
+        t(variables.active ? "drivers.reactivated" : "drivers.deactivated", {
+          name: variables.name,
+        }),
+      );
     },
     onError: (error) => toast.danger(reason(error)),
   });

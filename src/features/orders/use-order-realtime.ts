@@ -1,9 +1,10 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
 import { useToasts } from "@/components/ui/toast";
+import { fetchAppSettings } from "@/features/settings/api/app-settings";
 import { chime } from "@/lib/chime";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
@@ -52,6 +53,25 @@ export function useOrderRealtime() {
     toastRef.current = toast;
   }, [toast]);
 
+  /**
+   * The chosen sound, held in a ref for the same reason the toast is.
+   *
+   * The subscription is set up once and its handler closes over whatever was
+   * in scope then. Reading the setting directly would freeze whichever value
+   * happened to be loaded when the channel opened — so changing the sound would
+   * appear to do nothing until a reload, which is exactly the sort of setting
+   * that gets reported as broken.
+   */
+  const settings = useQuery({
+    queryKey: ["app-settings"],
+    queryFn: fetchAppSettings,
+    staleTime: 10 * 60_000,
+  });
+  const soundRef = useRef<string | null>(null);
+  useEffect(() => {
+    soundRef.current = settings.data?.notificationSoundUrl ?? null;
+  }, [settings.data]);
+
   useEffect(() => {
     const supabase = getClient();
 
@@ -62,7 +82,7 @@ export function useOrderRealtime() {
         { event: "INSERT", schema: "public", table: "orders" },
         () => {
           void queryClient.invalidateQueries({ queryKey: orderKeys.all });
-          chime();
+          chime(soundRef.current);
           toastRef.current.info(t("orders.arrived"));
         },
       )

@@ -117,6 +117,32 @@ export const IMAGE = {
   types: ["image/jpeg", "image/png", "image/webp"] as const,
 } as const;
 
+/**
+ * The new-order sound.
+ *
+ * ## Why a megabyte and not five
+ *
+ * This plays when an order arrives, on a dashboard that may have been open for
+ * hours — so it is fetched once and held. A chime is a second or two of audio;
+ * an MP3 of that is tens of kilobytes, and anything approaching a megabyte is
+ * somebody uploading a song by mistake. The cap is generous enough not to
+ * refuse a real chime and small enough that the mistake is caught here rather
+ * than by an operator wondering why the tab is using 40 MB.
+ *
+ * ## And why seconds are capped too
+ *
+ * A three-minute file would play over the next four orders. The check is on
+ * *duration*, decoded in the browser before anything is sent, because a short
+ * file and a long one can be the same size — bitrate decides — so a byte limit
+ * alone would let a long quiet recording through.
+ */
+export const SOUND = {
+  maxBytes: 1024 * 1024,
+  maxSeconds: 8,
+  /** Decided from magic bytes, never from the browser's claimed MIME type. */
+  types: ["audio/mpeg"] as const,
+} as const;
+
 export const PAGE = {
   /** Rows per page in a list. */
   size: 50,

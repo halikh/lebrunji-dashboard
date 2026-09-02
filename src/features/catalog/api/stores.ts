@@ -1,5 +1,6 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
+import { digitsOf } from "@/features/drivers/api/couriers";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -32,6 +33,14 @@ export type Store = {
   longitude: number | null;
   prepMinMinutes: number;
   prepMaxMinutes: number;
+  /**
+   * Where an order is sent to this kitchen — digits, no `+`, as `wa.me` wants.
+   *
+   * Null is ordinary: the catalogue is set up before every merchant has been
+   * asked for one. It is what makes the dashboard hide the send control for a
+   * shop rather than offering one that opens an empty chat.
+   */
+  whatsappPhone: string | null;
 };
 
 /**
@@ -62,6 +71,7 @@ export async function fetchStores(
     .select(
       `id, slug, name, image_url, category_id, currency_code, is_active, is_featured,
        sort_order, latitude, longitude, prep_min_minutes, prep_max_minutes,
+       whatsapp_phone,
        categories ( name )`,
     )
     .is("deleted_at", null)
@@ -94,6 +104,7 @@ export async function fetchStore(id: string): Promise<Store> {
     .select(
       `id, slug, name, image_url, category_id, currency_code, is_active, is_featured,
        sort_order, latitude, longitude, prep_min_minutes, prep_max_minutes,
+       whatsapp_phone,
        categories ( name )`,
     )
     .eq("id", id)
@@ -113,6 +124,18 @@ export type StoreDraft = {
   prepMinMinutes: number;
   prepMaxMinutes: number;
   isActive: boolean;
+  /**
+   * Where an order is sent to the kitchen. Digits, no `+`, as `wa.me` takes it.
+   *
+   * Optional on a draft because the wizard does not ask: a shop is added before
+   * anybody has been asked for a number, and a required field there would be a
+   * step with no answer. It is set afterwards, on the details tab.
+   *
+   * Null is ordinary — the catalogue is set up before every merchant has been
+   * asked — and it is what makes the dashboard hide the send control for that
+   * shop rather than offering one that opens an empty chat.
+   */
+  whatsappPhone?: string | null;
 };
 
 /**
@@ -187,6 +210,9 @@ export async function createStore(
       // means nothing.
       latitude: draft.latitude,
       longitude: draft.longitude,
+      whatsapp_phone: draft.whatsappPhone
+        ? digitsOf(draft.whatsappPhone)
+        : null,
       prep_min_minutes: draft.prepMinMinutes,
       prep_max_minutes: draft.prepMaxMinutes,
       is_active: draft.isActive,
@@ -202,6 +228,8 @@ export async function createStore(
 
 export type StorePatch = {
   name?: Localized;
+  /** Blank clears it. See `updateStore` on why that is null and not "". */
+  whatsappPhone?: string | null;
   imageUrl?: string | null;
   isActive?: boolean;
   isFeatured?: boolean;
@@ -242,6 +270,13 @@ export async function updateStore(
   if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
   if (patch.latitude !== undefined) row.latitude = patch.latitude;
   if (patch.longitude !== undefined) row.longitude = patch.longitude;
+  if (patch.whatsappPhone !== undefined) {
+    // Normalised on the way in, once, so no screen strips punctuation on the
+    // way out — the same rule `couriers.phone` follows. Blank clears it rather
+    // than storing an empty string, which the CHECK would refuse anyway.
+    const digits = patch.whatsappPhone ? digitsOf(patch.whatsappPhone) : "";
+    row.whatsapp_phone = digits || null;
+  }
   if (patch.prepMinMinutes !== undefined) {
     row.prep_min_minutes = patch.prepMinMinutes;
   }
@@ -289,6 +324,7 @@ function toStore(row: Record<string, unknown>): Store {
     sortOrder: row.sort_order as number,
     latitude: (row.latitude as number | null) ?? null,
     longitude: (row.longitude as number | null) ?? null,
+    whatsappPhone: (row.whatsapp_phone as string | null) ?? null,
     prepMinMinutes: row.prep_min_minutes as number,
     prepMaxMinutes: row.prep_max_minutes as number,
   };

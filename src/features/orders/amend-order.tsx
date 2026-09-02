@@ -10,7 +10,10 @@ import { useToasts } from "@/components/ui/toast";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { useMenu } from "@/features/catalog/use-menu";
+import { useItemOptionGroups } from "@/features/catalog/use-options";
 import { Price } from "@/features/reference/price";
+import { useMoney } from "@/features/reference/use-currencies";
+import { formatMoney } from "@/lib/money";
 
 import { amendOrder, type LineChange, type Substitution } from "./api/amend";
 import type { Order, OrderLine } from "./api/orders";
@@ -72,6 +75,30 @@ export function AmendOrder({
   const [counts, setCounts] = useState<Record<string, number>>({});
   /** Line id → the dish sent instead. */
   const [swaps, setSwaps] = useState<Record<string, string>>({});
+  /**
+   * Line id → the choices made on the substitute.
+   *
+   * Kept beside the swap rather than inside it so that changing the dish can
+   * clear them in one place: an option belongs to one dish (migration 0074), so
+   * choices carried across a change of dish would be refused by the function —
+   * and would look, on screen, as though they had been accepted.
+   */
+  const [swapOptions, setSwapOptions] = useState<Record<string, string[]>>({});
+  /**
+   * Line id → what the substitute costs, options included.
+   *
+   * Reported up by `AmendLine`, which is the only component holding the menu
+   * and the option groups. Without it the running total below counted a
+   * substituted line at **zero** — the original goes to zero and the
+   * replacement was invisible — so the figure the operator read down the phone
+   * was lower than the one the order ended up with.
+   *
+   * Pushed from the handlers rather than derived in an effect: the dish and the
+   * options both change in response to a click, and that click already knows
+   * the new price. An effect would recompute it a render later, which is one
+   * frame of a total nobody chose.
+   */
+  const [swapPrices, setSwapPrices] = useState<Record<string, number>>({});
   const [note, setNote] = useState("");
 
   // Lines that are themselves the result of an earlier amendment are shown but
@@ -93,12 +120,22 @@ export function AmendOrder({
           }),
         ),
         substitutions: Object.entries(swaps).map(
-          ([replacesLineId, menuItemId]): Substitution => ({
-            replacesLineId,
-            menuItemId,
-            quantity:
-              lines.find((line) => line.id === replacesLineId)?.quantity ?? 1,
-          }),
+          ([replacesLineId, menuItemId]): Substitution => {
+            const original = lines.find((line) => line.id === replacesLineId);
+            const ordered = original?.quantity ?? 1;
+            const coming = counts[replacesLineId] ?? ordered;
+
+            return {
+              replacesLineId,
+              menuItemId,
+              // The substitute covers what is **missing**, not the whole line.
+              // Sending the ordered quantity charged for both halves of a
+              // partial swap: three ordered, one available, and the customer
+              // got billed for one kibbeh and three sfiha.
+              quantity: Math.max(ordered - coming, 1),
+              optionIds: swapOptions[replacesLineId] ?? [],
+            };
+          },
         ),
         note,
       }),
@@ -125,7 +162,16 @@ export function AmendOrder({
    */
   const subtotal = lines.reduce((sum, line) => {
     const quantity = counts[line.id] ?? line.fulfilledQuantity ?? line.quantity;
-    return sum + line.unitPrice * quantity;
+    const kept = line.unitPrice * quantity;
+
+    // A substitution is the original at its reduced quantity **plus** the
+    // replacement at the quantity that went missing — which is what the
+    // function does, and what the customer agreed to.
+    const swapped = swaps[line.id]
+      ? (swapPrices[line.id] ?? 0) * (line.quantity - quantity)
+      : 0;
+
+    return sum + kept + swapped;
   }, 0);
   const total = Math.max(subtotal + order.deliveryFee - order.discount, 0);
 
@@ -178,14 +224,37 @@ export function AmendOrder({
                       setCounts((current) => ({ ...current, [line.id]: next }))
                     }
                     swap={swaps[line.id] ?? null}
-                    onSwap={(itemId) =>
+                    onSwap={(itemId, unitPrice) => {
                       setSwaps((current) => {
                         const next = { ...current };
                         if (itemId) next[line.id] = itemId;
                         else delete next[line.id];
                         return next;
-                      })
-                    }
+                      });
+                      // Choices belong to the dish they were made on. Carrying
+                      // them to a different one would be refused by the
+                      // function and would look accepted until then.
+                      setSwapOptions((current) => {
+                        const next = { ...current };
+                        delete next[line.id];
+                        return next;
+                      });
+                      setSwapPrices((current) => ({
+                        ...current,
+                        [line.id]: unitPrice,
+                      }));
+                    }}
+                    options={swapOptions[line.id] ?? []}
+                    onOptions={(ids, unitPrice) => {
+                      setSwapOptions((current) => ({
+                        ...current,
+                        [line.id]: ids,
+                      }));
+                      setSwapPrices((current) => ({
+                        ...current,
+                        [line.id]: unitPrice,
+                      }));
+                    }}
                   />
                 ))}
               </section>
@@ -261,6 +330,8 @@ function AmendLine({
   onCount,
   swap,
   onSwap,
+  options,
+  onOptions,
 }: {
   line: OrderLine;
   storeId: string;
@@ -268,16 +339,52 @@ function AmendLine({
   count: number;
   onCount: (next: number) => void;
   swap: string | null;
-  onSwap: (itemId: string | null) => void;
+  /** The chosen dish and what it costs bare — the parent cannot price it. */
+  onSwap: (itemId: string | null, unitPrice: number) => void;
+  options: string[];
+  /** The choices and the resulting unit price, extras included. */
+  onOptions: (ids: string[], unitPrice: number) => void;
 }) {
   const menu = useMenu(storeId);
+  // Only for the dish actually chosen. A question about a dish nobody has
+  // picked is a request for nothing, and `useItemOptionGroups` is disabled on
+  // a null id rather than fetching every menu's questions up front.
+  const groups = useItemOptionGroups(swap);
+  const { currencies } = useMoney();
+  const currency = currencies?.find((one) => one.code === currencyCode);
+  const money = (minor: number) =>
+    currency ? formatMoney(minor, currency) : null;
   const short = count < line.quantity;
+
+  /**
+   * What a dish costs with these choices.
+   *
+   * The same sum migration 0091 does — the dish's price plus every chosen
+   * option's — and it is a preview, not the decision: the figure written is the
+   * one the function computes and returns. That is what makes a second copy of
+   * the arithmetic tolerable here.
+   */
+  function priceOf(itemId: string | null, optionIds: string[]): number {
+    if (!itemId) return 0;
+
+    const dish = (menu.data ?? [])
+      .flatMap((section) => section.items)
+      .find((item) => item.id === itemId);
+    if (!dish) return 0;
+
+    const extras = (groups.data ?? [])
+      .flatMap((group) => group.options)
+      .filter((option) => optionIds.includes(option.id))
+      .reduce((sum, option) => sum + option.price, 0);
+
+    return dish.price + extras;
+  }
 
   // Flattened across sections: the operator is looking for a dish, and which
   // heading it lives under is the menu screen's concern rather than this one's.
   // The dish being replaced is left out — offering it as its own substitute is
   // an option with nothing behind it.
-  const options = (menu.data ?? [])
+  const dishes = (menu.data ?? [])
     .flatMap((section) => section.items)
     .filter((item) => item.isActive && item.id !== line.menuItemId)
     .map((item) => ({ value: item.id, label: pickLocalized(item.name) }));
@@ -347,14 +454,97 @@ function AmendLine({
             <div className="min-w-0 flex-grow">
               <Select
                 value={swap ?? ""}
-                onChange={(value) => onSwap(value || null)}
-                options={options}
+                onChange={(value) =>
+                  onSwap(value || null, priceOf(value || null, []))
+                }
+                options={dishes}
                 placeholder={t("amend.nothing")}
                 isClearable
               />
             </div>
           </div>
         )}
+
+        {/* The chosen dish's own questions. They appear only once a dish is
+            picked, because until then there is nothing to ask about — and they
+            matter for money as well as for the kitchen: an option carries a
+            price, so a substitute taken with extras and recorded without them
+            is a total the customer never agreed to.
+
+            Every group is shown, required or not, because the operator is on
+            the phone reading them out. Hiding the optional ones would mean
+            asking "anything else with that?" from memory. */}
+        {swap &&
+          (groups.data ?? [])
+            .filter((group) => group.isActive)
+            .map((group) => (
+              <div key={group.id} className="flex flex-col gap-xs">
+                <span className="text-[13px] font-semibold">
+                  {pickLocalized(group.title)}
+                  {group.minSelections > 0 && (
+                    <span className="ps-sm text-[11px] font-normal text-danger">
+                      {t("amend.optionRequired")}
+                    </span>
+                  )}
+                </span>
+
+                <div className="flex flex-wrap gap-xs">
+                  {group.options
+                    .filter((option) => option.isActive)
+                    .map((option) => {
+                      const on = options.includes(option.id);
+
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => {
+                            // `single` replaces every other choice in the same
+                            // group; `multi` toggles. The database has the same
+                            // rule as `max_selections`, and getting it wrong
+                            // here would show a selection the save then refuses.
+                            const others = options.filter(
+                              (id) =>
+                                !group.options.some(
+                                  (sibling) => sibling.id === id,
+                                ),
+                            );
+                            const next =
+                              group.mode === "single"
+                                ? on
+                                  ? others
+                                  : [...others, option.id]
+                                : on
+                                  ? options.filter((id) => id !== option.id)
+                                  : [...options, option.id];
+
+                            onOptions(next, priceOf(swap, next));
+                          }}
+                          className={cx(
+                            "rounded-md border px-md py-xs text-[13px] transition-[background-color,border-color]",
+                            on
+                              ? "border-active bg-active-wash font-semibold text-active-ink"
+                              : "border-border text-text-soft",
+                          )}
+                        >
+                          {pickLocalized(option.name)}
+                          {option.price > 0 && (
+                            // `Price` renders both currencies stacked, which is
+                            // right on a bill and wrong inside a chip. The
+                            // extra is a nudge on a label, so it is the one
+                            // figure here shown in one currency.
+                            <span className="ps-xs tabular-nums text-text-faint">
+                              {"+"}
+                              {money(option.price) ?? option.price}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            ))}
       </div>
     </div>
   );

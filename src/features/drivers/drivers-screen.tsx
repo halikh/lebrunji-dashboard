@@ -27,9 +27,13 @@ import {
 import type { DayHours } from "@/features/catalog/api/hours";
 
 import { HoursGrid } from "./hours-grid";
-import { useArchiveCourier, useCouriers, useSaveCourier } from "./use-couriers";
+import {
+  useCouriers,
+  useSaveCourier,
+  useSetCourierActive,
+} from "./use-couriers";
 
-type Scope = "all" | "active" | "off";
+type Scope = "all" | "active" | "off" | "inactive";
 
 const TABS: { key: Scope; labelKey: TranslationKey; tone?: TabTone }[] = [
   { key: "all", labelKey: "drivers.tabAll" },
@@ -49,6 +53,15 @@ const TABS: { key: Scope; labelKey: TranslationKey; tone?: TabTone }[] = [
       wash: "var(--color-neutral-fill)",
       ink: "var(--color-text)",
       dot: "var(--color-text-faint)",
+    },
+  },
+  {
+    key: "inactive",
+    labelKey: "drivers.tabInactive",
+    tone: {
+      wash: "var(--color-danger-wash)",
+      ink: "var(--color-text)",
+      dot: "var(--color-danger)",
     },
   },
 ];
@@ -101,7 +114,7 @@ export function DriversScreen() {
   }
 
   const save = useSaveCourier();
-  const archive = useArchiveCourier();
+  const setActive = useSetCourierActive();
 
   /** The row being edited, `"new"` for the one being added, or nothing. */
   const [open, setOpen] = useState<string | null>(null);
@@ -123,18 +136,27 @@ export function DriversScreen() {
    * somebody is typing: "Taking orders 2" beside a filtered list means two of
    * the matches, not two in the business.
    */
+  // Two different questions, and the tabs answer both. "All" and the two shift
+  // tabs are about people who work here; "Not active" is about people who used
+  // to — which is why they are excluded from the first three rather than
+  // sitting in them switched off.
+  const onBooks = matching.filter((one) => one.isActive);
+
   const counts: Record<Scope, number> = {
-    all: matching.length,
-    active: matching.filter((one) => isTakingOrders(one)).length,
-    off: matching.filter((one) => !isTakingOrders(one)).length,
+    all: onBooks.length,
+    active: onBooks.filter((one) => isTakingOrders(one)).length,
+    off: onBooks.filter((one) => !isTakingOrders(one)).length,
+    inactive: matching.filter((one) => !one.isActive).length,
   };
 
   const rows =
-    scope === "all"
-      ? matching
-      : matching.filter((one) =>
-          scope === "active" ? isTakingOrders(one) : !isTakingOrders(one),
-        );
+    scope === "inactive"
+      ? matching.filter((one) => !one.isActive)
+      : scope === "all"
+        ? onBooks
+        : onBooks.filter((one) =>
+            scope === "active" ? isTakingOrders(one) : !isTakingOrders(one),
+          );
 
   /** The driver the panel is editing, or nothing when it is adding one. */
   const editing =
@@ -219,9 +241,19 @@ export function DriversScreen() {
                   name: courier.name,
                 })
               }
-              onArchive={async () => {
-                await archive.mutateAsync({
+              onSetActive={(active) =>
+                active
+                  ? setActive.mutate({
+                      id: courier.id,
+                      active: true,
+                      name: courier.name,
+                    })
+                  : undefined
+              }
+              onDeactivate={async () => {
+                await setActive.mutateAsync({
                   id: courier.id,
+                  active: false,
                   name: courier.name,
                 });
               }}
@@ -292,13 +324,15 @@ function DriverRow({
   open,
   onEdit,
   onOverride,
-  onArchive,
+  onSetActive,
+  onDeactivate,
 }: {
   courier: Courier;
   open: boolean;
   onEdit: () => void;
   onOverride: (value: boolean | null) => void;
-  onArchive: () => Promise<void>;
+  onSetActive: (active: boolean) => void;
+  onDeactivate: () => Promise<void>;
 }) {
   const taking = isTakingOrders(courier);
   const overridden = isOverridden(courier);
@@ -335,21 +369,29 @@ function DriverRow({
           either way — so the row says when one is in force and offers to stop.
           An override left behind is the failure the rota was meant to end. */}
       <span className="relative z-10 flex shrink-0 flex-col items-end gap-xxs">
-        <Toggle
-          on={taking}
-          onChange={() => onOverride(!taking)}
-          labelOn={t("drivers.onShift")}
-          labelOff={t("drivers.offShift")}
-          className="w-[124px]"
-        />
-        {overridden && (
-          <button
-            type="button"
-            onClick={() => onOverride(null)}
-            className="text-[11px] font-semibold text-primary hover:underline"
-          >
-            {t("drivers.followRota")}
-          </button>
+        {!courier.isActive ? (
+          <span className="rounded-sm bg-danger-wash px-sm py-[1px] text-[11px] font-semibold text-text">
+            {t("drivers.inactive")}
+          </span>
+        ) : (
+          <>
+            <Toggle
+              on={taking}
+              onChange={() => onOverride(!taking)}
+              labelOn={t("drivers.onShift")}
+              labelOff={t("drivers.offShift")}
+              className="w-[124px]"
+            />
+            {overridden && (
+              <button
+                type="button"
+                onClick={() => onOverride(null)}
+                className="text-[11px] font-semibold text-primary hover:underline"
+              >
+                {t("drivers.followRota")}
+              </button>
+            )}
+          </>
         )}
       </span>
 
@@ -358,18 +400,40 @@ function DriverRow({
           {t("drivers.edit")}
         </Button>
 
-        <ConfirmButton
-          onConfirm={onArchive}
-          titleKey="drivers.archiveTitle"
-          bodyKey="drivers.archiveBody"
-          confirmKey="drivers.archiveConfirm"
-          params={{ name: courier.name }}
-          variant="danger"
-          triggerVariant="danger"
-          size="sm"
-        >
-          {t("content.remove")}
-        </ConfirmButton>
+        {/* There is no delete. A driver who has left still appears on every
+            order they carried, and removing the row would leave that history
+            pointing at a name nobody can look up.
+
+            Switching off asks first — it takes somebody out of dispatch, and
+            from this side of the screen nothing looks different afterwards.
+            Switching back on does not: it restores, and a confirmation on a
+            reversal is a question with one sensible answer. */}
+        {courier.isActive ? (
+          <ConfirmButton
+            onConfirm={onDeactivate}
+            titleKey="drivers.deactivateTitle"
+            bodyKey="drivers.deactivateBody"
+            confirmKey="drivers.deactivateConfirm"
+            params={{ name: courier.name }}
+            variant="danger"
+            // Filled, like every other destructive control on a row. `quiet`
+            // is transparent, so beside a filled Edit it read as text rather
+            // than as a button — and the one control here with a consequence
+            // should not be the one that looks least like a control.
+            triggerVariant="danger"
+            size="sm"
+          >
+            {t("drivers.deactivate")}
+          </ConfirmButton>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onSetActive(true)}
+          >
+            {t("drivers.reactivate")}
+          </Button>
+        )}
       </span>
     </div>
   );

@@ -914,31 +914,6 @@ function PaymentsTab() {
               name: pickLocalized(values.name ?? method.name),
             })
           }
-          aside={
-            <ConfirmToggle
-              on={method.isEnabled}
-              onChange={() =>
-                update.mutate({
-                  id: method.id,
-                  patch: { isEnabled: !method.isEnabled },
-                })
-              }
-              labelOn={t("content.enabled")}
-              labelOff={t("content.disabled")}
-              params={{ name: pickLocalized(method.name) }}
-              whenTurningOn={{
-                titleKey: "content.enableTitle",
-                bodyKey: "content.enableBody",
-                confirmKey: "content.enableConfirm",
-              }}
-              whenTurningOff={{
-                titleKey: "content.disableTitle",
-                bodyKey: "content.disableBody",
-                confirmKey: "content.disableConfirm",
-              }}
-              className="w-[112px]"
-            />
-          }
         />
       ))}
     </div>

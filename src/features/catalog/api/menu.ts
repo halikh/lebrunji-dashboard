@@ -1,7 +1,7 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
-import type { Localized } from "@/lib/validation";
+import { localizedOrNull, type Localized } from "@/lib/validation";
 
 import { setItemTags } from "./tags";
 
@@ -284,7 +284,10 @@ export async function createMenuItem(
       // name and makes it unique inside the shop — which a client cannot do
       // without racing another tab.
       name: draft.name,
-      description: draft.description,
+      // Null when blank, never `{}` — see `localizedOrNull`. A description
+      // is optional and the constraint accepts an absent one; it does not
+      // accept an object with a locale missing.
+      description: localizedOrNull(draft.description),
       price: draft.price,
       is_active: draft.isActive,
       image_url: draft.imageUrl,
@@ -316,7 +319,8 @@ export async function updateMenuItem(
 ): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
-  if (patch.description !== undefined) row.description = patch.description;
+  if (patch.description !== undefined)
+    row.description = localizedOrNull(patch.description);
   if (patch.price !== undefined) row.price = patch.price;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   // `null` is a value here — it is how a picture is removed — so the check is

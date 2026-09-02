@@ -1,6 +1,11 @@
 import { t } from "@/i18n/translations";
 import { IMAGE } from "./limits";
-import { sniffImageType, validateImage } from "./validation";
+import {
+  sniffAudioType,
+  sniffImageType,
+  validateImage,
+  validateSound,
+} from "./validation";
 
 /**
  * Pictures, from the browser into the object store.
@@ -195,4 +200,121 @@ function signMessage(status: number): string {
 function putMessage(status: number): string {
   if (status === 403) return t("images.linkExpired");
   return t("images.failed");
+}
+
+/**
+ * Uploads the new-order sound.
+ *
+ * Shares the whole path with a picture — the same route, the same operator
+ * check, the same signed `PUT` — because the decision being made is identical
+ * and a second copy of it would be a second place for the authorisation to
+ * drift. What differs is only what counts as valid, and that is `validateSound`.
+ *
+ * ## Checked before a byte is sent, and again by the server
+ *
+ * Type from the file's first bytes, not `File.type`; size and **duration**,
+ * because bitrate decides how many bytes a second costs and a long quiet file
+ * can weigh less than a short loud one. A three-minute recording inside the
+ * byte limit would play over the next four orders.
+ *
+ * The server re-checks type and size against the `sounds` folder's own limits.
+ * It cannot check duration — that needs a decoder — which is exactly why the
+ * *byte* cap is the one the server enforces and the duration check is a
+ * courtesy that stops the obvious mistake before it costs an upload.
+ */
+export async function uploadSound(
+  file: File,
+  options: {
+    onProgress?: (fraction: number) => void;
+    signal?: AbortSignal;
+  } = {},
+): Promise<UploadedImage> {
+  const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const type = sniffAudioType(head);
+
+  const verdict = validateSound({
+    bytes: file.size,
+    type,
+    seconds: await readDuration(file),
+  });
+  if (!verdict.ok) throw new Error(t(verdict.key, verdict.params));
+
+  const permission = await fetch("/api/images", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ folder: "sounds", type, bytes: file.size }),
+    signal: options.signal,
+  });
+
+  if (!permission.ok) throw new Error(signMessage(permission.status));
+
+  const { key, uploadUrl, url } = (await permission.json()) as {
+    key: string;
+    uploadUrl: string;
+    url: string;
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", uploadUrl);
+    request.setRequestHeader("content-type", type as string);
+
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable)
+        options.onProgress?.(event.loaded / event.total);
+    });
+    request.addEventListener("load", () => {
+      if (request.status >= 200 && request.status < 300) resolve();
+      else reject(new Error(putMessage(request.status)));
+    });
+    request.addEventListener("error", () =>
+      reject(new Error(t("images.failed"))),
+    );
+    request.addEventListener("abort", () =>
+      reject(new DOMException("Aborted", "AbortError")),
+    );
+
+    options.signal?.addEventListener("abort", () => request.abort(), {
+      once: true,
+    });
+    request.send(file);
+  });
+
+  return { path: key, url };
+}
+
+/**
+ * How long the file plays, or undefined if it cannot be read.
+ *
+ * Undefined rather than throwing, for the reason `readDimensions` gives: some
+ * perfectly playable files refuse to decode in some browsers, and rejecting a
+ * good chime because the browser would not measure it is the wrong trade.
+ * `validateSound` skips the duration check when it has no number.
+ *
+ * The object URL is revoked either way — without it every attempt leaks a blob
+ * for the life of the tab.
+ */
+async function readDuration(file: File): Promise<number | undefined> {
+  const url = URL.createObjectURL(file);
+
+  try {
+    return await new Promise<number | undefined>((resolve) => {
+      const audio = new Audio();
+      // A file that never fires either event would leave this pending for ever,
+      // and the upload with it.
+      const timer = setTimeout(() => resolve(undefined), 3000);
+      const done = (value: number | undefined) => {
+        clearTimeout(timer);
+        resolve(value);
+      };
+
+      audio.addEventListener("loadedmetadata", () =>
+        done(Number.isFinite(audio.duration) ? audio.duration : undefined),
+      );
+      audio.addEventListener("error", () => done(undefined));
+      audio.src = url;
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }

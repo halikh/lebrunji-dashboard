@@ -18,7 +18,7 @@ import { formatPhone } from "@/lib/phone";
 import { isOpenNow } from "@/lib/week";
 
 import type { Order, OrderLine } from "./api/orders";
-import { dispatchMessage, whatsappLink } from "./dispatch";
+import { dispatchMessage, kitchenMessage, whatsappLink } from "./dispatch";
 
 /**
  * Handing the order to a driver.
@@ -116,6 +116,9 @@ export function DispatchModal({
             {t("dispatch.title", { code: order.code })}
           </h2>
           <p className="text-[13px] text-text-soft">{t("dispatch.blurb")}</p>
+          <p className="text-[12px] text-text-faint">
+            {t("dispatch.kitchenBlurb")}
+          </p>
 
           {filtering && (
             <div className="flex pt-sm">
@@ -128,7 +131,73 @@ export function DispatchModal({
           )}
         </div>
 
-        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+          {/* The kitchen first, because it is the earlier step: a shop that has
+              not been told what to cook has nothing for a driver to collect.
+
+              Each shop gets **only its own items**, and no address, phone or
+              money — see `kitchenMessage`. A shop cooking one half of a
+              two-shop order has no reason to hold a customer's home address,
+              and once it is in a WhatsApp thread it is on somebody's phone for
+              good. */}
+          <section className="flex flex-col gap-sm">
+            <h3 className="text-[13px] font-semibold text-text-soft">
+              {t("dispatch.kitchenTab")}
+            </h3>
+
+            {order.stores.map((portion) =>
+              portion.storeWhatsapp ? (
+                <a
+                  key={portion.id}
+                  href={whatsappLink(
+                    portion.storeWhatsapp,
+                    kitchenMessage({ ...order, lines }, portion.id),
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cx(
+                    "flex items-center gap-lg rounded-lg border border-border bg-surface p-lg",
+                    "transition-[border-color,background-color] hover:border-whatsapp hover:bg-whatsapp-wash/60",
+                  )}
+                >
+                  <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+                    <span className="truncate text-[15px] font-semibold">
+                      {portion.storeName}
+                    </span>
+                    <span className="truncate text-[12px] tabular-nums text-text-faint">
+                      {formatPhone(portion.storeWhatsapp)}
+                    </span>
+                  </div>
+
+                  <span className="flex shrink-0 items-center gap-sm rounded-md bg-whatsapp px-lg py-sm text-[14px] font-semibold text-on-whatsapp">
+                    <WhatsAppMark />
+                    {t("dispatch.kitchenSend")}
+                  </span>
+                </a>
+              ) : (
+                // No number is not a broken row. It names the shop, says why
+                // there is nothing to press, and points at the screen that
+                // fixes it.
+                <p
+                  key={portion.id}
+                  className="rounded-lg border border-dashed border-border px-lg py-md text-[13px] text-text-faint"
+                >
+                  {portion.storeName} — {t("dispatch.kitchenNoNumber")}{" "}
+                  <Link
+                    href={`/catalogue/${portion.storeId}`}
+                    className="font-semibold text-primary hover:underline"
+                  >
+                    {t("dispatch.kitchenAddNumber")}
+                  </Link>
+                </p>
+              ),
+            )}
+          </section>
+
+          <h3 className="text-[13px] font-semibold text-text-soft">
+            {t("dispatch.driverTab")}
+          </h3>
+
           {couriers.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1].map((row) => (

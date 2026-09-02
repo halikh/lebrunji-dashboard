@@ -6,7 +6,6 @@ import { useCallback, type ReactNode } from "react";
 
 import { Button, cx } from "@/components/ui";
 import { ROW } from "@/components/ui/row";
-import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Copyable } from "@/components/ui/copyable";
 import { Avatar } from "@/components/ui/avatar";
 import { OrderPanel } from "@/features/orders/order-panel";
@@ -29,14 +28,13 @@ import type {
   CustomerOrder,
   CustomerRedemption,
 } from "./api/customers";
+import { AccountActions } from "./account-actions";
 import { StatusChip, nameOf } from "./customers-screen";
 import {
-  useCloseCustomerAccount,
   useCustomer,
   useCustomerOrders,
   useCustomerRedemptions,
   useCustomerStats,
-  useSetCustomerActive,
 } from "./use-customers";
 
 /**
@@ -191,9 +189,6 @@ export function CustomerProfile({ id }: { id: string }) {
     [params, pathname, router],
   );
 
-  const setActive = useSetCustomerActive();
-  const close = useCloseCustomerAccount();
-
   if (customer.isPending) {
     return (
       <div className="flex h-full items-center justify-center text-[13px] text-text-faint">
@@ -324,61 +319,10 @@ export function CustomerProfile({ id }: { id: string }) {
             </span>
           </div>
 
-          {/* Both actions are confirmed, and they are not the same weight.
-              Suspension is a door held shut; closing releases the phone number,
-              so the customer signing up again gets a *new* account and this one
-              can never be reopened. A closed account offers neither. */}
-          {!closed && (
-            <div className="flex shrink-0 items-center gap-sm">
-              <ConfirmButton
-                onConfirm={async () => {
-                  await setActive.mutateAsync({
-                    id: row.id,
-                    isActive: !row.isActive,
-                    name,
-                  });
-                }}
-                titleKey={
-                  row.isActive
-                    ? "customers.suspendTitle"
-                    : "customers.reinstateTitle"
-                }
-                bodyKey={
-                  row.isActive
-                    ? "customers.suspendBody"
-                    : "customers.reinstateBody"
-                }
-                confirmKey={
-                  row.isActive
-                    ? "customers.suspendConfirm"
-                    : "customers.reinstateConfirm"
-                }
-                params={{ name }}
-                variant={row.isActive ? "danger" : "primary"}
-                triggerVariant="secondary"
-                size="sm"
-              >
-                {row.isActive
-                  ? t("customers.suspend")
-                  : t("customers.reinstate")}
-              </ConfirmButton>
-
-              <ConfirmButton
-                onConfirm={async () => {
-                  await close.mutateAsync({ id: row.id, name });
-                }}
-                titleKey="customers.closeTitle"
-                bodyKey="customers.closeBody"
-                confirmKey="customers.closeConfirm"
-                params={{ name, phone: formatPhone(row.phone) }}
-                variant="danger"
-                triggerVariant="danger"
-                size="sm"
-              >
-                {t("customers.close")}
-              </ConfirmButton>
-            </div>
-          )}
+          {/* The same pair the list row carries — one component, so the
+              confirmation copy cannot say two different things about the same
+              act depending on which screen you reached it from. */}
+          <AccountActions customer={row} />
         </div>
       </header>
 

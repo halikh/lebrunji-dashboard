@@ -198,9 +198,9 @@ const en = {
   dispatch: {
     // The button on the receipt, and the dialog it opens.
     open: "Send to driver",
-    title: "Send {code} to a driver",
+    title: "Send {code}",
     blurb:
-      "Opens WhatsApp with the whole order written out. Check the number before you send it — it carries the customer’s address.",
+      "Opens WhatsApp with the order written out. Check the number before you send it.",
     send: "Send",
     opensWhatsApp:
       "Opens in WhatsApp. Nothing is sent until you press send there.",
@@ -225,6 +225,24 @@ const en = {
     // The rate had not loaded, so no figure here would be trustworthy. Better
     // to say so than to send a number that might be wrong by a hundredfold.
     amountUnknown: "Amount: see the dashboard.",
+
+    /*
+     * The kitchen's ticket. Shorter than the driver's on purpose — see
+     * `kitchenMessage`. No address, no phone, no money: a shop cooking one half
+     * of an order has no reason to hold a customer record, and a total they
+     * cannot collect is a number they might act on.
+     */
+    kitchenHeading: "New order — {code}",
+    kitchenFor: "For: {name}",
+    kitchenFooter: "Sent to {store}. Reply here if anything is unavailable.",
+    kitchenSend: "Send to shop",
+    kitchenTitle: "Send {code} to the kitchen",
+    kitchenBlurb:
+      "Each shop gets only its own items. No address, no phone number and no total — the driver carries those.",
+    kitchenNoNumber: "No WhatsApp number for this shop.",
+    kitchenAddNumber: "Add one",
+    kitchenTab: "Shops",
+    driverTab: "Driver",
   },
 
   drivers: {
@@ -278,6 +296,12 @@ const en = {
     profileCaveat:
       "This is when the chat was opened, not when the order arrived. The status is what says that.",
     handedAt: "Handed over {when}",
+    statToday: "Today",
+    statPerDay: "Average a day",
+    statPerWeek: "Average a week",
+    // The denominator, said out loud. An average over four days is a different
+    // claim from one over four months.
+    overDays: "over {count} days",
     statTotal: "Orders",
     statThisWeek: "This week",
     add: "New driver",
@@ -289,10 +313,20 @@ const en = {
     phoneHint:
       "With the country code and no +. This is the number the order is sent to.",
     active: "Taking orders",
-    inactive: "Off shift",
     saved: "{name} saved",
     added: "{name} added",
-    archived: "{name} archived",
+    tabInactive: "Not active",
+    inactive: "Not active",
+    deactivate: "Deactivate",
+    reactivate: "Bring back",
+    deactivated: "{name} is no longer active",
+    reactivated: "{name} is active again",
+    // Says what actually happens, including the part that is not a deletion —
+    // the history is the reason there is no delete here at all.
+    deactivateTitle: "Deactivate {name}?",
+    deactivateBody:
+      "They stop being offered on orders. Nothing is deleted: the orders they carried keep their name, and their number is kept so bringing them back is one click.",
+    deactivateConfirm: "Deactivate driver",
     archiveTitle: "Archive {name}?",
     archiveBody:
       "They stop appearing on orders. Their number is kept, so switching them back on later does not mean typing it again.",
@@ -318,6 +352,10 @@ const en = {
     ordered: "of {count} ordered",
     instead: "Instead send",
     nothing: "Nothing",
+    // Marked on the group rather than enforced here: the operator is reading
+    // the questions down a phone, and a form that refused to save until every
+    // required one was answered would stop them mid-call.
+    optionRequired: "required",
     note: "What happened",
     noteHint:
       "For whoever reads this order next. The customer does not see it.",
@@ -357,6 +395,47 @@ const en = {
     // nothing back — see migration 0083.
     caveat: "This is when the chat was opened, not when it arrived.",
     nothing: "Nothing has happened to this order since it was placed.",
+  },
+
+  /**
+   * The settings that belong to the business rather than to a row.
+   *
+   * Each one says its *consequence*, not just its name. Moving the opening hour
+   * moves what "today" means on the queue and in every report, and a label
+   * reading "Opens at" alone would hide that behind a dropdown that looks like
+   * a preference.
+   */
+  general: {
+    tab: "General",
+    saved: "Saved",
+
+    clockTitle: "Times",
+    clockLabel: "Clock",
+    clockHint:
+      "How times read across the dashboard and the app. Both show the same thing, so a total read down the phone matches the customer's screen.",
+    clock24: "22:00",
+    clock12: "10:00 PM",
+
+    shiftTitle: "When you take orders",
+    // The consequence, before the control rather than after it.
+    shiftBlurb:
+      "The opening hour is also where a day begins. “Today” on the queue and every day in the reports run from it — so a night that ends at 02:00 counts as one day’s trade rather than two half-nights.",
+    opensAt: "Opens at",
+    closesAt: "Closes at",
+    saveShift: "Save hours",
+    // Not a mistake to correct: a shop open past midnight is the ordinary case.
+    overnight: "Open overnight, {open} to {close} the next day.",
+
+    soundTitle: "New order sound",
+    soundBlurb:
+      "Plays when an order arrives, wherever you are in the dashboard.",
+    soundChoose: "Choose an MP3",
+    soundReplace: "Replace",
+    soundPlay: "Play it",
+    soundClear: "Use the built-in one",
+    soundCustom: "Using your own sound",
+    soundBuiltIn: "Using the built-in chime",
+    soundLimits: "MP3, under {size} KB and {seconds} seconds",
   },
 
   orders: {
@@ -461,6 +540,11 @@ const en = {
     percentageOver: "A percentage cannot be over 100.",
     windowReversed: "The promotion would end before it started.",
     imageType: "Images must be JPEG, PNG or WebP.",
+    // The sound. Says the shape of the answer, not just that the answer was
+    // wrong: "an MP3" and "under 8 seconds" are both things somebody can act on.
+    soundType: "That is not an MP3.",
+    soundTooBig: "Sounds must be under {max} KB.",
+    soundTooLong: "Sounds must be under {max} seconds.",
     imageTooBig: "Images must be under {max} MB.",
     imageTooSmall: "At least {min}px on each side.",
     imageTooLarge: "At most {max}px on each side.",
@@ -641,6 +725,12 @@ const en = {
     nameHint: "What customers see at the top of the shop.",
     imageHint: "The picture on the shop's card in the app.",
     prepTitle: "Preparation time",
+    whatsapp: "WhatsApp number",
+    // Says what its absence costs, which is the part somebody skipping the
+    // field cannot otherwise know.
+    whatsappHint:
+      "Where an order is sent so the kitchen can start. Country code, no +. Without one this shop cannot be sent orders.",
+    whatsappPlaceholder: "96170123456",
     prepWindow: "Kitchen takes",
     // Says what the number is *for*, which the label cannot: this is the range
     // the app quotes a customer before they order.
@@ -1279,6 +1369,8 @@ const en = {
     title: "Your account",
     blurb:
       "Your own sign-in. Both changes ask for your current password — a signed-in session is exactly what an unattended laptop already has, so it cannot be the proof for a change that outlives it.",
+    tabPassword: "Password",
+    tabEmail: "Email",
     signedInAs: "Signed in as",
     failed: "Could not read your account.",
 
@@ -1377,8 +1469,10 @@ const en = {
     // ---- payments ----------------------------------------------------------
     // There is one row and no gateway anywhere in the codebase, so the tab
     // renames what is there rather than offering to add anything.
+    // Says why there is nothing to switch. A screen with one row and no
+    // controls invites "is this broken"; a sentence answers it once.
     paymentsBlurb:
-      "How customers pay. There is one method and no payment gateway in this product, so this is what it is called rather than what is accepted.",
+      "How customers pay. There is one method and no payment gateway in this product, so you can rename it and describe it — there is nothing to turn on or off. Switching it off would stop every checkout in the app, so the database refuses that too.",
     methodName: "Name",
     methodDetail: "Description",
     enabled: "Accepted",

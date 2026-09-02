@@ -131,6 +131,15 @@ export function StoreMenu({ storeId }: { storeId: string }) {
   const [open, setOpen] = useState<PanelTarget | null>(null);
 
   /**
+   * How many dishes have been added through this panel.
+   *
+   * The editor's `key` on a new item, so "save and add another" gets a blank
+   * form — and a *failed* save does not. Counting saves rather than
+   * submissions is the whole distinction.
+   */
+  const [added, setAdded] = useState(0);
+
+  /**
    * Adding a section, which stays inline while renaming one does not.
    *
    * Not an inconsistency. Renaming is an edit to a thing already in the list,
@@ -522,14 +531,21 @@ export function StoreMenu({ storeId }: { storeId: string }) {
               />
             ) : (
               <MenuItemEditor
-                // Keyed, so switching from one item to another rebuilds the form
-                // rather than leaving the previous item's text in the fields — the
-                // state lives inside the editor, and React would otherwise reuse
-                // it. The counter on a new item is what makes "add another" clear
-                // the form.
-                key={
-                  open.itemId ?? `new-${open.sectionId}-${create.submittedAt}`
-                }
+                /*
+                  Keyed, so switching from one item to another rebuilds the form
+                  rather than leaving the previous item's text in the fields —
+                  the state lives inside the editor, and React would otherwise
+                  reuse it. The counter on a new item is what makes "add
+                  another" clear the form.
+
+                  It counts **saves**, not submissions. It used to be
+                  `create.submittedAt`, which changes on every attempt — so a
+                  refused insert remounted the editor and threw away everything
+                  the operator had typed, at the exact moment they needed to
+                  read the error and correct one field. Losing a form to its own
+                  error message is the worst version of a validation failure.
+                */
+                key={open.itemId ?? `new-${open.sectionId}-${added}`}
                 storeId={storeId}
                 itemId={open.itemId}
                 sectionId={open.sectionId}
@@ -558,17 +574,21 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                   open.itemId
                     ? undefined
                     : (draft) =>
-                        create.mutate({
-                          draft: {
-                            ...draft,
-                            storeId,
-                            sectionId: open.sectionId,
+                        create.mutate(
+                          {
+                            draft: {
+                              ...draft,
+                              storeId,
+                              sectionId: open.sectionId,
+                            },
+                            // At the end of the section it was added to. The column
+                            // has no default, and "where does it go" is a question
+                            // the caller can answer and the database cannot.
+                            sortOrder: nextSortOrder(openSection),
                           },
-                          // At the end of the section it was added to. The column
-                          // has no default, and "where does it go" is a question
-                          // the caller can answer and the database cannot.
-                          sortOrder: nextSortOrder(openSection),
-                        })
+                          // The blank form is the reward for a save that landed.
+                          { onSuccess: () => setAdded((count) => count + 1) },
+                        )
                 }
                 onCancel={() => setOpen(null)}
               />

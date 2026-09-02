@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireOperator } from "@/lib/auth/operator";
-import { IMAGE } from "@/lib/limits";
+import { IMAGE, SOUND } from "@/lib/limits";
 import { deleteObject, imageUrlFor, presignUpload } from "@/lib/storage/bucket";
 
 /**
@@ -30,15 +30,38 @@ import { deleteObject, imageUrlFor, presignUpload } from "@/lib/storage/bucket";
  * product where the guard cannot be a CHECK constraint.
  */
 
-/** The three places an image can belong to. Anything else is not a folder. */
-const FOLDERS = ["menu-items", "stores", "categories"] as const;
+/**
+ * Where an upload can belong. Anything else is not a folder.
+ *
+ * `sounds` is here rather than in a route of its own: the decision this
+ * endpoint makes — is the caller an operator, is the type allowed, what is the
+ * key — is identical for a chime and a photograph, and a second copy of that
+ * would be a second place for the operator check to drift.
+ */
+const FOLDERS = ["menu-items", "stores", "categories", "sounds"] as const;
 type Folder = (typeof FOLDERS)[number];
 
 const EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  "audio/mpeg": "mp3",
 };
+
+/**
+ * Which types each folder accepts, and how big.
+ *
+ * Per folder rather than one global list, because they are different limits for
+ * different reasons — 5 MB is a reasonable photograph and an absurd chime — and
+ * because a photograph in `sounds` would be served as audio and play nothing.
+ */
+const ALLOWED: Record<Folder, { types: readonly string[]; maxBytes: number }> =
+  {
+    "menu-items": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
+    stores: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
+    categories: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
+    sounds: { types: SOUND.types, maxBytes: SOUND.maxBytes },
+  };
 
 export async function POST(request: NextRequest) {
   // Built first, so a token rotation inside the check has a jar to write into.
@@ -58,8 +81,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "folder" }, { status: 400 });
   }
 
+  const rules = ALLOWED[folder as Folder];
+
   const type = body.type;
-  if (typeof type !== "string" || !(type in EXTENSIONS)) {
+  // Checked against **this folder's** list, not against every type the route
+  // knows: a JPEG uploaded into `sounds` would be stored, served as audio, and
+  // play nothing with nothing to explain it.
+  if (typeof type !== "string" || !rules.types.includes(type)) {
     return NextResponse.json({ error: "type" }, { status: 400 });
   }
 
@@ -67,7 +95,7 @@ export async function POST(request: NextRequest) {
   if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes <= 0) {
     return NextResponse.json({ error: "size" }, { status: 400 });
   }
-  if (bytes > IMAGE.maxBytes) {
+  if (bytes > rules.maxBytes) {
     return NextResponse.json({ error: "tooBig" }, { status: 413 });
   }
 
@@ -108,7 +136,7 @@ export async function DELETE(request: NextRequest) {
   // whole string, because a pattern that only has to appear *somewhere* is not
   // a constraint on a path.
   const shape =
-    /^(menu-items|stores|categories)\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+    /^(menu-items|stores|categories|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
   if (!shape.test(key)) {
     return NextResponse.json({ error: "key" }, { status: 400 });
   }

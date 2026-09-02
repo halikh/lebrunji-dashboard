@@ -134,3 +134,83 @@ export function dispatchMessage(
 
   return lines.join("\n");
 }
+
+/**
+ * The order as the **kitchen** needs it, for one shop.
+ *
+ * ## What is stripped, and why each thing goes
+ *
+ * The driver's message is the whole order because a driver is going to a door
+ * and needs the door, the phone and the amount. A kitchen needs none of that,
+ * and sending it anyway is not merely noise:
+ *
+ * - **No address, no map pin, no customer phone.** A shop cooking one half of a
+ *   two-shop order has no reason to hold a stranger's home address, and once it
+ *   is in a WhatsApp thread it is on somebody's phone for good. This is the
+ *   difference between telling a supplier what to make and handing them a
+ *   customer record.
+ * - **No money.** The kitchen is not collecting it — cash on delivery means the
+ *   driver does — and the total on a multi-shop order is not this shop's
+ *   figure anyway. A number they cannot act on is a number they might.
+ * - **No other shop's items.** Obvious, and it is the whole reason this is
+ *   per-shop rather than one broadcast.
+ *
+ * ## What is kept
+ *
+ * The code, so a phone call about it has something to name. The lines with
+ * their options and notes, which *is* the job. The customer's first name only,
+ * because a bag needs a label and a surname adds nothing to that. And the
+ * courier note when the shop is the only one on the order — "no coriander"
+ * reaches the person who can act on it.
+ *
+ * ## Amended lines are shown as they now stand
+ *
+ * `fulfilled_quantity` decides the number sent, so a shop that has already said
+ * it is out of something is not asked for it again. A line at zero is left out
+ * entirely rather than struck through: the customer's receipt needs to show
+ * what is missing, the kitchen's ticket does not.
+ */
+export function kitchenMessage(
+  order: Order & { lines: OrderLine[] },
+  storeId: string,
+): string {
+  const portion = order.stores.find((one) => one.id === storeId);
+  const lines: string[] = [];
+
+  lines.push(t("dispatch.kitchenHeading", { code: order.code }));
+  lines.push(t("dispatch.placed", { when: formatDateTime(order.placedAt) }));
+
+  // A first name, not the full one. The bag needs a label; the shop does not
+  // need a customer.
+  const first = order.customerName.trim().split(/\s+/)[0] ?? "";
+  if (first) lines.push(t("dispatch.kitchenFor", { name: first }));
+
+  lines.push("");
+
+  for (const line of order.lines.filter(
+    (one) => one.orderStoreId === storeId,
+  )) {
+    const quantity = line.fulfilledQuantity ?? line.quantity;
+    if (quantity === 0) continue;
+
+    lines.push(`• ${quantity} × ${line.name}`);
+    for (const option of line.options) lines.push(`   ${option}`);
+    if (line.note)
+      lines.push(`   ${t("dispatch.lineNote", { note: line.note })}`);
+  }
+
+  // Only when this shop is the whole order. On a split order the note may be
+  // about the other half, and passing it on invites a kitchen to act on an
+  // instruction that was never theirs.
+  if (order.courierNote && order.stores.length === 1) {
+    lines.push("");
+    lines.push(t("dispatch.note", { note: order.courierNote }));
+  }
+
+  if (portion) {
+    lines.push("");
+    lines.push(t("dispatch.kitchenFooter", { store: portion.storeName }));
+  }
+
+  return lines.join("\n");
+}

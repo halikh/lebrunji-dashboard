@@ -34,6 +34,8 @@ export type Courier = {
    * exactly the hours it matters. See migration 0084.
    */
   hours: DayHours[];
+  /** Still on the books. `false` is a driver who has left — never deleted. */
+  isActive: boolean;
   /**
    * Overrules the rota for tonight, or `null` to follow it.
    *
@@ -50,7 +52,7 @@ export type Courier = {
 // level to work out the row shape, and a `+` between two halves defeats that —
 // every read then comes back as an error union and the mappers stop compiling.
 const COLUMNS =
-  "id, name, phone, sort_order, available_override, courier_hours ( day_of_week, opens_at, closes_at )";
+  "id, name, phone, sort_order, available_override, deleted_at, courier_hours ( day_of_week, opens_at, closes_at )";
 
 function toCourier(row: Record<string, unknown>): Courier {
   const hours = Array.isArray(row.courier_hours)
@@ -63,6 +65,7 @@ function toCourier(row: Record<string, unknown>): Courier {
     phone: row.phone as string,
     sortOrder: row.sort_order as number,
     availableOverride: (row.available_override as boolean | null) ?? null,
+    isActive: row.deleted_at === null,
     hours: hours
       .map((day) => ({
         dayOfWeek: day.day_of_week as number,
@@ -96,10 +99,12 @@ function toCourier(row: Record<string, unknown>): Courier {
 export async function fetchCouriers(search = ""): Promise<Courier[]> {
   const term = search.trim();
 
+  // Inactive drivers are included and filtered on screen. They are not deleted
+  // rows to be hidden — they are people who have left, and the list has a tab
+  // for finding them again.
   let query = getClient()
     .from("couriers")
     .select(COLUMNS)
-    .is("deleted_at", null)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
@@ -127,7 +132,6 @@ export async function fetchCourier(id: string): Promise<Courier | null> {
     .from("couriers")
     .select(COLUMNS)
     .eq("id", id)
-    .is("deleted_at", null)
     .maybeSingle();
 
   if (error) throw new Error(`Could not read the driver: ${error.message}`);
@@ -338,18 +342,33 @@ export async function saveCourierHours(
 }
 
 /**
- * Archives a driver.
+ * Whether a driver is still on the books.
  *
- * Soft, like every other lifecycle row here, and for a reason particular to
- * this table: the number is the thing worth keeping. Somebody coming back after
- * a season should be switched on again, not re-typed — re-typing is where a
- * digit gets lost, and a wrong digit here means a dispatch message delivered to
- * a stranger.
+ * **There is no delete.** A driver who has left still appears on every order
+ * they carried, and a row removed from under `order_dispatches` would leave a
+ * history pointing at a name nobody can look up — which is the history somebody
+ * reads precisely when an old order is being questioned.
+ *
+ * So it is `deleted_at`, used as an on/off rather than as a tombstone: clearing
+ * it brings the same person back, with the same number. That matters more here
+ * than on most tables, because re-typing a phone number is where a digit gets
+ * lost, and a wrong digit sends a customer's address to a stranger.
+ *
+ * The two states are different questions and both are needed:
+ *
+ * - **Active** — do they work here at all. Set by hand, changes rarely.
+ * - **Taking orders** — are they working *now*. Read from `courier_hours`, with
+ *   `available_override` for tonight's exception.
+ *
+ * An inactive driver is never offered, whatever their rota says.
  */
-export async function archiveCourier(id: string): Promise<void> {
+export async function setCourierActive(
+  id: string,
+  active: boolean,
+): Promise<void> {
   const { error } = await getClient()
     .from("couriers")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ deleted_at: active ? null : new Date().toISOString() })
     .eq("id", id);
 
   if (error) throw new Error(error.message);
@@ -380,6 +399,9 @@ export function digitsOf(input: string): string {
  * is tonight's exception, not the other way round.
  */
 export function isTakingOrders(courier: Courier, now?: Date): boolean {
+  // Someone who has left is never taking orders, whatever their old rota or a
+  // stale override says. The employment state wins over both.
+  if (!courier.isActive) return false;
   return courier.availableOverride ?? isOpenNow(courier.hours, now);
 }
 

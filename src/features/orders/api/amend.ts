@@ -46,6 +46,15 @@ export type Substitution = {
   /** What is coming instead, priced at today's menu price. */
   menuItemId: string;
   quantity: number;
+  /**
+   * The choices made on it — a size, a bread, extras.
+   *
+   * Empty is ordinary. Their prices are added to the line by the function
+   * (migration 0091), the same way `place_order` adds them, because a
+   * substitute charged without its extras is a total the customer never agreed
+   * to on the phone.
+   */
+  optionIds: string[];
 };
 
 export type AmendedTotals = {
@@ -74,6 +83,7 @@ export async function amendOrder(input: {
           replaces_line_id: swap.replacesLineId,
           menu_item_id: swap.menuItemId,
           quantity: swap.quantity,
+          option_ids: swap.optionIds,
         })),
       },
       p_note: input.note,

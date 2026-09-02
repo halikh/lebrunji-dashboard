@@ -22,6 +22,15 @@ export type OrderStore = {
   storeId: string;
   storeName: string;
   storeImageUrl: string | null;
+  /**
+   * Where this kitchen is sent its half of the order, or null.
+   *
+   * On the portion rather than fetched separately: the panel already joins
+   * `stores` for the name and the picture, and a second query for one column
+   * would be a round trip to answer a question the first one was already
+   * asking.
+   */
+  storeWhatsapp: string | null;
   statusSlug: string;
   statusName: string;
   /** Position on the path. `null` is terminal and off it — cancelled. */
@@ -281,7 +290,7 @@ export async function fetchOrder(
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal,
-         stores ( name, image_url ),
+         stores ( name, image_url, whatsapp_phone ),
          order_statuses ( slug, name, progress ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
            fulfilled_quantity, replaces_line_id, amendment_reason,
@@ -491,6 +500,8 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
         id: store.id as string,
         storeId: store.store_id as string,
         storeName: localized(asRecord(store.stores)?.name, locale),
+        storeWhatsapp:
+          (asRecord(store.stores)?.whatsapp_phone as string | null) ?? null,
         storeImageUrl:
           (asRecord(store.stores)?.image_url as string | null) ?? null,
         statusSlug: (status?.slug as string) ?? "",

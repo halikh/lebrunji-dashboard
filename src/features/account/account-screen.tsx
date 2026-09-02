@@ -3,10 +3,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { Button, Input } from "@/components/ui";
+import { Button, Input, cx } from "@/components/ui";
 import { Field } from "@/components/ui/field";
+import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { useToasts } from "@/components/ui/toast";
-import { t } from "@/i18n/translations";
+import { GeneralTab } from "@/features/settings/general-tab";
+import { t, type TranslationKey } from "@/i18n/translations";
 import { PASSWORD } from "@/lib/limits";
 import { validatePassword } from "@/lib/validation";
 
@@ -48,7 +50,17 @@ import { validatePassword } from "@/lib/validation";
  * when they had not, which is the single worst thing this screen could get
  * wrong.
  */
+type TabKey = "general" | "password" | "email";
+
+const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
+  { key: "general", labelKey: "general.tab" },
+  { key: "password", labelKey: "account.tabPassword" },
+  { key: "email", labelKey: "account.tabEmail" },
+];
+
 export function AccountScreen() {
+  const [tab, setTab] = useState<TabKey>("general");
+
   const toast = useToasts();
   const queryClient = useQueryClient();
 
@@ -66,12 +78,42 @@ export function AccountScreen() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-xs border-b border-border bg-surface px-xxl py-lg">
+      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-lg">
         <h1 className="text-[24px]">{t("account.title")}</h1>
         <p className="text-[13px] text-text-soft">{t("account.blurb")}</p>
+
+        {/* Chapters of one screen, so `SectionTab` — the same underline the
+            store and the customer profile use.
+
+            General is first and it is not an account setting: it is the shop's.
+            It sits here because this is the page an operator opens to change
+            how the thing behaves, and a fifth tab on Settings would have put
+            the clock format next to the privacy policy. */}
+        <div role="tablist" className="-mb-px flex gap-lg">
+          {TABS.map(({ key, labelKey }) => (
+            <SectionTab
+              key={key}
+              label={t(labelKey)}
+              active={tab === key}
+              onClick={() => setTab(key)}
+              onKeyDown={tabArrowHandler(
+                TABS.map((one) => one.key),
+                tab,
+                setTab,
+              )}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+      {tab === "general" && <GeneralTab />}
+
+      <div
+        className={cx(
+          "flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl",
+          tab === "general" && "hidden",
+        )}
+      >
         {/* Full width and first: which account these two forms are about is the
           thing to establish before either of them is filled in. */}
         <section className="flex flex-col gap-xs rounded-md border border-border bg-surface p-lg">
@@ -83,11 +125,15 @@ export function AccountScreen() {
           </p>
         </section>
 
-        {/* Side by side on a wide screen. They are two versions of one errand —
-          the same current-password field, the same shape — and stacking them
-          put the second below the fold on the screen where somebody has come
-          to do exactly one of the two. */}
-        <div className="grid gap-xxl xl:grid-cols-2">
+        {/* One at a time, not side by side. They were a two-column grid, which
+            was right when the page was only these two forms: the same
+            current-password field, the same shape, and stacking them put the
+            second below the fold. With tabs the choice is made above, so
+            showing both would be offering it twice.
+
+            Siblings rather than a swapped child, so a half-typed password
+            survives a look at the email form and back. */}
+        <div className={cx(tab !== "password" && "hidden")}>
           <Change
             title={t("account.passwordTitle")}
             blurb={t("account.passwordBlurb")}
@@ -95,7 +141,9 @@ export function AccountScreen() {
             fields="password"
             onDone={() => toast.success(t("account.passwordChanged"))}
           />
+        </div>
 
+        <div className={cx(tab !== "email" && "hidden")}>
           <Change
             title={t("account.emailTitle")}
             blurb={t("account.emailBlurb")}

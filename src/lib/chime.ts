@@ -81,7 +81,32 @@ export function unlock() {
  * Sine waves with an envelope: a bare oscillator switched on and off clicks at
  * both ends, which is the part that makes a synthesised tone sound cheap.
  */
-export function chime() {
+export function chime(url?: string | null) {
+  // An uploaded sound replaces the synthesised one. A plain `<audio>` rather
+  // than decoding into the Web Audio graph: the graph exists to *build* a tone
+  // out of oscillators, and a file needs none of that — it needs a decoder,
+  // which the element already is.
+  //
+  // The built-in chime is the fallback and not an error case. If the file will
+  // not play — deleted from the store, offline, a codec the browser refuses —
+  // an order arriving in silence is the failure this whole function exists to
+  // prevent, so it falls back rather than giving up.
+  if (url) {
+    try {
+      const audio = new Audio(url);
+      audio.volume = 0.6;
+      void audio.play().catch(() => synth());
+      return;
+    } catch {
+      // Fall through to the built-in one.
+    }
+  }
+
+  synth();
+}
+
+/** The built-in chime: three sine notes with an envelope. */
+function synth() {
   const ctx = audioContext();
   if (!ctx) return;
 

@@ -14,7 +14,11 @@ import { t } from "@/i18n/translations";
 import { Price } from "@/features/reference/price";
 import { statusTone } from "@/lib/order-status";
 import { formatPhone } from "@/lib/phone";
-import { formatDayAndTime, startOfBusinessDayPlus } from "@/lib/time";
+import {
+  formatDayAndTime,
+  startOfBusinessDay,
+  startOfBusinessDayPlus,
+} from "@/lib/time";
 
 import { isOverridden, isTakingOrders, type Courier } from "./api/couriers";
 import { DriverEditor } from "./drivers-screen";
@@ -72,10 +76,55 @@ export function DriverProfile({ id }: { id: string }) {
     );
   }
 
+  /**
+   * Four figures, and two of them are averages on purpose.
+   *
+   * Counts answer "what has happened", which is what somebody checking on
+   * tonight wants. Averages answer "is this normal", which is the question a
+   * count cannot: seven hand-overs today means nothing until you know whether
+   * the usual is three or thirty.
+   *
+   * Both windows are **trading days**, not calendar ones — `startOfBusinessDay`
+   * cuts at 08:00 — so a hand-over at half past midnight counts towards the
+   * evening it belonged to rather than resetting "today" while the kitchen is
+   * still cooking.
+   */
+  const dayStart = startOfBusinessDay().getTime();
   const weekStart = startOfBusinessDayPlus(-6).getTime();
+
+  const today = rows.filter(
+    (one) => new Date(one.dispatchedAt).getTime() >= dayStart,
+  ).length;
   const thisWeek = rows.filter(
     (one) => new Date(one.dispatchedAt).getTime() >= weekStart,
   ).length;
+
+  /**
+   * The averages, over the days this driver has actually been on the books.
+   *
+   * Dividing by a fixed 7 or 30 would punish somebody who started on Tuesday:
+   * their first week reads as a fraction of what they really did. The span runs
+   * from their **earliest hand-over** to today, which is the only window the
+   * dashboard can honestly claim to know about — `couriers` records no start
+   * date, and inventing one from `created_at` would count the days between
+   * being added to the system and first being given an order.
+   *
+   * At least one day, so a driver on their first evening divides by one rather
+   * than by zero.
+   */
+  const earliest = rows.length
+    ? Math.min(
+        ...rows.map((one) =>
+          startOfBusinessDay(new Date(one.dispatchedAt)).getTime(),
+        ),
+      )
+    : dayStart;
+  const daysActive = Math.max(
+    1,
+    Math.round((dayStart - earliest) / 86_400_000) + 1,
+  );
+  const perDay = rows.length / daysActive;
+  const perWeek = perDay * 7;
 
   return (
     <div className="relative flex h-full">
@@ -132,8 +181,15 @@ export function DriverProfile({ id }: { id: string }) {
             record itself. */}
         <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
           <div className="flex flex-wrap gap-lg">
-            <Stat label={t("drivers.statTotal")} value={rows.length} />
-            <Stat label={t("drivers.statThisWeek")} value={thisWeek} />
+            <Stat label={t("drivers.statToday")} value={String(today)} />
+            <Stat label={t("drivers.statThisWeek")} value={String(thisWeek)} />
+            <Stat
+              label={t("drivers.statPerDay")}
+              value={average(perDay)}
+              note={t("drivers.overDays", { count: daysActive })}
+            />
+            <Stat label={t("drivers.statPerWeek")} value={average(perWeek)} />
+            <Stat label={t("drivers.statTotal")} value={String(rows.length)} />
           </div>
 
           {/* Nothing handed over yet means no section at all. A heading, a
@@ -302,11 +358,37 @@ function Back() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+}) {
   return (
     <div className="flex min-w-[140px] flex-col gap-xxs rounded-lg border border-border bg-surface px-lg py-md">
       <span className="text-[24px] font-bold tabular-nums">{value}</span>
       <span className="text-[12px] text-text-faint">{label}</span>
+      {/* What the average is over. An average with no denominator on screen is
+          a number somebody has to take on trust, and this one's denominator is
+          unusual — days since their first order, not a fixed week. */}
+      {note && <span className="text-[11px] text-text-faint">{note}</span>}
     </div>
   );
+}
+
+/**
+ * An average, to one decimal, with the decimal dropped when it is a whole
+ * number.
+ *
+ * `2.0` reads as a measurement and `2` reads as a count; the first is what this
+ * is, so the point stays wherever it carries information and goes when it does
+ * not. Two decimals would imply a precision that four hand-overs over three
+ * days does not have.
+ */
+function average(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }

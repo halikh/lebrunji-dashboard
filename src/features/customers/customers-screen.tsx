@@ -6,6 +6,8 @@ import { useState } from "react";
 
 import { Button, cx } from "@/components/ui";
 import { Avatar } from "@/components/ui/avatar";
+
+import { AccountActions } from "./account-actions";
 import { SearchInput } from "@/components/ui/search-input";
 import { ROW } from "@/components/ui/row";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -278,6 +280,13 @@ function Row({ customer }: { customer: Customer }) {
       </span>
 
       <StatusChip customer={customer} />
+
+      {/* `relative z-10`, above the stretched link that covers the row — the
+          second half of that pattern, and the half whose absence looks like a
+          broken button rather than a misplaced layer. */}
+      <span className="relative z-10">
+        <AccountActions customer={customer} />
+      </span>
     </div>
   );
 }

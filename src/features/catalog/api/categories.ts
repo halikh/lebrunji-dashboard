@@ -1,6 +1,6 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
-import type { Localized } from "@/lib/validation";
+import { localizedOrNull, type Localized } from "@/lib/validation";
 
 /**
  * Categories — the tiles on the app's home screen.
@@ -139,16 +139,19 @@ export async function createCategory(
   draft: CategoryDraft,
   sortOrder: number,
 ): Promise<void> {
-  const { error } = await getClient().from("categories").insert({
-    category_kind_id: draft.kindId,
-    name: draft.name,
-    tagline: draft.tagline,
-    is_active: draft.isActive,
-    has_menu_nav: draft.hasMenuNav,
-    sort_order: sortOrder,
-    // No `slug`: the trigger from migration 0071 derives one from the English
-    // name and makes it unique, which a client cannot do without racing.
-  });
+  const { error } = await getClient()
+    .from("categories")
+    .insert({
+      category_kind_id: draft.kindId,
+      name: draft.name,
+      // Null when blank, never `{}` — see `localizedOrNull`.
+      tagline: localizedOrNull(draft.tagline),
+      is_active: draft.isActive,
+      has_menu_nav: draft.hasMenuNav,
+      sort_order: sortOrder,
+      // No `slug`: the trigger from migration 0071 derives one from the English
+      // name and makes it unique, which a client cannot do without racing.
+    });
 
   if (error) throw new Error(friendly(error.message));
 }
@@ -162,7 +165,7 @@ export async function updateCategory(
   const row: Record<string, unknown> = {};
   if (patch.kindId !== undefined) row.category_kind_id = patch.kindId;
   if (patch.name !== undefined) row.name = patch.name;
-  if (patch.tagline !== undefined) row.tagline = patch.tagline;
+  if (patch.tagline !== undefined) row.tagline = localizedOrNull(patch.tagline);
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.hasMenuNav !== undefined) row.has_menu_nav = patch.hasMenuNav;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;

@@ -26,6 +26,7 @@ import {
   PASSWORD,
   PREP_MINUTES,
   SLUG_PATTERN,
+  SOUND,
   TEXT,
 } from "./limits";
 
@@ -60,6 +61,37 @@ const fail = (key: TranslationKey, params?: Params): Valid => ({
 
 /** A translated value: one string per language code. */
 export type Localized = Record<string, string>;
+
+/**
+ * A localised value as the database wants it: the object, or **null** when
+ * every language is blank.
+ *
+ * The `_locales` CHECK constraints (migration 0051) allow an optional column to
+ * be null outright, and otherwise require *every* locale to be present and
+ * non-empty. An empty form field therefore has two possible encodings and only
+ * one of them is legal — `{}` and `{ en: "", ar: "" }` are both rejected, with
+ * a message naming a constraint.
+ *
+ * That is exactly what happened: a dish saved with no description sent `{}`,
+ * Postgres refused it, and the operator was told "every language needs a value"
+ * about a field they had deliberately left blank.
+ *
+ * So an all-blank value becomes null here, once, rather than in each form.
+ * Blank *entries* are dropped too — a partly-filled value has already been
+ * refused by `validateLocalizedText`, and sending `{ en: "x", ar: "" }` would
+ * hit the constraint rather than the form's own message.
+ */
+export function localizedOrNull(
+  value: Localized | null | undefined,
+): Localized | null {
+  if (!value) return null;
+
+  const filled = Object.entries(value)
+    .map(([code, text]) => [code, text.trim()] as const)
+    .filter(([, text]) => text.length > 0);
+
+  return filled.length > 0 ? Object.fromEntries(filled) : null;
+}
 
 export function validateSlug(value: string): Valid {
   const slug = value.trim();
@@ -357,4 +389,75 @@ export function validatePassword(
 /** Collapses a set of results into the first failure, for a whole form. */
 export function firstFailure(results: readonly Valid[]): Valid {
   return results.find((result) => !result.ok) ?? OK;
+}
+
+/**
+ * Is this an MP3, and is it a chime rather than a song?
+ *
+ * The same three-part shape `validateImage` has, and for the same reasons: the
+ * type comes from the file's **first bytes** rather than from `File.type`,
+ * which the operating system derives from the extension — so a `.mp3` that is
+ * really a video claims `audio/mpeg` there, the store accepts it, and the
+ * dashboard plays nothing with no explanation.
+ *
+ * Duration is checked as well as size because they are not the same question:
+ * bitrate decides how many bytes a second costs, so a long quiet recording can
+ * be smaller than a short loud one. A three-minute file inside the byte limit
+ * would play over the next four orders.
+ *
+ * `seconds` is optional for the same reason `validateImage`'s dimensions are:
+ * decoding can fail on a file that is perfectly playable, and refusing a good
+ * chime because the browser would not measure it is the wrong trade.
+ */
+export function validateSound(input: {
+  bytes: number;
+  type: string | null;
+  seconds?: number;
+}): Valid {
+  if (
+    input.type === null ||
+    !(SOUND.types as readonly string[]).includes(input.type)
+  ) {
+    return fail("validation.soundType");
+  }
+  if (input.bytes > SOUND.maxBytes) {
+    return fail("validation.soundTooBig", {
+      max: Math.round(SOUND.maxBytes / 1024),
+    });
+  }
+  if (input.seconds !== undefined && input.seconds > SOUND.maxSeconds) {
+    return fail("validation.soundTooLong", { max: SOUND.maxSeconds });
+  }
+  return OK;
+}
+
+/**
+ * An MP3, from its first bytes.
+ *
+ * Two legal openings and both have to be accepted, because which one a file has
+ * depends on the encoder rather than on anything a person chose:
+ *
+ * - `ID3` — a tag block at the front, which is what most encoders write.
+ * - A frame sync: eleven set bits, so `FF` then a byte whose top three bits are
+ *   set. `FB`, `F3` and `F2` are the ones seen in practice.
+ *
+ * Anything else is not an MP3, whatever the extension says.
+ */
+export function sniffAudioType(bytes: Uint8Array): string | null {
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0x49 &&
+    bytes[1] === 0x44 &&
+    bytes[2] === 0x33
+  ) {
+    return "audio/mpeg";
+  }
+  if (
+    bytes.length >= 2 &&
+    bytes[0] === 0xff &&
+    ((bytes[1] as number) & 0xe0) === 0xe0
+  ) {
+    return "audio/mpeg";
+  }
+  return null;
 }

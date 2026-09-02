@@ -8,6 +8,7 @@ import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Map } from "@/components/ui/map";
 import { NumberInput } from "@/components/ui/number-input";
+import { digitsOf } from "@/features/drivers/api/couriers";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -85,6 +86,7 @@ function Form({ store }: { store: Store }) {
 
   const [name, setName] = useState<Localized>(store.name);
   const [imageUrl, setImageUrl] = useState<string | null>(store.imageUrl);
+  const [whatsapp, setWhatsapp] = useState(store.whatsappPhone ?? "");
   const [prepMin, setPrepMin] = useState(String(store.prepMinMinutes));
   const [prepMax, setPrepMax] = useState(String(store.prepMaxMinutes));
   const [pin, setPin] = useState(
@@ -96,6 +98,7 @@ function Form({ store }: { store: Store }) {
   const [errors, setErrors] = useState<{
     name?: string;
     prep?: string;
+    whatsapp?: string;
     pin?: string;
   }>({});
 
@@ -112,6 +115,13 @@ function Form({ store }: { store: Store }) {
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
       prep: prepCheck.ok ? undefined : t(prepCheck.key, prepCheck.params),
+      // The same rule the CHECK constraint carries, so the operator is told
+      // before saving rather than by a constraint name afterwards. Empty is
+      // fine — the field is optional.
+      whatsapp:
+        whatsapp.trim() === "" || /^[1-9][0-9]{6,14}$/.test(digitsOf(whatsapp))
+          ? undefined
+          : t("drivers.badPhone"),
       // An empty box is "no pin", which is a legitimate state — a shop can be
       // saved without one, with the warning above. Text that is not a location
       // is not, and saving null for it would look exactly like success while
@@ -131,13 +141,14 @@ function Form({ store }: { store: Store }) {
     };
 
     setErrors(found);
-    if (found.name || found.prep || found.pin) return;
+    if (found.name || found.prep || found.pin || found.whatsapp) return;
 
     update.mutate({
       id: store.id,
       patch: {
         name,
         imageUrl,
+        whatsappPhone: whatsapp.trim() || null,
         prepMinMinutes: min,
         prepMaxMinutes: max,
         // Both or neither. Half a pin is a row that passes every constraint and
@@ -174,24 +185,26 @@ function Form({ store }: { store: Store }) {
 
         So: what the shop *is* on the left, where it *is* on the right.
       */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-        {/* The fields scroll; the map does not.
+      {/* One scrollbar, for the page.
 
-            At 420px the map ran past the bottom of the window, so seeing the
-            end of it meant scrolling a page that had nothing else to show —
-            and a map you have to scroll to see all of is a map you cannot read
-            at a glance, which is its whole job here.
+          The columns used to scroll independently — the fields in their own
+          box, the map fixed beside them — on the reasoning that a map you have
+          to scroll is a map you cannot read at a glance. That is true of the
+          map and it was bought at the wrong price: an inner scrollbar in the
+          middle of a page is a second thing to find and a second thing to
+          reach the end of, and the wheel does nothing once the pointer strays
+          out of it. The form got longer, and the seam started showing.
 
-            So on a wide screen the two columns are independent: the fields take
-            their own scrollbar when they need one, and the map takes exactly
-            the height that is left. Stacked on a narrow screen there is one
-            scroll again, and the map falls back to a sensible minimum. */}
+          So the page scrolls and the map stays put by being **sticky** instead
+          — same effect while there is room, no second scrollbar, and it
+          releases naturally when the fields run past it. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row">
         {/* The padding is on the scrolling column, not on the box around it.
             A scroll container clips what leaves it, and the focus ring is a
             box-shadow drawn a few pixels *outside* the input — so with the
             padding one level up, the ring on the first field was sliced down
             its left edge. Inside the scroller there is room for it. */}
-        <div className="flex flex-col gap-xxl p-xxl lg:w-[540px] lg:shrink-0 lg:overflow-y-auto">
+        <div className="flex flex-col gap-xxl p-xxl lg:w-[540px] lg:shrink-0">
           <section className="flex flex-col gap-lg">
             <LocalizedField
               label={t("store.name")}
@@ -248,13 +261,31 @@ function Form({ store }: { store: Store }) {
                 </span>
               </div>
             </Field>
+
+            {/* Where the order is sent so the kitchen can start. Optional, and
+                the hint says what happens without it rather than leaving an
+                empty field to be wondered about — a shop with no number simply
+                does not appear on the send list. */}
+            <Field
+              label={t("store.whatsapp")}
+              hint={t("store.whatsappHint")}
+              error={errors.whatsapp}
+            >
+              <Input
+                value={whatsapp}
+                onChange={(event) => setWhatsapp(event.target.value)}
+                placeholder={t("store.whatsappPlaceholder")}
+                inputMode="tel"
+                maxLength={24}
+              />
+            </Field>
           </section>
         </div>
 
         {/* Sticky, so the map stays in view while the fields on the left are
             worked through. It is the reference the other column is edited
             against, not a section that comes after it. */}
-        <section className="flex min-h-0 flex-col gap-lg p-xxl pt-0 lg:flex-1 lg:ps-0 lg:pt-xxl">
+        <section className="flex flex-col gap-lg p-xxl pt-0 lg:sticky lg:top-0 lg:flex-1 lg:self-start lg:ps-0 lg:pt-xxl">
           <h2 className="ps-md text-[17px]">{t("store.locationTitle")}</h2>
 
           {/* Said here, not left to be found on a customer's bill. */}

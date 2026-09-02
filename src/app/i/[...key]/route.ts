@@ -41,12 +41,14 @@ import { getObject } from "@/lib/storage/bucket";
  */
 
 /** Exactly what `POST /api/images` generates, and nothing else. */
-const KEY = /^(menu-items|stores|categories)\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+const KEY =
+  /^(menu-items|stores|categories|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
 
 const TYPES: Record<string, string> = {
   jpg: "image/jpeg",
   png: "image/png",
   webp: "image/webp",
+  mp3: "audio/mpeg",
 };
 
 export async function GET(
