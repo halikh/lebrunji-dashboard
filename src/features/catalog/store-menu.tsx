@@ -14,6 +14,7 @@ import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { useRevealOnMount } from "@/components/ui/reveal";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Price } from "@/features/reference/price";
+import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { SEARCH, TEXT } from "@/lib/limits";
@@ -21,12 +22,15 @@ import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
 import { MenuItemEditor } from "./menu-item-editor";
+import { BulkForm } from "./bulk-form";
 import { ItemTags } from "./tag-chip";
 import {
   useArchiveMenuItem,
   useArchiveMenuSection,
   useCreateMenuItem,
+  useCreateMenuItems,
   useCreateMenuSection,
+  useCreateMenuSections,
   useMenu,
   useMenuSearch,
   useReorderMenu,
@@ -162,7 +166,18 @@ export function StoreMenu({
    * the list growing by one, in the place the new section will be — and the
    * form is where the button was, so nothing has to move to make room.
    */
-  const [adding, setAdding] = useState(false);
+  /**
+   * How a section is being added: not at all, one at a time, or as a list.
+   *
+   * One state rather than two booleans — they are mutually exclusive, and two
+   * booleans is a fourth state that means nothing.
+   */
+  const createItems = useCreateMenuItems(storeId);
+  const createSections = useCreateMenuSections(storeId);
+  const { decimalsOf } = useMoney();
+
+  const [adding, setAddingMode] = useState<"none" | "one" | "bulk">("none");
+  const setAdding = (on: boolean) => setAddingMode(on ? "one" : "none");
 
   /**
    * The search term, and the mode it puts the screen in.
@@ -378,10 +393,21 @@ export function StoreMenu({
             {/* Beside the search rather than at the end of the list. The
                 header does not scroll, so this is reachable on a menu of any
                 length — which is what the pinned bar used to be for. */}
-            {menu.isSuccess && !adding && (
-              <Button onClick={() => setAdding(true)}>
-                {t("menu.addSection")}
-              </Button>
+            {menu.isSuccess && adding === "none" && (
+              <>
+                <Button onClick={() => setAddingMode("one")}>
+                  {t("menu.addSection")}
+                </Button>
+                {/* Beside the one-at-a-time button, because they are two ways
+                    to start the same job and the choice is made before either
+                    is open. */}
+                <Button
+                  variant="secondary"
+                  onClick={() => setAddingMode("bulk")}
+                >
+                  {t("menu.bulkSections")}
+                </Button>
+              </>
             )}
             {searching && (
               <>
@@ -573,6 +599,12 @@ export function StoreMenu({
                       itemId: null,
                     })
                   }
+                  decimals={decimalsOf(store.data?.currencyCode ?? "")}
+                  bulk={{
+                    pending: createItems.isPending,
+                    add: (sectionId, items, sortOrder) =>
+                      createItems.mutate({ sectionId, items, sortOrder }),
+                  }}
                   onToggle={(item) =>
                     update.mutate({
                       id: item.id,
@@ -593,7 +625,27 @@ export function StoreMenu({
           {/* The form appears where the new section will, at the end of the
               list — and scrolls itself into view, because on a long menu it
               opens below the fold. The button that opens it is pinned below. */}
-          {!searching && menu.isSuccess && adding && (
+          {!searching && menu.isSuccess && adding === "bulk" && (
+            <BulkForm
+              kind="sections"
+              // A section is a heading and nothing else — no price column.
+              price="none"
+              decimals={null}
+              pending={createSections.isPending}
+              onCancel={() => setAddingMode("none")}
+              onSubmit={(rows) =>
+                createSections.mutate(
+                  {
+                    titles: rows.map((row) => row.name),
+                    sortOrder: sections.length,
+                  },
+                  { onSuccess: () => setAddingMode("none") },
+                )
+              }
+            />
+          )}
+
+          {!searching && menu.isSuccess && adding === "one" && (
             <SectionForm
               pending={createSection.isPending}
               onSave={(title) =>
@@ -652,6 +704,8 @@ function Section({
   onReorderItems,
   onEdit,
   onAdd,
+  decimals,
+  bulk,
   onToggle,
   onArchive,
 }: {
@@ -668,10 +722,24 @@ function Section({
   onReorderItems: (ids: string[]) => void;
   onEdit: (id: string) => void;
   onAdd: () => void;
+  /** The shop's currency decimals, for scaling prices in a pasted list. */
+  decimals: number | null;
+  /** Writes a pasted list of items into this section. */
+  bulk: {
+    pending: boolean;
+    add: (
+      sectionId: string,
+      items: { name: Localized; price: number }[],
+      sortOrder: number,
+    ) => void;
+  };
   onToggle: (item: MenuItem) => void;
   onArchive: (item: MenuItem) => Promise<void>;
 } & ReorderProps) {
   const title = pickLocalized(section.title);
+
+  /** Whether this section's paste box is open. Per section, not per menu. */
+  const [pasting, setPasting] = useState(false);
 
   const itemOrder = useReorder({
     ids: section.items.map((item) => item.id),
@@ -787,25 +855,52 @@ function Section({
 
       {/* At the bottom of the section, not in a header. It is where the eye
           already is after reading the list. */}
-      <button
-        type="button"
-        onClick={onAdd}
-        className="flex items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-faint hover:bg-neutral-fill hover:text-text-soft"
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          strokeLinecap="round"
-          aria-hidden
-        >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        {t("menu.addItem", { section: title })}
-      </button>
+      {pasting ? (
+        <BulkForm
+          kind="items"
+          // An item without a price is not an item — unlike a choice, where
+          // free is the common case.
+          price="required"
+          decimals={decimals}
+          pending={bulk.pending}
+          onCancel={() => setPasting(false)}
+          onSubmit={(rows) => {
+            bulk.add(
+              section.id,
+              // Never null under the `required` rule.
+              rows.map((row) => ({ name: row.name, price: row.price ?? 0 })),
+              nextSortOrder(section),
+            );
+            setPasting(false);
+          }}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center gap-sm">
+          <button
+            type="button"
+            onClick={onAdd}
+            className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-faint hover:bg-neutral-fill hover:text-text-soft"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              aria-hidden
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            {t("menu.addItem", { section: title })}
+          </button>
+
+          <Button variant="secondary" onClick={() => setPasting(true)}>
+            {t("menu.bulkItems")}
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

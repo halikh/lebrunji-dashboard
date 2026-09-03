@@ -47,6 +47,20 @@ export const ROW =
  * something that cannot be clicked is a promise the row does not keep, and it
  * is the kind of thing that gets added by copying the line above without
  * noticing which one it was.
+ *
+ * ## It carries its own border colour, and `ROW` does not
+ *
+ * Not an inconsistency. A `ROW` is in a list whose rows have *states* — hidden,
+ * archived, open — so each caller sets `border-border` or a state colour, and a
+ * default here would be a class every one of them has to beat. A static row has
+ * no states by definition, so there is nothing to override and no caller to
+ * remember.
+ *
+ * It was written without one, and the consequence was not subtle: `border` with
+ * no colour falls back to `currentColor`, so the archive's rows came out
+ * outlined in the near-black of their own text. A bare `border` is never what
+ * anybody means.
  */
 export const ROW_STATIC =
-  "relative flex items-center gap-lg rounded-md border bg-surface px-lg py-md";
+  "relative flex items-center gap-lg rounded-md border border-border " +
+  "bg-surface px-lg py-md";

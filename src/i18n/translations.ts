@@ -889,10 +889,10 @@ const en = {
   tags: {
     tab: "Tags",
     blurb:
-      "The chips a dish can carry. One vocabulary for the whole app — a tag means the same thing on every menu, which is what makes it worth having instead of typing the word on each dish.",
+      "The chips an item can carry. One vocabulary for the whole app — a tag means the same thing on every menu, which is what makes it worth having instead of typing the word on each item.",
     add: "New tag",
     name: "Name",
-    nameHint: "Short. It sits beside a dish's name, not under it.",
+    nameHint: "Short. It sits beside an item's name, not under it.",
     toneLabel: "Colour",
     toneHint:
       "Pick the chip, not the colour — each option shows what the tag will look like in the app.",
@@ -907,9 +907,9 @@ const en = {
     visibility: "Visibility",
     live: "Live",
     hidden: "Hidden",
-    liveHint: "Customers see this chip on every dish that carries it.",
+    liveHint: "Customers see this chip on every item that carries it.",
     hiddenHint:
-      "The chip is gone from the app. The dishes keep it, so switching this back on restores it to all of them.",
+      "The chip is gone from the app. The items keep it, so switching this back on restores it to all of them.",
     save: "Save tag",
     added: "{name} added",
     saved: "{name} saved",
@@ -917,20 +917,20 @@ const en = {
     archive: "Archive",
     archiveTitle: "Archive {name}?",
     archiveBody:
-      "The chip disappears from {count} dish(es) immediately. Nothing else changes — the dishes keep the tag, so bringing it back restores it to all of them.",
+      "The chip disappears from {count} item(s) immediately. Nothing else changes — the items keep the tag, so bringing it back restores it to all of them.",
     archiveConfirm: "Archive",
     // A count on the row is what turns "retire this" from a guess into a
     // decision. Zero is said in words rather than as "0 dishes", because
     // "unused" is the thing the operator is scanning for.
-    unused: "Not on any dish yet",
-    usedBy: "On {count} dish(es)",
+    unused: "Not on any item yet",
+    usedBy: "On {count} item(s)",
     showTitle: "Show {name} to customers?",
     showBody:
-      "The chip appears on all {count} dish(es) that carry it, straight away.",
+      "The chip appears on all {count} item(s) that carry it, straight away.",
     showConfirm: "Show it",
     hideTitle: "Hide {name} from customers?",
     hideBody:
-      "The chip disappears from all {count} dish(es) straight away. They keep the tag, so this is reversible in one click.",
+      "The chip disappears from all {count} item(s) straight away. They keep the tag, so this is reversible in one click.",
     hideConfirm: "Hide it",
     search: "Search tags",
     reorderHint: "Drag the rows to reorder. Searching turns that off.",
@@ -941,11 +941,11 @@ const en = {
     // because "why is Spicy first here" is otherwise a per-dish question.
     itemLabel: "Tags",
     itemHint:
-      "The chips shown on this dish. Their order comes from the Tags tab, so it is the same on every dish.",
+      "The chips shown on this item. Their order comes from the Tags tab, so it is the same on every item.",
     itemPlaceholder: "Add a tag",
     itemNone: "No tags have been set up yet. Add some on the Tags tab.",
     unknownTone: "That is not a colour a tag can be drawn in.",
-    alreadyOnDish: "This dish already carries that tag.",
+    alreadyOnDish: "This item already carries that tag.",
   },
 
   /**
@@ -964,7 +964,7 @@ const en = {
     hint: "Nothing here is deleted — order history still points at all of it. Bring back what you need.",
     all: "All",
     sections: "Sections",
-    items: "Dishes",
+    items: "Items",
     groups: "Questions",
     options: "Choices",
     stores: "Shops",
@@ -993,18 +993,18 @@ const en = {
       tag and a shop at once.
     */
     restoreTitle: "Bring {name} back?",
-    restoreSection: "It appears on the menu again. Dishes archived inside it stay archived until you bring those back too.",
+    restoreSection: "It appears on the menu again. Items archived inside it stay archived until you bring those back too.",
     restoreItem: "It appears on the menu again and customers can order it.",
-    restoreGroup: "It is asked again whenever this dish is ordered.",
+    restoreGroup: "It is asked again whenever this item is ordered.",
     restoreOption: "It is offered again as an answer to this question.",
     restoreStore: "It appears in the app again and customers can order from it.",
     restoreCategory: "It appears in the app again, with whatever shops you bring back into it.",
-    restoreTag: "It can be put on dishes again, and reappears on any that still carry it.",
+    restoreTag: "It can be put on items again, and reappears on any that still carry it.",
     restorePromotion: "It runs again if its dates still allow — check them, because they come back exactly as they were.",
     restoreConfirm: "Bring it back",
     // The refusal. A dish restored into an archived section is listed by
     // neither the dashboard nor the app, so it is refused rather than mislaid.
-    sectionGoneFirst: "Bring back {name} first — a dish cannot return to an archived section.",
+    sectionGoneFirst: "Bring back {name} first — an item cannot return to an archived section.",
     // The same refusal one tier up: `stores.category_id` is not null, so a shop
     // restored into an archived category is on a shelf nothing draws.
     categoryGoneFirst: "Bring back {name} first — a shop cannot return to an archived category.",
@@ -1021,28 +1021,63 @@ const en = {
     sectionRestored: "{name} is back",
     offered: "{name} is offered again",
     emptyTitle: "Nothing put away",
-    emptyBody: "Archived sections and dishes, and withdrawn questions and choices, collect here.",
+    emptyBody: "Archived sections and items, and withdrawn questions and choices, collect here.",
     failedTitle: "Could not load the archive",
+  },
+
+  /**
+   * Bulk entry, shared by sections, items and choices.
+   *
+   * One namespace rather than three, because the strings are about the *format*
+   * — columns, a bar, a line number — and the format is one thing. Three copies
+   * would be three places for the separator to be described differently from
+   * the way the parser reads it.
+   */
+  bulk: {
+    hint: "One per line, columns separated by a vertical bar.",
+    hintPriceOptional:
+      "One per line, columns separated by a vertical bar. The price is last and can be left off — no price means free.",
+    hintPriceRequired:
+      "One per line, columns separated by a vertical bar, with the price last.",
+    label: "Your list",
+    sectionsTitle: "Several sections at once",
+    itemsTitle: "Several items at once",
+    choicesTitle: "Several choices at once",
+    submit: "Add {count}",
+    submitOne: "Add 1",
+    nothing: "Nothing to add yet — type or paste a list above.",
+    ready: "{count} ready to add",
+    problems: "Fix these lines first",
+    line: "Line {line}",
+    columns: "Expected {expected} columns separated by | , found {found}.",
+    nameMissing: "The {code} name is empty.",
+    nameLong: "The {code} name is longer than {max} characters.",
+    price: "The price is missing or is not a number.",
+    priceRange: "That price is out of range.",
+    duplicate: "\"{name}\" is already on line {first}.",
+    addedSections: "{count} sections added",
+    addedItems: "{count} items added",
+    addedChoices: "{count} choices added",
   },
 
   options: {
     tab: "Options",
     tabHint:
-      "Pick a section, then a dish. Its questions are set up on the right.",
+      "Pick a section, then an item. Its questions are set up on the right.",
     section: "Section",
-    sectionHint: "Narrows the list of dishes below.",
+    sectionHint: "Narrows the list of items below.",
     pickSection: "Choose a section",
-    item: "Dish",
-    itemHint: "The questions belong to this dish and no other.",
-    pickItem: "Choose a dish",
+    item: "Item",
+    itemHint: "The questions belong to this item and no other.",
+    pickItem: "Choose an item",
     // The marker in the picker. A dish with no questions looks complete
     // everywhere else, so this is the only place it can be seen at a glance.
     noneSet: "no options yet",
-    noQuestions: "This dish asks nothing yet.",
+    noQuestions: "This item asks nothing yet.",
     title: "Options",
-    hint: "Questions asked when this dish is ordered — a size, extras, something left out.",
-    saveFirst: "Save this dish first, then set up its options.",
-    openFor: "Set up this dish's options",
+    hint: "Questions asked when this item is ordered — a size, extras, something left out.",
+    saveFirst: "Save this item first, then set up its options.",
+    openFor: "Set up this item's options",
     chooseOne: "Choose one",
     chooseAny: "Choose any",
     required: "Required",
@@ -1059,7 +1094,7 @@ const en = {
     noLimit: "No limit",
     mustChoose: "Must the customer answer",
     mustChooseHint:
-      "Required questions have to be answered before the dish can be added.",
+      "Required questions have to be answered before the item can be added.",
     saveGroup: "Create question",
     // Renaming a question and re-pricing a choice. Both were missing: every
     // other fact about a group was a switch that wrote as it was flicked,
@@ -1073,31 +1108,9 @@ const en = {
     editChoiceLabel: "Edit {name}",
     optionName: "Choice",
     extraCost: "Adds",
-    extraCostHint: "Added to the dish's price. Leave at 0 for a free choice.",
+    extraCostHint: "Added to the item's price. Leave at 0 for a free choice.",
     addOption: "Add choice",
-    // Bulk entry. A question's answers arrive as a set — three sizes, six
-    // extras — and adding them one at a time is the menu-building job at its
-    // most tedious. The operator usually has the list already.
     bulkAdd: "Paste a list",
-    bulkTitle: "Several choices at once",
-    bulkHint:
-      "One choice per line, columns separated by a vertical bar. The price is last and can be left off — a choice with no price is free.",
-    bulkPlaceholderLabel: "Your list",
-    bulkSubmit: "Add {count} choices",
-    bulkSubmitOne: "Add 1 choice",
-    bulkAdded: "{count} choices added",
-    bulkNothing: "Nothing to add yet — type or paste a list above.",
-    bulkReady: "{count} ready to add",
-    // Problems, one per line, named by the line as it was typed.
-    bulkProblems: "Fix these lines first",
-    bulkLine: "Line {line}",
-    bulkColumns:
-      "Expected {expected} columns separated by | , found {found}.",
-    bulkNameMissing: "The {code} name is empty.",
-    bulkNameLong: "The {code} name is longer than {max} characters.",
-    bulkPrice: "The price is not a number.",
-    bulkPriceRange: "That price is out of range.",
-    bulkDuplicate: "\"{name}\" is already on line {first}.",
     // Names the question, because a dish has several and the buttons are
     // otherwise identical down the page.
     addChoiceTo: "Add a choice to {name}",
@@ -1131,7 +1144,7 @@ const en = {
       "Customers stop being asked it. It moves to the Archive tab, where you can bring it back.",
     withdrawGroupConfirm: "Withdraw it",
     offerGroupTitle: "Offer {name} again?",
-    offerGroupBody: "Customers are asked it again whenever this dish is ordered.",
+    offerGroupBody: "Customers are asked it again whenever this item is ordered.",
     offerGroupConfirm: "Offer it",
     withdrawChoiceTitle: "Withdraw {name}?",
     withdrawChoiceBody:
@@ -1324,7 +1337,7 @@ const en = {
       order: "Every order",
       store: "Orders from certain shops",
       category: "Orders from certain categories",
-      menuItem: "Orders containing certain dishes",
+      menuItem: "Orders containing certain items",
     },
     // Hand-written SQL can attach scopes of several types at once. The form
     // cannot show that, so it says so and refuses to touch them.
@@ -1343,12 +1356,12 @@ const en = {
     pickDishShop: "Which shop",
     pickDishShopPlaceholder: "Choose a shop",
     pickShopFirst: "Choose a shop first.",
-    pickDishes: "Dishes",
+    pickDishes: "Items",
     pickDishesHint:
-      "The shop's name is shown beside each, so two dishes with the same name are told apart.",
-    pickDishesPlaceholder: "Search for a dish",
-    typeToFindDishes: "Start typing to find a dish.",
-    noDishes: "No dish matches {term}.",
+      "The shop's name is shown beside each, so two items with the same name are told apart.",
+    pickDishesPlaceholder: "Search for an item",
+    typeToFindDishes: "Start typing to find an item.",
+    noDishes: "No item matches {term}.",
     firstOrderLabel: "New customers",
     firstOrderHint:
       "Only for somebody who has never ordered before. Cancelled orders count — it is about who they are, not about what survived.",
@@ -1464,7 +1477,7 @@ const en = {
     colDay: "Day",
     colOrders: "Orders",
     colRevenue: "Revenue",
-    colItem: "Dish",
+    colItem: "Item",
     colStore: "Shop",
     colQuantity: "Sold",
     colWeekday: "Day",
@@ -1496,7 +1509,7 @@ const en = {
       "Orders by hour of the day and day of the week, in Beirut time.",
 
     chartItems: "What sells",
-    chartItemsAria: "The ten dishes sold most often in this range.",
+    chartItemsAria: "The ten items sold most often in this range.",
     sold: "{count} sold",
 
     chartStores: "Which shops earn",
@@ -1717,6 +1730,9 @@ const en = {
     // decoration.
     sections: "Sections",
     addSection: "Add a section",
+    // The bulk route, beside the one-at-a-time button in both places.
+    bulkSections: "Paste sections",
+    bulkItems: "Paste items",
     sectionTitle: "Section name",
     sectionTitleHint: "What customers see above the items in it.",
     sectionAdded: "{name} added",

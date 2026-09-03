@@ -2,17 +2,26 @@ import { TEXT } from "@/lib/limits";
 import { validatePrice, type Localized } from "@/lib/validation";
 
 /**
- * Reading a list of choices out of a block of typed text.
+ * Reading a list of named rows out of a block of typed text.
  *
  * ## Why bulk entry exists
  *
- * A question's answers arrive as a *set*, not one at a time: sizes are small,
- * medium and large; extras are six things the kitchen already knows. The form
- * that adds them takes a name in every language and a price, and doing that six
- * times — six focus changes, six Add presses, six round trips — is the whole
- * job of setting up a menu repeated at its most tedious scale. Operators
- * already have the list, usually in a message or a spreadsheet. This lets them
- * paste it.
+ * Menu content arrives as a *set*, not one thing at a time. A shop's sections
+ * are the six headings on its printed menu. A section's items are the eleven
+ * lines under one of those headings. A question's answers are small, medium and
+ * large. Every one of those is typed into a form that takes a name in each
+ * language, once per row — and doing that eleven times is eleven focus changes,
+ * eleven Add presses and eleven round trips, which is the job of setting up a
+ * menu at its most tedious scale. Operators already have the list, usually in a
+ * message or a spreadsheet. This lets them paste it.
+ *
+ * ## One parser for all three
+ *
+ * Sections, items and choices differ in exactly one way: whether a row carries
+ * a price, and whether that price is required. Everything else — the columns,
+ * the languages, the duplicate check, the all-or-nothing rule — is identical,
+ * and three copies of it would be three places for the currency scaling to
+ * drift. `price` says which of the three this is.
  *
  * ## The format is one choice per line, columns separated by `|`
  *
@@ -51,10 +60,19 @@ import { validatePrice, type Localized } from "@/lib/validation";
  * described in one sentence.
  */
 
-export type ParsedChoice = {
+/** What a row asks of its last column. */
+export type PriceRule =
+  /** Sections: no price column at all. */
+  | "none"
+  /** Choices: a free answer is the common case, so an absent price is zero. */
+  | "optional"
+  /** Items: a dish with no price is not a dish, so the column must be there. */
+  | "required";
+
+export type ParsedRow = {
   name: Localized;
-  /** Minor units, already scaled by the currency's decimals. */
-  price: number;
+  /** Minor units, already scaled. `null` only when the rule is `none`. */
+  price: number | null;
 };
 
 /** A line that could not be read, and why — `line` is 1-based, as typed. */
@@ -66,19 +84,19 @@ export type LineProblem = {
 };
 
 export type BulkProblemKey =
-  | "options.bulkColumns"
-  | "options.bulkNameMissing"
-  | "options.bulkNameLong"
-  | "options.bulkPrice"
-  | "options.bulkPriceRange"
-  | "options.bulkDuplicate";
+  | "bulk.columns"
+  | "bulk.nameMissing"
+  | "bulk.nameLong"
+  | "bulk.price"
+  | "bulk.priceRange"
+  | "bulk.duplicate";
 
 export type BulkParse =
-  | { ok: true; choices: ParsedChoice[] }
+  | { ok: true; rows: ParsedRow[] }
   | { ok: false; problems: LineProblem[] };
 
 /**
- * Turns the textarea's contents into choices, or into a list of problems.
+ * Turns the textarea's contents into rows, or into a list of problems.
  *
  * @param text     What was typed. Blank lines are skipped, not reported —
  *                 pasted lists routinely carry a trailing newline, and refusing
@@ -89,14 +107,17 @@ export type BulkParse =
  *                 priced line a problem rather than a guess — the same rule
  *                 `MoneyInput` follows, and for the same reason: a scale
  *                 guessed wrong is wrong by a factor of a hundred.
+ * @param price    Whether the last column is a price, and whether it must be
+ *                 there. See {@link PriceRule}.
  */
-export function parseBulkChoices(
+export function parseBulkRows(
   text: string,
   codes: string[],
   decimals: number | null,
+  price: PriceRule,
 ): BulkParse {
   const problems: LineProblem[] = [];
-  const choices: ParsedChoice[] = [];
+  const rows: ParsedRow[] = [];
   /** Lower-cased first-language names, to catch a list pasted twice. */
   const seen = new Map<string, number>();
 
@@ -109,14 +130,17 @@ export function parseBulkChoices(
 
     const columns = raw.split("|").map((column) => column.trim());
 
-    // One column per language, plus an optional price. More than that is a
-    // stray `|` inside a name, which is worth saying rather than silently
-    // dropping half of it.
-    if (columns.length < codes.length || columns.length > codes.length + 1) {
+    // One column per language, then the price if this kind has one. Anything
+    // else is a stray `|` inside a name or a missing column, and both are worth
+    // saying rather than silently dropping half a row.
+    const least = codes.length + (price === "required" ? 1 : 0);
+    const most = codes.length + (price === "none" ? 0 : 1);
+
+    if (columns.length < least || columns.length > most) {
       problems.push({
         line: at,
-        key: "options.bulkColumns",
-        params: { expected: codes.length, found: columns.length },
+        key: "bulk.columns",
+        params: { expected: least, found: columns.length },
       });
       continue;
     }
@@ -129,7 +153,7 @@ export function parseBulkChoices(
       if (value === "") {
         problems.push({
           line: at,
-          key: "options.bulkNameMissing",
+          key: "bulk.nameMissing",
           params: { code: codes[column].toUpperCase() },
         });
         named = false;
@@ -138,7 +162,7 @@ export function parseBulkChoices(
       if (value.length > TEXT.name) {
         problems.push({
           line: at,
-          key: "options.bulkNameLong",
+          key: "bulk.nameLong",
           params: { code: codes[column].toUpperCase(), max: TEXT.name },
         });
         named = false;
@@ -149,40 +173,43 @@ export function parseBulkChoices(
 
     if (!named) continue;
 
-    const typed = columns[codes.length];
-    const price = toMinorUnits(typed, decimals);
-    if (price === null) {
-      problems.push({ line: at, key: "options.bulkPrice" });
-      continue;
+    let amount: number | null = null;
+
+    if (price !== "none") {
+      amount = toMinorUnits(columns[codes.length], decimals);
+      if (amount === null) {
+        problems.push({ line: at, key: "bulk.price" });
+        continue;
+      }
+
+      const money = validatePrice(amount);
+      if (!money.ok) {
+        problems.push({ line: at, key: "bulk.priceRange" });
+        continue;
+      }
     }
 
-    const money = validatePrice(price);
-    if (!money.ok) {
-      problems.push({ line: at, key: "options.bulkPriceRange" });
-      continue;
-    }
-
-    // Within the pasted block only. Whether it collides with a choice already
-    // on the question is the database's business — `item_options_group_slug_idx`
-    // (0067) is unique per group — and repeating that rule here would be a
-    // second copy of it to drift.
+    // Within the pasted block only. Whether it collides with something already
+    // on the shop is the database's business — the slug indexes from `0067` and
+    // `0071` are unique per group and per store — and repeating those rules
+    // here would be a second copy of them to drift.
     const handle = (name[codes[0]] ?? "").toLowerCase();
     const first = seen.get(handle);
     if (first !== undefined) {
       problems.push({
         line: at,
-        key: "options.bulkDuplicate",
+        key: "bulk.duplicate",
         params: { name: name[codes[0]] ?? "", first },
       });
       continue;
     }
     seen.set(handle, at);
 
-    choices.push({ name, price });
+    rows.push({ name, price: amount });
   }
 
   if (problems.length > 0) return { ok: false, problems };
-  return { ok: true, choices };
+  return { ok: true, rows };
 }
 
 /**
@@ -209,20 +236,42 @@ function toMinorUnits(typed: string | undefined, decimals: number | null): numbe
  * hint and to the parse at once. A hint that fell behind the format would be
  * worse than none: it would be an instruction to type something that fails.
  */
-export function bulkPlaceholder(codes: string[]): string {
-  const examples: Record<string, string[]> = {
-    en: ["Small", "Medium", "Large"],
-    ar: ["صغير", "وسط", "كبير"],
+export function bulkPlaceholder(
+  codes: string[],
+  price: PriceRule,
+  kind: "sections" | "items" | "choices" = "choices",
+): string {
+  const examples: Record<string, Record<string, string[]>> = {
+    sections: {
+      en: ["Starters", "Mains", "Desserts"],
+      ar: ["المقبلات", "الأطباق الرئيسية", "الحلويات"],
+    },
+    items: {
+      en: ["Hummus", "Falafel plate", "Tabbouleh"],
+      ar: ["حمص", "صحن فلافل", "تبولة"],
+    },
+    choices: {
+      en: ["Small", "Medium", "Large"],
+      ar: ["صغير", "وسط", "كبير"],
+    },
   };
+
+  // Prices for the three example lines. Where one may be left off, the first
+  // line leaves it off — both shapes are valid, and the example is the only
+  // place that is said. Where it is required, all three carry one.
+  const prices =
+    price === "none"
+      ? ["", "", ""]
+      : price === "optional"
+        ? ["", "1.50", "3"]
+        : ["4", "6.50", "5"];
 
   return [0, 1, 2]
     .map((row) => {
       const columns = codes.map(
-        (code) => examples[code]?.[row] ?? `${code}-${row + 1}`,
+        (code) => examples[kind][code]?.[row] ?? `${code}-${row + 1}`,
       );
-      // A free first line and priced ones after it, because both shapes are
-      // valid and the example is the only place that is said.
-      return [...columns, ["", "1.50", "3"][row]].filter(Boolean).join(" | ");
+      return [...columns, prices[row]].filter(Boolean).join(" | ");
     })
     .join("\n");
 }

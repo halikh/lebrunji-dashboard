@@ -21,6 +21,8 @@ import {
   type MenuItemDraft,
   type MenuItemPatch,
   type MenuSection,
+  createMenuItems,
+  createMenuSections,
   fetchArchive,
   restoreMenuItem,
   restoreMenuSection,
@@ -135,6 +137,37 @@ export function useUpdateMenuItem(storeId: string) {
   });
 }
 
+/**
+ * Several items into one section, in one write.
+ *
+ * It says how many landed, unlike the single add, which is silent. Adding one
+ * is a row appearing where the operator is already looking; adding eleven is a
+ * block of text becoming a list, and the count is the confirmation that the
+ * paste was read the way it was meant.
+ */
+export function useCreateMenuItems(storeId: string) {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  return useMutation({
+    mutationFn: (input: {
+      sectionId: string;
+      items: { name: Localized; price: number }[];
+      sortOrder: number;
+    }) =>
+      createMenuItems(storeId, input.sectionId, input.items, input.sortOrder),
+    onSuccess: (_result, input) => {
+      void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
+      toast.success(t("bulk.addedItems", { count: input.items.length }));
+    },
+    onError: (error) => {
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      );
+    },
+  });
+}
+
 export function useArchiveMenuItem(storeId: string) {
   const queryClient = useQueryClient();
   const toast = useToasts();
@@ -170,6 +203,26 @@ export function useCreateMenuSection(storeId: string) {
       toast.success(
         t("menu.sectionAdded", { name: pickLocalized(input.draft.title) }),
       );
+    },
+    onError: (error) => {
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      );
+    },
+  });
+}
+
+/** Several sections at once. Same bargain as `useCreateMenuItems`. */
+export function useCreateMenuSections(storeId: string) {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  return useMutation({
+    mutationFn: (input: { titles: Localized[]; sortOrder: number }) =>
+      createMenuSections(storeId, input.titles, input.sortOrder),
+    onSuccess: (_result, input) => {
+      void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
+      toast.success(t("bulk.addedSections", { count: input.titles.length }));
     },
     onError: (error) => {
       toast.danger(

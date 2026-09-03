@@ -308,6 +308,55 @@ export async function createMenuItem(
   }
 }
 
+/**
+ * Adds several items to one section.
+ *
+ * **One insert, not a loop.** Eleven inserts is eleven round trips and eleven
+ * chances to stop halfway, and a half-written list is the worst outcome here:
+ * the operator cannot re-paste without duplicating whatever landed. A single
+ * statement writes every row or none.
+ *
+ * No description, no picture, no tags. Those are per-item judgements made while
+ * looking at the item, and asking for them in a pasted list would make the
+ * format wide enough that nobody would use it. The names and the prices are
+ * what a menu *is*; the rest is editing afterwards.
+ *
+ * `sortOrder` is where the first one lands and the rest follow it, in the order
+ * they were typed — which is what keeps a pasted menu in menu order rather than
+ * in whatever order the database returns.
+ */
+export async function createMenuItems(
+  storeId: string,
+  sectionId: string,
+  items: { name: Localized; price: number }[],
+  sortOrder: number,
+): Promise<void> {
+  if (items.length === 0) return;
+
+  const { error } = await getClient()
+    .from("menu_items")
+    .insert(
+      items.map((item, index) => ({
+        store_id: storeId,
+        menu_section_id: sectionId,
+        name: item.name,
+        // Absent, not empty. `localizedOrNull`'s rule: the constraint accepts a
+        // missing description and refuses an object with a locale missing.
+        description: null,
+        price: item.price,
+        is_active: true,
+        image_url: null,
+        sort_order: sortOrder + index,
+        // No `slug`: the trigger from `0070` derives one per row from the
+        // English name and makes it unique in the shop — which is also what
+        // refuses a pasted name that already exists, in one place rather than
+        // in a check this would have to keep in step.
+      })),
+    );
+
+  if (error) throw new Error(friendly(error.message));
+}
+
 export type MenuItemPatch = Partial<
   Omit<MenuItemDraft, "storeId" | "sectionId">
 > & {
@@ -394,6 +443,34 @@ export async function updateMenuSection(
     .from("menu_sections")
     .update({ title: patch.title })
     .eq("id", id);
+
+  if (error) throw new Error(friendly(error.message));
+}
+
+/**
+ * Adds several sections at once.
+ *
+ * The same bargain as `createMenuItems`, one level up: one insert, order
+ * preserved from the order they were typed, and the slug left to the trigger
+ * from `0071`. A shop's sections are the headings on its printed menu and they
+ * are known all at once, which is exactly the shape bulk entry is for.
+ */
+export async function createMenuSections(
+  storeId: string,
+  titles: Localized[],
+  sortOrder: number,
+): Promise<void> {
+  if (titles.length === 0) return;
+
+  const { error } = await getClient()
+    .from("menu_sections")
+    .insert(
+      titles.map((title, index) => ({
+        store_id: storeId,
+        title,
+        sort_order: sortOrder + index,
+      })),
+    );
 
   if (error) throw new Error(friendly(error.message));
 }

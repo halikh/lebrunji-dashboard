@@ -25,7 +25,7 @@ import {
 } from "@/lib/validation";
 
 import type { OptionGroup, OptionGroupMode } from "./api/options";
-import { bulkPlaceholder, parseBulkChoices } from "./bulk-choices";
+import { BulkForm } from "./bulk-form";
 import { useMenu } from "./use-menu";
 import {
   useCreateOptionGroup,
@@ -757,30 +757,12 @@ function TitleForm({
 }
 
 /**
- * Adding a question's answers as a list.
+ * Adding a question's answers as a pasted list.
  *
- * ## Why this is a textarea and not a repeating row of fields
- *
- * Five blank rows of three inputs is fifteen boxes and fourteen tab stops, and
- * it still has to guess how many rows to offer. The list the operator is
- * copying from — a message from the kitchen, a column of a spreadsheet — is
- * already text, so the fastest path from what they have to what the database
- * needs is a paste. Typing it out by hand is no worse than the row-of-fields
- * version either, because a line is one line rather than three focus changes.
- *
- * ## Nothing is written until every line reads
- *
- * The parse is all-or-nothing, and the reason is recoverability: a bulk add
- * that inserted the first four lines and stopped would leave the operator
- * working out which four landed, and re-pasting the list would duplicate them.
- * So the problems are listed by line number, the button is disabled while any
- * remain, and the insert is one statement — see `createItemOptions`.
- *
- * ## The count on the button is the preview
- *
- * "Add 6 choices" is a parse result rendered as a label: it says the block was
- * read the way it was meant before anything is written, which is the question
- * somebody pasting nine lines actually has.
+ * The form itself is `BulkForm`, shared with sections and items — see its note
+ * on why one component covers all three. What is local here is the rule that a
+ * choice's price may be left off, because a free extra is the common case, and
+ * the mutation that writes them.
  */
 function BulkChoices({
   groupId,
@@ -794,110 +776,31 @@ function BulkChoices({
   sortOrder: number;
   onDone: () => void;
 }) {
-  const languages = useLanguages();
-  const codes = languages.data?.map((language) => language.code) ?? [];
   const options = useItemOptions();
   const { decimalsOf } = useMoney();
-  const decimals = decimalsOf(currencyCode);
-
-  const form = useRevealOnMount<HTMLDivElement>({ focus: true });
-
-  const [text, setText] = useState("");
-
-  // Parsed on every keystroke rather than on submit. The problems are the point
-  // of the screen — an operator fixing line 7 wants to see line 7 stop being a
-  // problem, not to press a button to find out.
-  const parsed = parseBulkChoices(text, codes, decimals);
-  const ready = parsed.ok ? parsed.choices.length : 0;
-  const blank = text.trim() === "";
 
   return (
-    <div
-      ref={form}
-      className="flex flex-col gap-lg rounded-md border border-active bg-surface p-lg"
-    >
-      <div className="flex flex-col gap-xxs">
-        <h3 className="text-[15px] font-semibold">{t("options.bulkTitle")}</h3>
-        <p className="text-[13px] text-text-soft">{t("options.bulkHint")}</p>
-      </div>
-
-      <Field label={t("options.bulkPlaceholderLabel")}>
-        <textarea
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          rows={6}
-          spellCheck={false}
-          // The example is generated from the same `codes` the parser reads, so
-          // a third language adds a column to both at once — a hint that fell
-          // behind the format would be an instruction to type something that
-          // fails.
-          placeholder={bulkPlaceholder(codes)}
-          aria-invalid={(!parsed.ok && !blank) || undefined}
-          className={cx(
-            "w-full rounded-md border bg-surface p-md text-[14px] text-text",
-            // Monospace: the columns line up, so a missing bar is visible as a
-            // ragged line rather than having to be counted.
-            "font-mono placeholder:text-text-faint focus:bg-field-focus",
-            !parsed.ok && !blank ? "border-danger" : "border-border",
-          )}
-        />
-      </Field>
-
-      {!parsed.ok && (
-        <div className="flex flex-col gap-xs rounded-md bg-danger-wash/40 p-md">
-          <p className="text-[13px] font-semibold">
-            {t("options.bulkProblems")}
-          </p>
-          <ul className="flex flex-col gap-xxs">
-            {parsed.problems.map((problem) => (
-              <li
-                key={`${problem.line}-${problem.key}`}
-                className="text-[13px] text-text-soft"
-              >
-                <span className="font-semibold tabular-nums">
-                  {t("options.bulkLine", { line: problem.line })}
-                </span>
-                {" — "}
-                {t(problem.key, problem.params)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-sm">
-        <span className="min-w-0 flex-grow text-[13px] text-text-faint">
-          {blank
-            ? t("options.bulkNothing")
-            : parsed.ok
-              ? t("options.bulkReady", { count: ready })
-              : ""}
-        </span>
-
-        <Button
-          variant="secondary"
-          onClick={onDone}
-          disabled={options.addMany.isPending}
-        >
-          {t("common.cancel")}
-        </Button>
-        <Button
-          disabled={!parsed.ok || ready === 0}
-          pending={options.addMany.isPending}
-          onClick={() => {
-            if (!parsed.ok) return;
-            options.addMany.mutate(
-              { groupId, choices: parsed.choices, sortOrder },
-              { onSuccess: onDone },
-            );
-          }}
-        >
-          {ready === 1
-            ? t("options.bulkSubmitOne")
-            : t("options.bulkSubmit", { count: ready })}
-        </Button>
-      </div>
-    </div>
+    <BulkForm
+      kind="choices"
+      price="optional"
+      decimals={decimalsOf(currencyCode)}
+      pending={options.addMany.isPending}
+      onCancel={onDone}
+      onSubmit={(rows) =>
+        options.addMany.mutate(
+          {
+            groupId,
+            // Never null under the `optional` rule: an absent price is free.
+            choices: rows.map((row) => ({
+              name: row.name,
+              price: row.price ?? 0,
+            })),
+            sortOrder,
+          },
+          { onSuccess: onDone },
+        )
+      }
+    />
   );
 }
 

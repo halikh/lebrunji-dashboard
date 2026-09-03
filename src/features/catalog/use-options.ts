@@ -157,7 +157,7 @@ export function useItemOptions() {
     }) => createItemOptions(input.groupId, input.choices, input.sortOrder),
     onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: ["options"] });
-      toast.success(t("options.bulkAdded", { count: input.choices.length }));
+      toast.success(t("bulk.addedChoices", { count: input.choices.length }));
     },
     onError: settle.onError,
   });
