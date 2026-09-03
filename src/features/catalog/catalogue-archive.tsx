@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
-import { Button } from "@/components/ui";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ROW_STATIC } from "@/components/ui/row";
 import { FilterTab, tabArrowHandler } from "@/components/ui/tab";
@@ -28,9 +28,14 @@ import { useCatalogueArchive, useCatalogueRestore } from "./use-archive";
  *
  * All four tables carry a `deleted_at` and nothing is ever removed: a shop is
  * referenced by every order placed at it, a tag by the dishes wearing it, a
- * promotion by its redemptions. So "Bring back" is the whole vocabulary — there
- * is no delete to sit beside it and no confirmation to ask, because restoring
- * is the reversal, not the risk.
+ * promotion by its redemptions. So "Bring back" is the whole vocabulary, with
+ * no delete beside it.
+ *
+ * It still asks before it acts. Restoring is reversible, so the dialog is not
+ * there to prevent a loss — it is there because the action is **outward-facing**
+ * and the rows are identical: a restored shop is orderable by customers the
+ * moment it lands, and naming the thing in the question is what catches the
+ * click that landed one row off.
  *
  * ## A shop says which category it would return to
  *
@@ -156,9 +161,10 @@ export function CatalogueArchive() {
                 })}
               />
               <Restore
-                pending={restore.category.isPending}
-                onClick={() =>
-                  restore.category.mutate({
+                name={pickLocalized(category.name)}
+                body="archive.restoreCategory"
+                onConfirm={() =>
+                  restore.category.mutateAsync({
                     id: category.id,
                     name: pickLocalized(category.name),
                   })
@@ -194,9 +200,10 @@ export function CatalogueArchive() {
                 </Blocked>
               ) : (
                 <Restore
-                  pending={restore.store.isPending}
-                  onClick={() =>
-                    restore.store.mutate({
+                  name={pickLocalized(store.name)}
+                  body="archive.restoreStore"
+                  onConfirm={() =>
+                    restore.store.mutateAsync({
                       id: store.id,
                       name: pickLocalized(store.name),
                     })
@@ -226,9 +233,10 @@ export function CatalogueArchive() {
                 })}
               />
               <Restore
-                pending={restore.tag.isPending}
-                onClick={() =>
-                  restore.tag.mutate({
+                name={pickLocalized(tag.name)}
+                body="archive.restoreTag"
+                onConfirm={() =>
+                  restore.tag.mutateAsync({
                     id: tag.id,
                     name: pickLocalized(tag.name),
                   })
@@ -255,9 +263,10 @@ export function CatalogueArchive() {
                 })}
               />
               <Restore
-                pending={restore.promotion.isPending}
-                onClick={() =>
-                  restore.promotion.mutate({
+                name={promotion.slug}
+                body="archive.restorePromotion"
+                onConfirm={() =>
+                  restore.promotion.mutateAsync({
                     id: promotion.id,
                     name: promotion.slug,
                   })
@@ -344,23 +353,41 @@ function Group({
   );
 }
 
-/** Mint — the theme's "going well", the same button the drivers list uses. */
+/**
+ * Bringing one thing back, after a question.
+ *
+ * What earns a dialog on a *reversible* action is that it is outward-facing: a
+ * restored shop is orderable by customers the moment it lands, and the row
+ * clicked is one of a column of identical rows. The question names the thing,
+ * which is what catches the case a confirmation exists for — the wrong row.
+ *
+ * Mint on the confirm button, because coral is the ordinary go-on and red is a
+ * warning, and this is neither. `body` differs per kind because what happens
+ * differs per kind — see the strings.
+ */
 function Restore({
-  pending,
-  onClick,
+  name,
+  body,
+  onConfirm,
 }: {
-  pending: boolean;
-  onClick: () => void;
+  /** The thing's own name, so the question is about the row that was clicked. */
+  name: string;
+  body: TranslationKey;
+  onConfirm: () => Promise<void>;
 }) {
   return (
-    <Button
+    <ConfirmButton
+      onConfirm={onConfirm}
+      titleKey="archive.restoreTitle"
+      bodyKey={body}
+      confirmKey="archive.restoreConfirm"
+      params={{ name }}
       variant="accent"
+      triggerVariant="accent"
       size="sm"
       className="shrink-0"
-      pending={pending}
-      onClick={onClick}
     >
       {t("archive.restore")}
-    </Button>
+    </ConfirmButton>
   );
 }

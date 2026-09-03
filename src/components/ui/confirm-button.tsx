@@ -68,8 +68,15 @@ export function ConfirmButton({
    * they clicked the wrong row — which is the case a confirmation exists for.
    */
   params?: Params;
-  /** The *confirm* button's variant. The trigger keeps its own look. */
-  variant?: "danger" | "primary";
+  /**
+   * The *confirm* button's variant. The trigger keeps its own look.
+   *
+   * `accent` is mint, the theme's "going well", for a question whose answer
+   * *restores* something — bringing a shop back, lifting a withdrawal. Coral
+   * would read as the ordinary go-on and red as a warning, and neither is what
+   * "put this back" is.
+   */
+  variant?: "danger" | "primary" | "accent";
   children: ReactNode;
   size?: "md" | "sm";
   fullWidth?: boolean;
@@ -103,7 +110,12 @@ export function ConfirmButton({
    *   screen whose whole purpose is that one button.
    */
   triggerVariant?:
-    "quiet" | "secondary" | "primary" | "danger" | "danger-quiet";
+    | "quiet"
+    | "secondary"
+    | "primary"
+    | "danger"
+    | "danger-quiet"
+    | "accent";
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);

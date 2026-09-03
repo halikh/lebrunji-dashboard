@@ -983,6 +983,25 @@ const en = {
     inQuestion: "{question} · {dish}",
     archivedOn: "Archived {when}",
     restore: "Bring back",
+    /*
+      Confirmations on every "Bring back".
+
+      Each says what will *happen*, not "Are you sure?" — the component's own
+      rule, and the reason is that a question with no information in it is the
+      kind people learn to dismiss. What happens differs by kind, so there is a
+      sentence per kind rather than one that has to be vague enough to cover a
+      tag and a shop at once.
+    */
+    restoreTitle: "Bring {name} back?",
+    restoreSection: "It appears on the menu again. Dishes archived inside it stay archived until you bring those back too.",
+    restoreItem: "It appears on the menu again and customers can order it.",
+    restoreGroup: "It is asked again whenever this dish is ordered.",
+    restoreOption: "It is offered again as an answer to this question.",
+    restoreStore: "It appears in the app again and customers can order from it.",
+    restoreCategory: "It appears in the app again, with whatever shops you bring back into it.",
+    restoreTag: "It can be put on dishes again, and reappears on any that still carry it.",
+    restorePromotion: "It runs again if its dates still allow — check them, because they come back exactly as they were.",
+    restoreConfirm: "Bring it back",
     // The refusal. A dish restored into an archived section is listed by
     // neither the dashboard nor the app, so it is refused rather than mislaid.
     sectionGoneFirst: "Bring back {name} first — a dish cannot return to an archived section.",
@@ -1056,16 +1075,75 @@ const en = {
     extraCost: "Adds",
     extraCostHint: "Added to the dish's price. Leave at 0 for a free choice.",
     addOption: "Add choice",
+    // Bulk entry. A question's answers arrive as a set — three sizes, six
+    // extras — and adding them one at a time is the menu-building job at its
+    // most tedious. The operator usually has the list already.
+    bulkAdd: "Paste a list",
+    bulkTitle: "Several choices at once",
+    bulkHint:
+      "One choice per line, columns separated by a vertical bar. The price is last and can be left off — a choice with no price is free.",
+    bulkPlaceholderLabel: "Your list",
+    bulkSubmit: "Add {count} choices",
+    bulkSubmitOne: "Add 1 choice",
+    bulkAdded: "{count} choices added",
+    bulkNothing: "Nothing to add yet — type or paste a list above.",
+    bulkReady: "{count} ready to add",
+    // Problems, one per line, named by the line as it was typed.
+    bulkProblems: "Fix these lines first",
+    bulkLine: "Line {line}",
+    bulkColumns:
+      "Expected {expected} columns separated by | , found {found}.",
+    bulkNameMissing: "The {code} name is empty.",
+    bulkNameLong: "The {code} name is longer than {max} characters.",
+    bulkPrice: "The price is not a number.",
+    bulkPriceRange: "That price is out of range.",
+    bulkDuplicate: "\"{name}\" is already on line {first}.",
     // Names the question, because a dish has several and the buttons are
     // otherwise identical down the page.
     addChoiceTo: "Add a choice to {name}",
     choices: "Choices",
     noChoices: "No choices yet. Add the first one below.",
+    // Not the same state as having none, and the difference matters: told this
+    // question was empty, an operator would re-add the choices it already has
+    // — and the unique slug per group (0067) would refuse them with a message
+    // about a constraint.
+    allWithdrawn:
+      "Every choice here is withdrawn. Bring them back from the Archive tab, or add new ones below.",
     // "Withdrawn", not "deleted". These rows are referenced by past orders
     // forever and are never removed; what changes is whether the shop still
     // offers them, and that is reversible.
     offeredGroup: "Offered",
     withdrawn: "Withdrawn",
+    /*
+      Both directions of the switch ask, and they ask different things.
+
+      Withdrawing changes what a customer sees on a shop that is open and taking
+      orders, and the failure is silent from this side: nothing looks wrong here,
+      and what is discovered later is that a dish stopped selling because the
+      size question vanished from it. Nobody undoes a mistake they did not
+      notice — so the moment to catch it is before it happens, not after.
+
+      Each direction also says where it goes, because withdrawing now *moves*
+      the row to the Archive tab rather than leaving it greyed out here.
+    */
+    withdrawGroupTitle: "Withdraw {name}?",
+    withdrawGroupBody:
+      "Customers stop being asked it. It moves to the Archive tab, where you can bring it back.",
+    withdrawGroupConfirm: "Withdraw it",
+    offerGroupTitle: "Offer {name} again?",
+    offerGroupBody: "Customers are asked it again whenever this dish is ordered.",
+    offerGroupConfirm: "Offer it",
+    withdrawChoiceTitle: "Withdraw {name}?",
+    withdrawChoiceBody:
+      "Customers stop being able to pick it. It moves to the Archive tab, where you can bring it back.",
+    withdrawChoiceConfirm: "Withdraw it",
+    offerChoiceTitle: "Offer {name} again?",
+    offerChoiceBody: "Customers can pick it again as an answer to this question.",
+    offerChoiceConfirm: "Offer it",
+    // Said once at the top of a dish's questions, so the absence of the
+    // withdrawn ones is a fact on screen rather than something to work out.
+    withdrawnElsewhere:
+      "Withdrawn questions and choices are on the Archive tab.",
     isDefault: "Default",
     makeDefault: "Make default",
     failedTitle: "Could not load the options",

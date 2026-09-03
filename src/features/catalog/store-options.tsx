@@ -11,6 +11,7 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { useRevealOnMount } from "@/components/ui/reveal";
 import { Select } from "@/components/ui/select";
+import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Toggle } from "@/components/ui/toggle";
 import { useMoney } from "@/features/reference/use-currencies";
 import { useLanguages } from "@/features/reference/use-languages";
@@ -24,6 +25,7 @@ import {
 } from "@/lib/validation";
 
 import type { OptionGroup, OptionGroupMode } from "./api/options";
+import { bulkPlaceholder, parseBulkChoices } from "./bulk-choices";
 import { useMenu } from "./use-menu";
 import {
   useCreateOptionGroup,
@@ -178,6 +180,23 @@ function ItemQuestions({
    */
   const [open, setOpen] = useState<string | null>(null);
 
+  /**
+   * Only the questions this dish still asks.
+   *
+   * Withdrawn ones used to sit here greyed out, and the reason given was that a
+   * withdrawn question with nowhere to go could never be brought back. That is
+   * no longer true: the Archive tab lists them and restores them. Leaving them
+   * here as well would put the same row in two places — one of which is a list
+   * whose whole job is to say *what this dish asks*, a question a withdrawn row
+   * answers wrongly.
+   *
+   * The fetch still returns them, deliberately. It is the archive's source too,
+   * and a `is_active` filter in the query would make this screen right and that
+   * one empty.
+   */
+  const offered = (groups.data ?? []).filter((group) => group.isActive);
+  const withdrawn = (groups.data ?? []).length - offered.length;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
@@ -198,13 +217,21 @@ function ItemQuestions({
           </p>
         )}
 
-        {groups.isSuccess && groups.data.length === 0 && !adding && (
+        {groups.isSuccess && offered.length === 0 && !adding && (
           <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
             {t("options.noQuestions")}
           </p>
         )}
 
-        {groups.data?.map((group) => (
+        {/* Said only when something is actually missing from the list, so it is
+            an explanation rather than a standing notice nobody reads. */}
+        {withdrawn > 0 && (
+          <p className="ps-md text-[13px] text-text-faint">
+            {t("options.withdrawnElsewhere")}
+          </p>
+        )}
+
+        {offered.map((group) => (
           <Question
             key={group.id}
             group={group}
@@ -252,7 +279,14 @@ function Question({
   const update = useUpdateOptionGroup();
   const options = useItemOptions();
 
-  const [addingChoice, setAddingChoice] = useState(false);
+  /**
+   * How choices are being added: not at all, one at a time, or as a list.
+   *
+   * One state rather than two booleans. They are mutually exclusive — a form
+   * and a paste box open together would be two Add buttons doing nearly the
+   * same thing — and two booleans is a fourth state that means nothing.
+   */
+  const [adding, setAdding] = useState<"none" | "one" | "bulk">("none");
   /** Which answer is being corrected. One at a time — a row is either a row or
       a form, and two open forms in a list is two places to press Save. */
   const [editingChoice, setEditingChoice] = useState<string | null>(null);
@@ -267,6 +301,16 @@ function Question({
    */
   const [added, setAdded] = useState(0);
   const currencyCode = store.data?.currencyCode ?? "";
+
+  /**
+   * Only the answers this question still offers.
+   *
+   * Same reasoning as the question list above: a withdrawn choice lives on the
+   * Archive tab now, and a list of what a question asks should not include the
+   * answers it stopped asking. The count on the collapsed summary follows it,
+   * or the header would promise choices the expanded list does not show.
+   */
+  const choices = group.options.filter((option) => option.isActive);
 
   return (
     <section
@@ -325,7 +369,7 @@ function Question({
                     ? "options.required"
                     : "options.optional",
                 ),
-                t("options.count", { count: group.options.length }),
+                t("options.count", { count: choices.length }),
               ].join(" · ")}
             </span>
           </span>
@@ -347,16 +391,32 @@ function Question({
         >
           {t("options.renameGroup")}
         </Button>
-        <Toggle
+        {/* Asks first, both ways. Withdrawing a question changes what a
+            customer is shown on a shop that is open and taking orders, and the
+            failure is silent from this side — what gets noticed later is that a
+            dish stopped selling. It is also one switch in a column of identical
+            switches, which makes the wrong row the easiest slip here. */}
+        <ConfirmToggle
           on={group.isActive}
           onChange={() =>
-            update.mutate({
+            update.mutateAsync({
               id: group.id,
               patch: { isActive: !group.isActive },
             })
           }
           labelOn={t("options.offeredGroup")}
           labelOff={t("options.withdrawn")}
+          params={{ name: pickLocalized(group.title) }}
+          whenTurningOn={{
+            titleKey: "options.offerGroupTitle",
+            bodyKey: "options.offerGroupBody",
+            confirmKey: "options.offerGroupConfirm",
+          }}
+          whenTurningOff={{
+            titleKey: "options.withdrawGroupTitle",
+            bodyKey: "options.withdrawGroupBody",
+            confirmKey: "options.withdrawGroupConfirm",
+          }}
           className="w-[124px]"
         />
       </div>
@@ -447,13 +507,21 @@ function Question({
           </div>
 
           <div className="flex flex-col gap-sm">
-            {group.options.length === 0 && (
+            {choices.length === 0 && (
               <p className="ps-md text-[13px] text-text-faint">
-                {t("options.noChoices")}
+                {/* "None" and "none left showing" are different states. Telling
+                    an operator a question is empty when its three choices are
+                    withdrawn invites them to type those three in again, and the
+                    unique slug per group would refuse each one. */}
+                {t(
+                  group.options.length === 0
+                    ? "options.noChoices"
+                    : "options.allWithdrawn",
+                )}
               </p>
             )}
 
-            {group.options.map((option) =>
+            {choices.map((option) =>
               editingChoice === option.id ? (
                 <ChoiceForm
                   key={option.id}
@@ -528,16 +596,27 @@ function Question({
                     {t("options.editChoice")}
                   </Button>
 
-                  <Toggle
+                  <ConfirmToggle
                     on={option.isActive}
                     onChange={() =>
-                      options.edit.mutate({
+                      options.edit.mutateAsync({
                         id: option.id,
                         patch: { isActive: !option.isActive },
                       })
                     }
                     labelOn={t("options.offeredGroup")}
                     labelOff={t("options.withdrawn")}
+                    params={{ name: pickLocalized(option.name) }}
+                    whenTurningOn={{
+                      titleKey: "options.offerChoiceTitle",
+                      bodyKey: "options.offerChoiceBody",
+                      confirmKey: "options.offerChoiceConfirm",
+                    }}
+                    whenTurningOff={{
+                      titleKey: "options.withdrawChoiceTitle",
+                      bodyKey: "options.withdrawChoiceBody",
+                      confirmKey: "options.withdrawChoiceConfirm",
+                    }}
                     className="w-[124px]"
                   />
                 </div>
@@ -548,7 +627,14 @@ function Question({
             a place to press, not a form sitting open. A permanently visible
             form under a list reads as a row of it, and on a dish with four
             questions it is four forms nobody is filling in. */}
-            {addingChoice ? (
+            {adding === "bulk" ? (
+              <BulkChoices
+                groupId={group.id}
+                currencyCode={currencyCode}
+                sortOrder={group.options.length}
+                onDone={() => setAdding("none")}
+              />
+            ) : adding === "one" ? (
               <ChoiceForm
                 key={added}
                 currencyCode={currencyCode}
@@ -566,28 +652,39 @@ function Question({
                     { onSuccess: () => setAdded((count) => count + 1) },
                   )
                 }
-                onCancel={() => setAddingChoice(false)}
+                onCancel={() => setAdding("none")}
               />
             ) : (
-              <button
-                type="button"
-                onClick={() => setAddingChoice(true)}
-                className="flex w-full items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-soft hover:border-primary hover:text-primary"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  aria-hidden
+              <div className="flex flex-wrap items-center gap-sm">
+                <button
+                  type="button"
+                  onClick={() => setAdding("one")}
+                  className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-soft hover:border-primary hover:text-primary"
                 >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                {t("options.addChoiceTo", { name: pickLocalized(group.title) })}
-              </button>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    aria-hidden
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  {t("options.addChoiceTo", {
+                    name: pickLocalized(group.title),
+                  })}
+                </button>
+
+                {/* Beside the one-at-a-time button rather than inside the form,
+                    because they are two ways to start the same job and the
+                    choice between them is made before either is open. */}
+                <Button variant="secondary" onClick={() => setAdding("bulk")}>
+                  {t("options.bulkAdd")}
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -653,6 +750,151 @@ function TitleForm({
         </Button>
         <Button onClick={submit} pending={pending}>
           {t("options.saveTitle")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Adding a question's answers as a list.
+ *
+ * ## Why this is a textarea and not a repeating row of fields
+ *
+ * Five blank rows of three inputs is fifteen boxes and fourteen tab stops, and
+ * it still has to guess how many rows to offer. The list the operator is
+ * copying from — a message from the kitchen, a column of a spreadsheet — is
+ * already text, so the fastest path from what they have to what the database
+ * needs is a paste. Typing it out by hand is no worse than the row-of-fields
+ * version either, because a line is one line rather than three focus changes.
+ *
+ * ## Nothing is written until every line reads
+ *
+ * The parse is all-or-nothing, and the reason is recoverability: a bulk add
+ * that inserted the first four lines and stopped would leave the operator
+ * working out which four landed, and re-pasting the list would duplicate them.
+ * So the problems are listed by line number, the button is disabled while any
+ * remain, and the insert is one statement — see `createItemOptions`.
+ *
+ * ## The count on the button is the preview
+ *
+ * "Add 6 choices" is a parse result rendered as a label: it says the block was
+ * read the way it was meant before anything is written, which is the question
+ * somebody pasting nine lines actually has.
+ */
+function BulkChoices({
+  groupId,
+  currencyCode,
+  sortOrder,
+  onDone,
+}: {
+  groupId: string;
+  /** The shop's currency — what the prices in the list are denominated in. */
+  currencyCode: string;
+  sortOrder: number;
+  onDone: () => void;
+}) {
+  const languages = useLanguages();
+  const codes = languages.data?.map((language) => language.code) ?? [];
+  const options = useItemOptions();
+  const { decimalsOf } = useMoney();
+  const decimals = decimalsOf(currencyCode);
+
+  const form = useRevealOnMount<HTMLDivElement>({ focus: true });
+
+  const [text, setText] = useState("");
+
+  // Parsed on every keystroke rather than on submit. The problems are the point
+  // of the screen — an operator fixing line 7 wants to see line 7 stop being a
+  // problem, not to press a button to find out.
+  const parsed = parseBulkChoices(text, codes, decimals);
+  const ready = parsed.ok ? parsed.choices.length : 0;
+  const blank = text.trim() === "";
+
+  return (
+    <div
+      ref={form}
+      className="flex flex-col gap-lg rounded-md border border-active bg-surface p-lg"
+    >
+      <div className="flex flex-col gap-xxs">
+        <h3 className="text-[15px] font-semibold">{t("options.bulkTitle")}</h3>
+        <p className="text-[13px] text-text-soft">{t("options.bulkHint")}</p>
+      </div>
+
+      <Field label={t("options.bulkPlaceholderLabel")}>
+        <textarea
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          rows={6}
+          spellCheck={false}
+          // The example is generated from the same `codes` the parser reads, so
+          // a third language adds a column to both at once — a hint that fell
+          // behind the format would be an instruction to type something that
+          // fails.
+          placeholder={bulkPlaceholder(codes)}
+          aria-invalid={(!parsed.ok && !blank) || undefined}
+          className={cx(
+            "w-full rounded-md border bg-surface p-md text-[14px] text-text",
+            // Monospace: the columns line up, so a missing bar is visible as a
+            // ragged line rather than having to be counted.
+            "font-mono placeholder:text-text-faint focus:bg-field-focus",
+            !parsed.ok && !blank ? "border-danger" : "border-border",
+          )}
+        />
+      </Field>
+
+      {!parsed.ok && (
+        <div className="flex flex-col gap-xs rounded-md bg-danger-wash/40 p-md">
+          <p className="text-[13px] font-semibold">
+            {t("options.bulkProblems")}
+          </p>
+          <ul className="flex flex-col gap-xxs">
+            {parsed.problems.map((problem) => (
+              <li
+                key={`${problem.line}-${problem.key}`}
+                className="text-[13px] text-text-soft"
+              >
+                <span className="font-semibold tabular-nums">
+                  {t("options.bulkLine", { line: problem.line })}
+                </span>
+                {" — "}
+                {t(problem.key, problem.params)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-sm">
+        <span className="min-w-0 flex-grow text-[13px] text-text-faint">
+          {blank
+            ? t("options.bulkNothing")
+            : parsed.ok
+              ? t("options.bulkReady", { count: ready })
+              : ""}
+        </span>
+
+        <Button
+          variant="secondary"
+          onClick={onDone}
+          disabled={options.addMany.isPending}
+        >
+          {t("common.cancel")}
+        </Button>
+        <Button
+          disabled={!parsed.ok || ready === 0}
+          pending={options.addMany.isPending}
+          onClick={() => {
+            if (!parsed.ok) return;
+            options.addMany.mutate(
+              { groupId, choices: parsed.choices, sortOrder },
+              { onSuccess: onDone },
+            );
+          }}
+        >
+          {ready === 1
+            ? t("options.bulkSubmitOne")
+            : t("options.bulkSubmit", { count: ready })}
         </Button>
       </div>
     </div>

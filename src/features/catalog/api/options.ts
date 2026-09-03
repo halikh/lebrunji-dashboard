@@ -103,10 +103,18 @@ export async function fetchOptionCounts(
 /**
  * One dish's groups, with their options — **including withdrawn ones**.
  *
- * The app filters to what is offered; this is the screen that *decides* what is
- * offered, so it has to show the rest. A withdrawn option that vanished from
- * here could never be brought back, and "where did the large size go" would
- * have no answer on the page that took it away.
+ * The app filters to what is offered. This read does not, because it feeds two
+ * screens: the Options tab, which lists what a dish still asks, and the Archive
+ * tab, which lists what it stopped asking and puts it back.
+ *
+ * The Options screen filters to `is_active` itself. It used to show withdrawn
+ * rows greyed out, on the reasoning that one which vanished could never be
+ * brought back — true until the archive existed, and wrong now: it put the same
+ * row in two places, one of which is a list whose whole job is to say what this
+ * dish asks.
+ *
+ * The filter is deliberately **not** in this query. An `is_active` clause here
+ * would make that screen right and leave the archive empty.
  */
 export async function fetchItemOptionGroups(
   itemId: string,
@@ -201,6 +209,40 @@ export async function createItemOption(
     price,
     sort_order: sortOrder,
   });
+  if (error) throw new Error(friendly(error.message));
+}
+
+/**
+ * Adds several choices at once.
+ *
+ * **One insert, not a loop.** A loop of six inserts is six round trips and six
+ * chances to stop halfway — and a half-inserted list is the worst outcome
+ * available here, because the operator cannot re-paste it without duplicating
+ * whatever landed. A single statement either writes every row or writes none.
+ *
+ * `sortOrder` is the position the first one takes; the rest follow it, in the
+ * order they were typed. That is what makes a pasted list keep its order, which
+ * for sizes is the difference between small-medium-large and an alphabetical
+ * accident.
+ */
+export async function createItemOptions(
+  groupId: string,
+  choices: { name: Localized; price: number }[],
+  sortOrder: number,
+): Promise<void> {
+  if (choices.length === 0) return;
+
+  const { error } = await getClient()
+    .from("item_options")
+    .insert(
+      choices.map((choice, index) => ({
+        option_group_id: groupId,
+        name: choice.name,
+        price: choice.price,
+        sort_order: sortOrder + index,
+      })),
+    );
+
   if (error) throw new Error(friendly(error.message));
 }
 

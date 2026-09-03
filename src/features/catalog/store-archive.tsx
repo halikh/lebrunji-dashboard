@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
-import { Button } from "@/components/ui";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ROW_STATIC } from "@/components/ui/row";
 import { FilterTab, tabArrowHandler } from "@/components/ui/tab";
@@ -190,9 +190,10 @@ export function StoreArchive({ storeId }: { storeId: string }) {
                 </span>
               </span>
               <Restore
-                pending={restore.section.isPending}
-                onClick={() =>
-                  restore.section.mutate({
+                name={pickLocalized(section.title)}
+                body="archive.restoreSection"
+                onConfirm={() =>
+                  restore.section.mutateAsync({
                     id: section.id,
                     name: section.title,
                   })
@@ -240,9 +241,10 @@ export function StoreArchive({ storeId }: { storeId: string }) {
                 </span>
               ) : (
                 <Restore
-                  pending={restore.item.isPending}
-                  onClick={() =>
-                    restore.item.mutate({ id: item.id, name: item.name })
+                  name={pickLocalized(item.name)}
+                  body="archive.restoreItem"
+                  onConfirm={() =>
+                    restore.item.mutateAsync({ id: item.id, name: item.name })
                   }
                 />
               )}
@@ -265,9 +267,13 @@ export function StoreArchive({ storeId }: { storeId: string }) {
                 </span>
               </span>
               <Restore
-                pending={restore.group.isPending}
-                onClick={() =>
-                  restore.group.mutate({ id: group.id, name: group.title })
+                name={pickLocalized(group.title)}
+                body="archive.restoreGroup"
+                onConfirm={() =>
+                  restore.group.mutateAsync({
+                    id: group.id,
+                    name: group.title,
+                  })
                 }
               />
             </div>
@@ -299,9 +305,13 @@ export function StoreArchive({ storeId }: { storeId: string }) {
               </span>
 
               <Restore
-                pending={restore.option.isPending}
-                onClick={() =>
-                  restore.option.mutate({ id: option.id, name: option.name })
+                name={pickLocalized(option.name)}
+                body="archive.restoreOption"
+                onConfirm={() =>
+                  restore.option.mutateAsync({
+                    id: option.id,
+                    name: option.name,
+                  })
                 }
               />
             </div>
@@ -341,26 +351,50 @@ function Group({
 }
 
 /**
- * Mint, the theme's "going well" — the same button the drivers list uses to
- * bring somebody back. Restoring is the one action on this screen and it is a
- * restoration, so it should not be wearing the neutral grey of a Cancel.
+ * Bringing one thing back, after a question.
+ *
+ * ## Why it asks at all
+ *
+ * Restoring is reversible — re-archiving is one press — so by the strict
+ * reading of `ConfirmButton`'s own rule this could be a bare button. What earns
+ * the dialog is that it is **outward-facing**: a restored dish is orderable by
+ * customers the moment it lands, and the row that was clicked is one of a
+ * column of identical rows. The question names the thing, which is what catches
+ * the case a confirmation actually exists for — the wrong row.
+ *
+ * ## And why the confirm button is mint
+ *
+ * Coral is the ordinary go-on and red is a warning; this is neither. The dialog
+ * puts something back, and the last thing read before pressing should look like
+ * what it does. `body` differs per kind because what happens differs per kind:
+ * a section comes back empty, a choice comes back as an answer.
  */
 function Restore({
-  pending,
-  onClick,
+  name,
+  body,
+  onConfirm,
 }: {
-  pending: boolean;
-  onClick: () => void;
+  /** The thing's own name, so the question is about the row that was clicked. */
+  name: string;
+  /** What comes back, said per kind — see the note above. */
+  body: TranslationKey;
+  onConfirm: () => Promise<void>;
 }) {
   return (
-    <Button
+    <ConfirmButton
+      onConfirm={onConfirm}
+      titleKey="archive.restoreTitle"
+      bodyKey={body}
+      confirmKey="archive.restoreConfirm"
+      params={{ name }}
       variant="accent"
+      // Filled, like every other row-level action here. A quiet trigger in a
+      // column of rows reads as a footnote rather than as the one control.
+      triggerVariant="accent"
       size="sm"
       className="shrink-0"
-      pending={pending}
-      onClick={onClick}
     >
       {t("archive.restore")}
-    </Button>
+    </ConfirmButton>
   );
 }
