@@ -198,7 +198,14 @@ export function useStoreQuestions(storeId: string) {
  * removed" is arithmetic they would have to do to know whether they got what
  * they meant.
  */
-export function useSetQuestionItems(storeId: string) {
+/*
+ * No `storeId`, for the reason the three hooks above record: everything this
+ * touches is invalidated by the `["options"]` prefix, and a shop id threaded
+ * through would be a parameter that exists only to be ignored — which the first
+ * reader to notice would wire into a narrower invalidation, leaving the counts
+ * stale.
+ */
+export function useSetQuestionItems() {
   const queryClient = useQueryClient();
   const toast = useToasts();
 

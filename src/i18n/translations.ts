@@ -1082,6 +1082,10 @@ const en = {
     usedOnOne: "on 1 item",
     usedOnNone: "not asked anywhere",
     choices: "{count} choices",
+    // Above the answers, because this is the screen where an edit is least
+    // obviously not local — the whole point is that it is not.
+    editsEverywhere:
+      "Editing a choice here changes it on all {count} items asking this question.",
     noChoices: "no choices yet",
     manage: "Choose items",
     withdrawnMark: "Withdrawn",
