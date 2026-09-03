@@ -24,14 +24,15 @@ import {
   type Localized,
 } from "@/lib/validation";
 
-import type { OptionGroup, OptionGroupMode } from "./api/options";
+import type { OptionGroupMode, StoreQuestion } from "./api/options";
 import { BulkForm } from "./bulk-form";
 import { useMenu } from "./use-menu";
 import {
   useCreateOptionGroup,
-  useItemOptionGroups,
   useItemOptions,
   useOptionCounts,
+  useSetQuestionItems,
+  useStoreQuestions,
   useUpdateOptionGroup,
 } from "./use-options";
 import { useStore } from "./use-stores";
@@ -69,6 +70,7 @@ export function StoreOptions({ storeId }: { storeId: string }) {
 
   const menu = useMenu(storeId);
   const counts = useOptionCounts(storeId);
+  const store = useStore(storeId);
 
   const sections = menu.data ?? [];
   const sectionId = params.get("section");
@@ -138,35 +140,60 @@ export function StoreOptions({ storeId }: { storeId: string }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col border-t border-border lg:border-s lg:border-t-0">
-        {item ? (
-          <ItemQuestions
-            key={item.id}
-            storeId={storeId}
-            itemId={item.id}
-            itemName={pickLocalized(item.name)}
-          />
-        ) : (
-          <p className="p-xxl text-[14px] text-text-faint">
-            {section ? t("options.pickItem") : t("options.pickSection")}
-          </p>
-        )}
+        {/* Always a list. It used to say "pick a section" into an empty panel,
+            which was the only thing this screen could do before a question
+            could be asked on more than one item — there was no shop-wide view
+            for it to fall back to. Now there is, and it is the default. */}
+        <ItemQuestions
+          key={item?.id ?? "all"}
+          storeId={storeId}
+          itemId={item?.id ?? null}
+          itemName={
+            item
+              ? pickLocalized(item.name)
+              : store.data
+                ? pickLocalized(store.data.name)
+                : ""
+          }
+        />
       </div>
     </div>
   );
 }
 
-/** Every question asked about one dish. */
+/**
+ * Every question this shop asks, narrowed to one item when one is picked.
+ *
+ * ## Why one list and not two screens
+ *
+ * There were two: an Options tab that started from an item and showed its
+ * questions, and a Common options tab that started from a question and showed
+ * its items. Same rows, opposite directions — and the split meant repricing a
+ * choice was done in one place while deciding who asks about it was done in
+ * another, with no way to see both facts at once.
+ *
+ * So the selects on the left became a **filter** rather than the way in. With
+ * nothing picked this is the shop's questions; pick a section and it narrows;
+ * pick an item and it is that item's, which is exactly what the old Options tab
+ * showed. Nothing was taken away — the previous view is one selection deep.
+ */
 function ItemQuestions({
   storeId,
   itemId,
   itemName,
 }: {
   storeId: string;
-  itemId: string;
+  /** Null when no item is picked: the list is then the whole shop's. */
+  itemId: string | null;
+  /** The heading — the item's name, or the shop's own. */
   itemName: string;
 }) {
-  const groups = useItemOptionGroups(itemId);
+  const groups = useStoreQuestions(storeId);
+  const menu = useMenu(storeId);
+  const setItems = useSetQuestionItems();
   const [adding, setAdding] = useState(false);
+  /** Which question's item picker is open. One at a time — it is a menu. */
+  const [picking, setPicking] = useState<string | null>(null);
 
   /**
    * Which question is open, or none.
@@ -194,8 +221,11 @@ function ItemQuestions({
    * and a `is_active` filter in the query would make this screen right and that
    * one empty.
    */
-  const offered = (groups.data ?? []).filter((group) => group.isActive);
-  const withdrawn = (groups.data ?? []).length - offered.length;
+  const shown = (groups.data ?? []).filter(
+    (group) => itemId === null || group.itemIds.includes(itemId),
+  );
+  const offered = shown.filter((group) => group.isActive);
+  const withdrawn = shown.length - offered.length;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -231,17 +261,42 @@ function ItemQuestions({
           </p>
         )}
 
-        {offered.map((group) => (
-          <Question
-            key={group.id}
-            group={group}
-            storeId={storeId}
-            open={open === group.id}
-            onToggle={() =>
-              setOpen((current) => (current === group.id ? null : group.id))
-            }
-          />
-        ))}
+        {offered.map((group) =>
+          picking === group.id ? (
+            <ItemPicker
+              key={group.id}
+              question={group}
+              sections={menu.data ?? []}
+              pending={setItems.isPending}
+              onCancel={() => setPicking(null)}
+              onSave={(itemIds) =>
+                setItems.mutate(
+                  {
+                    groupId: group.id,
+                    itemIds,
+                    current: group.itemIds,
+                    // Every item gets it in the same slot. The alternative is
+                    // asking somebody to place one question twenty times.
+                    sortOrder: 0,
+                    name: group.title,
+                  },
+                  { onSuccess: () => setPicking(null) },
+                )
+              }
+            />
+          ) : (
+            <Question
+              key={group.id}
+              group={group}
+              storeId={storeId}
+              open={open === group.id}
+              onToggle={() =>
+                setOpen((current) => (current === group.id ? null : group.id))
+              }
+              onPickItems={() => setPicking(group.id)}
+            />
+          ),
+        )}
 
         {adding && (
           <NewQuestion
@@ -268,11 +323,14 @@ function Question({
   storeId,
   open,
   onToggle,
+  onPickItems,
 }: {
-  group: OptionGroup;
+  group: StoreQuestion;
   storeId: string;
   open: boolean;
   onToggle: () => void;
+  /** Opens the picker that says which items ask this. */
+  onPickItems: () => void;
 }) {
   const store = useStore(storeId);
   const { format } = useMoney();
@@ -310,7 +368,7 @@ function Question({
    * answers it stopped asking. The count on the collapsed summary follows it,
    * or the header would promise choices the expanded list does not show.
    */
-  const choices = group.options.filter((option) => option.isActive);
+  const choices = group.choices.filter((option) => option.isActive);
 
   return (
     <section
@@ -370,6 +428,16 @@ function Question({
                     : "options.optional",
                 ),
                 t("options.count", { count: choices.length }),
+                // Where it is asked. The fact that makes this list a shop's
+                // questions rather than one dish's — and the one that says
+                // whether an edit here touches one item or twenty.
+                group.itemIds.length === 0
+                  ? t("commonOptions.usedOnNone")
+                  : group.itemIds.length === 1
+                    ? t("commonOptions.usedOnOne")
+                    : t("commonOptions.usedOn", {
+                        count: group.itemIds.length,
+                      }),
               ].join(" · ")}
             </span>
           </span>
@@ -390,6 +458,9 @@ function Question({
           }}
         >
           {t("options.renameGroup")}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onPickItems}>
+          {t("commonOptions.manage")}
         </Button>
         {/* Asks first, both ways. Withdrawing a question changes what a
             customer is shown on a shop that is open and taking orders, and the
@@ -507,6 +578,17 @@ function Question({
           </div>
 
           <div className="flex flex-col gap-sm">
+            {/* Said only when it is true. On a question one item asks, an edit
+                is local and a notice about twenty would be noise; on a common
+                one it is the single most important thing about this screen. */}
+            {group.itemIds.length > 1 && (
+              <p className="ps-md text-[12px] text-text-faint">
+                {t("commonOptions.editsEverywhere", {
+                  count: group.itemIds.length,
+                })}
+              </p>
+            )}
+
             {choices.length === 0 && (
               <p className="ps-md text-[13px] text-text-faint">
                 {/* "None" and "none left showing" are different states. Telling
@@ -514,7 +596,7 @@ function Question({
                     withdrawn invites them to type those three in again, and the
                     unique slug per group would refuse each one. */}
                 {t(
-                  group.options.length === 0
+                  group.choices.length === 0
                     ? "options.noChoices"
                     : "options.allWithdrawn",
                 )}
@@ -631,7 +713,7 @@ function Question({
               <BulkChoices
                 groupId={group.id}
                 currencyCode={currencyCode}
-                sortOrder={group.options.length}
+                sortOrder={group.choices.length}
                 onDone={() => setAdding("none")}
               />
             ) : adding === "one" ? (
@@ -645,7 +727,7 @@ function Question({
                     {
                       groupId: group.id,
                       ...draft,
-                      sortOrder: group.options.length,
+                      sortOrder: group.choices.length,
                     },
                     // Stays open — choices arrive in runs, not one at a time.
                     // The bump is what empties it for the next one.
@@ -690,6 +772,170 @@ function Question({
         </div>
       </Collapse>
     </section>
+  );
+}
+
+/**
+ * Which items ask this question.
+ *
+ * ## A whole section, or the items in it, or both
+ *
+ * The section's own box ticks and unticks every live item under it, and shows
+ * a third state when only some are on — which is the state a menu is usually
+ * in, and drawing it as "off" would invite an operator to tick it and silently
+ * add the eleven they had deliberately left out.
+ *
+ * ## Save means "this is the answer"
+ *
+ * The picker hands back the whole list it wants and the diff is worked out in
+ * `setQuestionItems`. That is what makes unticking a box do something visible:
+ * a Save that only applied additions would leave the operator wondering what
+ * the tick did.
+ *
+ * ## Only live items are listed
+ *
+ * `useMenu` filters archived ones out, so there is nothing here to disable: an
+ * item that has been put away is not offered, and a link to it would be one
+ * nothing reads. Restoring the item from the Archive tab brings it back into
+ * this list, and its links come back with it — they were never removed.
+ */
+function ItemPicker({
+  question,
+  sections,
+  pending,
+  onSave,
+  onCancel,
+}: {
+  question: StoreQuestion;
+  sections: {
+    id: string;
+    title: Record<string, string>;
+    items: { id: string; name: Record<string, string> }[];
+  }[];
+  pending: boolean;
+  onSave: (itemIds: string[]) => void;
+  onCancel: () => void;
+}) {
+  const [chosen, setChosen] = useState<Set<string>>(
+    () => new Set(question.itemIds),
+  );
+
+  function toggle(id: string) {
+    setChosen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function setMany(ids: string[], on: boolean) {
+    setChosen((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  const everyId = sections.flatMap((section) =>
+    section.items.map((item) => item.id),
+  );
+
+  return (
+    <div className="flex flex-col gap-lg rounded-md border border-active bg-surface p-lg">
+      <div className="flex flex-col gap-xxs">
+        <h3 className="text-[15px] font-semibold">
+          {t("commonOptions.pickTitle", {
+            name: pickLocalized(question.title),
+          })}
+        </h3>
+        <p className="text-[13px] text-text-soft">
+          {t("commonOptions.pickHint")}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-sm">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setMany(everyId, true)}
+        >
+          {t("commonOptions.pickAll")}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setChosen(new Set())}
+        >
+          {t("commonOptions.pickNone")}
+        </Button>
+      </div>
+
+      <div className="flex max-h-[420px] flex-col gap-lg overflow-y-auto rounded-md border border-border p-lg">
+        {sections.map((section) => {
+          const ids = section.items.map((item) => item.id);
+          const on = ids.filter((id) => chosen.has(id)).length;
+          const all = ids.length > 0 && on === ids.length;
+
+          return (
+            <div key={section.id} className="flex flex-col gap-xs">
+              <label className="flex items-center gap-sm text-[14px] font-semibold">
+                <input
+                  type="checkbox"
+                  checked={all}
+                  // The third state: some but not all. Drawn rather than
+                  // rounded down to "off", which would invite a tick that
+                  // silently adds the ones left out on purpose.
+                  ref={(box) => {
+                    if (box) box.indeterminate = on > 0 && !all;
+                  }}
+                  onChange={() => setMany(ids, !all)}
+                  className="size-[16px] accent-[var(--color-active)]"
+                />
+                {pickLocalized(section.title)}
+                <span className="text-[12px] font-normal text-text-faint">
+                  {on}/{ids.length}
+                </span>
+              </label>
+
+              <div className="flex flex-col gap-xxs ps-xl">
+                {section.items.map((item) => (
+                  <label
+                    key={item.id}
+                    className="flex items-center gap-sm text-[14px]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={chosen.has(item.id)}
+                      onChange={() => toggle(item.id)}
+                      className="size-[16px] accent-[var(--color-active)]"
+                    />
+                    {pickLocalized(item.name)}
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-sm">
+        <span className="min-w-0 flex-grow text-[13px] text-text-faint">
+          {chosen.size === 0
+            ? t("commonOptions.pickedNone")
+            : t("commonOptions.picked", { count: chosen.size })}
+        </span>
+        <Button variant="secondary" onClick={onCancel} disabled={pending}>
+          {t("common.cancel")}
+        </Button>
+        <Button pending={pending} onClick={() => onSave([...chosen])}>
+          {t("commonOptions.save")}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -929,7 +1175,14 @@ function NewQuestion({
   onDone,
 }: {
   storeId: string;
-  itemId: string;
+  /**
+   * The item to start it on, or null when the list is not filtered to one.
+   *
+   * A question created with no item is asked nowhere until "Choose items" is
+   * used — which is a real and useful state, not a half-made row: it is how a
+   * common question is built before it is applied to twenty.
+   */
+  itemId: string | null;
   sortOrder: number;
   onDone: () => void;
 }) {
@@ -959,9 +1212,9 @@ function NewQuestion({
       {
         draft: {
           storeId,
-          // Just this item. A question created here is private until it is
-          // offered on more from the Common questions tab.
-          itemIds: [itemId],
+          // The item in view, if there is one. Otherwise none, and the row
+          // appears saying it is asked nowhere with the picker one press away.
+          itemIds: itemId ? [itemId] : [],
           title,
           mode,
           // A switch here, a number on the question itself. Creating one, the

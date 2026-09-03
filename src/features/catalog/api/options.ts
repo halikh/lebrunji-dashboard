@@ -76,14 +76,11 @@ export type OptionGroup = {
   isActive: boolean;
   /** Where it sits on the item it was read for — from the link, not the group. */
   sortOrder: number;
-  /** How many items ask it. One is a private question; more is a common one. */
-  itemCount: number;
   options: ItemOption[];
 };
 
 const GROUP_COLUMNS = `id, title, mode, min_selections, max_selections,
    is_active, sort_order,
-   menu_item_option_group_links ( count ),
    item_options ( id, name, price, is_active, is_default, sort_order )`;
 
 /**
@@ -115,20 +112,25 @@ export async function fetchOptionCounts(
 }
 
 /**
- * One dish's groups, with their options — **including withdrawn ones**.
+ * One item's questions, with their choices — **including withdrawn ones**.
  *
- * The app filters to what is offered. This read does not, because it feeds two
- * screens: the Options tab, which lists what a dish still asks, and the Archive
- * tab, which lists what it stopped asking and puts it back.
+ * ## Who still reads this
  *
- * The Options screen filters to `is_active` itself. It used to show withdrawn
- * rows greyed out, on the reasoning that one which vanished could never be
- * brought back — true until the archive existed, and wrong now: it put the same
- * row in two places, one of which is a list whose whole job is to say what this
- * dish asks.
+ * Order amendment, and only that. It used to feed the Options tab as well, but
+ * that screen now reads {@link fetchStoreQuestions}: since `0094` a question
+ * can be asked on many items, so the shop's whole list with a filter is the
+ * shape it wants, and this one — a single item's — would have been the same
+ * rows fetched a second way.
  *
- * The filter is deliberately **not** in this query. An `is_active` clause here
- * would make that screen right and leave the archive empty.
+ * Amending an order is genuinely per item: the operator has swapped one dish
+ * for another and needs the questions *that* dish asks, with nothing else on
+ * screen.
+ *
+ * ## Withdrawn rows come back, and the caller filters
+ *
+ * A choice that was on an order being amended may since have been withdrawn,
+ * and the line still has to render it. An `is_active` clause in the query would
+ * make the picker right and the amendment blank.
  */
 export async function fetchItemOptionGroups(
   itemId: string,
@@ -417,11 +419,6 @@ function toGroup(row: Record<string, unknown>): OptionGroup {
     maxSelections: (row.max_selections as number | null) ?? null,
     isActive: row.is_active as boolean,
     sortOrder: row.sort_order as number,
-    // PostgREST returns an aggregate embed as `[{ count: n }]`. Zero when a
-    // question is asked nowhere — which is a real state, not a bug: a group
-    // whose links were all removed is still a question, still editable, and
-    // still says so on the Common questions tab.
-    itemCount: (asArray(row.menu_item_option_group_links)[0]?.count as number) ?? 0,
     options: asArray(row.item_options)
       .map((option) => ({
         id: option.id as string,

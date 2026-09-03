@@ -1071,10 +1071,15 @@ const en = {
    * Not `common` — that namespace is already the shell's Save/Cancel/Close, and
    * a second one silently shadowed it.
    */
+  /**
+   * The item-picker half of the Options tab.
+   *
+   * Its own namespace, kept after the Common options tab was folded into
+   * Options: these strings are about *which items ask a question*, which is a
+   * different subject from what a question is and how it is answered, and one
+   * flat `options` namespace of sixty keys is harder to read than two of thirty.
+   */
   commonOptions: {
-    tab: "Common options",
-    title: "Questions across this shop",
-    hint: "A question can be asked on one item or on fifty. Editing it here changes it everywhere it is asked — which is the point, and the thing to be sure of before you press Save.",
     onItems: "{name} is on {count} items",
     onNoItems: "{name} is not on any item",
     // The count beside each question in the list.
@@ -1090,9 +1095,6 @@ const en = {
     manage: "Choose items",
     withdrawnMark: "Withdrawn",
     withdrawnHint: "Withdrawn from the whole shop. Bring it back from the Archive tab.",
-    emptyTitle: "No questions yet",
-    emptyBody: "Create one on the Options tab, then come back here to ask it on more items.",
-    failedTitle: "Could not load the questions",
     // The picker.
     pickTitle: "Which items ask {name}?",
     pickHint: "Tick a whole section, or the items inside it. Items in different sections can be mixed.",
@@ -1112,17 +1114,17 @@ const en = {
   options: {
     tab: "Options",
     tabHint:
-      "Pick a section, then an item. Its questions are set up on the right.",
+      "Every question this shop asks. Narrow to a section or one item to see only its own.",
     section: "Section",
-    sectionHint: "Narrows the list of items below.",
+    sectionHint: "Narrows the list of items below, and the questions on the right.",
     pickSection: "Choose a section",
     item: "Item",
-    itemHint: "The questions belong to this item and no other.",
+    itemHint: "Shows only the questions this item asks. Clear it to see them all.",
     pickItem: "Choose an item",
     // The marker in the picker. A dish with no questions looks complete
     // everywhere else, so this is the only place it can be seen at a glance.
     noneSet: "no options yet",
-    noQuestions: "This item asks nothing yet.",
+    noQuestions: "Nothing here yet.",
     title: "Options",
     hint: "Questions asked when this item is ordered — a size, extras, something left out.",
     saveFirst: "Save this item first, then set up its options.",
