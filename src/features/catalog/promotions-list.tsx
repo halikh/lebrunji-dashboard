@@ -1074,7 +1074,9 @@ function Amount({
 }: {
   value: string;
   onChange: (value: string) => void;
-  decimalDigits: number;
+  /** `null` until the base currency lands — `MoneyInput` waits rather than
+      guessing a scale. A percentage never needs it. */
+  decimalDigits: number | null;
   placeholder?: string;
   max?: number;
   /** Off for a percentage, which is a number and not an amount. */

@@ -1,7 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import ReactSelect, { type StylesConfig } from "react-select";
+import ReactSelect, {
+  components as reactSelectComponents,
+  type GroupBase,
+  type InputProps,
+  type StylesConfig,
+} from "react-select";
 import AsyncSelect from "react-select/async";
 
 import { useFieldWiring } from "./field";
@@ -60,6 +65,37 @@ export type SelectOption = {
   render?: ReactNode;
 };
 
+/**
+ * What the browser is told about the search box: nothing goes in it.
+ *
+ * react-select's control is a bare text `<input>`, which is the shape Chrome
+ * and the password managers guess at — on Settings it was being filled with the
+ * signed-in operator's email, so "Closes at" read `hali_tj@outlook…` over an
+ * empty menu, and the operator's hours were one keystroke from being saved
+ * wrong. The library already sends `autocomplete="off"`; Chrome ignores that on
+ * a field it believes it recognises. `new-password` is the token it does honour
+ * on a text input, and the `data-*` flags are what the extensions read.
+ *
+ * Spread from an object rather than written as attributes because `data-*` is
+ * not part of `InputProps`, and a component takes only the props it declares.
+ */
+const AUTOFILL_OFF = {
+  autoComplete: "new-password",
+  "data-1p-ignore": "true",
+  "data-lpignore": "true",
+  "data-bwignore": "true",
+  "data-form-type": "other",
+};
+
+/** react-select's own input, marked so nothing fills it. */
+function NoAutofillInput<
+  Option,
+  IsMulti extends boolean,
+  Group extends GroupBase<Option>,
+>(props: InputProps<Option, IsMulti, Group>) {
+  return <reactSelectComponents.Input {...props} {...AUTOFILL_OFF} />;
+}
+
 export function Select({
   value,
   onChange,
@@ -93,6 +129,7 @@ export function Select({
       placeholder={placeholder ?? ""}
       isDisabled={disabled}
       isClearable={isClearable}
+      components={{ Input: NoAutofillInput }}
       // The library's own class names are not used; everything is `styles`
       // below. This only removes them from the DOM so nothing can accidentally
       // depend on one.
@@ -310,6 +347,7 @@ export function MultiSelect({
       // chosen makes selecting it a no-op, which reads as the click not having
       // registered.
       hideSelectedOptions
+      components={{ Input: NoAutofillInput }}
       classNamePrefix=""
       formatOptionLabel={renderOption}
       styles={paletteStyles(isInvalid)}
@@ -383,6 +421,7 @@ export function AsyncMultiSelect({
       noOptionsMessage={({ inputValue }) =>
         noOptionsMessage ? noOptionsMessage(inputValue) : null
       }
+      components={{ Input: NoAutofillInput }}
       classNamePrefix=""
       formatOptionLabel={renderOption}
       styles={paletteStyles(isInvalid)}

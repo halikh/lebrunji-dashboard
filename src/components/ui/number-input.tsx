@@ -50,10 +50,12 @@ export function NumberInput({
       ref={ref}
       id={rest.id ?? field?.id}
       type="number"
-      // `decimal` rather than `numeric`: a price can carry a separator in a
-      // currency that has minor units, and a keyboard with no decimal point is
-      // one the operator has to fight.
-      inputMode="decimal"
+      // `decimal` rather than `numeric` by default: a price can carry a
+      // separator in a currency that has minor units, and a keyboard with no
+      // decimal point is one the operator has to fight. A caller that knows
+      // its field takes whole numbers only — a lira amount, a count of
+      // minutes — says so and gets the plainer keyboard.
+      inputMode={rest.inputMode ?? "decimal"}
       onWheel={(event) => {
         // Blur rather than `preventDefault`: the browser applies the change on
         // the focused element, so removing focus is what actually stops it —

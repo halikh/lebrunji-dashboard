@@ -68,6 +68,27 @@ export function useMoney() {
     [find],
   );
 
+  /**
+   * How many decimal places a *named* currency has — 2 for USD, 0 for LBP.
+   *
+   * Every shop picks its own currency (the wizard offers all of them), so a
+   * price belonging to a shop is denominated in that shop's currency and not in
+   * the base one. `MoneyInput` turns what somebody types into minor units by
+   * this number, and getting it from the wrong currency is a factor of a
+   * hundred either way: `89000` typed into an LBP shop scaled by USD's two
+   * decimals is 8,900,000 lira.
+   *
+   * **`null` when the answer is not known yet** — the reference query is still
+   * in flight, or the code is empty because the shop it came from has not
+   * loaded. Not a fallback of 2: a guessed scale is indistinguishable from a
+   * real one at the moment somebody types into it, and `MoneyInput` disables
+   * itself on `null` rather than converting against a guess.
+   */
+  const decimalsOf = useCallback(
+    (code: string): number | null => find(code)?.decimalDigits ?? null,
+    [find],
+  );
+
   /** The other active currency, for showing a second figure beside the first. */
   const secondaryCode = useCallback(
     (primary: string): string | null =>
@@ -87,14 +108,24 @@ export function useMoney() {
   /**
    * How many decimal places the base currency has — 2 for USD, 0 for LBP.
    *
-   * `MoneyInput` needs it to turn what somebody types into minor units, and it
-   * defaults to 2 only until the reference data lands. Reading it here rather
-   * than per screen keeps the answer in the same place as `baseCode`.
+   * `MoneyInput` needs it to turn what somebody types into minor units.
+   * Reading it here rather than per screen keeps the answer in the same place
+   * as `baseCode`.
+   *
+   * `null` until the reference data lands, and for the reason given on
+   * {@link decimalsOf}: it used to default to 2, which is USD's answer given
+   * confidently on a deployment whose base is the lira — a `50000` typed into
+   * the ladder in that first moment was banked as five million.
+   *
+   * **Only for amounts actually written in the base currency** — the delivery
+   * ladder and a discount's stated amounts. A shop's own prices are in the
+   * shop's currency; those want {@link decimalsOf}.
    */
-  const baseDecimals = rows?.find((one) => one.isBase)?.decimalDigits ?? 2;
+  const baseDecimals = rows?.find((one) => one.isBase)?.decimalDigits ?? null;
 
   return {
     format,
+    decimalsOf,
     convertTo,
     secondaryCode,
     baseCode,

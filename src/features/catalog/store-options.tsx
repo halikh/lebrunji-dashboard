@@ -7,6 +7,7 @@ import { Button, cx } from "@/components/ui";
 import { Collapse } from "@/components/ui/collapse";
 import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
+import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { useRevealOnMount } from "@/components/ui/reveal";
 import { Select } from "@/components/ui/select";
@@ -16,7 +17,11 @@ import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
-import { validateLocalizedText, type Localized } from "@/lib/validation";
+import {
+  validateLocalizedText,
+  validatePrice,
+  type Localized,
+} from "@/lib/validation";
 
 import type { OptionGroup, OptionGroupMode } from "./api/options";
 import { useMenu } from "./use-menu";
@@ -472,6 +477,7 @@ function Question({
             {addingChoice ? (
               <NewChoice
                 groupId={group.id}
+                currencyCode={currencyCode}
                 sortOrder={group.options.length}
                 onDone={() => setAddingChoice(false)}
               />
@@ -506,21 +512,32 @@ function Question({
 /** Adding an answer. Stays open — they arrive in runs, not one at a time. */
 function NewChoice({
   groupId,
+  currencyCode,
   sortOrder,
   onDone,
 }: {
   groupId: string;
+  /** The shop's currency — what the choice's extra cost is denominated in. */
+  currencyCode: string;
   sortOrder: number;
   onDone: () => void;
 }) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
   const options = useItemOptions();
+  // A choice is priced in its dish's currency, and a dish in its shop's — which
+  // is whichever one the wizard was pointed at and not necessarily the base
+  // one. The line above renders it with `format(price, currencyCode)`, so
+  // typing it against any other currency's decimals would mean writing with one
+  // scale and reading back with another.
+  const { decimalsOf } = useMoney();
+  const decimals = decimalsOf(currencyCode);
 
   const form = useRevealOnMount<HTMLDivElement>({ focus: true });
 
   const [name, setName] = useState<Localized>({});
-  const [price, setPrice] = useState("0");
+  /** Minor units, the way the column stores it — `MoneyInput` does the sum. */
+  const [price, setPrice] = useState<number | null>(0);
   const [error, setError] = useState<string | undefined>(undefined);
 
   function submit() {
@@ -529,19 +546,23 @@ function NewChoice({
       setError(t(check.key, check.params));
       return;
     }
-    const amount = Number(price);
-    if (!Number.isFinite(amount) || amount < 0) {
-      setError(t("validation.priceNegative"));
+    // An empty box is a free choice, which is the common case and not worth
+    // an error. Anything else goes through the same ceiling and whole-number
+    // checks as a dish's own price.
+    const amount = price ?? 0;
+    const money = validatePrice(amount);
+    if (!money.ok) {
+      setError(t(money.key, money.params));
       return;
     }
 
     setError(undefined);
     options.add.mutate(
-      { groupId, name, price: Math.round(amount), sortOrder },
+      { groupId, name, price: amount, sortOrder },
       {
         onSuccess: () => {
           setName({});
-          setPrice("0");
+          setPrice(0);
         },
       },
     );
@@ -565,13 +586,19 @@ function NewChoice({
           it. */}
       <Field label={t("options.extraCost")} hint={t("options.extraCostHint")}>
         <div className="flex flex-wrap items-center gap-sm">
-          <NumberInput
-            value={price}
-            onChange={(event) => setPrice(event.target.value)}
-            min={0}
-            placeholder="0"
-            className="w-[140px]"
-          />
+          {/* Typed as a person would say it — `3` is three dollars, not three
+              cents. The conversion to minor units is `MoneyInput`'s, the same
+              as on the dish's own price. */}
+          <span className="w-[140px]">
+            <MoneyInput
+              value={price}
+              onChange={setPrice}
+              // `null` until the shop's currency lands, and the box stays
+              // disabled until it does. Same reasoning as the dish's own price.
+              decimalDigits={decimals}
+              placeholder="0"
+            />
+          </span>
           <Button
             variant="secondary"
             onClick={onDone}

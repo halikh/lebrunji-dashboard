@@ -38,6 +38,15 @@ import { NumberInput } from "./number-input";
  * `null` means "not being edited", so an amount changed elsewhere — a discard, a
  * refetch — shows immediately rather than waiting for a focus it may never get.
  * No effect is involved, which is what keeps it from fighting its own value.
+ *
+ * ## An unknown scale disables the field
+ *
+ * `decimalDigits` is `null` while the currency is still being fetched, or when
+ * the shop the amount belongs to has not loaded. The field goes disabled and
+ * empty rather than picking a number to multiply by, because every wrong answer
+ * here is wrong by a factor of a hundred and looks exactly like a right one —
+ * `3` banked as `0.03`, `50000` banked as five million. There is no safe
+ * default, so there is no default.
  */
 export function MoneyInput({
   value,
@@ -52,8 +61,11 @@ export function MoneyInput({
   value: number | null;
   /** Minor units, or null when the field is empty and empty is allowed. */
   onChange: (minorUnits: number | null) => void;
-  /** From the currency: 2 for USD, 0 for LBP. */
-  decimalDigits: number;
+  /**
+   * From the currency: 2 for USD, 0 for LBP. `null` while it is unknown, which
+   * disables the field — see above.
+   */
+  decimalDigits: number | null;
   disabled?: boolean;
   placeholder?: string;
   min?: number;
@@ -61,20 +73,26 @@ export function MoneyInput({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
 
-  const factor = 10 ** decimalDigits;
-  const shown = draft ?? toMajor(value, decimalDigits);
+  const known = decimalDigits !== null;
+  const factor = known ? 10 ** decimalDigits : 1;
+  const shown = known ? (draft ?? toMajor(value, decimalDigits)) : "";
 
   return (
     <NumberInput
       value={shown}
-      disabled={disabled}
+      disabled={disabled || !known}
       placeholder={placeholder}
       aria-label={ariaLabel}
       min={min}
       // A cent at a time on a currency that has cents, a whole unit on one that
       // does not. The browser's own validation then refuses `0.5` lira rather
       // than rounding it somewhere the operator cannot see.
-      step={decimalDigits > 0 ? 1 / factor : 1}
+      step={known && decimalDigits > 0 ? 1 / factor : 1}
+      // A currency with no subunit has no decimal point to offer, and a phone
+      // keyboard that offers one is offering a precision the column cannot
+      // keep. `numeric` drops it; `decimal` is right for the currencies that
+      // do have cents.
+      inputMode={known && decimalDigits > 0 ? "decimal" : "numeric"}
       onChange={(event) => {
         const raw = event.target.value;
         setDraft(raw);

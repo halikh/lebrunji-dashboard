@@ -11,6 +11,7 @@ import { ImageUploader } from "@/components/ui/image-uploader";
 
 import { ItemOptions } from "./item-options";
 import { TagChip } from "./tag-chip";
+import { useStore } from "./use-stores";
 import { useTagVocabulary } from "./use-tags";
 import { useMoney } from "@/features/reference/use-currencies";
 import { useLanguages } from "@/features/reference/use-languages";
@@ -101,9 +102,17 @@ export function MenuItemEditor({
   onCancel: () => void;
 }) {
   const languages = useLanguages();
-  // A dish is priced in its shop's currency, and the shop's currency is the
-  // base one — the ladder and every discount are written in it too.
-  const { baseDecimals: decimals } = useMoney();
+  // A dish is priced in its shop's currency — which is whichever one the wizard
+  // was pointed at, and *not* necessarily the base one the ladder and the
+  // discounts are written in. Asking the base currency how many decimals to
+  // scale by put a hundred between what was typed and what was stored on every
+  // shop that priced in the other currency.
+  //
+  // The same query the menu screen around this already runs, so it is a cache
+  // read rather than a second fetch.
+  const store = useStore(storeId);
+  const { decimalsOf } = useMoney();
+  const decimals = decimalsOf(store.data?.currencyCode ?? "");
 
   const [name, setName] = useState<Localized>(initial?.name ?? {});
   const [description, setDescription] = useState<Localized>(
@@ -247,6 +256,9 @@ export function MenuItemEditor({
               onChange={(minor) =>
                 setPrice(minor === null ? "" : String(minor))
               }
+              // `null` until the shop's currency lands, which disables the box
+              // rather than letting `3` be entered before it is settled whether
+              // that means 3 or 300.
               decimalDigits={decimals}
               placeholder={t("menu.pricePlaceholder")}
             />
