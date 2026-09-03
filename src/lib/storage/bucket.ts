@@ -219,10 +219,36 @@ export async function deleteObject(key: string): Promise<void> {
  * the URL rather than the URL being opaque.
  *
  * `requestOrigin` is the fallback, not the preference — see `canonicalUrl`.
+ *
+ * ## In production it refuses rather than guessing
+ *
+ * The request's origin is whatever reached the Node process, which behind a
+ * proxy or a container is routinely not the address anybody can browse to. A
+ * deployment with `APP_PUBLIC_URL` unset wrote `https://localhost:8080/i/<key>`
+ * into `image_url` — an upload that succeeded, a row that saved, a bucket
+ * holding the file, and a picture that would never load again for anyone. The
+ * failure was invisible at every step *except* the last, which is on a
+ * customer's phone.
+ *
+ * A dead URL in a column outlives the deployment that wrote it, so this throws
+ * instead. The upload fails with the name of the variable to set, which is a
+ * five-minute fix; the alternative was a fortnight of images nobody could
+ * explain and a column to repair afterwards.
+ *
+ * Development is exempt: there the request's origin genuinely is the address,
+ * and requiring the variable to run the app locally would be ceremony.
  */
 export function imageUrlFor(key: string, requestOrigin: string): string {
   const { publicBaseUrl, canonicalUrl } = readBucketConfig();
-  const base =
-    publicBaseUrl || `${canonicalUrl || requestOrigin.replace(/\/+$/, "")}/i`;
-  return `${base}/${key}`;
+  if (publicBaseUrl) return `${publicBaseUrl}/${key}`;
+
+  if (!canonicalUrl && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "APP_PUBLIC_URL is not set. It is this deployment's own address, and " +
+        "it is written into `image_url` — falling back to the request's " +
+        "origin here stores a URL that only resolves inside the container.",
+    );
+  }
+
+  return `${canonicalUrl || requestOrigin.replace(/\/+$/, "")}/i/${key}`;
 }
