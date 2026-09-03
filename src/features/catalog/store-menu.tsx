@@ -18,6 +18,7 @@ import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { SEARCH, TEXT } from "@/lib/limits";
+import { itemUnit, pricePerUnit, unitKey } from "@/lib/units";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
@@ -979,7 +980,9 @@ function ItemRow({
           {pickLocalized(item.name)}
         </span>
         <span className="truncate text-[12px] text-text-faint">
-          {pickLocalized(item.description)}
+          {[unitSize(item), pickLocalized(item.description)]
+            .filter(Boolean)
+            .join(" · ")}
         </span>
         {/* What a customer sees on the dish, shown where the operator is
             already looking. Without it, checking which dishes carry "Spicy"
@@ -990,13 +993,16 @@ function ItemRow({
       {/* Set in the shop's own currency, shown in both: the price the merchant
           typed on top, what a customer thinking in the other one would hear
           underneath. */}
-      <div className="shrink-0">
+      <div className="flex shrink-0 flex-col items-end">
         <Price
           value={item.price}
           code={currencyCode}
           align="end"
           className="text-[15px] font-semibold"
         />
+        {/* The comparison figure, quoted per kilo or per litre whichever unit
+            was typed — so 500 g at $6.00 and 1 kg at $12.00 read the same. */}
+        <PerUnit item={item} code={currencyCode} />
       </div>
 
       {/* The same rule the section header follows: nothing in a row
@@ -1242,18 +1248,21 @@ function SearchResult({
           {pickLocalized(item.name)}
         </span>
         <span className="truncate text-[12px] text-text-faint">
-          {sectionTitle}
+          {[unitSize(item), sectionTitle].filter(Boolean).join(" · ")}
         </span>
         <ItemTags ids={item.tagIds} />
       </button>
 
-      <div className="shrink-0">
+      <div className="flex shrink-0 flex-col items-end">
         <Price
           value={item.price}
           code={currencyCode}
           align="end"
           className="text-[15px] font-semibold"
         />
+        {/* The comparison figure, quoted per kilo or per litre whichever unit
+            was typed — so 500 g at $6.00 and 1 kg at $12.00 read the same. */}
+        <PerUnit item={item} code={currencyCode} />
       </div>
 
       <ConfirmToggle
@@ -1312,5 +1321,55 @@ function Thumbnail({ url, dim }: { url: string | null; dim: boolean }) {
         dim && "opacity-50 grayscale",
       )}
     />
+  );
+}
+
+/**
+ * The size an item is sold in — "1 kg", "500 g" — or an empty string.
+ *
+ * A string rather than a component, because it sits inside a line that already
+ * joins two other facts with a separator, and a component there would mean the
+ * separator logic had to know whether the component rendered anything.
+ */
+function unitSize(item: MenuItem): string {
+  const unit = itemUnit(item);
+  if (!unit) return "";
+
+  return t("units.size", {
+    quantity: unit.quantity,
+    unit: t(unitKey(unit.unit)),
+  });
+}
+
+/**
+ * What the item comes to per kilo, per litre, or per piece.
+ *
+ * ## Why it is worth the line
+ *
+ * A price on its own is not comparable between two items sold in different
+ * sizes, and comparing them is the one thing a shelf is for. Quoting both
+ * against the same canonical unit — see `lib/units.ts` — is what makes 500 g at
+ * $6.00 and 1 kg at $12.00 legible as the same value.
+ *
+ * ## And why it is often nothing
+ *
+ * Absent for an item with no unit, which is most of them, and absent for a
+ * single piece: "$12.00 per piece" beside "$12.00" is the same number twice.
+ * `pricePerUnit` makes that call so no screen has to.
+ */
+function PerUnit({ item, code }: { item: MenuItem; code: string }) {
+  const { format } = useMoney();
+
+  const unit = itemUnit(item);
+  const per = unit ? pricePerUnit(item.price, unit) : null;
+  if (!per) return null;
+
+  return (
+    <span className="text-[11px] tabular-nums text-text-faint">
+      {t("units.per", {
+        amount: format(per.amount, code),
+        unit: t(unitKey(per.unit)),
+      })}
+    </span>
   );
 }

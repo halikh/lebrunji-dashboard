@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { Button, Field } from "@/components/ui";
+import { Button, Field, cx } from "@/components/ui";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumberInput } from "@/components/ui/number-input";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Toggle } from "@/components/ui/toggle";
-import { MultiSelect } from "@/components/ui/select";
+import { MultiSelect, Select } from "@/components/ui/select";
 import { ImageUploader } from "@/components/ui/image-uploader";
 
 import { ItemOptions } from "./item-options";
@@ -19,6 +20,7 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
 import type { Localized } from "@/lib/validation";
+import { PRICE_UNITS, unitKey, type PriceUnit } from "@/lib/units";
 import {
   validateLocalizedText,
   validatePrice,
@@ -33,6 +35,14 @@ export type ItemDraft = {
   isActive: boolean;
   /** A Storage URL, or null for no picture. */
   imageUrl: string | null;
+  /**
+   * What the price buys — `('kg', 1)` for a one-kilo pack.
+   *
+   * Both null for an item sold as itself, which is most of them. `0095` refuses
+   * one without the other, so the form clears them together.
+   */
+  priceUnit: PriceUnit | null;
+  unitQuantity: number | null;
   /**
    * The chips this dish carries, as ids into the shared vocabulary.
    *
@@ -124,6 +134,13 @@ export function MenuItemEditor({
     initial?.imageUrl ?? null,
   );
   const [tagIds, setTagIds] = useState<string[]>(initial?.tagIds ?? []);
+  const [priceUnit, setPriceUnit] = useState<PriceUnit | "">(
+    initial?.priceUnit ?? "",
+  );
+  /** A string while it is being typed — `1.` is not a number and is valid so far. */
+  const [unitQuantity, setUnitQuantity] = useState(
+    initial?.unitQuantity == null ? "" : String(initial.unitQuantity),
+  );
 
   const tags = useTagVocabulary();
 
@@ -144,6 +161,7 @@ export function MenuItemEditor({
     name?: string;
     description?: string;
     price?: string;
+    unit?: string;
   }>({});
 
   const codes = languages.data?.map((language) => language.code) ?? [];
@@ -176,6 +194,18 @@ export function MenuItemEditor({
   function build(): ItemDraft | null {
     const parsed = price.trim() === "" ? NaN : Number(price);
 
+    // Both or neither — the pair `0095` enforces. A unit with no amount is
+    // "kg" without saying how many, which nothing can draw.
+    const amount = unitQuantity.trim() === "" ? null : Number(unitQuantity);
+    const unitProblem =
+      priceUnit === ""
+        ? undefined
+        : amount === null || !Number.isFinite(amount)
+          ? t("units.quantityRequired")
+          : amount <= 0
+            ? t("units.quantityPositive")
+            : undefined;
+
     const found = {
       name: messageOf(validateLocalizedText(name, codes, TEXT.name)),
       description: messageOf(
@@ -184,6 +214,7 @@ export function MenuItemEditor({
         }),
       ),
       price: messageOf(validatePrice(Number.isFinite(parsed) ? parsed : NaN)),
+      unit: unitProblem,
     };
 
     setErrors(found);
@@ -192,8 +223,21 @@ export function MenuItemEditor({
     // the effect would not run.
     attempt.current += 1;
 
-    if (found.name || found.description || found.price) return null;
-    return { name, description, price: parsed, isActive, imageUrl, tagIds };
+    if (found.name || found.description || found.price || found.unit) {
+      return null;
+    }
+    return {
+      name,
+      description,
+      price: parsed,
+      isActive,
+      imageUrl,
+      tagIds,
+      // Cleared together: an amount left behind on an item whose unit was
+      // removed is a number nothing reads and the CHECK would refuse.
+      priceUnit: priceUnit === "" ? null : priceUnit,
+      unitQuantity: priceUnit === "" ? null : (amount as number),
+    };
   }
 
   return (
@@ -262,6 +306,59 @@ export function MenuItemEditor({
               decimalDigits={decimals}
               placeholder={t("menu.pricePlaceholder")}
             />
+          </Field>
+
+          {/* Straight after the price, because it is a fact *about* the price:
+              "$12.00" and "$12.00 for a kilo" are different offers, and reading
+              one without the other is how a customer compares two shops
+              wrongly. Empty for most items, which is why the unit leads and the
+              amount only appears once there is something to measure. */}
+          <Field
+            label={t("units.label")}
+            hint={t("units.hint")}
+            error={errors.unit}
+          >
+            <div className="flex flex-wrap items-start gap-sm">
+              {/* Full width until it has something to sit beside. Most items
+                  have no unit, so the common state of this field is one select
+                  and a lot of empty row — which reads as a control that failed
+                  to lay out rather than as one nothing was typed into. */}
+              <span
+                className={cx(
+                  priceUnit === "" ? "min-w-0 flex-grow" : "w-[150px]",
+                )}
+              >
+                <Select
+                  value={priceUnit}
+                  onChange={(value) => {
+                    setPriceUnit(value as PriceUnit | "");
+                    // Cleared together. An amount left behind on an item whose
+                    // unit was removed is a number nothing reads, and `0095`
+                    // would refuse the pair anyway.
+                    if (!value) setUnitQuantity("");
+                  }}
+                  placeholder={t("units.none")}
+                  isClearable
+                  options={PRICE_UNITS.map((unit) => ({
+                    value: unit,
+                    label: t(unitKey(unit)),
+                  }))}
+                />
+              </span>
+
+              {priceUnit !== "" && (
+                <span className="w-[130px]">
+                  <NumberInput
+                    value={unitQuantity}
+                    onChange={(event) => setUnitQuantity(event.target.value)}
+                    min={0}
+                    step="any"
+                    placeholder="1"
+                    aria-label={t("units.quantity")}
+                  />
+                </span>
+              )}
+            </div>
           </Field>
 
           {/* Beside the price rather than down with the options, because a tag

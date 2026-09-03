@@ -1111,6 +1111,33 @@ const en = {
     archivedItem: "archived",
   },
 
+  /**
+   * The units an item's price can be quoted in.
+   *
+   * Here rather than in a column, for the reason `0095` records: "kg" is "كغ"
+   * in Arabic, so the word is chrome and belongs beside every other piece of
+   * user-facing text. The *key* is what the database holds.
+   */
+  units: {
+    kg: "kg",
+    g: "g",
+    l: "L",
+    ml: "mL",
+    piece: "piece",
+    // The size under an item's name: "1 kg", "500 g".
+    size: "{quantity} {unit}",
+    // The comparison figure beside the price: "$12.00/kg".
+    per: "{amount}/{unit}",
+    // The editor.
+    label: "Sold by",
+    hint: "For anything priced by weight or volume. Leave the unit empty for an item sold as itself.",
+    none: "No unit",
+    quantity: "Amount",
+    quantityHint: "How much of that unit one of these is — 1 kg, or 500 g.",
+    quantityRequired: "Say how much, or clear the unit.",
+    quantityPositive: "The amount must be more than zero.",
+  },
+
   options: {
     tab: "Options",
     tabHint:

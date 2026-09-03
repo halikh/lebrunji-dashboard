@@ -3,6 +3,7 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
 import { localizedOrNull, type Localized } from "@/lib/validation";
+import { asPriceUnit, type PriceUnit } from "@/lib/units";
 
 import { setItemTags } from "./tags";
 
@@ -33,6 +34,15 @@ export type MenuItem = {
   imageUrl: string | null;
   isActive: boolean;
   sortOrder: number;
+  /**
+   * What the price buys, when the item is sold by weight or volume.
+   *
+   * Both null together or both set — `0095` refuses one without the other, so
+   * `itemUnit` in `lib/units.ts` is the one place that decides an item "has a
+   * unit" and no screen has to remember the pair travels together.
+   */
+  priceUnit: PriceUnit | null;
+  unitQuantity: number | null;
   /**
    * The tags on this dish, as ids into the vocabulary.
    *
@@ -67,6 +77,7 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
       `id, slug, title, sort_order,
        menu_items ( id, menu_section_id, slug, name, description, price,
                     image_url, is_active, sort_order, deleted_at,
+                    price_unit, unit_quantity,
                     menu_item_tag_links ( menu_item_tag_id ) )`,
     )
     .eq("store_id", storeId)
@@ -260,6 +271,9 @@ export type MenuItemDraft = {
   price: number;
   isActive: boolean;
   imageUrl: string | null;
+  /** Null together — see `MenuItem`. */
+  priceUnit: PriceUnit | null;
+  unitQuantity: number | null;
   /** Ids from the tag vocabulary. Empty is a valid answer, not a missing one. */
   tagIds: string[];
 };
@@ -292,6 +306,8 @@ export async function createMenuItem(
       price: draft.price,
       is_active: draft.isActive,
       image_url: draft.imageUrl,
+      price_unit: draft.priceUnit,
+      unit_quantity: draft.unitQuantity,
       sort_order: sortOrder,
     })
     // The id comes back because the links need something to point at. It is
@@ -376,6 +392,12 @@ export async function updateMenuItem(
   // `null` is a value here — it is how a picture is removed — so the check is
   // for the key being absent, not for the value being falsy.
   if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
+  // `null` is a value here too — it is how a unit is cleared — so the check is
+  // for the key being absent, not for the value being falsy.
+  if (patch.priceUnit !== undefined) row.price_unit = patch.priceUnit;
+  if (patch.unitQuantity !== undefined) {
+    row.unit_quantity = patch.unitQuantity;
+  }
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 
   // A patch may be tags only — a reorder is not, and neither is a switch — so
@@ -649,6 +671,12 @@ function toItem(row: Record<string, unknown>): MenuItem {
     price: row.price as number,
     imageUrl: (row.image_url as string | null) ?? null,
     isActive: row.is_active as boolean,
+    priceUnit: asPriceUnit(row.price_unit),
+    // `numeric` arrives as a string from PostgREST — it is arbitrary precision
+    // and JSON has no type for that. Parsed once here rather than in each
+    // screen, where the first one to forget would compare "500" to 500.
+    unitQuantity:
+      row.unit_quantity == null ? null : Number(row.unit_quantity),
     sortOrder: row.sort_order as number,
     // An embed with nothing in it comes back as `[]`, so an untagged dish and
     // a dish whose links were not asked for look identical here. Every read
