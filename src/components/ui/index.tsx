@@ -48,7 +48,8 @@ type ButtonVariant =
   | "quiet"
   | "danger"
   | "danger-quiet"
-  | "primary-quiet";
+  | "primary-quiet"
+  | "accent";
 type ButtonSize = "md" | "sm";
 
 /**
@@ -96,6 +97,21 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
    * should do.
    */
   "primary-quiet": "bg-primary-wash text-primary hover:brightness-95",
+  /**
+   * The product's success colour — mint, the theme's "going well".
+   *
+   * For an action that *restores* something: bringing a driver back, lifting a
+   * suspension. `secondary` was wrong for those in a way worth naming — grey
+   * beside a red "Deactivate" says the two are peers, when one puts somebody
+   * back on the rota and the other takes them off it.
+   *
+   * **`accent-deep`, not `accent`.** White on mint measures 2.5:1, under even
+   * the 3:1 a graphic wants, and this variant carries a *label*. The deep mint
+   * is 5.9:1 and still unmistakably the same green — the same reasoning the
+   * coral note above records, reaching the opposite answer because the number
+   * came out differently.
+   */
+  accent: "bg-accent-deep text-on-accent hover:brightness-110",
 };
 
 export function Button({

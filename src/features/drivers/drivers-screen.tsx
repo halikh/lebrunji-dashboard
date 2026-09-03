@@ -358,6 +358,15 @@ function DriverRow({
         <span className="truncate text-[12px] tabular-nums text-text-faint">
           {formatPhone(courier.phone)}
         </span>
+        {/* Under the phone, with the identity. Whether somebody is still on the
+            books is a fact about *them*; the shift switch beside it is a fact
+            about tonight. Stacked in the same column as the rota controls the
+            two read as one setting with two states, which they are not. */}
+        {!courier.isActive && (
+          <span className="w-fit rounded-sm bg-danger-wash px-sm py-[1px] text-[11px] font-semibold text-text">
+            {t("drivers.inactive")}
+          </span>
+        )}
       </div>
 
       {/* The rota is the standing answer and this is tonight's exception, so
@@ -368,32 +377,26 @@ function DriverRow({
           An override is invisible from the outside — the badge reads the same
           either way — so the row says when one is in force and offers to stop.
           An override left behind is the failure the rota was meant to end. */}
-      <span className="relative z-10 flex shrink-0 flex-col items-end gap-xxs">
-        {!courier.isActive ? (
-          <span className="rounded-sm bg-danger-wash px-sm py-[1px] text-[11px] font-semibold text-text">
-            {t("drivers.inactive")}
-          </span>
-        ) : (
-          <>
-            <Toggle
-              on={taking}
-              onChange={() => onOverride(!taking)}
-              labelOn={t("drivers.onShift")}
-              labelOff={t("drivers.offShift")}
-              className="w-[124px]"
-            />
-            {overridden && (
-              <button
-                type="button"
-                onClick={() => onOverride(null)}
-                className="text-[11px] font-semibold text-primary hover:underline"
-              >
-                {t("drivers.followRota")}
-              </button>
-            )}
-          </>
-        )}
-      </span>
+      {courier.isActive && (
+        <span className="relative z-10 flex shrink-0 flex-col items-end gap-xxs">
+          <Toggle
+            on={taking}
+            onChange={() => onOverride(!taking)}
+            labelOn={t("drivers.onShift")}
+            labelOff={t("drivers.offShift")}
+            className="w-[124px]"
+          />
+          {overridden && (
+            <button
+              type="button"
+              onClick={() => onOverride(null)}
+              className="text-[11px] font-semibold text-primary hover:underline"
+            >
+              {t("drivers.followRota")}
+            </button>
+          )}
+        </span>
+      )}
 
       <span className="relative z-10 flex items-center gap-sm">
         <Button variant="secondary" size="sm" onClick={onEdit}>
@@ -426,11 +429,9 @@ function DriverRow({
             {t("drivers.deactivate")}
           </ConfirmButton>
         ) : (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onSetActive(true)}
-          >
+          // Mint, the theme's "going well". Grey beside a red Deactivate said
+          // the two were peers; this one puts somebody back on the rota.
+          <Button variant="accent" size="sm" onClick={() => onSetActive(true)}>
             {t("drivers.reactivate")}
           </Button>
         )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { Button, cx } from "@/components/ui";
 import { SearchInput } from "@/components/ui/search-input";
@@ -66,7 +67,21 @@ type PanelTarget =
   /** Renaming only. Adding one is inline at the bottom of the list. */
   | { kind: "section"; sectionId: string };
 
-export function StoreMenu({ storeId }: { storeId: string }) {
+export function StoreMenu({
+  storeId,
+  panelSlot,
+}: {
+  storeId: string;
+  /**
+   * Where the detail panel is drawn, from `StoreScreen`.
+   *
+   * The panel is a sibling of the *page* rather than of this list, so that it
+   * runs the full height beside the shop's header rather than starting under
+   * it. Null on the first render, before the slot's node exists — the panel is
+   * shut then, so it renders in place and nothing is seen to move.
+   */
+  panelSlot: HTMLElement | null;
+}) {
   const store = useStore(storeId);
   const menu = useMenu(storeId);
   const create = useCreateMenuItem(storeId);
@@ -192,6 +207,151 @@ export function StoreMenu({ storeId }: { storeId: string }) {
       : update.error instanceof Error
         ? update.error.message
         : null;
+
+  /**
+   * The detail panel, drawn into `StoreScreen`'s slot when there is one.
+   *
+   * `createPortal` moves the DOM node and leaves the React tree exactly
+   * where it is — so `open`, the section being renamed, the save mutations
+   * and the counter behind "add another" all stay here, and none of them
+   * has to be threaded up to a parent to move a box by the height of a
+   * header.
+   */
+  const panel = (
+    <Panel
+      open={open !== null}
+      onClose={() => setOpen(null)}
+      label={t("menu.formLabel")}
+    >
+      {open && (
+        <>
+          <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
+            <div className="flex flex-grow flex-col gap-xxs">
+              {/* The overline says where in the menu this lands. On a section
+                      it says what is being edited *is* a section, which the title
+                      below cannot — "Cold mezze" alone reads as an item. */}
+              <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
+                {open.kind === "section"
+                  ? t("menu.sections")
+                  : pickLocalized(openSection?.title ?? {})}
+              </span>
+              <h2 className="text-[20px]">
+                {open.kind === "section"
+                  ? openSection
+                    ? pickLocalized(openSection.title)
+                    : t("menu.addSection")
+                  : editingItem
+                    ? pickLocalized(editingItem.name)
+                    : t("menu.newItem")}
+              </h2>
+            </div>
+            {/* The same close the receipt has. Escape and Cancel both work,
+                    but a visible affordance is what people look for first. */}
+            <button
+              type="button"
+              onClick={() => setOpen(null)}
+              aria-label={t("common.close")}
+              className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft hover:bg-neutral-fill lg:flex"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                aria-hidden
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+
+          {open.kind === "section" ? (
+            <SectionForm
+              // Keyed on the section, so opening a different one rebuilds
+              // the form rather than leaving the previous name in the field.
+              key={open.sectionId}
+              variant="panel"
+              initial={openSection?.title}
+              pending={renameSection.isPending}
+              onSave={(title) =>
+                renameSection.mutate(
+                  { id: open.sectionId, title },
+                  { onSuccess: () => setOpen(null) },
+                )
+              }
+              onCancel={() => setOpen(null)}
+            />
+          ) : (
+            <MenuItemEditor
+              /*
+                    Keyed, so switching from one item to another rebuilds the form
+                    rather than leaving the previous item's text in the fields —
+                    the state lives inside the editor, and React would otherwise
+                    reuse it. The counter on a new item is what makes "add
+                    another" clear the form.
+
+                    It counts **saves**, not submissions. It used to be
+                    `create.submittedAt`, which changes on every attempt — so a
+                    refused insert remounted the editor and threw away everything
+                    the operator had typed, at the exact moment they needed to
+                    read the error and correct one field. Losing a form to its own
+                    error message is the worst version of a validation failure.
+                  */
+              key={open.itemId ?? `new-${open.sectionId}-${added}`}
+              storeId={storeId}
+              itemId={open.itemId}
+              sectionId={open.sectionId}
+              initial={editingItem}
+              pending={pending}
+              error={error}
+              onSave={(draft) => {
+                if (open.itemId) {
+                  update.mutate(
+                    { id: open.itemId, patch: draft },
+                    { onSuccess: () => setOpen(null) },
+                  );
+                } else {
+                  create.mutate(
+                    {
+                      draft: { ...draft, storeId, sectionId: open.sectionId },
+                      sortOrder: nextSortOrder(openSection),
+                    },
+                    { onSuccess: () => setOpen(null) },
+                  );
+                }
+              }}
+              onSaveAndAnother={
+                // Only while adding. "Add another" means nothing when editing
+                // something that already exists.
+                open.itemId
+                  ? undefined
+                  : (draft) =>
+                      create.mutate(
+                        {
+                          draft: {
+                            ...draft,
+                            storeId,
+                            sectionId: open.sectionId,
+                          },
+                          // At the end of the section it was added to. The column
+                          // has no default, and "where does it go" is a question
+                          // the caller can answer and the database cannot.
+                          sortOrder: nextSortOrder(openSection),
+                        },
+                        // The blank form is the reward for a save that landed.
+                        { onSuccess: () => setAdded((count) => count + 1) },
+                      )
+              }
+              onCancel={() => setOpen(null)}
+            />
+          )}
+        </>
+      )}
+    </Panel>
+  );
 
   return (
     // The shop's name and its tabs belong to `StoreScreen`, which draws them
@@ -463,139 +623,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             section to join. */}{" "}
       </div>
 
-      <Panel
-        open={open !== null}
-        onClose={() => setOpen(null)}
-        label={t("menu.formLabel")}
-      >
-        {open && (
-          <>
-            <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
-              <div className="flex flex-grow flex-col gap-xxs">
-                {/* The overline says where in the menu this lands. On a section
-                    it says what is being edited *is* a section, which the title
-                    below cannot — "Cold mezze" alone reads as an item. */}
-                <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
-                  {open.kind === "section"
-                    ? t("menu.sections")
-                    : pickLocalized(openSection?.title ?? {})}
-                </span>
-                <h2 className="text-[20px]">
-                  {open.kind === "section"
-                    ? openSection
-                      ? pickLocalized(openSection.title)
-                      : t("menu.addSection")
-                    : editingItem
-                      ? pickLocalized(editingItem.name)
-                      : t("menu.newItem")}
-                </h2>
-              </div>
-              {/* The same close the receipt has. Escape and Cancel both work,
-                  but a visible affordance is what people look for first. */}
-              <button
-                type="button"
-                onClick={() => setOpen(null)}
-                aria-label={t("common.close")}
-                className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft hover:bg-neutral-fill lg:flex"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  aria-hidden
-                >
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-
-            {open.kind === "section" ? (
-              <SectionForm
-                // Keyed on the section, so opening a different one rebuilds
-                // the form rather than leaving the previous name in the field.
-                key={open.sectionId}
-                variant="panel"
-                initial={openSection?.title}
-                pending={renameSection.isPending}
-                onSave={(title) =>
-                  renameSection.mutate(
-                    { id: open.sectionId, title },
-                    { onSuccess: () => setOpen(null) },
-                  )
-                }
-                onCancel={() => setOpen(null)}
-              />
-            ) : (
-              <MenuItemEditor
-                /*
-                  Keyed, so switching from one item to another rebuilds the form
-                  rather than leaving the previous item's text in the fields —
-                  the state lives inside the editor, and React would otherwise
-                  reuse it. The counter on a new item is what makes "add
-                  another" clear the form.
-
-                  It counts **saves**, not submissions. It used to be
-                  `create.submittedAt`, which changes on every attempt — so a
-                  refused insert remounted the editor and threw away everything
-                  the operator had typed, at the exact moment they needed to
-                  read the error and correct one field. Losing a form to its own
-                  error message is the worst version of a validation failure.
-                */
-                key={open.itemId ?? `new-${open.sectionId}-${added}`}
-                storeId={storeId}
-                itemId={open.itemId}
-                sectionId={open.sectionId}
-                initial={editingItem}
-                pending={pending}
-                error={error}
-                onSave={(draft) => {
-                  if (open.itemId) {
-                    update.mutate(
-                      { id: open.itemId, patch: draft },
-                      { onSuccess: () => setOpen(null) },
-                    );
-                  } else {
-                    create.mutate(
-                      {
-                        draft: { ...draft, storeId, sectionId: open.sectionId },
-                        sortOrder: nextSortOrder(openSection),
-                      },
-                      { onSuccess: () => setOpen(null) },
-                    );
-                  }
-                }}
-                onSaveAndAnother={
-                  // Only while adding. "Add another" means nothing when editing
-                  // something that already exists.
-                  open.itemId
-                    ? undefined
-                    : (draft) =>
-                        create.mutate(
-                          {
-                            draft: {
-                              ...draft,
-                              storeId,
-                              sectionId: open.sectionId,
-                            },
-                            // At the end of the section it was added to. The column
-                            // has no default, and "where does it go" is a question
-                            // the caller can answer and the database cannot.
-                            sortOrder: nextSortOrder(openSection),
-                          },
-                          // The blank form is the reward for a save that landed.
-                          { onSuccess: () => setAdded((count) => count + 1) },
-                        )
-                }
-                onCancel={() => setOpen(null)}
-              />
-            )}
-          </>
-        )}
-      </Panel>
+      {panelSlot ? createPortal(panel, panelSlot) : panel}
     </div>
   );
 }

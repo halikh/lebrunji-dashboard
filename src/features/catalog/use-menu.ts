@@ -21,9 +21,13 @@ import {
   type MenuItemDraft,
   type MenuItemPatch,
   type MenuSection,
+  fetchArchive,
+  restoreMenuItem,
+  restoreMenuSection,
   type MenuSectionDraft,
   type SortUpdate,
 } from "./api/menu";
+import { updateItemOption, updateOptionGroup } from "./api/options";
 
 export const menuKeys = {
   all: ["menu"] as const,
@@ -274,4 +278,95 @@ export function useReorderMenu(storeId: string) {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// The archive
+// ---------------------------------------------------------------------------
+
+/**
+ * What this shop has put away.
+ *
+ * Keyed under the shop's menu, so every archive and every restore already
+ * invalidates it — a dish archived on the menu tab appears here without the
+ * mutation having to know this screen exists.
+ */
+export function useArchive(storeId: string) {
+  return useQuery({
+    queryKey: [...menuKeys.store(storeId), "archive"],
+    queryFn: () => fetchArchive(storeId),
+  });
+}
+
+/**
+ * Bringing something back.
+ *
+ * One hook for all three, because they share an invalidation and a failure
+ * path, and because the interesting outcome is the *refusal* — a dish whose
+ * section is still archived — which has to reach the operator as a sentence
+ * rather than as a button that does nothing.
+ *
+ * `["options"]` as well as the menu key: a withdrawn choice coming back changes
+ * the Options tab, which is keyed separately.
+ */
+export function useRestore(storeId: string) {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  const settle = {
+    onError: (error: unknown) => {
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      );
+    },
+  };
+
+  function refresh() {
+    void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
+    void queryClient.invalidateQueries({ queryKey: ["options"] });
+  }
+
+  const item = useMutation({
+    mutationFn: (input: { id: string; name: Localized }) =>
+      restoreMenuItem(input.id),
+    onSuccess: (_result, input) => {
+      refresh();
+      toast.success(t("archive.restored", { name: pickLocalized(input.name) }));
+    },
+    ...settle,
+  });
+
+  const section = useMutation({
+    mutationFn: (input: { id: string; name: Localized }) =>
+      restoreMenuSection(input.id),
+    onSuccess: (_result, input) => {
+      refresh();
+      toast.success(
+        t("archive.sectionRestored", { name: pickLocalized(input.name) }),
+      );
+    },
+    ...settle,
+  });
+
+  const group = useMutation({
+    mutationFn: (input: { id: string; name: Localized }) =>
+      updateOptionGroup(input.id, { isActive: true }),
+    onSuccess: (_result, input) => {
+      refresh();
+      toast.success(t("archive.offered", { name: pickLocalized(input.name) }));
+    },
+    ...settle,
+  });
+
+  const option = useMutation({
+    mutationFn: (input: { id: string; name: Localized }) =>
+      updateItemOption(input.id, { isActive: true }),
+    onSuccess: (_result, input) => {
+      refresh();
+      toast.success(t("archive.offered", { name: pickLocalized(input.name) }));
+    },
+    ...settle,
+  });
+
+  return { item, section, group, option };
 }

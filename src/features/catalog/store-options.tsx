@@ -253,6 +253,19 @@ function Question({
   const options = useItemOptions();
 
   const [addingChoice, setAddingChoice] = useState(false);
+  /** Which answer is being corrected. One at a time — a row is either a row or
+      a form, and two open forms in a list is two places to press Save. */
+  const [editingChoice, setEditingChoice] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  /**
+   * Bumped on every successful add, and used as the add form's `key`.
+   *
+   * The form stays open because choices arrive in runs, and it has to come back
+   * empty for the next one. Remounting is what clears it — resetting the fields
+   * by hand meant the price box's own draft string survived, so the previous
+   * choice's figure sat in a form that had already been submitted.
+   */
+  const [added, setAdded] = useState(0);
   const currencyCode = store.data?.currencyCode ?? "";
 
   return (
@@ -321,6 +334,19 @@ function Question({
             forever, so `is_active` is the only honest way to stop asking a
             question — and it is reversible, which is why it is a switch rather
             than a confirmed, final-sounding button. */}
+        {/* Opens the question as well as the rename form. Pressing "Rename" on
+            a collapsed question and having nothing appear reads as a broken
+            button — the form is inside the body it does not know is shut. */}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setRenaming(true);
+            if (!open) onToggle();
+          }}
+        >
+          {t("options.renameGroup")}
+        </Button>
         <Toggle
           on={group.isActive}
           onChange={() =>
@@ -337,6 +363,24 @@ function Question({
 
       <Collapse open={open}>
         <div className="flex flex-col gap-lg pt-lg">
+          {/* Above the switches, because it is the question itself and they are
+              its rules. It only exists while it is being used: a text box
+              sitting permanently over a row of switches reads as the heading of
+              the block rather than as a thing to edit. */}
+          {renaming && (
+            <TitleForm
+              initial={group.title}
+              pending={update.isPending}
+              onSave={(title) =>
+                update.mutate(
+                  { id: group.id, patch: { title } },
+                  { onSuccess: () => setRenaming(false) },
+                )
+              }
+              onCancel={() => setRenaming(false)}
+            />
+          )}
+
           {/* Switches and small numbers rather than a form with a Save: each is
               one fact, there is nothing to weigh up between them, and the
               result is on screen as it changes. */}
@@ -409,77 +453,120 @@ function Question({
               </p>
             )}
 
-            {group.options.map((option) => (
-              <div
-                key={option.id}
-                className={cx(
-                  "flex flex-wrap items-center gap-md rounded-md border px-lg py-md",
-                  option.isActive
-                    ? "border-border"
-                    : "border-danger-wash bg-danger-wash/30",
-                )}
-              >
-                <span className="min-w-0 flex-grow truncate text-[14px]">
-                  {pickLocalized(option.name)}
-                </span>
+            {group.options.map((option) =>
+              editingChoice === option.id ? (
+                <ChoiceForm
+                  key={option.id}
+                  initial={{ name: option.name, price: option.price }}
+                  currencyCode={currencyCode}
+                  pending={options.edit.isPending}
+                  saveLabel={t("options.saveChoice")}
+                  onSave={(draft) =>
+                    options.edit.mutate(
+                      { id: option.id, patch: draft },
+                      { onSuccess: () => setEditingChoice(null) },
+                    )
+                  }
+                  onCancel={() => setEditingChoice(null)}
+                />
+              ) : (
+                <div
+                  key={option.id}
+                  className={cx(
+                    "flex flex-wrap items-center gap-md rounded-md border px-lg py-md",
+                    option.isActive
+                      ? "border-border"
+                      : "border-danger-wash bg-danger-wash/30",
+                  )}
+                >
+                  <span className="min-w-0 flex-grow truncate text-[14px]">
+                    {pickLocalized(option.name)}
+                  </span>
 
-                <span className="shrink-0 text-[13px] tabular-nums text-text-soft">
-                  {/* Free in words. `$0.00` on a choice reads as a price somebody
+                  <span className="shrink-0 text-[13px] tabular-nums text-text-soft">
+                    {/* Free in words. `$0.00` on a choice reads as a price somebody
                   forgot to fill in. */}
-                  {option.price === 0
-                    ? t("options.free")
-                    : `+ ${format(option.price, currencyCode)}`}
-                </span>
+                    {option.price === 0
+                      ? t("options.free")
+                      : `+ ${format(option.price, currencyCode)}`}
+                  </span>
 
-                {/* Which answer the sheet opens on. Only meaningful where the
+                  {/* Which answer the sheet opens on. Only meaningful where the
                 customer must answer and may pick one — an optional question
                 opens on nothing, which is the point of it being optional. */}
-                {group.minSelections >= 1 &&
-                  group.mode === "single" &&
-                  (option.isDefault ? (
-                    <span className="shrink-0 rounded-full bg-accent-wash px-md py-xxs text-[12px] font-semibold text-accent-deep">
-                      {t("options.isDefault")}
-                    </span>
-                  ) : (
-                    <Button
-                      variant="primary-quiet"
-                      size="sm"
-                      onClick={() =>
-                        options.makeDefault.mutate({
-                          groupId: group.id,
-                          optionId: option.id,
-                        })
-                      }
-                    >
-                      {t("options.makeDefault")}
-                    </Button>
-                  ))}
+                  {group.minSelections >= 1 &&
+                    group.mode === "single" &&
+                    (option.isDefault ? (
+                      <span className="shrink-0 rounded-full bg-accent-wash px-md py-xxs text-[12px] font-semibold text-accent-deep">
+                        {t("options.isDefault")}
+                      </span>
+                    ) : (
+                      <Button
+                        variant="primary-quiet"
+                        size="sm"
+                        onClick={() =>
+                          options.makeDefault.mutate({
+                            groupId: group.id,
+                            optionId: option.id,
+                          })
+                        }
+                      >
+                        {t("options.makeDefault")}
+                      </Button>
+                    ))}
 
-                <Toggle
-                  on={option.isActive}
-                  onChange={() =>
-                    options.edit.mutate({
-                      id: option.id,
-                      patch: { isActive: !option.isActive },
-                    })
-                  }
-                  labelOn={t("options.offeredGroup")}
-                  labelOff={t("options.withdrawn")}
-                  className="w-[124px]"
-                />
-              </div>
-            ))}
+                  {/* Named for a screen reader, because a group of six choices is
+                    six identical "Edit"s otherwise. */}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setEditingChoice(option.id)}
+                    aria-label={t("options.editChoiceLabel", {
+                      name: pickLocalized(option.name),
+                    })}
+                  >
+                    {t("options.editChoice")}
+                  </Button>
+
+                  <Toggle
+                    on={option.isActive}
+                    onChange={() =>
+                      options.edit.mutate({
+                        id: option.id,
+                        patch: { isActive: !option.isActive },
+                      })
+                    }
+                    labelOn={t("options.offeredGroup")}
+                    labelOff={t("options.withdrawn")}
+                    className="w-[124px]"
+                  />
+                </div>
+              ),
+            )}
 
             {/* The same shape as "Add an item to Signature plates" on the menu:
             a place to press, not a form sitting open. A permanently visible
             form under a list reads as a row of it, and on a dish with four
             questions it is four forms nobody is filling in. */}
             {addingChoice ? (
-              <NewChoice
-                groupId={group.id}
+              <ChoiceForm
+                key={added}
                 currencyCode={currencyCode}
-                sortOrder={group.options.length}
-                onDone={() => setAddingChoice(false)}
+                pending={options.add.isPending}
+                saveLabel={t("options.addOption")}
+                onSave={(draft) =>
+                  options.add.mutate(
+                    {
+                      groupId: group.id,
+                      ...draft,
+                      sortOrder: group.options.length,
+                    },
+                    // Stays open — choices arrive in runs, not one at a time.
+                    // The bump is what empties it for the next one.
+                    { onSuccess: () => setAdded((count) => count + 1) },
+                  )
+                }
+                onCancel={() => setAddingChoice(false)}
               />
             ) : (
               <button
@@ -509,35 +596,114 @@ function Question({
   );
 }
 
-/** Adding an answer. Stays open — they arrive in runs, not one at a time. */
-function NewChoice({
-  groupId,
-  currencyCode,
-  sortOrder,
-  onDone,
+/**
+ * Correcting what a question asks.
+ *
+ * Every other fact about a group is a switch that writes as it is flicked, and
+ * this one is not: text is typed rather than chosen, so it needs a Save and an
+ * escape from a half-finished edit. That is the whole reason it is a form and
+ * the rules above it are not.
+ */
+function TitleForm({
+  initial,
+  pending,
+  onSave,
+  onCancel,
 }: {
-  groupId: string;
-  /** The shop's currency — what the choice's extra cost is denominated in. */
-  currencyCode: string;
-  sortOrder: number;
-  onDone: () => void;
+  initial: Localized;
+  pending: boolean;
+  onSave: (title: Localized) => void;
+  onCancel: () => void;
 }) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
-  const options = useItemOptions();
+
+  const form = useRevealOnMount<HTMLDivElement>({ focus: true });
+
+  const [title, setTitle] = useState<Localized>(initial);
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  function submit() {
+    const check = validateLocalizedText(title, codes, TEXT.title);
+    if (!check.ok) {
+      setError(t(check.key, check.params));
+      return;
+    }
+    setError(undefined);
+    onSave(title);
+  }
+
+  return (
+    <div
+      ref={form}
+      className="flex flex-col gap-lg rounded-md border border-active bg-surface p-lg"
+    >
+      <LocalizedField
+        label={t("options.groupTitle")}
+        hint={t("options.groupTitleHint")}
+        value={title}
+        onChange={setTitle}
+        maxLength={TEXT.title}
+        error={error}
+        placeholder={{ en: "What size?", ar: "أي حجم؟" }}
+      />
+      <div className="flex items-center gap-sm">
+        <Button variant="secondary" onClick={onCancel} disabled={pending}>
+          {t("common.cancel")}
+        </Button>
+        <Button onClick={submit} pending={pending}>
+          {t("options.saveTitle")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Naming and pricing an answer — **the same form whether it is new or not**.
+ *
+ * There were two candidates for the edit case: a second form beside this one,
+ * or this one with an `initial`. Two would drift, and the way they would drift
+ * is that one grows the currency-aware price box and the other keeps a plain
+ * number — which is the exact bug that put `0.03` on a choice somebody priced
+ * at three. One form, one conversion, one set of validation.
+ *
+ * It does not own a mutation. Adding appends and stays open for the next one;
+ * editing writes one row and closes. Those are different enough that the caller
+ * should say which it is, and identical enough that the fields should not care.
+ */
+function ChoiceForm({
+  initial,
+  currencyCode,
+  pending,
+  saveLabel,
+  onSave,
+  onCancel,
+}: {
+  /** The row being corrected, or absent when this is a new choice. */
+  initial?: { name: Localized; price: number };
+  /** The shop's currency — what the extra cost is denominated in. */
+  currencyCode: string;
+  pending: boolean;
+  saveLabel: string;
+  onSave: (draft: { name: Localized; price: number }) => void;
+  onCancel: () => void;
+}) {
+  const languages = useLanguages();
+  const codes = languages.data?.map((language) => language.code) ?? [];
   // A choice is priced in its dish's currency, and a dish in its shop's — which
   // is whichever one the wizard was pointed at and not necessarily the base
-  // one. The line above renders it with `format(price, currencyCode)`, so
-  // typing it against any other currency's decimals would mean writing with one
-  // scale and reading back with another.
+  // one. The row above renders it with `format(price, currencyCode)`, so typing
+  // it against any other currency's decimals would mean writing with one scale
+  // and reading back with another.
   const { decimalsOf } = useMoney();
   const decimals = decimalsOf(currencyCode);
 
   const form = useRevealOnMount<HTMLDivElement>({ focus: true });
 
-  const [name, setName] = useState<Localized>({});
+  const [name, setName] = useState<Localized>(initial?.name ?? {});
   /** Minor units, the way the column stores it — `MoneyInput` does the sum. */
-  const [price, setPrice] = useState<number | null>(0);
+  const [price, setPrice] = useState<number | null>(initial?.price ?? 0);
   const [error, setError] = useState<string | undefined>(undefined);
 
   function submit() {
@@ -557,21 +723,18 @@ function NewChoice({
     }
 
     setError(undefined);
-    options.add.mutate(
-      { groupId, name, price: amount, sortOrder },
-      {
-        onSuccess: () => {
-          setName({});
-          setPrice(0);
-        },
-      },
-    );
+    onSave({ name, price: amount });
   }
 
   return (
     <div
       ref={form}
-      className="flex flex-col gap-lg rounded-md border border-dashed border-border bg-surface p-lg"
+      className={cx(
+        "flex flex-col gap-lg rounded-md border bg-surface p-lg",
+        // Dashed while it is a gap waiting to be filled, solid and marked once
+        // it is standing in for a row that already exists.
+        initial ? "border-active" : "border-dashed border-border",
+      )}
     >
       <LocalizedField
         label={t("options.optionName")}
@@ -581,9 +744,9 @@ function NewChoice({
         error={error}
         placeholder={{ en: "Large", ar: "كبير" }}
       />
-      {/* The button is inside the field's control slot, beside the box, so it
-          lines up with the thing it acts on rather than with the hint under
-          it. */}
+      {/* The buttons are inside the field's control slot, beside the box, so
+          they line up with the thing they act on rather than with the hint
+          under it. */}
       <Field label={t("options.extraCost")} hint={t("options.extraCostHint")}>
         <div className="flex flex-wrap items-center gap-sm">
           {/* Typed as a person would say it — `3` is three dollars, not three
@@ -599,15 +762,13 @@ function NewChoice({
               placeholder="0"
             />
           </span>
-          <Button
-            variant="secondary"
-            onClick={onDone}
-            disabled={options.add.isPending}
-          >
+          {/* Cancel then save, the same order as everywhere else: the button in
+              a given position should always do the same thing. */}
+          <Button variant="secondary" onClick={onCancel} disabled={pending}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={submit} pending={options.add.isPending}>
-            {t("options.addOption")}
+          <Button onClick={submit} pending={pending}>
+            {saveLabel}
           </Button>
         </div>
       </Field>

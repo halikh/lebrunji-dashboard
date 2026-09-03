@@ -948,6 +948,52 @@ const en = {
     alreadyOnDish: "This dish already carries that tag.",
   },
 
+  /**
+   * The archive tab.
+   *
+   * Two mechanisms, two words, on purpose. A section or a dish is **archived**
+   * — a `deleted_at`, soft because order lines reference it for ever. A
+   * question or a choice is **withdrawn** — `is_active`, because those tables
+   * have no `deleted_at` and migration 0019 says they should not. Calling both
+   * "deleted" would be one word for two states that come back by different
+   * routes.
+   */
+  archive: {
+    tab: "Archive",
+    title: "Put away",
+    hint: "Nothing here is deleted — order history still points at all of it. Bring back what you need.",
+    all: "All",
+    sections: "Sections",
+    items: "Dishes",
+    groups: "Questions",
+    options: "Choices",
+    stores: "Shops",
+    categories: "Categories",
+    tags: "Tags",
+    promotions: "Promotions",
+    // Shown when a filter is on and its own set is empty — distinct from the
+    // whole archive being empty, which is a different sentence and a different
+    // mascot.
+    noneOfThese: "Nothing archived of this kind",
+    noneOfTheseBody: "Try another filter, or All.",
+    // Says where it would return to, which is the fact that decides whether
+    // pressing the button is safe.
+    inSection: "in {name}",
+    onDish: "on {name}",
+    inQuestion: "{question} · {dish}",
+    archivedOn: "Archived {when}",
+    restore: "Bring back",
+    // The refusal. A dish restored into an archived section is listed by
+    // neither the dashboard nor the app, so it is refused rather than mislaid.
+    sectionGoneFirst: "Bring back {name} first — a dish cannot return to an archived section.",
+    restored: "{name} is back on the menu",
+    sectionRestored: "{name} is back",
+    offered: "{name} is offered again",
+    emptyTitle: "Nothing put away",
+    emptyBody: "Archived sections and dishes, and withdrawn questions and choices, collect here.",
+    failedTitle: "Could not load the archive",
+  },
+
   options: {
     tab: "Options",
     tabHint:
@@ -984,6 +1030,16 @@ const en = {
     mustChooseHint:
       "Required questions have to be answered before the dish can be added.",
     saveGroup: "Create question",
+    // Renaming a question and re-pricing a choice. Both were missing: every
+    // other fact about a group was a switch that wrote as it was flicked,
+    // while the two *text* facts — what is asked, and what an answer is
+    // called and costs — could only be set at creation and never corrected.
+    renameGroup: "Rename",
+    saveTitle: "Save question",
+    editChoice: "Edit",
+    saveChoice: "Save choice",
+    // Named, because a group has several rows of identical buttons.
+    editChoiceLabel: "Edit {name}",
     optionName: "Choice",
     extraCost: "Adds",
     extraCostHint: "Added to the dish's price. Leave at 0 for a free choice.",

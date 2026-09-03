@@ -267,6 +267,12 @@ function Row({ customer }: { customer: Customer }) {
         <span className="truncate tabular-nums text-[12px] text-text-faint">
           {formatPhone(customer.phone)}
         </span>
+        {/* Under the phone, with the identity, rather than out in the row of
+            facts. Whether an account is suspended is a property of *this
+            person* — the same kind of thing as their name — while the order
+            count and the join date are measurements taken of them. Out on the
+            right it also sat between two figures and read as a third. */}
+        <StatusChip customer={customer} />
       </span>
 
       <span className="shrink-0 text-[12px] text-text-faint">
@@ -278,8 +284,6 @@ function Row({ customer }: { customer: Customer }) {
       <span className="w-[110px] shrink-0 text-[12px] text-text-faint">
         {t("customers.joined", { when: formatDate(customer.createdAt) })}
       </span>
-
-      <StatusChip customer={customer} />
 
       {/* `relative z-10`, above the stretched link that covers the row — the
           second half of that pattern, and the half whose absence looks like a

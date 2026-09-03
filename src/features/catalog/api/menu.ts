@@ -1,4 +1,5 @@
 import { getClient } from "@/lib/supabase/client";
+import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
 import { localizedOrNull, type Localized } from "@/lib/validation";
@@ -587,4 +588,229 @@ function asArray(value: unknown): Record<string, unknown>[] {
   if (value && typeof value === "object")
     return [value as Record<string, unknown>];
   return [];
+}
+
+// ---------------------------------------------------------------------------
+// The archive
+// ---------------------------------------------------------------------------
+
+/**
+ * What a shop has put away.
+ *
+ * ## Why this needs a screen at all
+ *
+ * Archiving is soft everywhere in this product — order lines reference items
+ * for ever, so a row is never removed — and until now the *only* consequence of
+ * that was invisible. A section or a dish left the menu and there was nowhere
+ * it went: no list of it, no way back, and no answer to "where did Signature
+ * plates go" beyond re-creating it under a name the slug index would then
+ * refuse. A soft delete with no view of what it holds is a hard delete that
+ * costs storage.
+ *
+ * ## Withdrawn options are in here too, and they are a different mechanism
+ *
+ * `option_groups` and `item_options` have no `deleted_at` — migration 0019 is
+ * explicit that `is_active` is how they are withdrawn, and that two ways to say
+ * "gone" would be two places to check. So the archive reads two kinds of
+ * absence and says so on screen rather than flattening them into one word: a
+ * dish is *archived*, a choice is *withdrawn*, and only one of those can be
+ * undone from the tab it normally lives on.
+ */
+export type ArchivedSection = {
+  id: string;
+  title: Localized;
+  archivedAt: string;
+};
+
+export type ArchivedItem = {
+  id: string;
+  name: Localized;
+  price: number;
+  imageUrl: string | null;
+  archivedAt: string;
+  sectionTitle: Localized;
+  /** Whether the section it would return to is itself archived. */
+  sectionArchived: boolean;
+};
+
+export type WithdrawnGroup = {
+  id: string;
+  title: Localized;
+  itemName: Localized;
+};
+
+export type WithdrawnOption = {
+  id: string;
+  name: Localized;
+  price: number;
+  groupTitle: Localized;
+  itemName: Localized;
+};
+
+export type Archive = {
+  sections: ArchivedSection[];
+  items: ArchivedItem[];
+  groups: WithdrawnGroup[];
+  options: WithdrawnOption[];
+};
+
+/**
+ * Everything one shop has put away, in one read.
+ *
+ * Four queries rather than one join: they are four different questions about
+ * three tables, and the join that answered all of them at once would return a
+ * row per option per group per item and be un-picked apart in the browser.
+ * They run together, so it is one round trip's worth of waiting.
+ *
+ * **Archived items carry their section's state**, because it decides whether
+ * they can come back: restoring a dish into an archived section is the mislaid
+ * state `archiveMenuSection` exists to prevent, and the screen has to be able
+ * to say so before the operator presses the button rather than after.
+ */
+export async function fetchArchive(storeId: string): Promise<Archive> {
+  const client = getClient();
+
+  const [sections, items, groups, options] = await Promise.all([
+    client
+      .from("menu_sections")
+      .select("id, title, deleted_at")
+      .eq("store_id", storeId)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false }),
+
+    client
+      .from("menu_items")
+      .select(
+        "id, name, price, image_url, deleted_at, menu_sections!inner ( title, deleted_at )",
+      )
+      .eq("store_id", storeId)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false }),
+
+    client
+      .from("option_groups")
+      .select("id, title, is_active, menu_items!inner ( name, store_id )")
+      .eq("menu_items.store_id", storeId)
+      .eq("is_active", false),
+
+    client
+      .from("item_options")
+      .select(
+        `id, name, price, is_active,
+         option_groups!inner ( title, menu_items!inner ( name, store_id ) )`,
+      )
+      .eq("option_groups.menu_items.store_id", storeId)
+      .eq("is_active", false),
+  ]);
+
+  for (const result of [sections, items, groups, options]) {
+    if (result.error) {
+      throw new Error(`Could not read the archive: ${result.error.message}`);
+    }
+  }
+
+  return {
+    sections: (sections.data ?? []).map((row) => ({
+      id: row.id as string,
+      title: (row.title as Localized) ?? {},
+      archivedAt: row.deleted_at as string,
+    })),
+    items: (items.data ?? []).map((row) => {
+      const section = one(row.menu_sections);
+      return {
+        id: row.id as string,
+        name: (row.name as Localized) ?? {},
+        price: row.price as number,
+        imageUrl: (row.image_url as string | null) ?? null,
+        archivedAt: row.deleted_at as string,
+        sectionTitle: (section?.title as Localized) ?? {},
+        sectionArchived: section?.deleted_at != null,
+      };
+    }),
+    groups: (groups.data ?? []).map((row) => ({
+      id: row.id as string,
+      title: (row.title as Localized) ?? {},
+      itemName: (one(row.menu_items)?.name as Localized) ?? {},
+    })),
+    options: (options.data ?? []).map((row) => {
+      const group = one(row.option_groups);
+      return {
+        id: row.id as string,
+        name: (row.name as Localized) ?? {},
+        price: row.price as number,
+        groupTitle: (group?.title as Localized) ?? {},
+        itemName: (one(group?.menu_items)?.name as Localized) ?? {},
+      };
+    }),
+  };
+}
+
+/**
+ * Puts a dish back on the menu.
+ *
+ * **Refuses when its section is archived**, and the check is here rather than
+ * only in the screen: a restored dish in an archived section has a `deleted_at`
+ * of null inside a section that does not, so neither the dashboard nor the app
+ * would list it. It has not been restored; it has been mislaid — the same
+ * failure `archiveMenuSection` guards from the other direction, and the reason
+ * that function moves items out before it archives anything.
+ *
+ * The section is read back rather than trusted from the list on screen, which
+ * may be a minute old.
+ */
+export async function restoreMenuItem(id: string): Promise<void> {
+  const client = getClient();
+
+  const { data, error: lookup } = await client
+    .from("menu_items")
+    .select("menu_sections!inner ( title, deleted_at )")
+    .eq("id", id)
+    .single();
+
+  if (lookup) throw new Error(lookup.message);
+
+  const section = one(data?.menu_sections);
+  if (section?.deleted_at != null) {
+    throw new Error(
+      t("archive.sectionGoneFirst", {
+        name: pickLocalized((section.title as Localized) ?? {}),
+      }),
+    );
+  }
+
+  const { error } = await client
+    .from("menu_items")
+    .update({ deleted_at: null })
+    .eq("id", id);
+
+  if (error) throw new Error(friendly(error.message));
+}
+
+/**
+ * Puts a section back.
+ *
+ * Nothing to check: a section can only be archived once it is empty of live
+ * items, so the one that comes back is the one that went away. Its dishes are
+ * restored individually, which is also the only honest order — some of them
+ * were archived on purpose before the section was.
+ */
+export async function restoreMenuSection(id: string): Promise<void> {
+  const { error } = await getClient()
+    .from("menu_sections")
+    .update({ deleted_at: null })
+    .eq("id", id);
+
+  if (error) throw new Error(friendly(error.message));
+}
+
+/**
+ * PostgREST hands an embedded to-one back as an object, and sometimes as an
+ * array of one — which of the two depends on how it read the relationship.
+ * Both mean the same thing here, and a screen should not have to know which it
+ * got.
+ */
+function one(value: unknown): Record<string, unknown> | undefined {
+  if (Array.isArray(value)) return value[0] as Record<string, unknown>;
+  if (value && typeof value === "object") return value as Record<string, unknown>;
+  return undefined;
 }
