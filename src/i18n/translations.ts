@@ -986,6 +986,18 @@ const en = {
     // The refusal. A dish restored into an archived section is listed by
     // neither the dashboard nor the app, so it is refused rather than mislaid.
     sectionGoneFirst: "Bring back {name} first — a dish cannot return to an archived section.",
+    // The same refusal one tier up: `stores.category_id` is not null, so a shop
+    // restored into an archived category is on a shelf nothing draws.
+    categoryGoneFirst: "Bring back {name} first — a shop cannot return to an archived category.",
+    broughtBack: "{name} is back",
+    // The catalogue-level archive, above the per-shop one.
+    catalogueTitle: "Put away",
+    catalogueHint: "Archived shops, categories, tags and promotions. Nothing here is deleted — bring back what you need.",
+    catalogueEmptyBody: "Archived shops, categories, tags and promotions collect here.",
+    inCategory: "in {name}",
+    // A promotion has no customer-facing name, so the slug is the handle — the
+    // same one the promotions list shows.
+    promotionSlug: "{slug}",
     restored: "{name} is back on the menu",
     sectionRestored: "{name} is back",
     offered: "{name} is offered again",

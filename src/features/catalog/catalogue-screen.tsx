@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
 
+import { CatalogueArchive } from "./catalogue-archive";
 import { CategoriesList } from "./categories-list";
 import { PromotionsList } from "./promotions-list";
 import { StoresList } from "./stores-list";
@@ -43,6 +44,10 @@ const TABS = [
   { key: "categories", labelKey: "categories.tab" },
   { key: "promotions", labelKey: "promotions.tab" },
   { key: "tags", labelKey: "tags.tab" },
+  // Last, like the shop page's. It is where you go to undo something rather
+  // than part of building the catalogue up, and the tab order should read as
+  // the order the work is done in.
+  { key: "archive", labelKey: "archive.tab" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -129,6 +134,15 @@ export function CatalogueScreen() {
       <div className={cx("min-h-0 flex-1", tab !== "tags" && "hidden")}>
         <TagsList />
       </div>
+      {/* Mounted only while it is open, unlike its siblings. They stay mounted
+          to keep a search term and a scroll position across a tab switch; this
+          one has neither, and its four queries would otherwise run on every
+          visit to the catalogue to answer a question nobody asked. */}
+      {tab === "archive" && (
+        <div className="min-h-0 flex-1">
+          <CatalogueArchive />
+        </div>
+      )}
     </div>
   );
 }
