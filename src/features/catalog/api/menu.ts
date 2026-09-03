@@ -713,7 +713,10 @@ export type ArchivedItem = {
 export type WithdrawnGroup = {
   id: string;
   title: Localized;
+  /** One of the items it is asked on — the row says "and N others". */
   itemName: Localized;
+  /** How many items ask it. Zero is possible and is worth showing. */
+  itemCount: number;
 };
 
 export type WithdrawnOption = {
@@ -722,6 +725,7 @@ export type WithdrawnOption = {
   price: number;
   groupTitle: Localized;
   itemName: Localized;
+  itemCount: number;
 };
 
 export type Archive = {
@@ -764,19 +768,27 @@ export async function fetchArchive(storeId: string): Promise<Archive> {
       .not("deleted_at", "is", null)
       .order("deleted_at", { ascending: false }),
 
+    // Scoped by the group's own `store_id` rather than through an item, since
+    // `0094` there is no owning item to join to — and a withdrawn question that
+    // is asked on nothing would drop out of an inner join to the links, which
+    // is exactly the row most in need of being listed here.
     client
       .from("option_groups")
-      .select("id, title, is_active, menu_items!inner ( name, store_id )")
-      .eq("menu_items.store_id", storeId)
+      .select(
+        `id, title, is_active,
+         menu_item_option_group_links ( menu_items ( name ) )`,
+      )
+      .eq("store_id", storeId)
       .eq("is_active", false),
 
     client
       .from("item_options")
       .select(
         `id, name, price, is_active,
-         option_groups!inner ( title, menu_items!inner ( name, store_id ) )`,
+         option_groups!inner ( title, store_id,
+           menu_item_option_group_links ( menu_items ( name ) ) )`,
       )
-      .eq("option_groups.menu_items.store_id", storeId)
+      .eq("option_groups.store_id", storeId)
       .eq("is_active", false),
   ]);
 
@@ -807,7 +819,8 @@ export async function fetchArchive(storeId: string): Promise<Archive> {
     groups: (groups.data ?? []).map((row) => ({
       id: row.id as string,
       title: (row.title as Localized) ?? {},
-      itemName: (one(row.menu_items)?.name as Localized) ?? {},
+      itemName: firstItemName(row.menu_item_option_group_links),
+      itemCount: asArray(row.menu_item_option_group_links).length,
     })),
     options: (options.data ?? []).map((row) => {
       const group = one(row.option_groups);
@@ -816,7 +829,8 @@ export async function fetchArchive(storeId: string): Promise<Archive> {
         name: (row.name as Localized) ?? {},
         price: row.price as number,
         groupTitle: (group?.title as Localized) ?? {},
-        itemName: (one(group?.menu_items)?.name as Localized) ?? {},
+        itemName: firstItemName(group?.menu_item_option_group_links),
+        itemCount: asArray(group?.menu_item_option_group_links).length,
       };
     }),
   };
@@ -886,6 +900,19 @@ export async function restoreMenuSection(id: string): Promise<void> {
  * Both mean the same thing here, and a screen should not have to know which it
  * got.
  */
+/**
+ * The name of one item a question is asked on, for a row that has room for one.
+ *
+ * A common question is asked on many and the row says "and N others" beside
+ * this; a question asked on none — every link removed, the group kept — gives
+ * an empty name, which the screen renders as its own state rather than as a
+ * blank.
+ */
+function firstItemName(links: unknown): Localized {
+  const item = one(asArray(links)[0]?.menu_items);
+  return (item?.name as Localized) ?? {};
+}
+
 function one(value: unknown): Record<string, unknown> | undefined {
   if (Array.isArray(value)) return value[0] as Record<string, unknown>;
   if (value && typeof value === "object") return value as Record<string, unknown>;

@@ -10,6 +10,7 @@ import { t } from "@/i18n/translations";
 
 import { StoreDetails } from "./store-details";
 import { StoreArchive } from "./store-archive";
+import { StoreCommonOptions } from "./store-common-options";
 import { StoreHours } from "./store-hours";
 import { StoreMenu } from "./store-menu";
 import { StoreOptions } from "./store-options";
@@ -41,6 +42,10 @@ const TABS = [
   { key: "menu", labelKey: "menu.title" },
   { key: "details", labelKey: "store.tab" },
   { key: "options", labelKey: "options.tab" },
+  // Beside Options, because they are the same rows read the other way round:
+  // Options starts from an item and shows its questions, this starts from a
+  // question and shows its items.
+  { key: "common", labelKey: "commonOptions.tab" },
   { key: "hours", labelKey: "hours.tab" },
   // Last. It is where you go to undo something, not part of setting a shop up,
   // and the tab order should read as the order the work is done in.
@@ -174,6 +179,14 @@ export function StoreScreen({ storeId }: { storeId: string }) {
         <div className={cx("min-h-0 flex-1", tab !== "options" && "hidden")}>
           <StoreOptions storeId={storeId} />
         </div>
+        {/* Mounted only while open. It reads every question in the shop and the
+            whole menu to draw its picker, which is a lot to fetch on every
+            visit to a shop for a tab most visits do not open. */}
+        {tab === "common" && (
+          <div className="min-h-0 flex-1">
+            <StoreCommonOptions storeId={storeId} />
+          </div>
+        )}
         <div className={cx("min-h-0 flex-1", tab !== "hours" && "hidden")}>
           <StoreHours storeId={storeId} />
         </div>

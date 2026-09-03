@@ -1060,6 +1060,51 @@ const en = {
     addedChoices: "{count} choices added",
   },
 
+  /**
+   * Common questions: one question asked on many items.
+   *
+   * `0094` restored the link table `0074` dropped, so a question is offered on
+   * the items its links name. The vocabulary on screen follows that: a question
+   * is **offered on** items rather than belonging to one, and taking it off
+   * some items is not the same act as withdrawing it from the shop.
+   *
+   * Not `common` — that namespace is already the shell's Save/Cancel/Close, and
+   * a second one silently shadowed it.
+   */
+  commonOptions: {
+    tab: "Common options",
+    title: "Questions across this shop",
+    hint: "A question can be asked on one item or on fifty. Editing it here changes it everywhere it is asked — which is the point, and the thing to be sure of before you press Save.",
+    onItems: "{name} is on {count} items",
+    onNoItems: "{name} is not on any item",
+    // The count beside each question in the list.
+    usedOn: "on {count} items",
+    usedOnOne: "on 1 item",
+    usedOnNone: "not asked anywhere",
+    choices: "{count} choices",
+    noChoices: "no choices yet",
+    manage: "Choose items",
+    withdrawnMark: "Withdrawn",
+    withdrawnHint: "Withdrawn from the whole shop. Bring it back from the Archive tab.",
+    emptyTitle: "No questions yet",
+    emptyBody: "Create one on the Options tab, then come back here to ask it on more items.",
+    failedTitle: "Could not load the questions",
+    // The picker.
+    pickTitle: "Which items ask {name}?",
+    pickHint: "Tick a whole section, or the items inside it. Items in different sections can be mixed.",
+    pickAll: "Every item in this shop",
+    pickNone: "Clear all",
+    section: "{name}",
+    // Says what Save will do, before it is pressed — an operator ticking a
+    // section of thirteen wants the number, not to count the boxes.
+    picked: "{count} items selected",
+    pickedNone: "No items selected — the question will be asked nowhere.",
+    save: "Save",
+    // A dish that is archived cannot be ticked: the question would be asked on
+    // something no menu shows.
+    archivedItem: "archived",
+  },
+
   options: {
     tab: "Options",
     tabHint:

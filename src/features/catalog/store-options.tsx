@@ -817,7 +817,7 @@ function BulkChoices({
  * editing writes one row and closes. Those are different enough that the caller
  * should say which it is, and identical enough that the fields should not care.
  */
-function ChoiceForm({
+export function ChoiceForm({
   initial,
   currencyCode,
   pending,
@@ -959,7 +959,9 @@ function NewQuestion({
       {
         draft: {
           storeId,
-          itemId,
+          // Just this item. A question created here is private until it is
+          // offered on more from the Common questions tab.
+          itemIds: [itemId],
           title,
           mode,
           // A switch here, a number on the question itself. Creating one, the

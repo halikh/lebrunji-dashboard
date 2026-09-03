@@ -29,19 +29,28 @@ import type { Localized } from "@/lib/validation";
  * - **`is_default`** says which answer a required group opens on. Before it,
  *   the app took whichever sorted first, which is a guess dressed as a decision.
  *
- * ## Every group belongs to exactly one dish
+ * ## A question is offered on the items its links name
  *
- * There was briefly a second kind — a shop-wide group offered on many items —
- * and migration `0074` removed it. Sharing a group sounds like a saving and is
- * not, because what merchants share is the *shape* of a question, never its
- * answers: "Add extras" on a grill and "Add extras" on a dessert have the same
- * name and nothing else in common. A shared group is either edited into
- * something wrong for half the dishes offering it, or split by hand until it is
- * per-item anyway — while every screen has to explain which kind it is showing.
+ * `0074` gave every group one owner. `0094` reversed that, and its own note
+ * says why: a size question is genuinely identical across twenty pizzas, and
+ * one owner per group made that twenty questions to type and twenty edits to
+ * reprice, with no way to confirm all twenty landed.
  *
- * So `menu_item_id` is `not null`, and the join table is gone: one-to-many
- * needs none, and keeping it would store the same fact twice for a reader to
- * choose between.
+ * There is still only **one kind** of group, which was `0074`'s other and
+ * better objection — `0073` had two, and every screen had to explain which it
+ * was showing. Where a question is offered is said by
+ * `menu_item_option_group_links` and by nothing else: one link is a question on
+ * one dish, twenty links is a common question.
+ *
+ * So there is no `menu_item_id`. Keeping one beside the links would be the same
+ * fact in two places with the reader left to choose, which is what `0074` said
+ * about the link table and was right about.
+ *
+ * ## Position is per link
+ *
+ * Where a question sits is a fact about *this dish*, so `sort_order` on the
+ * link is what the screens read. The group's own `sort_order` is only the
+ * default a new link copies.
  */
 
 export type ItemOption = {
@@ -65,14 +74,16 @@ export type OptionGroup = {
   /** Null means no ceiling. Never below `minSelections` — the CHECK refuses. */
   maxSelections: number | null;
   isActive: boolean;
+  /** Where it sits on the item it was read for — from the link, not the group. */
   sortOrder: number;
-  /** The dish this question is asked about. Never null. */
-  itemId: string;
+  /** How many items ask it. One is a private question; more is a common one. */
+  itemCount: number;
   options: ItemOption[];
 };
 
 const GROUP_COLUMNS = `id, title, mode, min_selections, max_selections,
-   is_active, sort_order, menu_item_id,
+   is_active, sort_order,
+   menu_item_option_group_links ( count ),
    item_options ( id, name, price, is_active, is_default, sort_order )`;
 
 /**
@@ -85,8 +96,11 @@ const GROUP_COLUMNS = `id, title, mode, min_selections, max_selections,
 export async function fetchOptionCounts(
   storeId: string,
 ): Promise<Map<string, number>> {
+  // Off the links, which is now the only place that says where a question is
+  // offered. A common question counts once for each item asking it, which is
+  // what the marker is about: whether *this dish* has anything set up.
   const { data, error } = await getClient()
-    .from("option_groups")
+    .from("menu_item_option_group_links")
     .select("menu_item_id, menu_items!inner(store_id)")
     .eq("menu_items.store_id", storeId);
 
@@ -119,27 +133,44 @@ export async function fetchOptionCounts(
 export async function fetchItemOptionGroups(
   itemId: string,
 ): Promise<OptionGroup[]> {
+  // From the links, so the order is this dish's own: `sort_order` on the link
+  // is where the question sits *here*, and a common question is second on one
+  // dish and fifth on another.
   const { data, error } = await getClient()
-    .from("option_groups")
-    .select(GROUP_COLUMNS)
+    .from("menu_item_option_group_links")
+    .select(`sort_order, option_groups!inner ( ${GROUP_COLUMNS} )`)
     .eq("menu_item_id", itemId)
     .order("sort_order", { ascending: true });
 
   if (error) throw new Error(`Could not read the options: ${error.message}`);
 
-  return (data ?? []).map(toGroup);
+  return (data ?? []).flatMap((link) => {
+    const group = one(link.option_groups);
+    if (!group) return [];
+    // The link's position wins over the group's, which is only the default a
+    // new link copies.
+    return [toGroup({ ...group, sort_order: link.sort_order })];
+  });
 }
 
 export type OptionGroupDraft = {
   storeId: string;
-  /** The dish it is asked about. Required — there is no other kind. */
-  itemId: string;
+  /** The items it is asked on. One is a private question; more is a common one. */
+  itemIds: string[];
   title: Localized;
   mode: OptionGroupMode;
   minSelections: number;
   maxSelections: number | null;
 };
 
+/**
+ * Creates a question and offers it on the items named.
+ *
+ * Two writes, and they cannot be one: the links reference a group that does not
+ * exist until the insert returns. The group goes first, so a failure to link
+ * leaves a question nothing asks — visible on the Common questions tab as
+ * "on 0 items" and fixable there — rather than links pointing at nothing.
+ */
 export async function createOptionGroup(
   draft: OptionGroupDraft,
   sortOrder: number,
@@ -154,8 +185,9 @@ export async function createOptionGroup(
       // Meaningless on a single-choice group — the mode already says one — and
       // a number there would be a fact nothing reads and everything ignores.
       max_selections: draft.mode === "multi" ? draft.maxSelections : null,
+      // The default a new link copies — see `0094`. Where it actually sits is
+      // the link's own `sort_order`.
       sort_order: sortOrder,
-      menu_item_id: draft.itemId,
       // No `slug`: the trigger from migration 0071 derives it from the English
       // title and makes it unique within the shop.
     })
@@ -163,7 +195,68 @@ export async function createOptionGroup(
     .single();
 
   if (error) throw new Error(friendly(error.message));
-  return data.id as string;
+
+  const id = data.id as string;
+  if (draft.itemIds.length > 0) await offerGroupOn(id, draft.itemIds, sortOrder);
+  return id;
+}
+
+/**
+ * Offers an existing question on more items.
+ *
+ * One insert for all of them, and `on conflict` is left to the unique index:
+ * offering a question on an item that already asks it is not an error worth
+ * raising, so the caller filters first and the index is the backstop.
+ *
+ * `sortOrder` is where it lands on each — the same position on every item,
+ * because the alternative is asking the operator to place it twenty times.
+ */
+export async function offerGroupOn(
+  groupId: string,
+  itemIds: string[],
+  sortOrder: number,
+): Promise<void> {
+  if (itemIds.length === 0) return;
+
+  const { error } = await getClient()
+    .from("menu_item_option_group_links")
+    .upsert(
+      itemIds.map((itemId) => ({
+        option_group_id: groupId,
+        menu_item_id: itemId,
+        sort_order: sortOrder,
+      })),
+      { onConflict: "menu_item_id,option_group_id", ignoreDuplicates: true },
+    );
+
+  if (error) throw new Error(friendly(error.message));
+}
+
+/**
+ * Stops offering a question on some items.
+ *
+ * **Not the same as withdrawing it.** `is_active` takes a question off every
+ * item at once and is how it leaves the menu; this takes it off *these* items
+ * and leaves it asked everywhere else. A common question that turned out to be
+ * wrong for two dishes out of twenty is exactly this, and doing it by
+ * withdrawing would take it off the other eighteen.
+ *
+ * Deleting the link is safe where deleting the group is not: nothing references
+ * a link. Order history points at `item_options`, which is untouched.
+ */
+export async function stopOfferingGroupOn(
+  groupId: string,
+  itemIds: string[],
+): Promise<void> {
+  if (itemIds.length === 0) return;
+
+  const { error } = await getClient()
+    .from("menu_item_option_group_links")
+    .delete()
+    .eq("option_group_id", groupId)
+    .in("menu_item_id", itemIds);
+
+  if (error) throw new Error(friendly(error.message));
 }
 
 export type OptionGroupPatch = Partial<Omit<OptionGroupDraft, "storeId">> & {
@@ -324,7 +417,11 @@ function toGroup(row: Record<string, unknown>): OptionGroup {
     maxSelections: (row.max_selections as number | null) ?? null,
     isActive: row.is_active as boolean,
     sortOrder: row.sort_order as number,
-    itemId: row.menu_item_id as string,
+    // PostgREST returns an aggregate embed as `[{ count: n }]`. Zero when a
+    // question is asked nowhere — which is a real state, not a bug: a group
+    // whose links were all removed is still a question, still editable, and
+    // still says so on the Common questions tab.
+    itemCount: (asArray(row.menu_item_option_group_links)[0]?.count as number) ?? 0,
     options: asArray(row.item_options)
       .map((option) => ({
         id: option.id as string,
@@ -338,9 +435,137 @@ function toGroup(row: Record<string, unknown>): OptionGroup {
   };
 }
 
+/**
+ * PostgREST hands a to-one embed back as an object, and sometimes as an array
+ * of one, depending on how it read the relationship. Both mean the same here.
+ */
+function one(value: unknown): Record<string, unknown> | undefined {
+  return asArray(value)[0];
+}
+
 function asArray(value: unknown): Record<string, unknown>[] {
   if (Array.isArray(value)) return value as Record<string, unknown>[];
   if (value && typeof value === "object")
     return [value as Record<string, unknown>];
   return [];
+}
+
+// ---------------------------------------------------------------------------
+// Questions across a whole shop
+// ---------------------------------------------------------------------------
+
+/**
+ * Every question a shop has, with the items it is asked on.
+ *
+ * ## Why this read exists next to `fetchItemOptionGroups`
+ *
+ * That one answers "what does this dish ask", which is the Options tab's
+ * question and is per item. This answers "what does this shop ask, and where" —
+ * which only became a question worth asking when `0094` let a group be offered
+ * on many items. Before it, the two reads would have returned the same rows
+ * with the same shape and one of them would have been deleted.
+ *
+ * It returns the item **ids**, not their names. The names live on the menu,
+ * which the picker already has loaded to draw its sections — holding a second
+ * copy here would mean a question showing the name an item had when this query
+ * last ran.
+ *
+ * Withdrawn questions come back too. A common question withdrawn from the whole
+ * shop still has to be findable, and the Archive tab is where it is brought
+ * back; this screen marks it rather than hiding it, because "why is Choose a
+ * size not on anything" needs an answer on the page that would otherwise be
+ * silent about it.
+ */
+export type StoreQuestion = {
+  id: string;
+  title: Localized;
+  mode: OptionGroupMode;
+  minSelections: number;
+  maxSelections: number | null;
+  isActive: boolean;
+  /**
+   * Its answers, withdrawn ones included.
+   *
+   * The whole point of a common question is that its *choices* are common too —
+   * "Small, Medium, Large at +0/+1.50/+3" is the thing being shared, and a
+   * screen that showed only the title would be asking somebody to trust that
+   * twenty items got the right three prices. Withdrawn ones come back marked,
+   * for the reason `fetchItemOptionGroups` gives: this read also has to be able
+   * to show what stopped being offered.
+   */
+  choices: ItemOption[];
+  /** The items asking it. Empty is a real state: a question offered nowhere. */
+  itemIds: string[];
+};
+
+export async function fetchStoreQuestions(
+  storeId: string,
+): Promise<StoreQuestion[]> {
+  const { data, error } = await getClient()
+    .from("option_groups")
+    .select(
+      `id, title, mode, min_selections, max_selections, is_active, sort_order,
+       menu_item_option_group_links ( menu_item_id ),
+       item_options ( id, name, price, is_active, is_default, sort_order )`,
+    )
+    .eq("store_id", storeId)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw new Error(`Could not read the questions: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    title: (row.title as Localized) ?? {},
+    mode: row.mode as OptionGroupMode,
+    minSelections: (row.min_selections as number) ?? 0,
+    maxSelections: (row.max_selections as number | null) ?? null,
+    isActive: row.is_active as boolean,
+    choices: asArray(row.item_options)
+      .map((option) => ({
+        id: option.id as string,
+        name: (option.name as Localized) ?? {},
+        price: option.price as number,
+        isActive: option.is_active as boolean,
+        isDefault: option.is_default as boolean,
+        sortOrder: option.sort_order as number,
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder),
+    itemIds: asArray(row.menu_item_option_group_links).map(
+      (link) => link.menu_item_id as string,
+    ),
+  }));
+}
+
+/**
+ * Sets exactly which items ask a question.
+ *
+ * The caller hands the whole list it wants, not a pair of add/remove lists, and
+ * the diff is worked out here. That is the difference between a picker whose
+ * Save means "this is the answer" and one whose Save means "apply these
+ * changes" — the second is what leaves an operator wondering whether unticking
+ * a box did anything.
+ *
+ * Removals go first. Two links for a moment is a question asked twice on one
+ * dish, which nothing in the schema forbids and the sheet would render twice;
+ * none for a moment is a dish that briefly stops asking, which is the same
+ * thing the operator is deliberately doing to some of them anyway.
+ */
+export async function setQuestionItems(
+  groupId: string,
+  itemIds: string[],
+  current: string[],
+  sortOrder: number,
+): Promise<void> {
+  const wanted = new Set(itemIds);
+  const had = new Set(current);
+
+  await stopOfferingGroupOn(
+    groupId,
+    current.filter((id) => !wanted.has(id)),
+  );
+  await offerGroupOn(
+    groupId,
+    itemIds.filter((id) => !had.has(id)),
+    sortOrder,
+  );
 }

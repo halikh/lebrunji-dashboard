@@ -13,6 +13,8 @@ import {
   createOptionGroup,
   fetchItemOptionGroups,
   fetchOptionCounts,
+  fetchStoreQuestions,
+  setQuestionItems,
   setDefaultOption,
   updateItemOption,
   updateOptionGroup,
@@ -178,3 +180,59 @@ export function useItemOptions() {
 }
 
 export type { OptionGroup };
+
+/** Every question in a shop, with the items each is asked on. */
+export function useStoreQuestions(storeId: string) {
+  return useQuery({
+    queryKey: [...optionKeys.counts(storeId), "questions"],
+    queryFn: () => fetchStoreQuestions(storeId),
+  });
+}
+
+/**
+ * Changing which items ask a question.
+ *
+ * Says how many items it ended up on, rather than how many were added or
+ * removed. That is the fact the operator was deciding — "Choose a size is on 14
+ * items" is checkable against the picker they just closed, while "3 added, 1
+ * removed" is arithmetic they would have to do to know whether they got what
+ * they meant.
+ */
+export function useSetQuestionItems(storeId: string) {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  return useMutation({
+    mutationFn: (input: {
+      groupId: string;
+      itemIds: string[];
+      current: string[];
+      sortOrder: number;
+      name: Localized;
+    }) =>
+      setQuestionItems(
+        input.groupId,
+        input.itemIds,
+        input.current,
+        input.sortOrder,
+      ),
+    onSuccess: (_result, input) => {
+      // The prefix: this shop's questions, every dish's own list, and the
+      // counts that mark items with nothing set up.
+      void queryClient.invalidateQueries({ queryKey: ["options"] });
+      toast.success(
+        input.itemIds.length === 0
+          ? t("commonOptions.onNoItems", { name: pickLocalized(input.name) })
+          : t("commonOptions.onItems", {
+              name: pickLocalized(input.name),
+              count: input.itemIds.length,
+            }),
+      );
+    },
+    onError: (error) => {
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      );
+    },
+  });
+}
