@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { BackLink } from "@/components/ui/back-link";
 import { Button, cx } from "@/components/ui";
 import { Copyable } from "@/components/ui/copyable";
 import { useConfirmLeave } from "@/components/unsaved-changes";
@@ -117,25 +118,9 @@ export function OrderScreen({ id }: { id: string }) {
             bare list would mean hunting for the row again — in a list that has
             moved since, because orders arrive and advance while you read. The
             queue reads `?order=` for exactly this. */}
-        <Link
-          href={`/?order=${order.data.id}`}
-          className="flex w-fit items-center gap-xs text-[13px] font-semibold text-primary hover:underline"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M15 5l-7 7 7 7" />
-          </svg>
+        <BackLink href={`/?order=${order.data.id}`}>
           {t("orders.backToQueue")}
-        </Link>
+        </BackLink>
 
         <div className="flex flex-wrap items-center gap-lg">
           <div className="flex min-w-0 flex-grow flex-col gap-xxs">

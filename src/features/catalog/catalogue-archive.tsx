@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
+import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ROW_STATIC } from "@/components/ui/row";
@@ -180,7 +181,10 @@ export function CatalogueArchive() {
         >
           {data?.stores.map((store) => (
             <div key={store.id} className={ROW_STATIC}>
-              <Thumbnail url={store.imageUrl} />
+              <Thumbnail
+                url={store.imageUrl}
+                name={pickLocalized(store.name)}
+              />
               <Identity
                 name={pickLocalized(store.name)}
                 detail={[
@@ -252,7 +256,7 @@ export function CatalogueArchive() {
         >
           {data?.promotions.map((promotion) => (
             <div key={promotion.id} className={ROW_STATIC}>
-              <Thumbnail url={promotion.imageUrl} />
+              <Thumbnail url={promotion.imageUrl} name={promotion.slug} />
               {/* The slug is the name. `0013` dropped every text column a
                   customer would have read — the card is artwork — so the slug is
                   the only handle an operator has on a picture in a list. */}
@@ -290,24 +294,19 @@ function Identity({ name, detail }: { name: string; detail: string }) {
   );
 }
 
-/** The picture, or the space one would take — the menu list's own shape. */
-function Thumbnail({ url }: { url: string | null }) {
+/**
+ * The picture, or the space one would take — the menu list's own shape.
+ *
+ * Clickable here as everywhere else, and it earns it on this screen more than
+ * most: deciding whether to bring a shop back usually means looking at what it
+ * was, and a 44pt square is not that.
+ */
+function Thumbnail({ url, name }: { url: string | null; name: string }) {
   if (!url) {
-    return (
-      <div
-        aria-hidden
-        className="size-[44px] shrink-0 rounded-md bg-neutral-fill"
-      />
-    );
+    return <ImagePlaceholder className="size-[44px] rounded-md" />;
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      alt=""
-      aria-hidden
-      className="size-[44px] shrink-0 rounded-md object-cover"
-    />
+    <PreviewImage src={url} name={name} className="size-[44px] rounded-md" />
   );
 }
 

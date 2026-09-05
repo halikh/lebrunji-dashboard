@@ -221,7 +221,12 @@ export function AmendOrder({
             return (
               <section key={store.id} className="flex flex-col gap-md">
                 <div className="flex items-center gap-md">
-                  <Thumbnail src={store.storeImageUrl} size={32} rounded />
+                  <Thumbnail
+                    src={store.storeImageUrl}
+                    size={32}
+                    rounded
+                    name={store.storeName}
+                  />
                   <h3 className="truncate text-[15px] font-semibold">
                     {store.storeName}
                   </h3>
@@ -416,7 +421,7 @@ function AmendLine({
             empty tray of. It dims when the line is going to zero, so the row
             reads as struck out at a glance rather than only in its text. */}
         <span className={cx(count === 0 && "opacity-40")}>
-          <Thumbnail src={line.imageUrl} size={40} />
+          <Thumbnail src={line.imageUrl} size={40} name={line.name} />
         </span>
         <span
           className={cx(

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
 import { ROW } from "@/components/ui/row";
@@ -223,21 +224,20 @@ function StoreRow({
       )}
     >
       {store.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        // `relative z-10`, for the same reason the controls below carry it:
+        // the shop's name is an anchor stretched over the whole row, and
+        // anything meant to be clickable in its own right has to sit above
+        // that overlay. Without this the picture would open the shop.
+        <PreviewImage
           src={store.imageUrl}
-          alt=""
-          aria-hidden
+          name={name}
           className={cx(
-            "size-[46px] shrink-0 rounded-md object-cover",
+            "relative z-10 size-[46px] rounded-md",
             !store.isActive && "opacity-50 grayscale",
           )}
         />
       ) : (
-        <div
-          aria-hidden
-          className="size-[46px] shrink-0 rounded-md bg-neutral-fill"
-        />
+        <ImagePlaceholder className="size-[46px] rounded-md" />
       )}
 
       <div className="flex min-w-0 flex-grow flex-col gap-xxs">

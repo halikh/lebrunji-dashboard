@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, Field, Input, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { LocalizedField } from "@/components/ui/localized-field";
@@ -33,6 +34,7 @@ import {
 import type { Branch, BranchDraft } from "./api/branches";
 import { BranchMenuPanel } from "./branch-menu-panel";
 import { NoPinWarning } from "./no-pin-warning";
+import { StoreBrandForm } from "./store-brand";
 import {
   useArchiveBranch,
   useBranches,
@@ -53,10 +55,20 @@ import { useStore } from "./use-stores";
  *
  * ## What moved off Details to get here
  *
- * The pin, the prep window, the WhatsApp number and the opening hours. All four
- * answer "where and when and how does an order reach a kitchen", and all four
- * are wrong the moment a shop has two addresses. The Details tab keeps what is
- * true of the brand: the name, the picture, the category, the currency.
+ * First the pin, the prep window, the WhatsApp number and the opening hours —
+ * all four answer "where and when and how does an order reach a kitchen", and
+ * all four are wrong the moment a shop has two addresses.
+ *
+ * Then the rest of it. What Details had left was three fields — the shop's
+ * name, its picture and its currency — on a tab of their own, next to a tab
+ * carrying everything else about the same shop. Nothing in either label said
+ * which one held the field you wanted. So the brand is the card at the top of
+ * this screen now and the places are the list below it: the shop, then where
+ * it trades. One tab, read downward.
+ *
+ * The card keeps its own Save, because it writes the `stores` row and the
+ * editor below writes a branch — two writes, and a single button over both
+ * would be claiming to do something it cannot.
  */
 export function BranchesTab({ storeId }: { storeId: string }) {
   /**
@@ -102,14 +114,19 @@ export function BranchesTab({ storeId }: { storeId: string }) {
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
         <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h2 className="flex-grow text-[18px]">{t("branches.tab")}</h2>
+          <h2 className="flex-grow text-[18px]">{t("branches.title")}</h2>
           <Button onClick={guarded(() => setOpen("new"))}>
             {t("branches.add")}
           </Button>
         </div>
 
         <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-          {/* Says why the tab exists on a shop with one branch, which is the
+          {/* The shop, before the places. See the note on the file. */}
+          <StoreBrandForm storeId={storeId} />
+
+          <h3 className="mt-xxl ps-md text-[17px]">{t("branches.places")}</h3>
+
+          {/* Says why the list exists on a shop with one branch, which is the
               first question it gets. */}
           <p className="ps-md text-[13px] text-text-faint">
             {t("branches.intro")}
@@ -285,21 +302,16 @@ function BranchRow({
           not optional: without it the rows of a shop that has no picture line
           up differently from every other list in the app. */}
       {imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <PreviewImage
           src={imageUrl}
-          alt=""
-          aria-hidden
+          name={name}
           className={cx(
-            "size-[46px] shrink-0 rounded-md object-cover",
+            "size-[46px] rounded-md",
             !branch.isActive && "opacity-50 grayscale",
           )}
         />
       ) : (
-        <div
-          aria-hidden
-          className="size-[46px] shrink-0 rounded-md bg-neutral-fill"
-        />
+        <ImagePlaceholder className="size-[46px] rounded-md" />
       )}
 
       <button

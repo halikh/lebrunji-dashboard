@@ -7,6 +7,7 @@ import { t } from "@/i18n/translations";
 
 import { Button, cx } from "./index";
 import { useFieldWiring } from "./field";
+import { PreviewImage } from "./image-preview";
 
 /**
  * Choosing a picture, and getting it into Storage.
@@ -118,12 +119,15 @@ export function ImageUploader({
   if (value) {
     return (
       <div className="flex items-center gap-lg">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        {/* Clickable, like every other picture in the dashboard. Ninety-six
+            points is enough to see that *a* photograph arrived and not enough
+            to see whether it is the right one the right way up — which is the
+            whole question this control exists to let somebody answer before
+            they save. No name to pass: the row being edited may not have one
+            yet. */}
+        <PreviewImage
           src={value}
-          alt=""
-          aria-hidden
-          className="size-[96px] shrink-0 rounded-md border border-border object-cover"
+          className="size-[96px] rounded-md border border-border"
         />
 
         <div className="flex flex-col items-start gap-sm">
@@ -206,7 +210,15 @@ export function ImageUploader({
         }}
         className={cx(
           "flex cursor-pointer flex-col items-center gap-xs rounded-md border border-dashed px-lg py-xl text-center",
-          over ? "border-primary bg-primary-wash" : "border-border",
+          // A ground of its own, rather than whatever is behind it.
+          //
+          // It was transparent, so on a form the zone was a dashed outline
+          // drawn straight onto the page's cream — the one control on the
+          // screen with no surface under it, which read as a disabled area
+          // rather than as somewhere to drop a file. `bg-surface` is what every
+          // other input on the form stands on. The drag state keeps its own
+          // tint, because that one is feedback rather than chrome.
+          over ? "border-primary bg-primary-wash" : "border-border bg-surface",
           disabled && "cursor-not-allowed opacity-60",
         )}
       >

@@ -265,10 +265,20 @@ function Row({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow text-left"
+        className="flex min-w-0 flex-grow items-center gap-md text-left"
       >
         <span className="truncate text-[15px] font-semibold">
           {pickLocalized(category.name)}
+        </span>
+
+        {/* How many shops are in it — the same line the tags list puts beside a
+            chip, and here it answers the question the Archive button is about
+            to refuse on. `stillHasShops` says the number after the attempt;
+            this says it before. */}
+        <span className="shrink-0 truncate text-[12px] text-text-faint">
+          {category.usedBy === 0
+            ? t("categories.unused")
+            : t("categories.usedBy", { count: category.usedBy })}
         </span>
       </button>
 

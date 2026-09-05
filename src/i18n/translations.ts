@@ -660,6 +660,16 @@ const en = {
     linkExpired: "That upload link expired. Choose the file again.",
     notAllowed: "This account is not allowed to upload images.",
     failed: "The upload did not finish. Nothing has been changed.",
+
+    // The thumbnail's accessible name. It is a button now — every picture in
+    // the dashboard opens full size — so it needs one, and the version that
+    // names the row is what stops a list announcing the same three words on
+    // every line.
+    view: "View the picture",
+    viewOf: "View the picture of {name}",
+    // The heading over the full-size view, for the few call sites with no name
+    // to put there.
+    preview: "Picture",
   },
 
   /**
@@ -776,7 +786,8 @@ const en = {
     noDefaultCountry:
       "No default country is set up, so a shop cannot be created. That is a database seed, not a setting on this screen.",
 
-    tab: "Details",
+    // No `tab` any more: the Details tab is gone, and its three fields are the
+    // card at the top of Branches. See `branches-tab.tsx`.
     name: "Shop name",
     nameHint: "What customers see at the top of the shop.",
     imageHint: "The picture on the shop's card in the app.",
@@ -930,6 +941,13 @@ const en = {
     unfeatureBody:
       "It keeps its place in the list; it just no longer leads the home screen.",
     unfeatureConfirm: "Stop featuring",
+    // What "archive" will refuse on, said on the row rather than in the
+    // refusal. `stillHasShops` below is the same fact arriving too late to be
+    // useful; this is it in time to plan around. The same line the tags list
+    // carries, for the same reason.
+    usedBy: "On {count} shop(s)",
+    unused: "No shops yet",
+
     search: "Search categories",
     searchHint: "Drag the tiles to change the order customers see them in.",
     // Reordering is off while filtered, and saying so beats a handle that
@@ -1998,6 +2016,13 @@ const en = {
    */
   branches: {
     tab: "Branches",
+    // The heading over the whole tab, which now carries the shop itself as
+    // well as the places it trades from — see `branches-tab.tsx`. The tab's
+    // own label stays "Branches": that is what somebody is looking for when
+    // they come here, and the shop's card is the first thing they see anyway.
+    title: "Shop and branches",
+    // The heading over the list, under the shop's own card.
+    places: "Branches",
     // Said once at the top, because "why is there a Branches tab on a shop with
     // one branch" is the first question this screen gets.
     intro:

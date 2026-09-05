@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Copyable } from "@/components/ui/copyable";
@@ -357,7 +358,12 @@ function StoreSection({
   return (
     <section className="flex flex-col gap-md">
       <div className="flex items-center gap-md">
-        <Thumbnail src={store.storeImageUrl} size={38} rounded />
+        <Thumbnail
+          src={store.storeImageUrl}
+          size={38}
+          rounded
+          name={store.storeName}
+        />
         <div className="flex min-w-0 flex-grow flex-col gap-xxs">
           <h3 className="truncate text-[17px]">{store.storeName}</h3>
           <span
@@ -385,7 +391,7 @@ function StoreSection({
 
           return (
             <div key={line.id} className="flex items-start gap-md text-[14px]">
-              <Thumbnail src={line.imageUrl} size={44} />
+              <Thumbnail src={line.imageUrl} size={44} name={line.name} />
               <span
                 className={cx(
                   "w-[26px] shrink-0 pt-xs font-bold tabular-nums",
@@ -461,37 +467,25 @@ export function Thumbnail({
   src,
   size,
   rounded = false,
+  name,
 }: {
   src: string | null;
   size: number;
   rounded?: boolean;
+  /** What it is a picture of, for the button that opens it. */
+  name?: string;
 }) {
   const style = { width: size, height: size, borderRadius: rounded ? 999 : 14 };
 
   if (!src) {
-    return (
-      <div aria-hidden className="shrink-0 bg-neutral-fill" style={style} />
-    );
+    return <ImagePlaceholder style={style} />;
   }
 
-  return (
-    // A plain `<img>`, and the rule is overridden rather than obeyed: these are
-    // arbitrary URLs a merchant typed, pointing at any host. `next/image`
-    // refuses a host that is not declared in `next.config`, so it would turn
-    // every picture into a configuration change — and the optimisation it
-    // offers is worth nothing on a 44px thumbnail.
-    //
-    // Decorative: the name is right beside it in text, so announcing the
-    // picture too would read the item twice.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt=""
-      aria-hidden
-      className="shrink-0 object-cover"
-      style={style}
-    />
-  );
+  // It opens full size on a click, like every other picture in the dashboard.
+  // Here that is worth more than most: an operator reading an order is often
+  // deciding whether the kitchen sent the right thing, and a 44pt square is
+  // not enough to settle it.
+  return <PreviewImage src={src} name={name} style={style} />;
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {

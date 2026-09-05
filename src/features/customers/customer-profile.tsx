@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type ReactNode } from "react";
 
+import { BackLink } from "@/components/ui/back-link";
 import { Button, cx } from "@/components/ui";
 import { ROW } from "@/components/ui/row";
 import { Copyable } from "@/components/ui/copyable";
@@ -252,28 +253,11 @@ export function CustomerProfile({ id }: { id: string }) {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <header className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-xxl py-lg">
-        {/* The same back link the store screen carries — arrow, size, colour
-            and hover all matching, because two spellings of "go up a level"
-            are two things to recognise. */}
-        <Link
-          href={back.href}
-          className="flex w-fit items-center gap-xs text-[13px] font-semibold text-primary hover:underline"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M15 5l-7 7 7 7" />
-          </svg>
-          {back.label}
-        </Link>
+        {/* The same back control the store and the order carry — one
+            component now, because "two spellings of go up a level are two
+            things to recognise" was written here first and then copied three
+            times, which is how a convention decays. */}
+        <BackLink href={back.href}>{back.label}</BackLink>
 
         <div className="flex flex-wrap items-center gap-lg">
           {/* The same colour this customer wears on the list, because it is

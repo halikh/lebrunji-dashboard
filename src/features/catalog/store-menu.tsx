@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import { useGuardedAction } from "@/components/unsaved-changes";
 import { createPortal } from "react-dom";
 
+import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, cx } from "@/components/ui";
 import { SearchInput } from "@/components/ui/search-input";
 import { ROW } from "@/components/ui/row";
@@ -953,21 +954,16 @@ function ItemRow({
       </button>
 
       {item.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <PreviewImage
           src={item.imageUrl}
-          alt=""
-          aria-hidden
+          name={pickLocalized(item.name)}
           className={cx(
-            "size-[44px] shrink-0 rounded-md object-cover",
+            "size-[44px] rounded-md",
             !item.isActive && "opacity-50 grayscale",
           )}
         />
       ) : (
-        <div
-          aria-hidden
-          className="size-[44px] shrink-0 rounded-md bg-neutral-fill"
-        />
+        <ImagePlaceholder className="size-[44px] rounded-md" />
       )}
 
       {/* The row opens the form. A pencil icon would be a second target for the
@@ -1238,7 +1234,11 @@ function SearchResult({
         item.isActive && open && "border-active",
       )}
     >
-      <Thumbnail url={item.imageUrl} dim={!item.isActive} />
+      <Thumbnail
+        url={item.imageUrl}
+        dim={!item.isActive}
+        name={pickLocalized(item.name)}
+      />
 
       <button
         type="button"
@@ -1306,26 +1306,31 @@ function SearchResult({
   );
 }
 
-/** The item's picture, or the space one would take. */
-function Thumbnail({ url, dim }: { url: string | null; dim: boolean }) {
+/**
+ * The item's picture, or the space one would take.
+ *
+ * A click opens it full size. Forty-four points says *whether* there is a
+ * photograph; it does not say whether it is the right dish, in focus, or the
+ * right way up — and those are what somebody scanning a menu for a bad picture
+ * is actually looking for.
+ */
+function Thumbnail({
+  url,
+  dim,
+  name,
+}: {
+  url: string | null;
+  dim: boolean;
+  name: string;
+}) {
   if (!url) {
-    return (
-      <div
-        aria-hidden
-        className="size-[44px] shrink-0 rounded-md bg-neutral-fill"
-      />
-    );
+    return <ImagePlaceholder className="size-[44px] rounded-md" />;
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <PreviewImage
       src={url}
-      alt=""
-      aria-hidden
-      className={cx(
-        "size-[44px] shrink-0 rounded-md object-cover",
-        dim && "opacity-50 grayscale",
-      )}
+      name={name}
+      className={cx("size-[44px] rounded-md", dim && "opacity-50 grayscale")}
     />
   );
 }

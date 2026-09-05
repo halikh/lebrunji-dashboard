@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { Field } from "@/components/ui/field";
 import { ImageUploader } from "@/components/ui/image-uploader";
@@ -20,22 +20,25 @@ import { useMenu } from "./use-menu";
 import { useSetStoreCurrency, useStore, useUpdateStore } from "./use-stores";
 
 /**
- * A shop's own settings, as opposed to what it sells.
+ * The shop itself — the brand, as opposed to the places it trades from.
  *
- * ## Why this is a tab and not a wizard
+ * ## It used to be a tab, and now it is a card on the Branches one
  *
- * The flow study called for a wizard on **create** — one decision per step, so
- * nothing important is a field somebody scrolled past — and a tabbed page for
- * editing, because after the first day you come here to change one thing. This
- * is that page. A shop is created a handful of times ever and edited for years.
+ * The pin, the prep window and the WhatsApp number moved to Branches with
+ * `0101`, because all three are facts about an address and a shop with two
+ * addresses cannot answer any of them once. What that left behind was a whole
+ * tab holding three fields — a name, a picture and a currency — sitting beside
+ * a tab called Branches that carried everything else about the same shop. Two
+ * tabs, and no way to tell from their labels which one had the field you
+ * wanted.
  *
- * ## The place is not here any more
+ * So this is the card at the top of Branches now: the shop, and then the
+ * places. Everything about a shop is edited on one screen, read from the brand
+ * downward, and the tab strip is one item shorter.
  *
- * The pin, the prep window and the WhatsApp number moved to the Branches tab
- * with `0101`. All three are facts about an address, and a shop with two
- * addresses cannot answer any of them once. What is left here is the brand:
- * the name, the picture, the category and the currency, which are the same
- * wherever it trades.
+ * It keeps its own Save. The branch editor writes a branch and this writes the
+ * store row — two different writes, and one button over both would claim to do
+ * something it cannot.
  *
  * ## Why it is here at all
  *
@@ -71,25 +74,24 @@ import { useSetStoreCurrency, useStore, useUpdateStore } from "./use-stores";
  * typo in the name. The change is exactly reversible — no row is rewritten —
  * and the warning is unmissable and sits against the control that caused it.
  */
-export function StoreDetails({ storeId }: { storeId: string }) {
+export function StoreBrandForm({ storeId }: { storeId: string }) {
   const store = useStore(storeId);
 
   if (store.isPending) {
     return (
-      <div aria-hidden className="flex flex-col gap-lg p-xxl">
-        {[0, 1, 2].map((row) => (
-          <div
-            key={row}
-            className="h-[64px] rounded-md border border-border bg-surface opacity-60"
-          />
-        ))}
-      </div>
+      <Card>
+        <div aria-hidden className="flex flex-col gap-lg">
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="h-[64px] rounded-md bg-neutral-fill" />
+          ))}
+        </div>
+      </Card>
     );
   }
 
   if (store.isError || !store.data) {
     return (
-      <div className="flex flex-col items-center gap-lg py-huge text-center">
+      <Card className="flex flex-col items-center gap-lg text-center">
         <div className="flex flex-col gap-xs">
           <h2 className="text-[18px]">{t("catalogue.failedTitle")}</h2>
           <p className="text-[14px] text-text-soft">
@@ -99,7 +101,7 @@ export function StoreDetails({ storeId }: { storeId: string }) {
         <Button variant="secondary" onClick={() => void store.refetch()}>
           {t("common.retry")}
         </Button>
-      </div>
+      </Card>
     );
   }
 
@@ -337,84 +339,52 @@ function Form({ store }: { store: Store }) {
   }
 
   return (
-    // `h-full`, not `flex-1`.
-    //
-    // `flex-1` only means anything inside a flex container, and the tab wrapper
-    // around this is an ordinary block — so the pane grew to fit its content
-    // and pushed the Save row off the bottom of the screen, which is the one
-    // place it must never be.
-    <div className="flex h-full min-h-0 flex-col">
+    <Card className="flex flex-col gap-xxl">
       {/*
-        Two columns from `lg`, and the split is by what each thing *wants*, not
-        by cutting the form in half.
+        One column, capped.
 
-        In one column this page was a 560px strip of fields with half a screen
-        of nothing beside it. The fix is not to stretch the inputs into that
-        space — a text field a thousand pixels wide is harder to read and to
-        aim at, and a name is a short answer whatever the monitor is. It is to
-        put something in the right column that is genuinely better for being
-        large.
-
-        The map is that thing. It is the only part of this page where more
-        pixels mean more information — a pin you can actually place a street
-        from — and it is also the part that costs money to get wrong.
-
-        So: what the shop *is* on the left, where it *is* on the right.
+        This was two — fields on the left, the map on the right — until the pin
+        moved to the branch that owns it. What is left is three short answers,
+        and stretching a name field across a wide monitor makes it harder to
+        read and to aim at rather than easier. `max-w-[540px]` is the same width
+        the left column had.
       */}
-      {/* One scrollbar, for the page.
-
-          The columns used to scroll independently — the fields in their own
-          box, the map fixed beside them — on the reasoning that a map you have
-          to scroll is a map you cannot read at a glance. That is true of the
-          map and it was bought at the wrong price: an inner scrollbar in the
-          middle of a page is a second thing to find and a second thing to
-          reach the end of, and the wheel does nothing once the pointer strays
-          out of it. The form got longer, and the seam started showing.
-
-          So the page scrolls and the map stays put by being **sticky** instead
-          — same effect while there is room, no second scrollbar, and it
-          releases naturally when the fields run past it. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row">
-        {/* The padding is on the scrolling column, not on the box around it.
-            A scroll container clips what leaves it, and the focus ring is a
-            box-shadow drawn a few pixels *outside* the input — so with the
-            padding one level up, the ring on the first field was sliced down
-            its left edge. Inside the scroller there is room for it. */}
-        <div className="flex flex-col gap-xxl p-xxl lg:w-[540px] lg:shrink-0">
-          <section className="flex flex-col gap-lg">
-            <LocalizedField
-              label={t("store.name")}
-              value={name}
-              onChange={setName}
-              maxLength={TEXT.name}
-              hint={t("store.nameHint")}
-              error={errors.name}
-              placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارة" }}
-            />
-
-            <Field label={t("images.label")} hint={t("store.imageHint")}>
-              <ImageUploader
-                value={imageUrl}
-                onChange={setImageUrl}
-                folder="stores"
-                disabled={update.isPending}
-              />
-            </Field>
-          </section>
-
-          <CurrencySection
-            value={currencyCode}
-            onChange={setCurrencyCode}
-            mode={mode}
-            onModeChange={setMode}
-            preview={preview}
+      <div className="flex max-w-[540px] flex-col gap-xxl">
+        <section className="flex flex-col gap-lg">
+          <LocalizedField
+            label={t("store.name")}
+            value={name}
+            onChange={setName}
+            maxLength={TEXT.name}
+            hint={t("store.nameHint")}
+            error={errors.name}
+            placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارة" }}
           />
-        </div>
+
+          <Field label={t("images.label")} hint={t("store.imageHint")}>
+            <ImageUploader
+              value={imageUrl}
+              onChange={setImageUrl}
+              folder="stores"
+              disabled={update.isPending}
+            />
+          </Field>
+        </section>
+
+        <CurrencySection
+          value={currencyCode}
+          onChange={setCurrencyCode}
+          mode={mode}
+          onModeChange={setMode}
+          preview={preview}
+        />
       </div>
 
-      {/* Pinned, like the item editor's. On a form this long the operator
-          should never have to scroll to find Save. */}
-      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
+      {/* At the end of the card rather than pinned to the window. A pinned bar
+          is right for a pane that *is* the screen; this one is a card with a
+          list of branches under it, and a Save floating over that list would
+          be ambiguous about which of the two it saved. */}
+      <div className="flex items-center justify-end border-t border-border pt-lg">
         <Button
           onClick={() => void save()}
           pending={update.isPending || setCurrency.isPending}
@@ -422,6 +392,6 @@ function Form({ store }: { store: Store }) {
           {t("store.save")}
         </Button>
       </div>
-    </div>
+    </Card>
   );
 }

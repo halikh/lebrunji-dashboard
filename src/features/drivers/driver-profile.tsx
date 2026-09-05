@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { BackLink } from "@/components/ui/back-link";
 import { Button, cx } from "@/components/ui";
 import { Avatar } from "@/components/ui/avatar";
 import { Copyable } from "@/components/ui/copyable";
@@ -333,27 +334,7 @@ function Availability({
 }
 
 function Back() {
-  return (
-    <Link
-      href="/drivers"
-      className="flex w-fit items-center gap-xs text-[13px] font-semibold text-primary hover:underline"
-    >
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden
-      >
-        <path d="M15 5l-7 7 7 7" />
-      </svg>
-      {t("drivers.backToList")}
-    </Link>
-  );
+  return <BackLink href="/drivers">{t("drivers.backToList")}</BackLink>;
 }
 
 function Stat({

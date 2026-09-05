@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
+import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, Input, cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
 import { ROW } from "@/components/ui/row";
@@ -285,23 +286,21 @@ function Row({
           picture is the whole content — a thumbnail would show the middle of a
           card and tell nobody whether it reads. */}
       {promotion.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        // The one picture in the dashboard the operator is really judging
+        // rather than recognising: artwork that does not read is the whole
+        // failure mode of a promotion, and 128 by 64 is not enough to tell.
+        <PreviewImage
           src={promotion.imageUrl}
-          alt=""
-          aria-hidden
+          name={promotion.slug}
           className={cx(
-            "h-[64px] w-[128px] shrink-0 rounded-md object-cover",
+            "h-[64px] w-[128px] rounded-md",
             !promotion.isActive && "opacity-50 grayscale",
           )}
         />
       ) : (
-        <div
-          aria-hidden
-          className="flex h-[64px] w-[128px] shrink-0 items-center justify-center rounded-md bg-neutral-fill text-[11px] text-text-faint"
-        >
+        <ImagePlaceholder className="flex h-[64px] w-[128px] items-center justify-center rounded-md text-[11px] text-text-faint">
           {t("promotions.noArtwork")}
-        </div>
+        </ImagePlaceholder>
       )}
 
       <button

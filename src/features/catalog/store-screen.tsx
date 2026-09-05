@@ -1,17 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { useConfirmLeave } from "@/components/unsaved-changes";
 
 import { cx } from "@/components/ui";
+import { BackLink } from "@/components/ui/back-link";
+import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
 import { BranchesTab } from "./branches-tab";
-import { StoreDetails } from "./store-details";
 import { StoreArchive } from "./store-archive";
 import { StoreHours } from "./store-hours";
 import { StoreMenu } from "./store-menu";
@@ -42,10 +42,19 @@ import { useStore } from "./use-stores";
 
 const TABS = [
   { key: "menu", labelKey: "menu.title" },
-  { key: "details", labelKey: "store.tab" },
-  // After Details, because a branch is a fact about a shop that already
-  // exists — and before Options and Hours, both of which now read as
-  // questions about *which* branch.
+  /**
+   * The shop, and the places it trades from.
+   *
+   * There was a Details tab in front of this one, and by the end it held three
+   * fields — the name, the picture and the currency — because `0101` had
+   * already moved the pin, the prep window, the WhatsApp number and the hours
+   * onto the branch that owns them. Two tabs about the same shop, and neither
+   * label said which one had the field you wanted.
+   *
+   * So Details is gone and its three fields are the card at the top of this
+   * tab. `?tab=details` still lands somewhere sensible: an unknown tab falls
+   * back to the menu, which is where the link was pointing at a shop anyway.
+   */
   { key: "branches", labelKey: "branches.tab" },
   // One tab, not two. It was Options (an item's questions) beside Common
   // options (a question's items) — the same rows read in opposite directions,
@@ -113,30 +122,53 @@ export function StoreScreen({ storeId }: { storeId: string }) {
      */
     <div className="relative flex h-full min-w-0">
       <div className="flex min-w-0 flex-grow flex-col">
-        <div className="flex shrink-0 flex-col gap-xs border-b border-border bg-surface px-xxl pt-lg">
-          <Link
-            href="/catalogue"
-            className="flex w-fit items-center gap-xs text-[13px] font-semibold text-primary hover:underline"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M15 5l-7 7 7 7" />
-            </svg>
-            {t("menu.back")}
-          </Link>
+        {/* `gap-md`, not `gap-xs`. The header used to be three single lines and
+            is now a button, a two-line identity block and the tabs — at the
+            old spacing they touched. */}
+        <div className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-xxl pt-lg">
+          <BackLink href="/catalogue">{t("menu.back")}</BackLink>
 
-          <h1 className="text-[24px]">
-            {store.data ? pickLocalized(store.data.name) : ""}
-          </h1>
+          {/*
+            The shop, said the way the shops list says it.
+
+            The header used to be the name alone, which meant the two facts an
+            operator checks first — is this the right shop, and is this the
+            right *branch* of a name that repeats — were on the list they had
+            just left and nowhere on the page they had arrived at. The picture
+            and the category line are what that list shows, so the row and the
+            page are recognisably the same object.
+
+            The prep window comes with the category because it is on that same
+            line in the list. It is the shop's own default; a branch may differ,
+            and the Branches tab is where that shows.
+          */}
+          <div className="flex items-center gap-lg">
+            {store.data &&
+              (store.data.imageUrl ? (
+                <PreviewImage
+                  src={store.data.imageUrl}
+                  name={pickLocalized(store.data.name)}
+                  className="size-[52px] rounded-md"
+                />
+              ) : (
+                <ImagePlaceholder className="size-[52px] rounded-md" />
+              ))}
+
+            <div className="flex min-w-0 flex-col gap-xxs">
+              <h1 className="truncate text-[24px]">
+                {store.data ? pickLocalized(store.data.name) : ""}
+              </h1>
+              {store.data && (
+                <span className="truncate text-[12px] text-text-faint">
+                  {store.data.categoryName} ·{" "}
+                  {t("catalogue.prep", {
+                    min: store.data.prepMinMinutes,
+                    max: store.data.prepMaxMinutes,
+                  })}
+                </span>
+              )}
+            </div>
+          </div>
 
           {/*
             `tablist` with real tabs, not links styled as tabs. The distinction is
@@ -188,9 +220,6 @@ export function StoreScreen({ storeId }: { storeId: string }) {
             returning to a screen they were just on. */}
         <div className={cx("min-h-0 flex-1", tab !== "menu" && "hidden")}>
           <StoreMenu storeId={storeId} panelSlot={panelSlot} />
-        </div>
-        <div className={cx("min-h-0 flex-1", tab !== "details" && "hidden")}>
-          <StoreDetails storeId={storeId} />
         </div>
         {/* Mounted only when open, like Archive: it has no scroll position or
             open panel worth preserving, and its query would otherwise run on

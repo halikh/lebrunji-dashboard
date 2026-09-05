@@ -46,10 +46,31 @@ export type Category = {
    */
   hasMenuNav: boolean;
   sortOrder: number;
+  /**
+   * How many live shops are in this category.
+   *
+   * Read with the row rather than on demand, for the reason `archiveCategory`
+   * below already half-implements: `stores.category_id` is `not null` and
+   * references this row, so archiving one that still has shops is *refused*.
+   * The count was therefore a fact the operator could only discover by trying
+   * — an error message where a label would have done. On the row it is
+   * something to plan around instead of something to be stopped by.
+   *
+   * Archived shops are excluded, because they are what the refusal excludes:
+   * the number on the row and the number in the refusal have to be the same
+   * number, or the label is worse than nothing.
+   */
+  usedBy: number;
 };
 
+// `stores ( count )` is an aggregate embed — one row per category carrying how
+// many stores point at it. The `deleted_at` filter on the embed is applied to
+// the *stores* before they are counted, which is what keeps archived shops out
+// of the total without dropping empty categories from the list (an inner join
+// would have done exactly that).
 const COLUMNS = `id, slug, category_kind_id, name,
-   is_active, has_menu_nav, sort_order`;
+   is_active, has_menu_nav, sort_order,
+   stores ( count )`;
 
 /**
  * There is no picture, deliberately.
@@ -80,7 +101,9 @@ export async function fetchCategories(
   let query = getClient()
     .from("categories")
     .select(COLUMNS)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    // On the embed, not on this row — see `COLUMNS`.
+    .is("stores.deleted_at", null);
 
   const term = search?.trim();
   if (term) {
@@ -106,7 +129,29 @@ export async function fetchCategories(
     isActive: row.is_active as boolean,
     hasMenuNav: row.has_menu_nav as boolean,
     sortOrder: row.sort_order as number,
+    usedBy: countOf(row.stores),
   }));
+}
+
+/**
+ * PostgREST returns an aggregate embed as `[{ count: n }]`, and as `[]` when
+ * there is nothing to count — so the empty case is an absent row rather than a
+ * zero. Read defensively: a shape mismatch here would put "On undefined shops"
+ * on a row, which looks like the screen is broken rather than like the data is.
+ *
+ * The same helper `api/tags.ts`, `api/menu.ts` and `api/promotions.ts` each
+ * carry, and for the same reason. Four copies is a smell; extracting it is a
+ * change to three files nobody asked about, and this is not the commit for it.
+ */
+function countOf(value: unknown): number {
+  if (Array.isArray(value)) {
+    const first = value[0] as { count?: number } | undefined;
+    return first?.count ?? 0;
+  }
+  if (value && typeof value === "object") {
+    return (value as { count?: number }).count ?? 0;
+  }
+  return 0;
 }
 
 /** The kinds a category can belong to. A handful of rows, changed by migration. */
