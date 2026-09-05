@@ -526,26 +526,26 @@ export function StoreWizard({
 }
 
 /** Stable keys for the step strip, so a reorder cannot desync it from state. */
-const STEP_KEYS = ["name", "placement", "location", "timing"] as const;
+const STEP_KEYS = ["name", "placement", "location", "orders"] as const;
 
 /** Two or three words each — the strip is a map, not a second set of headings. */
 const SHORT = [
   "store.shortName",
   "store.shortPlacement",
   "store.shortLocation",
-  "store.shortTiming",
+  "store.shortOrders",
 ] as const;
 
 const TITLES = [
   "store.stepName",
   "store.stepPlacement",
   "store.stepLocation",
-  "store.stepTiming",
+  "store.stepOrders",
 ] as const;
 
 const BLURBS = [
   "store.stepNameBlurb",
   "store.stepPlacementBlurb",
   "store.stepLocationBlurb",
-  "store.stepTimingBlurb",
+  "store.stepOrdersBlurb",
 ] as const;

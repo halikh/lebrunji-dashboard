@@ -677,7 +677,7 @@ const en = {
     shortName: "Name",
     shortPlacement: "Placement",
     shortLocation: "Location",
-    shortTiming: "Timing",
+    shortOrders: "Orders",
     created: "{name} added — set up its menu next",
 
     stepName: "What is it called?",
@@ -689,9 +689,13 @@ const en = {
     stepLocation: "Where is it?",
     stepLocationBlurb:
       "Paste a Google Maps link or a pair of coordinates. This is what delivery is charged from.",
-    stepTiming: "How long does it take, and is it open for business?",
-    stepTimingBlurb:
-      "The preparation window drives the delivery estimate a customer is shown.",
+    stepOrders: "How does it take orders, and is it open for business?",
+    // Says what each of the three answers is *for*. The step used to be the
+    // prep window alone and was called Timing; the number moved here because
+    // both halves are the same question — how an order reaches this kitchen,
+    // and how long it takes once it has.
+    stepOrdersBlurb:
+      "The preparation window drives the delivery estimate a customer is shown, and the number is where an order is sent so the kitchen can start.",
 
     category: "Category",
     categoryHint: "The tile customers find it under on the home screen.",
