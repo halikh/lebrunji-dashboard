@@ -3,6 +3,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
+import { UnsavedChangesProvider } from "@/components/unsaved-changes";
 import { ToastProvider } from "@/components/ui/toast";
 import { createQueryClient } from "@/lib/query";
 
@@ -20,7 +21,12 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>{children}</ToastProvider>
+      <ToastProvider>
+        {/* Outside the screens and inside the toaster: it guards every link in
+            the shell, and a form that saves on its way out should still be able
+            to raise a toast. */}
+        <UnsavedChangesProvider>{children}</UnsavedChangesProvider>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

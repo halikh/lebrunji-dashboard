@@ -164,12 +164,48 @@ svg,
  * their colour — so this is invisible normally and is the whole focus indicator
  * there.
  */
+:root {
+  /**
+   * The ring itself, named so that the rule below and the one after it are the
+   * same ring rather than two that agree today.
+   */
+  --focus-ring:
+    0 0 0 1px var(--color-active), 0 0 0 4px var(--color-active-wash);
+}
+
 :focus-visible {
   outline: 2px solid transparent;
   outline-offset: 2px;
-  box-shadow:
-    0 0 0 1px var(--color-active),
-    0 0 0 4px var(--color-active-wash);
+  box-shadow: var(--focus-ring);
+}
+
+/**
+ * A control made of more than one element rings as a whole.
+ *
+ * `PhoneInput` is a fixed `+961` beside a box of digits, sharing one border. The
+ * rule above puts the ring on whatever is *focused*, which there is the inner
+ * input — so tabbing into it drew a ring around the digits, inside the field,
+ * leaving the country code sitting outside its own control's focus state.
+ *
+ * A group says so with `field-group`, takes the ring on behalf of whatever it
+ * contains, and suppresses the inner one. `:has` rather than `:focus-within` so
+ * that a *mouse* click does not ring it — matching `:focus-visible` exactly,
+ * which is the behaviour every other control in the app has.
+ *
+ * Written here rather than as Tailwind classes on the component for the reason
+ * the ring is here at all: a second declaration of these two shadows is a
+ * divergence waiting to happen, and the field that drifts would be the one
+ * nobody focuses while looking at it.
+ */
+.field-group:has(:focus-visible) {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
+.field-group :focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 /**

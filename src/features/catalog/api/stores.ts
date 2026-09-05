@@ -1,6 +1,6 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
-import { digitsOf } from "@/features/drivers/api/couriers";
+import { digitsOf } from "@/lib/phone";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -127,13 +127,15 @@ export type StoreDraft = {
   /**
    * Where an order is sent to the kitchen. Digits, no `+`, as `wa.me` takes it.
    *
-   * Optional on a draft because the wizard does not ask: a shop is added before
-   * anybody has been asked for a number, and a required field there would be a
-   * step with no answer. It is set afterwards, on the details tab.
+   * The wizard now asks for it, on the step that already covers how an order
+   * reaches this kitchen — so the usual case is a shop that arrives with its
+   * number rather than one that has to be gone back to.
    *
-   * Null is ordinary — the catalogue is set up before every merchant has been
-   * asked — and it is what makes the dashboard hide the send control for that
-   * shop rather than offering one that opens an empty chat.
+   * Still optional, and that is not an oversight: a catalogue is often built
+   * before every merchant has been asked for a number, and making it required
+   * would be a step with no answer. Null is ordinary, and it is what makes the
+   * dashboard hide the send control for that shop rather than offering one that
+   * opens an empty chat. It can be filled in later on the details tab.
    */
   whatsappPhone?: string | null;
 };

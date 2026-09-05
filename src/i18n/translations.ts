@@ -308,10 +308,11 @@ const en = {
     name: "Name",
     namePlaceholder: "Ali",
     phone: "WhatsApp number",
-    // The example is the shape that works: country code, no plus, no zero.
-    phonePlaceholder: "96170123456",
-    phoneHint:
-      "With the country code and no +. This is the number the order is sent to.",
+    // The national part only — the +961 is drawn in the field, not typed into
+    // it. No leading zero, because the trunk prefix is not part of the number
+    // the code is joined onto.
+    phonePlaceholder: "70123456",
+    phoneHint: "The number the order is sent to.",
     active: "Taking orders",
     saved: "{name} saved",
     added: "{name} added",
@@ -332,7 +333,9 @@ const en = {
       "They stop appearing on orders. Their number is kept, so switching them back on later does not mean typing it again.",
     archiveConfirm: "Archive driver",
     duplicatePhone: "That number already belongs to another driver.",
-    badPhone: "That does not look like a phone number with a country code.",
+    // No longer "with a country code": the code is not theirs to get wrong any
+    // more, so the message is about the part they did type.
+    badPhone: "That is not a full Lebanese number.",
     empty: "No drivers yet.",
   },
 
@@ -523,6 +526,7 @@ const en = {
     priceWhole: "A price must be a whole number.",
     priceNegative: "A price cannot be negative.",
     priceHuge: "That price looks wrong — check the number of zeros.",
+    phone: "That is not a full Lebanese number.",
     dayOfWeek: "Pick a day of the week.",
     timeShape: "Times are HH:MM, 24-hour.",
     hoursSame: "Opening and closing at the same time reads as open all day.",
@@ -777,8 +781,8 @@ const en = {
     // Says what its absence costs, which is the part somebody skipping the
     // field cannot otherwise know.
     whatsappHint:
-      "Where an order is sent so the kitchen can start. Country code, no +. Without one this shop cannot be sent orders.",
-    whatsappPlaceholder: "96170123456",
+      "Where an order is sent so the kitchen can start. Without one this shop cannot be sent orders.",
+    whatsappPlaceholder: "70123456",
     prepWindow: "Kitchen takes",
     // Says what the number is *for*, which the label cannot: this is the range
     // the app quotes a customer before they order.
@@ -1936,12 +1940,32 @@ const en = {
     openLarger: "Open in Google Maps",
   },
 
+  /**
+   * Leaving a form with work still in it.
+   *
+   * "Discard changes", not "OK" — the last thing read before clicking is what
+   * it does, which is the same rule `ConfirmButton` follows. The body says what
+   * is at stake rather than asking "are you sure", because a question with no
+   * information in it is one people learn to dismiss.
+   */
+  unsaved: {
+    title: "Leave without saving?",
+    body: "This form has changes that have not been saved. Leaving now discards them.",
+    stay: "Keep editing",
+    discard: "Discard changes",
+  },
+
   confirm: {
     signOutTitle: "Sign out?",
     // Says what happens, not "are you sure". A question with no information in
     // it is the kind people learn to dismiss without reading.
     signOutBody:
       "You will stop receiving new-order alerts on this device until you sign back in.",
+    // The same question with the part that actually costs something first.
+    // Signing out of a machine is recoverable; the half-finished menu edit
+    // behind the dialog is not.
+    signOutBodyUnsaved:
+      "You have unsaved changes, and signing out discards them. You will also stop receiving new-order alerts on this device until you sign back in.",
     signOutConfirm: "Sign out",
   },
 

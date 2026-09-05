@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button, cx } from "@/components/ui";
 import { Field } from "@/components/ui/field";
 import { useRevealOnMount } from "@/components/ui/reveal";
+import { useUnsavedChanges } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { t, type TranslationKey } from "@/i18n/translations";
 
@@ -76,6 +77,10 @@ export function BulkForm({
   const form = useRevealOnMount<HTMLDivElement>({ focus: true });
 
   const [text, setText] = useState("");
+
+  // A pasted block is the most expensive thing in this dashboard to lose: it is
+  // typically a whole menu assembled somewhere else.
+  useUnsavedChanges(text.trim() !== "");
 
   // Parsed on every keystroke rather than on submit. The problems are the point
   // of the screen — somebody fixing line 7 wants to watch line 7 stop being a

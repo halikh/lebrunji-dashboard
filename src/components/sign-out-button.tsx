@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/shell/icons";
 import { railItemClass } from "@/components/shell/rail-item";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { useAnyUnsaved } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 import { forgetAccessToken } from "@/lib/supabase/client";
 
@@ -45,6 +46,10 @@ import { forgetAccessToken } from "@/lib/supabase/client";
  */
 export function SignOutButton() {
   const router = useRouter();
+  // Not a second dialog stacked on this one: signing out already asks, so the
+  // unsaved work becomes a sentence in the question that is being asked anyway.
+  // Two modals in a row is how the second one stops being read.
+  const unsaved = useAnyUnsaved();
 
   async function signOut() {
     // A route handler, because the refresh token it has to revoke is in an
@@ -73,7 +78,7 @@ export function SignOutButton() {
     <ConfirmButton
       onConfirm={signOut}
       titleKey="confirm.signOutTitle"
-      bodyKey="confirm.signOutBody"
+      bodyKey={unsaved ? "confirm.signOutBodyUnsaved" : "confirm.signOutBody"}
       confirmKey="confirm.signOutConfirm"
       variant="danger"
       // Rendered as a rail item rather than a button, from the same class

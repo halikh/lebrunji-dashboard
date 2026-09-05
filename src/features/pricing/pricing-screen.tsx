@@ -11,6 +11,7 @@ import { reveal } from "@/components/ui/reveal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useMoney } from "@/features/reference/use-currencies";
+import { useUnsavedChanges } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 import { convertMoney, formatMoney } from "@/lib/money";
 import { formatDateTime } from "@/lib/time";
@@ -132,6 +133,10 @@ function Rate() {
   const typed = value ?? (other ? String(other.rate) : "");
   const next = Number(typed);
   const valid = Number.isFinite(next) && next > 0;
+
+  // Null means untouched, so a rate merely looked at is not unsaved work. Above
+  // every early return below, because a hook cannot be conditional.
+  useUnsavedChanges(value !== null && next !== other?.rate);
 
   if (rates.isPending) {
     return <div aria-hidden className="h-[140px] rounded-md bg-neutral-fill" />;
@@ -297,6 +302,10 @@ function Conversions({
   const samples = [2, 12.5, 50, 500];
   const changed = Math.abs(next - current) > 0.0000005;
 
+  /** One sample at one rate, written the way the app will write it. */
+  const at = (minor: number, rate: number) =>
+    formatMoney(convertMoney(minor, from, { ...to, rate }), to);
+
   return (
     <aside className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto">
       <div className="flex flex-col gap-xs">
@@ -334,11 +343,11 @@ function Conversions({
                 {formatMoney(minor, from)}
               </span>
               <span className="w-[140px] text-end tabular-nums text-text-soft">
-                {formatMoney(convertMoney(minor, from, { ...to, rate: current }), to)}
+                {at(minor, current)}
               </span>
               {changed && (
                 <span className="w-[140px] text-end font-semibold tabular-nums text-active-deep">
-                  {formatMoney(convertMoney(minor, from, { ...to, rate: next }), to)}
+                  {at(minor, next)}
                 </span>
               )}
             </div>
@@ -388,6 +397,8 @@ function Ladder() {
   const bands = draft ?? saved;
   const dirty =
     draft !== null && JSON.stringify(draft) !== JSON.stringify(saved);
+
+  useUnsavedChanges(dirty);
 
   // What an amount here is in. Read from `currencies.is_base` through
   // `useMoney` rather than inferred from `rate === 1` — see the note there.

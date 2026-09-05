@@ -1,5 +1,6 @@
 import type { DayHours } from "@/features/catalog/api/hours";
 import { SEARCH } from "@/lib/limits";
+import { digitsOf } from "@/lib/phone";
 import { isOpenNow } from "@/lib/week";
 import { getClient } from "@/lib/supabase/client";
 
@@ -372,18 +373,6 @@ export async function setCourierActive(
     .eq("id", id);
 
   if (error) throw new Error(error.message);
-}
-
-/**
- * A typed phone number as digits.
- *
- * A leading `00` is the other way of writing `+`, and people type both. Dropping
- * it rather than keeping it is the difference between `009611234567` — which
- * WhatsApp reads as an unknown country — and a number that rings.
- */
-export function digitsOf(input: string): string {
-  const digits = input.replace(/\D/g, "");
-  return digits.startsWith("00") ? digits.slice(2) : digits;
 }
 
 /**

@@ -9,6 +9,7 @@ import { LocalizedField } from "@/components/ui/localized-field";
 import { Toggle } from "@/components/ui/toggle";
 import { MultiSelect, Select } from "@/components/ui/select";
 import { ImageUploader } from "@/components/ui/image-uploader";
+import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 
 import { ItemOptions } from "./item-options";
 import { TagChip } from "./tag-chip";
@@ -140,6 +141,35 @@ export function MenuItemEditor({
   /** A string while it is being typed — `1.` is not a number and is valid so far. */
   const [unitQuantity, setUnitQuantity] = useState(
     initial?.unitQuantity == null ? "" : String(initial.unitQuantity),
+  );
+
+  // A new item opens with `isActive` already true, so the comparison is against
+  // what the form *opened with* rather than against empty — otherwise every
+  // blank editor would announce itself as unsaved the moment it appeared.
+  useUnsavedChanges(
+    changed(
+      {
+        name,
+        description,
+        price,
+        isActive,
+        imageUrl,
+        tagIds,
+        priceUnit,
+        unitQuantity,
+      },
+      {
+        name: initial?.name ?? {},
+        description: initial?.description ?? {},
+        price: String(initial?.price ?? ""),
+        isActive: initial?.isActive ?? true,
+        imageUrl: initial?.imageUrl ?? null,
+        tagIds: initial?.tagIds ?? [],
+        priceUnit: initial?.priceUnit ?? "",
+        unitQuantity:
+          initial?.unitQuantity == null ? "" : String(initial.unitQuantity),
+      },
+    ),
   );
 
   const tags = useTagVocabulary();

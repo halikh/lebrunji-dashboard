@@ -7,6 +7,7 @@ import { Button, Field, cx } from "@/components/ui";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { useToasts } from "@/components/ui/toast";
+import { useUnsavedChanges } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 import { chime } from "@/lib/chime";
 import { uploadSound } from "@/lib/images";
@@ -71,6 +72,9 @@ export function GeneralTab() {
     current != null &&
     (Number(openHour) !== current.openHour ||
       Number(closeHour) !== current.closeHour);
+
+  // Before the error return below: a hook cannot be conditional.
+  useUnsavedChanges(windowDirty);
 
   if (settings.isError) {
     return (

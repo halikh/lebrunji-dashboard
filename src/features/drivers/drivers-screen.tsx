@@ -7,18 +7,20 @@ import { useState } from "react";
 import { Button, Field, Input, cx } from "@/components/ui";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { ROW } from "@/components/ui/row";
 import { Panel } from "@/components/ui/panel";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { PanelHeader } from "@/components/ui/panel-header";
 import { Toggle } from "@/components/ui/toggle";
 import { SearchInput } from "@/components/ui/search-input";
 import { FilterTab, tabArrowHandler, type TabTone } from "@/components/ui/tab";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { SEARCH, TEXT } from "@/lib/limits";
-import { formatPhone } from "@/lib/phone";
+import { digitsOf, formatPhone } from "@/lib/phone";
+import { validatePhone } from "@/lib/validation";
 
 import {
-  digitsOf,
   isOverridden,
   isTakingOrders,
   type Courier,
@@ -476,6 +478,20 @@ export function DriverEditor({
     initial?.hours ?? DEFAULT_WEEK,
   );
 
+  // A new driver starts from `DEFAULT_WEEK`, so an untouched blank form is not
+  // dirty and closing it asks nothing — which is right: there is nothing there
+  // to lose yet.
+  useUnsavedChanges(
+    changed(
+      { name, phone, hours },
+      {
+        name: initial?.name ?? "",
+        phone: initial?.phone ?? "",
+        hours: initial?.hours ?? DEFAULT_WEEK,
+      },
+    ),
+  );
+
   /**
    * The same rule the CHECK constraint carries, applied here so the operator is
    * told before saving rather than by a constraint name afterwards.
@@ -489,9 +505,7 @@ export function DriverEditor({
    */
   const digits = digitsOf(phone);
   const ready =
-    name.trim().length > 0 &&
-    /^[1-9][0-9]{6,14}$/.test(digits) &&
-    hours.length > 0;
+    name.trim().length > 0 && validatePhone(digits).ok && hours.length > 0;
 
   return (
     <form
@@ -516,12 +530,10 @@ export function DriverEditor({
         </Field>
 
         <Field label={t("drivers.phone")} hint={t("drivers.phoneHint")}>
-          <Input
+          <PhoneInput
             value={phone}
-            onChange={(event) => setPhone(event.target.value)}
+            onChange={setPhone}
             placeholder={t("drivers.phonePlaceholder")}
-            inputMode="tel"
-            maxLength={24}
           />
         </Field>
 

@@ -18,7 +18,14 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
 import { parseLocation } from "@/lib/location";
-import { validateLocalizedText, validatePrepWindow } from "@/lib/validation";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
+import { digitsOf } from "@/lib/phone";
+import {
+  validateLocalizedText,
+  validatePhone,
+  validatePrepWindow,
+} from "@/lib/validation";
 import type { Localized } from "@/lib/validation";
 
 import { fetchDefaultCountry, type StoreDraft } from "./api/stores";
@@ -94,9 +101,44 @@ export function StoreWizard({
   const [categoryId, setCategoryId] = useState("");
   const [currencyCode, setCurrencyCode] = useState("");
   const [pin, setPin] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [prepMin, setPrepMin] = useState("10");
   const [prepMax, setPrepMax] = useState("20");
   const [isActive, setIsActive] = useState(false);
+
+  /**
+   * A wizard is dirty as soon as it stops looking like a blank one.
+   *
+   * Compared against the defaults rather than tracked with a flag, so backing a
+   * field out — typing a name and deleting it again — leaves nothing to warn
+   * about. `step` is not in the comparison: moving between steps is not an edit.
+   */
+  useUnsavedChanges(
+    changed(
+      {
+        name,
+        imageUrl,
+        categoryId,
+        currencyCode,
+        pin,
+        whatsapp,
+        prepMin,
+        prepMax,
+        isActive,
+      },
+      {
+        name: {},
+        imageUrl: null,
+        categoryId: "",
+        currencyCode: "",
+        pin: "",
+        whatsapp: "",
+        prepMin: "10",
+        prepMax: "20",
+        isActive: false,
+      },
+    ),
+  );
 
   const [errors, setErrors] = useState<{
     name?: string;
@@ -104,6 +146,7 @@ export function StoreWizard({
     currency?: string;
     pin?: string;
     prep?: string;
+    whatsapp?: string;
   }>({});
 
   const located = parseLocation(pin);
@@ -160,7 +203,19 @@ export function StoreWizard({
     }
 
     const check = validatePrepWindow(Number(prepMin), Number(prepMax));
-    return { prep: check.ok ? undefined : t(check.key, check.params) };
+    const phone = validatePhone(digitsOf(whatsapp));
+
+    return {
+      prep: check.ok ? undefined : t(check.key, check.params),
+      // Optional, so an empty box passes: a shop is often added before anybody
+      // has been asked for its number. A *wrong* number does not pass, because
+      // the failure it causes is silent — the shop simply never appears on the
+      // send list, and nothing on screen says why.
+      whatsapp:
+        whatsapp.trim() === "" || phone.ok
+          ? undefined
+          : t(phone.key, phone.params),
+    };
   }
 
   function next() {
@@ -185,6 +240,7 @@ export function StoreWizard({
       longitude: coordinates?.longitude ?? null,
       prepMinMinutes: Number(prepMin),
       prepMaxMinutes: Number(prepMax),
+      whatsappPhone: whatsapp.trim() || null,
       isActive,
     };
 
@@ -391,6 +447,23 @@ export function StoreWizard({
                     {t("store.minutes")}
                   </span>
                 </div>
+              </Field>
+
+              {/* Beside the prep window rather than on a step of its own: both
+                  answer the same question — how an order reaches this kitchen
+                  and how long it takes once it does. Optional, and the hint
+                  says what its absence costs, which is the part somebody
+                  skipping the field cannot otherwise know. */}
+              <Field
+                label={t("store.whatsapp")}
+                hint={t("store.whatsappHint")}
+                error={errors.whatsapp}
+              >
+                <PhoneInput
+                  value={whatsapp}
+                  onChange={setWhatsapp}
+                  placeholder={t("store.whatsappPlaceholder")}
+                />
               </Field>
 
               <Field

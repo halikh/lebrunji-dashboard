@@ -7,6 +7,7 @@ import { Button, Field, cx } from "@/components/ui";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { useToasts } from "@/components/ui/toast";
+import { useUnsavedChanges } from "@/components/unsaved-changes";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { useMenu } from "@/features/catalog/use-menu";
@@ -100,6 +101,15 @@ export function AmendOrder({
    */
   const [swapPrices, setSwapPrices] = useState<Record<string, number>>({});
   const [note, setNote] = useState("");
+
+  // Absent keys mean unchanged, so an amendment that has been opened and not
+  // touched is not unsaved work. `swapOptions` and `swapPrices` are left out:
+  // neither can be set without a swap, which is counted.
+  useUnsavedChanges(
+    Object.keys(counts).length > 0 ||
+      Object.keys(swaps).length > 0 ||
+      note.trim() !== "",
+  );
 
   // Lines that are themselves the result of an earlier amendment are shown but
   // not editable: a substitute has already been agreed, and amending an

@@ -3,13 +3,15 @@
 import { useState } from "react";
 
 import { Button, Input } from "@/components/ui";
+import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { Field } from "@/components/ui/field";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Map } from "@/components/ui/map";
 import { NumberInput } from "@/components/ui/number-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
-import { digitsOf } from "@/features/drivers/api/couriers";
+import { digitsOf } from "@/lib/phone";
 import { useLanguages } from "@/features/reference/use-languages";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
@@ -19,6 +21,7 @@ import { parseLocation } from "@/lib/location";
 import { restatePrice } from "@/lib/money";
 import {
   validateLocalizedText,
+  validatePhone,
   validatePrepWindow,
   type Localized,
 } from "@/lib/validation";
@@ -256,6 +259,27 @@ function Form({ store }: { store: Store }) {
       : "",
   );
 
+  // `mode` is left out on purpose: it is a question *about* a currency change
+  // rather than a value of its own, and it cannot be reached without moving
+  // `currencyCode` first — which is compared.
+  useUnsavedChanges(
+    changed(
+      { name, currencyCode, imageUrl, whatsapp, prepMin, prepMax, pin },
+      {
+        name: store.name,
+        currencyCode: store.currencyCode,
+        imageUrl: store.imageUrl,
+        whatsapp: store.whatsappPhone ?? "",
+        prepMin: String(store.prepMinMinutes),
+        prepMax: String(store.prepMaxMinutes),
+        pin:
+          store.latitude !== null && store.longitude !== null
+            ? `${store.latitude}, ${store.longitude}`
+            : "",
+      },
+    ),
+  );
+
   const [errors, setErrors] = useState<{
     name?: string;
     prep?: string;
@@ -303,17 +327,18 @@ function Form({ store }: { store: Store }) {
 
     const nameCheck = validateLocalizedText(name, codes, TEXT.name);
     const prepCheck = validatePrepWindow(min, max);
+    const phoneCheck = validatePhone(digitsOf(whatsapp));
 
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
       prep: prepCheck.ok ? undefined : t(prepCheck.key, prepCheck.params),
-      // The same rule the CHECK constraint carries, so the operator is told
-      // before saving rather than by a constraint name afterwards. Empty is
-      // fine — the field is optional.
+      // Empty is fine — the field is optional. The rule itself lives in
+      // `validatePhone`, which is the CHECK constraint's, so the wizard and the
+      // driver form cannot drift from this one.
       whatsapp:
-        whatsapp.trim() === "" || /^[1-9][0-9]{6,14}$/.test(digitsOf(whatsapp))
+        whatsapp.trim() === "" || phoneCheck.ok
           ? undefined
-          : t("drivers.badPhone"),
+          : t(phoneCheck.key, phoneCheck.params),
       // An empty box is "no pin", which is a legitimate state — a shop can be
       // saved without one, with the warning above. Text that is not a location
       // is not, and saving null for it would look exactly like success while
@@ -499,12 +524,10 @@ function Form({ store }: { store: Store }) {
               hint={t("store.whatsappHint")}
               error={errors.whatsapp}
             >
-              <Input
+              <PhoneInput
                 value={whatsapp}
-                onChange={(event) => setWhatsapp(event.target.value)}
+                onChange={setWhatsapp}
                 placeholder={t("store.whatsappPlaceholder")}
-                inputMode="tel"
-                maxLength={24}
               />
             </Field>
           </section>

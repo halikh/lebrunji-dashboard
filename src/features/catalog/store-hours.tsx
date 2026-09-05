@@ -8,6 +8,7 @@ import { Button, cx } from "@/components/ui";
 import { Toggle } from "@/components/ui/toggle";
 import { useToasts } from "@/components/ui/toast";
 import { TimeField } from "@/components/ui/time-field";
+import { useUnsavedChanges } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 
 import { BUSINESS_TIMEZONE, toWallClock } from "@/lib/time";
@@ -175,6 +176,10 @@ function Grid({
    * Save is pressed, and has to admit that rather than look authoritative.
    */
   const dirty = JSON.stringify(toWindows(week)) !== JSON.stringify(saved);
+
+  // The panel already says so in words; this is what stops the week being
+  // walked away from without reading them.
+  useUnsavedChanges(dirty);
 
   function update(day: number, patch: Partial<Draft>) {
     setWeek((current) =>

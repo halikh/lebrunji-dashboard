@@ -214,6 +214,28 @@ export function validatePrepWindow(min: number, max: number): Valid {
 }
 
 /**
+ * A phone number, as the column will have it.
+ *
+ * The rule is the CHECK constraint's, applied here so the operator is told
+ * before saving rather than by a constraint name afterwards: digits, no leading
+ * zero, seven to fifteen of them — which is E.164, and is deliberately *any*
+ * country's number rather than Lebanon's.
+ *
+ * ## Why it validates the joined number and not the typed one
+ *
+ * `PhoneInput` draws `+961` and takes the rest, so what the operator types is
+ * never a whole number and checking it alone would be checking a fragment. What
+ * arrives here is the joined form the field emits and the column stores, which
+ * is the thing that has to be right.
+ *
+ * Empty is the caller's business, not this function's: a driver must have a
+ * number and a shop need not, and both call this.
+ */
+export function validatePhone(digits: string): Valid {
+  return /^[1-9][0-9]{6,14}$/.test(digits) ? OK : fail("validation.phone");
+}
+
+/**
  * One rung of the delivery ladder.
  *
  * `existing` is every other band's ceiling, because a band is meaningless alone:
