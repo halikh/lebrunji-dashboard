@@ -200,7 +200,6 @@ export async function archiveTag(id: string): Promise<void> {
   if (error) throw new Error(friendly(error.message));
 }
 
-
 /**
  * Puts a dish's tags exactly where the form says they should be.
  *

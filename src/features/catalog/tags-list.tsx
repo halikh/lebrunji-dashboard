@@ -21,12 +21,7 @@ import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { TAG_TONES, type Tag, type TagDraft, type TagTone } from "./api/tags";
 import { TagChip } from "./tag-chip";
-import {
-  useArchiveTag,
-  useCreateTag,
-  useTags,
-  useUpdateTag,
-} from "./use-tags";
+import { useArchiveTag, useCreateTag, useTags, useUpdateTag } from "./use-tags";
 
 /**
  * The tag vocabulary — the chips a dish can be given.
@@ -123,24 +118,24 @@ export function TagsList() {
           )}
 
           {rows.map((row) => (
-              <Row
-                key={row.id}
-                tag={row}
-                open={open === row.id}
-                onEdit={() => setOpen(row.id)}
-                onToggleActive={() => {
-                  setOpen(null);
-                  update.mutate({
-                    id: row.id,
-                    patch: { isActive: !row.isActive },
-                  });
-                }}
-                onArchive={async () => {
-                  setOpen(null);
-                  await archive.mutateAsync({ id: row.id, name: row.name });
-                }}
-              />
-            ))}
+            <Row
+              key={row.id}
+              tag={row}
+              open={open === row.id}
+              onEdit={() => setOpen(row.id)}
+              onToggleActive={() => {
+                setOpen(null);
+                update.mutate({
+                  id: row.id,
+                  patch: { isActive: !row.isActive },
+                });
+              }}
+              onArchive={async () => {
+                setOpen(null);
+                await archive.mutateAsync({ id: row.id, name: row.name });
+              }}
+            />
+          ))}
 
           {searching && rows.length === 0 && (
             <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
@@ -173,10 +168,7 @@ export function TagsList() {
                     { onSuccess: () => setOpen(null) },
                   );
                 } else {
-                  create.mutate(
-                    { draft },
-                    { onSuccess: () => setOpen(null) },
-                  );
+                  create.mutate({ draft }, { onSuccess: () => setOpen(null) });
                 }
               }}
               onCancel={() => setOpen(null)}
@@ -205,11 +197,11 @@ function Row({
 
   const className = cx(
     ROW,
-      // Marked, not dimmed — fading a row takes its controls with it, and a
-      // faded button reads as a disabled one.
-      !tag.isActive && "border-danger-wash bg-danger-wash/30",
-      open &&
-        "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
+    // Marked, not dimmed — fading a row takes its controls with it, and a
+    // faded button reads as a disabled one.
+    !tag.isActive && "border-danger-wash bg-danger-wash/30",
+    open &&
+      "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
     tag.isActive && !open && "border-border",
     tag.isActive && open && "border-active",
   );

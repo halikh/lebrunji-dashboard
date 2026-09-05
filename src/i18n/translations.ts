@@ -1046,26 +1046,35 @@ const en = {
       tag and a shop at once.
     */
     restoreTitle: "Bring {name} back?",
-    restoreSection: "It appears on the menu again. Items archived inside it stay archived until you bring those back too.",
+    restoreSection:
+      "It appears on the menu again. Items archived inside it stay archived until you bring those back too.",
     restoreItem: "It appears on the menu again and customers can order it.",
     restoreGroup: "It is asked again whenever this item is ordered.",
     restoreOption: "It is offered again as an answer to this question.",
-    restoreStore: "It appears in the app again and customers can order from it.",
-    restoreCategory: "It appears in the app again, with whatever shops you bring back into it.",
-    restoreTag: "It can be put on items again, and reappears on any that still carry it.",
-    restorePromotion: "It runs again if its dates still allow — check them, because they come back exactly as they were.",
+    restoreStore:
+      "It appears in the app again and customers can order from it.",
+    restoreCategory:
+      "It appears in the app again, with whatever shops you bring back into it.",
+    restoreTag:
+      "It can be put on items again, and reappears on any that still carry it.",
+    restorePromotion:
+      "It runs again if its dates still allow — check them, because they come back exactly as they were.",
     restoreConfirm: "Bring it back",
     // The refusal. A dish restored into an archived section is listed by
     // neither the dashboard nor the app, so it is refused rather than mislaid.
-    sectionGoneFirst: "Bring back {name} first — an item cannot return to an archived section.",
+    sectionGoneFirst:
+      "Bring back {name} first — an item cannot return to an archived section.",
     // The same refusal one tier up: `stores.category_id` is not null, so a shop
     // restored into an archived category is on a shelf nothing draws.
-    categoryGoneFirst: "Bring back {name} first — a shop cannot return to an archived category.",
+    categoryGoneFirst:
+      "Bring back {name} first — a shop cannot return to an archived category.",
     broughtBack: "{name} is back",
     // The catalogue-level archive, above the per-shop one.
     catalogueTitle: "Put away",
-    catalogueHint: "Archived shops, categories, tags and promotions. Nothing here is deleted — bring back what you need.",
-    catalogueEmptyBody: "Archived shops, categories, tags and promotions collect here.",
+    catalogueHint:
+      "Archived shops, categories, tags and promotions. Nothing here is deleted — bring back what you need.",
+    catalogueEmptyBody:
+      "Archived shops, categories, tags and promotions collect here.",
     inCategory: "in {name}",
     // A promotion has no customer-facing name, so the slug is the handle — the
     // same one the promotions list shows.
@@ -1074,7 +1083,8 @@ const en = {
     sectionRestored: "{name} is back",
     offered: "{name} is offered again",
     emptyTitle: "Nothing put away",
-    emptyBody: "Archived sections and items, and withdrawn questions and choices, collect here.",
+    emptyBody:
+      "Archived sections and items, and withdrawn questions and choices, collect here.",
     failedTitle: "Could not load the archive",
   },
 
@@ -1107,7 +1117,7 @@ const en = {
     nameLong: "The {code} name is longer than {max} characters.",
     price: "The price is missing or is not a number.",
     priceRange: "That price is out of range.",
-    duplicate: "\"{name}\" is already on line {first}.",
+    duplicate: '"{name}" is already on line {first}.',
     addedSections: "{count} sections added",
     addedItems: "{count} items added",
     addedChoices: "{count} choices added",
@@ -1160,10 +1170,12 @@ const en = {
     noChoices: "no choices yet",
     manage: "Choose items",
     withdrawnMark: "Withdrawn",
-    withdrawnHint: "Withdrawn from the whole shop. Bring it back from the Archive tab.",
+    withdrawnHint:
+      "Withdrawn from the whole shop. Bring it back from the Archive tab.",
     // The picker.
     pickTitle: "Which items ask {name}?",
-    pickHint: "Tick a whole section, or the items inside it. Items in different sections can be mixed.",
+    pickHint:
+      "Tick a whole section, or the items inside it. Items in different sections can be mixed.",
     pickAll: "Every item in this shop",
     pickNone: "Clear all",
     section: "{name}",
@@ -1209,10 +1221,12 @@ const en = {
     tabHint:
       "Every question this shop asks. Narrow to a section or one item to see only its own.",
     section: "Section",
-    sectionHint: "Narrows the list of items below, and the questions on the right.",
+    sectionHint:
+      "Narrows the list of items below, and the questions on the right.",
     pickSection: "Choose a section",
     item: "Item",
-    itemHint: "Shows only the questions this item asks. Clear it to see them all.",
+    itemHint:
+      "Shows only the questions this item asks. Clear it to see them all.",
     pickItem: "Choose an item",
     // The marker in the picker. A dish with no questions looks complete
     // everywhere else, so this is the only place it can be seen at a glance.
@@ -1286,14 +1300,16 @@ const en = {
       "Customers stop being asked it. It moves to the Archive tab, where you can bring it back.",
     withdrawGroupConfirm: "Withdraw it",
     offerGroupTitle: "Offer {name} again?",
-    offerGroupBody: "Customers are asked it again whenever this item is ordered.",
+    offerGroupBody:
+      "Customers are asked it again whenever this item is ordered.",
     offerGroupConfirm: "Offer it",
     withdrawChoiceTitle: "Withdraw {name}?",
     withdrawChoiceBody:
       "Customers stop being able to pick it. It moves to the Archive tab, where you can bring it back.",
     withdrawChoiceConfirm: "Withdraw it",
     offerChoiceTitle: "Offer {name} again?",
-    offerChoiceBody: "Customers can pick it again as an answer to this question.",
+    offerChoiceBody:
+      "Customers can pick it again as an answer to this question.",
     offerChoiceConfirm: "Offer it",
     // Said once at the top of a dish's questions, so the absence of the
     // withdrawn ones is a fact on screen rather than something to work out.
