@@ -10,6 +10,7 @@ import { cx } from "@/components/ui";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
+import { BranchesTab } from "./branches-tab";
 import { StoreDetails } from "./store-details";
 import { StoreArchive } from "./store-archive";
 import { StoreHours } from "./store-hours";
@@ -42,6 +43,10 @@ import { useStore } from "./use-stores";
 const TABS = [
   { key: "menu", labelKey: "menu.title" },
   { key: "details", labelKey: "store.tab" },
+  // After Details, because a branch is a fact about a shop that already
+  // exists — and before Options and Hours, both of which now read as
+  // questions about *which* branch.
+  { key: "branches", labelKey: "branches.tab" },
   // One tab, not two. It was Options (an item's questions) beside Common
   // options (a question's items) — the same rows read in opposite directions,
   // which meant repricing a choice happened on one screen and deciding who asks
@@ -187,6 +192,14 @@ export function StoreScreen({ storeId }: { storeId: string }) {
         <div className={cx("min-h-0 flex-1", tab !== "details" && "hidden")}>
           <StoreDetails storeId={storeId} />
         </div>
+        {/* Mounted only when open, like Archive: it has no scroll position or
+            open panel worth preserving, and its query would otherwise run on
+            every visit to every shop. */}
+        {tab === "branches" && (
+          <div className="min-h-0 flex-1">
+            <BranchesTab storeId={storeId} />
+          </div>
+        )}
         <div className={cx("min-h-0 flex-1", tab !== "options" && "hidden")}>
           <StoreOptions storeId={storeId} />
         </div>

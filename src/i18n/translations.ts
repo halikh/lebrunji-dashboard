@@ -1972,6 +1972,59 @@ const en = {
     discard: "Discard changes",
   },
 
+  /**
+   * Branches — the places one shop trades from.
+   *
+   * The words keep the split the schema does: a *store* is the brand and a
+   * *branch* is an address. Nothing here says "store", because the operator is
+   * looking at one already and the question on this tab is always about a
+   * place.
+   */
+  branches: {
+    tab: "Branches",
+    // Said once at the top, because "why is there a Branches tab on a shop with
+    // one branch" is the first question this screen gets.
+    intro:
+      "Where this shop trades from. The menu is shared by all of them — each branch can hide what it does not serve and charge its own prices.",
+    add: "New branch",
+    edit: "Edit branch",
+    name: "Branch name",
+    // The place, not the brand — the shop's name is already above.
+    nameHint: "The area or street, not the shop's name.",
+    namePlaceholder: "Hamra",
+    pin: "Where it is",
+    pinHint:
+      "Delivery is charged from here. Without a pin every order from this branch is charged at the top distance band.",
+    prep: "Kitchen takes",
+    prepHint:
+      "The range the app quotes with the delivery estimate for this branch.",
+    whatsapp: "WhatsApp number",
+    whatsappHint:
+      "Where an order from this branch is sent. Without one this branch cannot be sent orders.",
+    visibility: "Taking orders",
+    live: "Open",
+    hidden: "Closed",
+    liveHint: "Customers can order from this branch.",
+    hiddenHint:
+      "Hidden from the app. The shop's other branches are unaffected.",
+    hoursTitle: "Opening hours",
+    added: "{name} added",
+    saved: "{name} saved",
+    closed: "{name} closed",
+    closeTitle: "Close {name}?",
+    // Says what survives, because the word "close" reads as deletion.
+    closeBody:
+      "It stops appearing in the app and cannot be ordered from. Nothing is deleted: the orders it took keep pointing at it, and its prices and hidden items are kept so reopening is one click.",
+    closeConfirm: "Close branch",
+    // The one refusal worth a sentence rather than a constraint name.
+    lastOne:
+      "A shop needs somewhere to trade from. Add another branch before closing this one.",
+    pinHalf: "A pin needs both a latitude and a longitude.",
+    unpinned: "No pin",
+    count: "{count} branches",
+    countOne: "1 branch",
+  },
+
   confirm: {
     signOutTitle: "Sign out?",
     // Says what happens, not "are you sure". A question with no information in
