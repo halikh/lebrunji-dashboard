@@ -162,11 +162,23 @@ export function ImageUploader({
   return (
     <div className="flex flex-col gap-sm">
       {/*
-        A div, not a button. It contains two buttons of its own, and a button
-        inside a button is invalid and behaves unpredictably. The clickable
-        surface says so with a cursor of its own — the global rule deliberately
-        does not reach `div`s, because a rule broad enough to catch them would
-        put a pointer on half the page.
+        The whole zone opens the picker, not just the word "browse".
+
+        It already looked that way — `cursor-pointer` has been on this box all
+        along — and clicking anywhere but the link did nothing. A pointer over a
+        surface that ignores the click is a small lie, and the target it points
+        at is one word in a sentence.
+
+        A div rather than a button, because it contains a button of its own and
+        a button inside a button is invalid and behaves unpredictably. That
+        makes it unreachable from the keyboard, which is exactly what the inner
+        `browse` button is for: it stays as the focusable, announced way in, and
+        the div is the large target for a mouse. Making the div focusable too
+        would be a second tab stop onto the same action.
+
+        The cursor is declared here because the global rule deliberately does
+        not reach `div`s — one broad enough to catch them would put a pointer on
+        half the page.
       */}
       <div
         id={field?.id}
@@ -180,6 +192,13 @@ export function ImageUploader({
           if (!disabled) setOver(true);
         }}
         onDragLeave={() => setOver(false)}
+        onClick={() => {
+          // Not while it is uploading: the picker would open over a transfer
+          // already in flight, and the second file would replace the first
+          // without either finishing visibly.
+          if (disabled || busy) return;
+          input.current?.click();
+        }}
         onDrop={(event) => {
           event.preventDefault();
           setOver(false);
@@ -196,7 +215,12 @@ export function ImageUploader({
           <button
             type="button"
             disabled={disabled || busy}
-            onClick={() => input.current?.click()}
+            onClick={(event) => {
+              // The zone around this opens the picker too. Without stopping
+              // here the same click arrives there as well and asks twice.
+              event.stopPropagation();
+              input.current?.click();
+            }}
             className="font-semibold text-primary underline"
           >
             {t("images.browse")}

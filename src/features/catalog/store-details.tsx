@@ -313,7 +313,10 @@ function Form({ store }: { store: Store }) {
     currencyMoved && sample && from && into
       ? {
           before: format(sample.price, from.code),
-          keep: format(restatePrice(sample.price, from, into, "keep"), into.code),
+          keep: format(
+            restatePrice(sample.price, from, into, "keep"),
+            into.code,
+          ),
           convert: format(
             restatePrice(sample.price, from, into, "convert"),
             into.code,

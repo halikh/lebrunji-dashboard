@@ -17,7 +17,7 @@ import { Panel } from "@/components/ui/panel";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { PanelHeader } from "@/components/ui/panel-header";
 import { Toggle } from "@/components/ui/toggle";
-import { SearchInput } from "@/components/ui/search-input";
+import { ListHeader } from "@/components/ui/list-header";
 import { FilterTab, tabArrowHandler, type TabTone } from "@/components/ui/tab";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { SEARCH, TEXT } from "@/lib/limits";
@@ -174,17 +174,19 @@ export function DriversScreen() {
     // makes it open beside it — the same shape the shops list uses.
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
-        <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h1 className="shrink-0 text-[24px]">{t("drivers.title")}</h1>
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder={t("drivers.search")}
-          />
-          <Button onClick={guarded(() => setOpen("new"))}>
-            {t("drivers.add")}
-          </Button>
-        </div>
+        <ListHeader
+          title={t("drivers.title")}
+          search={{
+            value: search,
+            onChange: setSearch,
+            placeholder: t("drivers.search"),
+          }}
+          action={
+            <Button onClick={guarded(() => setOpen("new"))}>
+              {t("drivers.add")}
+            </Button>
+          }
+        />
 
         {/* The same strip the queue and the customers list use — same shape,
             same place, same keyboard behaviour — because these are the same

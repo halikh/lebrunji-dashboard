@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Button, cx } from "@/components/ui";
-import { SearchInput } from "@/components/ui/search-input";
+import { ListHeader } from "@/components/ui/list-header";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
@@ -97,31 +97,21 @@ export function TagsList() {
   return (
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
-        {/* The same bar as the shops and the categories — same border, same
-            padding, same place for the box — so moving between tabs is not
-            relearning where the search is. */}
-        <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h1 className="shrink-0 self-center text-[24px]">{t("tags.tab")}</h1>
-          {/* The rule under the box, always — not a warning that appears
-              once somebody has already typed. A handle that stops working is
-              confusing at the moment it stops; the sentence is only useful
-              before that. */}
-          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder={t("tags.search")}
-            />
-            <span className="ps-md text-[12px] text-text-faint">
-              {t("tags.reorderHint")}
-            </span>
-          </div>
-          {/* Beside the search, as on the shops tab. The list keeps its own
-              button at the end — that is where a new row appears — and the
-              pinned bar is the third way to reach the same action while the
-              end of the list is out of sight. */}
-          <Button onClick={() => setOpen("new")}>{t("tags.add")}</Button>
-        </div>
+        {/* The action is repeated here and at the end of the list: the end is
+            where a new row appears, and the bar is how it stays reachable while
+            the end is out of sight. */}
+        <ListHeader
+          title={t("tags.tab")}
+          search={{
+            value: search,
+            onChange: setSearch,
+            placeholder: t("tags.search"),
+          }}
+          hint={t("tags.reorderHint")}
+          action={
+            <Button onClick={() => setOpen("new")}>{t("tags.add")}</Button>
+          }
+        />
 
         <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
           {/* What the list is for, said once at the top. A vocabulary screen

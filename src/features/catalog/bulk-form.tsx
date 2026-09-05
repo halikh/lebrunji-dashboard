@@ -176,7 +176,9 @@ export function BulkForm({
             onSubmit(parsed.rows);
           }}
         >
-          {ready === 1 ? t("bulk.submitOne") : t("bulk.submit", { count: ready })}
+          {ready === 1
+            ? t("bulk.submitOne")
+            : t("bulk.submit", { count: ready })}
         </Button>
       </div>
     </div>

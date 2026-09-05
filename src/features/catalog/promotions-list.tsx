@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { Button, Input, cx } from "@/components/ui";
-import { SearchInput } from "@/components/ui/search-input";
+import { ListHeader } from "@/components/ui/list-header";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
@@ -123,32 +123,23 @@ export function PromotionsList() {
   return (
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
-        {/* The same bar as the shops, categories and tags — same border, same
-            padding, same place for the box. */}
-        <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h1 className="shrink-0 self-center text-[24px]">
-            {t("promotions.tab")}
-          </h1>
-          {/* The rule under the box, always — not a warning that appears
-              once somebody has already typed. A handle that stops working is
-              confusing at the moment it stops; the sentence is only useful
-              before that. */}
-          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder={t("promotions.search")}
-            />
-            <span className="ps-md text-[12px] text-text-faint">
-              {t("promotions.reorderHint")}
-            </span>
-          </div>
-          {/* Beside the search, as on the shops tab. The list keeps its own
-              button at the end — that is where a new row appears, and the two
-              are never on screen together — but a header button is what makes
-              "add one" reachable without reading the list first. */}
-          <Button onClick={() => setOpen("new")}>{t("promotions.add")}</Button>
-        </div>
+        {/* The action is repeated here and at the end of the list: the end is
+            where a new row appears, and the bar is what makes "add one"
+            reachable without reading the list first. */}
+        <ListHeader
+          title={t("promotions.tab")}
+          search={{
+            value: search,
+            onChange: setSearch,
+            placeholder: t("promotions.search"),
+          }}
+          hint={t("promotions.reorderHint")}
+          action={
+            <Button onClick={() => setOpen("new")}>
+              {t("promotions.add")}
+            </Button>
+          }
+        />
 
         <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
           <p className="ps-md pb-sm text-[13px] text-text-soft">

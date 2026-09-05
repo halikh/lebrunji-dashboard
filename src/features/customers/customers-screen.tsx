@@ -8,7 +8,7 @@ import { Button, cx } from "@/components/ui";
 import { Avatar } from "@/components/ui/avatar";
 
 import { AccountActions } from "./account-actions";
-import { SearchInput } from "@/components/ui/search-input";
+import { ListHeader } from "@/components/ui/list-header";
 import { ROW } from "@/components/ui/row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
@@ -133,19 +133,17 @@ export function CustomersScreen() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-        <h1 className="shrink-0 text-[24px]">{t("customers.title")}</h1>
-        {/* The one screen where the box *is* the point — a customer is found by
-            typing, not by scrolling — so it starts right after the heading and
-            runs to the end of the bar. A strut pushing it to the right left the
-            widest gap on the screen exactly where the most-used control was
-            meant to be. */}
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder={t("customers.search")}
-        />
-      </div>
+      {/* No action, deliberately: this is the one screen where the box *is*
+          the point — a customer is found by typing, not by scrolling — so it
+          runs to the end of the bar rather than stopping short of a button. */}
+      <ListHeader
+        title={t("customers.title")}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: t("customers.search"),
+        }}
+      />
 
       {/* The same strip the order queue uses — same shape, same place, same
           keyboard behaviour — because these are the same kind of control and

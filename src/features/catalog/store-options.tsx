@@ -883,7 +883,11 @@ function ChoiceRow({
         offeredHere &&
         (isDefaultHere ? (
           <span className="shrink-0 rounded-full bg-accent-wash px-md py-xxs text-[12px] font-semibold text-accent-deep">
-            {t(perItemDish === null ? "options.isDefault" : "options.defaultHere")}
+            {t(
+              perItemDish === null
+                ? "options.isDefault"
+                : "options.defaultHere",
+            )}
           </span>
         ) : (
           <Button
