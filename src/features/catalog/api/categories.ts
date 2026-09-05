@@ -1,5 +1,6 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
+import { formatLocalized } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -169,6 +170,19 @@ export async function fetchCategoryKinds(): Promise<CategoryKind[]> {
   }));
 }
 
+/*
+ * The house style, applied here as well as in the field.
+ *
+ * Not a duplicate of the form's rule — a second layer under it. `LocalizedField`
+ * formats as somebody types, which is the half that makes the rule *visible*;
+ * this is the half that makes it *true*. Bulk paste, the wizard, a future
+ * import and any screen written next all arrive here, and a rule enforced only
+ * by a component is a rule the next component does not have.
+ *
+ * See `lib/text-format.ts` for what the formats are and why.
+ */
+const NAME_FORMAT = "sentence" as const;
+
 export type CategoryDraft = {
   kindId: string;
   name: Localized;
@@ -182,7 +196,7 @@ export async function createCategory(
 ): Promise<void> {
   const { error } = await getClient().from("categories").insert({
     category_kind_id: draft.kindId,
-    name: draft.name,
+    name: formatLocalized(draft.name, NAME_FORMAT),
     is_active: draft.isActive,
     has_menu_nav: draft.hasMenuNav,
     sort_order: sortOrder,
@@ -201,7 +215,7 @@ export async function updateCategory(
 ): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.kindId !== undefined) row.category_kind_id = patch.kindId;
-  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.name !== undefined) row.name = formatLocalized(patch.name, NAME_FORMAT);
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.hasMenuNav !== undefined) row.has_menu_nav = patch.hasMenuNav;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;

@@ -373,6 +373,7 @@ function Editor({
           onChange={setName}
           maxLength={TEXT.name}
           error={errors.name}
+          format="sentence"
           placeholder={{ en: "Restaurants", ar: "مطاعم" }}
         />
 

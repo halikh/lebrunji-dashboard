@@ -1,5 +1,6 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
+import { formatLocalized, hasEmoji } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -140,6 +141,42 @@ function countOf(value: unknown): number {
   return 0;
 }
 
+/*
+ * The house style and the emoji rule, applied here as well as in the form.
+ *
+ * The form's copy of both is what makes them visible while somebody types;
+ * this copy is what makes them true. A rule enforced only by one editor is a
+ * rule the next screen written does not have — see `lib/text-format.ts`.
+ */
+const NAME_FORMAT = "sentence" as const;
+
+/**
+ * Refuses a tag whose name carries no emoji, naming the language that is short
+ * of one.
+ *
+ * ## Why it is a hard rule rather than a suggestion
+ *
+ * A tag is drawn as a chip a few millimetres tall, in a row beside two others,
+ * on a phone held at arm's length. At that size the picture is what is
+ * recognised and the word is what confirms it — so a chip without one is a
+ * grey rectangle that has to be *read* in a place nobody is reading. The
+ * vocabulary only works if it is uniform: one wordless chip in a row of six
+ * looks like a rendering fault rather than like a plainer tag.
+ *
+ * Every language separately, because the chip is drawn from whichever one the
+ * customer is using. An English name with an emoji and an Arabic one without
+ * is a tag that works on half the phones.
+ */
+function requireEmoji(name: Localized): void {
+  const short = Object.entries(name)
+    .filter(([, text]) => text.trim().length > 0 && !hasEmoji(text))
+    .map(([code]) => code);
+
+  if (short.length > 0) {
+    throw new Error(t("tags.needsEmoji", { language: short.join(", ") }));
+  }
+}
+
 export type TagDraft = {
   name: Localized;
   tone: TagTone;
@@ -147,8 +184,11 @@ export type TagDraft = {
 };
 
 export async function createTag(draft: TagDraft): Promise<void> {
+  const name = formatLocalized(draft.name, NAME_FORMAT);
+  requireEmoji(name);
+
   const { error } = await getClient().from("menu_item_tags").insert({
-    name: draft.name,
+    name,
     tone: draft.tone,
     is_active: draft.isActive,
     // No `slug`: `0071`'s trigger derives one from the English name
@@ -163,7 +203,11 @@ export type TagPatch = Partial<TagDraft>;
 
 export async function updateTag(id: string, patch: TagPatch): Promise<void> {
   const row: Record<string, unknown> = {};
-  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.name !== undefined) {
+    const name = formatLocalized(patch.name, NAME_FORMAT);
+    requireEmoji(name);
+    row.name = name;
+  }
   if (patch.tone !== undefined) row.tone = patch.tone;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
 

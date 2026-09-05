@@ -437,19 +437,36 @@ function BranchEditor({
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
       prep: prepCheck.ok ? undefined : t(prepCheck.key, prepCheck.params),
-      // Optional, like the shop's. A branch is often added before anybody has
-      // been given its number.
+      /*
+       * Required now, where it used to be optional.
+       *
+       * The old reasoning was that a branch is often added before anybody has
+       * been given its number, and that is true — but what it bought was a
+       * branch that is *listed and takes orders* with nowhere for an order to
+       * go. The order is placed, the customer is told the kitchen has it, and
+       * nothing arrives at a kitchen. Asked for at creation, the cost is one
+       * phone call before the branch goes live; left optional, the cost is an
+       * order.
+       */
       whatsapp:
-        whatsapp.trim() === "" || phoneCheck.ok
-          ? undefined
-          : t(phoneCheck.key, phoneCheck.params),
-      // An empty box is "no pin", which is legitimate and flagged on the row.
-      // Text that is not a location is not: saving null for it would look
-      // exactly like success while leaving the branch unpinned.
+        whatsapp.trim() === ""
+          ? t("branches.whatsappRequired")
+          : phoneCheck.ok
+            ? undefined
+            : t(phoneCheck.key, phoneCheck.params),
+      /*
+       * Required too, and for money rather than for tidiness.
+       *
+       * `delivery_fee_for_km` charges an unknown distance at the **top band**,
+       * so an unpinned branch does not fail to quote — it quotes the most
+       * expensive answer there is, on every order, silently. That is the
+       * failure `no-pin-warning.tsx` exists to shout about after the fact; this
+       * is the same fact asked before it can happen.
+       */
       pin: located.ok
         ? undefined
         : located.reason === "empty"
-          ? undefined
+          ? t("branches.pinRequired")
           : located.reason === "shortened"
             ? t("store.pinShortened")
             : t("store.pinInvalid"),
@@ -458,13 +475,16 @@ function BranchEditor({
     setErrors(found);
     if (Object.values(found).some(Boolean)) return;
 
+    // Both are checked above, so the fallbacks are unreachable — they are here
+    // because the columns are still nullable in the database and the types say
+    // so. See the note in the branch API about where that is enforced.
     onSave({
       name,
       latitude: coordinates?.latitude ?? null,
       longitude: coordinates?.longitude ?? null,
       prepMinMinutes: min,
       prepMaxMinutes: max,
-      whatsappPhone: whatsapp.trim() || null,
+      whatsappPhone: whatsapp.trim(),
       isActive,
     });
   }

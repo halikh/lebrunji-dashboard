@@ -358,7 +358,8 @@ function Form({ store }: { store: Store }) {
             maxLength={TEXT.name}
             hint={t("store.nameHint")}
             error={errors.name}
-            placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارة" }}
+            format="upper"
+            placeholder={{ en: "NARA KITCHEN", ar: "مطبخ نارة" }}
           />
 
           <Field label={t("images.label")} hint={t("store.imageHint")}>

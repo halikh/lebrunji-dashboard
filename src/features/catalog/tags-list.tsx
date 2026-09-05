@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
+import { hasEmoji } from "@/lib/text-format";
 import { t } from "@/i18n/translations";
 import { SEARCH, TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
@@ -292,7 +293,30 @@ function Editor({
 
   function submit() {
     const check = validateLocalizedText(name, codes, TEXT.tag);
-    const found = { name: check.ok ? undefined : t(check.key, check.params) };
+
+    /*
+     * The emoji rule, checked here as well as in `api/tags.ts`.
+     *
+     * The api copy is what makes it true on every path; this one is what makes
+     * it a *form error*, under the field, before the panel closes. A rule
+     * enforced only at the write boundary arrives as a toast over a form the
+     * operator has to reconstruct from memory.
+     *
+     * The languages are named for the same reason `stillNeeded` names them:
+     * "add an emoji" to somebody who added one is a message they cannot act on.
+     */
+    const short = codes.filter((code) => {
+      const text = name[code] ?? "";
+      return text.trim().length > 0 && !hasEmoji(text);
+    });
+
+    const found = {
+      name: !check.ok
+        ? t(check.key, check.params)
+        : short.length > 0
+          ? t("tags.needsEmoji", { language: short.join(", ") })
+          : undefined,
+    };
 
     setErrors(found);
     if (found.name) return;
@@ -309,8 +333,9 @@ function Editor({
           onChange={setName}
           maxLength={TEXT.tag}
           error={errors.name}
-          hint={t("tags.nameHint")}
-          placeholder={{ en: "Spicy", ar: "حار" }}
+          format="sentence"
+          hint={t("tags.emojiHint")}
+          placeholder={{ en: "🌶️ Spicy", ar: "🌶️ حار" }}
         />
 
         <Field label={t("tags.toneLabel")} hint={t("tags.toneHint")}>

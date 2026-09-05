@@ -157,6 +157,50 @@ export async function restoreBranch(id: string): Promise<void> {
   if (error) throw new Error(friendly(error.message));
 }
 
+/**
+ * The two answers a branch cannot trade without.
+ *
+ * ## Why they are refused here and not only in the form
+ *
+ * Both columns are still nullable — `0101` made them so deliberately, because a
+ * shop can be created before anyone has stood outside it with a phone. What has
+ * changed is not the schema's tolerance but what the dashboard will write: a
+ * branch is *listed and takes orders* the moment it exists, so "not yet
+ * answered" and "answered as nothing" are the same row to a customer.
+ *
+ * - **No number** and an order placed at this branch reaches no kitchen. The
+ *   order is taken, the customer is told it is being prepared, and nothing
+ *   happens.
+ * - **No pin** and `delivery_fee_for_km` charges an unknown distance at the
+ *   **top band** — so it does not fail to quote, it quotes the most expensive
+ *   answer there is, on every order, with nothing raising. That is the failure
+ *   `supabase/tests/branch-pricing.sql` §8 exists to catch.
+ *
+ * Enforced at this layer rather than in `BranchEditor` alone so that every
+ * path — the editor, a future import, a screen written next — meets it. The
+ * editor checks too, because a rule enforced only here arrives as a toast over
+ * a form the operator then has to reconstruct.
+ *
+ * A CHECK constraint would be better still and it is a migration in the app
+ * repo, not a change here — see `AGENTS.md`. This is the layer that is
+ * available without one.
+ */
+function requireTradeable(draft: {
+  whatsappPhone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}): void {
+  if (draft.whatsappPhone !== undefined && !digitsOf(draft.whatsappPhone ?? "")) {
+    throw new Error(t("branches.whatsappRequired"));
+  }
+  if (
+    (draft.latitude !== undefined || draft.longitude !== undefined) &&
+    (draft.latitude == null || draft.longitude == null)
+  ) {
+    throw new Error(t("branches.pinRequired"));
+  }
+}
+
 export type BranchDraft = {
   name: Localized;
   latitude: number | null;
@@ -172,6 +216,8 @@ export async function createBranch(
   draft: BranchDraft,
   sortOrder: number,
 ): Promise<string> {
+  requireTradeable(draft);
+
   const { data, error } = await getClient()
     .from("branches")
     .insert({
@@ -206,6 +252,8 @@ export async function updateBranch(
   id: string,
   patch: BranchPatch,
 ): Promise<void> {
+  requireTradeable(patch);
+
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.latitude !== undefined) row.latitude = patch.latitude;

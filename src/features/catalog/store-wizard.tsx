@@ -189,18 +189,21 @@ export function StoreWizard({
     }
 
     if (which === 2) {
-      // An empty box is "no pin", which is a legitimate state — the step says
-      // what it costs. Text that is *not* a location is not: saving null for it
-      // would look exactly like success while leaving the shop unpinned.
+      // Required now. An empty box used to pass, on the grounds that the step
+      // said what it cost — but what it cost is not a warning, it is money:
+      // `delivery_fee_for_km` charges an unknown distance at the **top band**,
+      // so an unpinned shop does not fail to quote, it quotes the most
+      // expensive answer there is on every order, silently.
       //
-      // The two failures are told apart because one has an obvious next step:
-      // a shortened link needs opening once, and saying so beats "that is not a
-      // coordinate pair" about something that plainly is a map link.
+      // The three failures are told apart because two have an obvious next
+      // step: an empty box needs an answer, and a shortened link needs opening
+      // once — and saying so beats "that is not a coordinate pair" about
+      // something that plainly is a map link.
       return {
         pin: located.ok
           ? undefined
           : located.reason === "empty"
-            ? undefined
+            ? t("branches.pinRequired")
             : located.reason === "shortened"
               ? t("store.pinShortened")
               : t("store.pinInvalid"),
@@ -212,14 +215,18 @@ export function StoreWizard({
 
     return {
       prep: check.ok ? undefined : t(check.key, check.params),
-      // Optional, so an empty box passes: a shop is often added before anybody
-      // has been asked for its number. A *wrong* number does not pass, because
-      // the failure it causes is silent — the shop simply never appears on the
-      // send list, and nothing on screen says why.
+      // Required now, where an empty box used to pass. The old reasoning — a
+      // shop is often added before anybody has been asked for its number — was
+      // true and bought a shop that is listed, takes orders, and has nowhere to
+      // send them. A *wrong* number was already refused, because the failure it
+      // causes is silent: the shop never appears on the send list and nothing
+      // on screen says why.
       whatsapp:
-        whatsapp.trim() === "" || phone.ok
-          ? undefined
-          : t(phone.key, phone.params),
+        whatsapp.trim() === ""
+          ? t("branches.whatsappRequired")
+          : phone.ok
+            ? undefined
+            : t(phone.key, phone.params),
     };
   }
 
@@ -334,7 +341,8 @@ export function StoreWizard({
                 onChange={setName}
                 maxLength={TEXT.name}
                 error={errors.name}
-                placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارا" }}
+                format="upper"
+                placeholder={{ en: "NARA KITCHEN", ar: "مطبخ نارا" }}
               />
               <Field label={t("images.label")} hint={t("store.imageHint")}>
                 <ImageUploader

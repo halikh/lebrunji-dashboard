@@ -1,4 +1,5 @@
 import { getClient } from "@/lib/supabase/client";
+import { formatLocalized } from "@/lib/text-format";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
@@ -264,6 +265,19 @@ async function searchMenuItems(
   return (data ?? []).map(toItem);
 }
 
+/*
+ * The house style, applied here as well as in the fields that write it.
+ *
+ * Two layers rather than one duplicated. `LocalizedField` formats as somebody
+ * types, which is what makes the rule visible; these are what make it true —
+ * bulk paste never opens a field at all, and a rule enforced only by a
+ * component is one the next component does not have.
+ *
+ * See `lib/text-format.ts` for the formats and the reasoning.
+ */
+const NAME_FORMAT = "upper" as const;
+const DESCRIPTION_FORMAT = "sentence" as const;
+
 export type MenuItemDraft = {
   storeId: string;
   sectionId: string;
@@ -299,11 +313,16 @@ export async function createMenuItem(
       // No `slug`. The trigger from migration 0070 derives it from the English
       // name and makes it unique inside the shop — which a client cannot do
       // without racing another tab.
-      name: draft.name,
+      // Shouted, and the description in sentence case — the house style, see
+      // the note by `NAME_FORMAT`.
+      name: formatLocalized(draft.name, NAME_FORMAT),
       // Null when blank, never `{}` — see `localizedOrNull`. A description
       // is optional and the constraint accepts an absent one; it does not
       // accept an object with a locale missing.
-      description: localizedOrNull(draft.description),
+      description: formatLocalized(
+        localizedOrNull(draft.description),
+        DESCRIPTION_FORMAT,
+      ),
       price: draft.price,
       is_active: draft.isActive,
       image_url: draft.imageUrl,
@@ -356,7 +375,10 @@ export async function createMenuItems(
       items.map((item, index) => ({
         store_id: storeId,
         menu_section_id: sectionId,
-        name: item.name,
+        // Bulk paste never touches a `LocalizedField`, so this line is the
+        // only thing holding a pasted menu to the same house style as one
+        // typed a dish at a time. It is the reason the rule lives here too.
+        name: formatLocalized(item.name, NAME_FORMAT),
         // Absent, not empty. `localizedOrNull`'s rule: the constraint accepts a
         // missing description and refuses an object with a locale missing.
         description: null,
@@ -385,9 +407,13 @@ export async function updateMenuItem(
   patch: MenuItemPatch,
 ): Promise<void> {
   const row: Record<string, unknown> = {};
-  if (patch.name !== undefined) row.name = patch.name;
-  if (patch.description !== undefined)
-    row.description = localizedOrNull(patch.description);
+  if (patch.name !== undefined) row.name = formatLocalized(patch.name, NAME_FORMAT);
+  if (patch.description !== undefined) {
+    row.description = formatLocalized(
+      localizedOrNull(patch.description),
+      DESCRIPTION_FORMAT,
+    );
+  }
   if (patch.price !== undefined) row.price = patch.price;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   // `null` is a value here — it is how a picture is removed — so the check is
@@ -451,7 +477,7 @@ export async function createMenuSection(
 ): Promise<void> {
   const { error } = await getClient().from("menu_sections").insert({
     store_id: draft.storeId,
-    title: draft.title,
+    title: formatLocalized(draft.title, NAME_FORMAT),
     sort_order: sortOrder,
   });
 
@@ -464,7 +490,15 @@ export async function updateMenuSection(
 ): Promise<void> {
   const { error } = await getClient()
     .from("menu_sections")
-    .update({ title: patch.title })
+    // `undefined` stays `undefined` — the key is then absent from the request
+    // and the column is left alone. Coercing it to `null` would be a write, and
+    // `title` is `not null`.
+    .update({
+      title:
+        patch.title === undefined
+          ? undefined
+          : formatLocalized(patch.title, NAME_FORMAT),
+    })
     .eq("id", id);
 
   if (error) throw new Error(friendly(error.message));
@@ -490,7 +524,7 @@ export async function createMenuSections(
     .insert(
       titles.map((title, index) => ({
         store_id: storeId,
-        title,
+        title: formatLocalized(title, NAME_FORMAT),
         sort_order: sortOrder + index,
       })),
     );

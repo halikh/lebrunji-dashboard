@@ -581,6 +581,9 @@ const en = {
     // Names the languages rather than saying "incomplete": the operator has
     // done most of the work, and what they need is which box is empty.
     stillNeeded: "Still needed in: {languages}",
+    // Names the characters rather than saying "invalid". A key that does
+    // nothing is pressed harder; a key that says why is not pressed again.
+    rejectedChars: "{chars} cannot be used in a name.",
   },
 
   catalogue: {
@@ -996,6 +999,11 @@ const en = {
     archiveConfirm: "Archive",
     // A count on the row is what turns "retire this" from a guess into a
     // decision. Zero is said in words rather than as "0 dishes", because
+    // The emoji rule. Said as what a tag *is* rather than as a refusal — the
+    // hint carries it before the error has to.
+    needsEmoji: "Every tag carries an emoji. Add one to the {language} name.",
+    emojiHint:
+      "Include an emoji — it is what a chip is recognised by on a phone, ahead of the word.",
     // "unused" is the thing the operator is scanning for.
     unused: "Not on any item yet",
     usedBy: "On {count} item(s)",
@@ -2042,6 +2050,14 @@ const en = {
     whatsapp: "WhatsApp number",
     whatsappHint:
       "Where an order from this branch is sent. Without one this branch cannot be sent orders.",
+    // Says the consequence rather than "required". A branch with no number is
+    // listed, takes orders, and has nowhere to send them.
+    whatsappRequired:
+      "A branch needs a number — without one an order placed here reaches no kitchen.",
+    // And this one is money: an unpinned branch does not fail to quote, it
+    // quotes the top distance band on every order.
+    pinRequired:
+      "A branch needs a pin — without one every delivery from it is charged at the top distance band.",
     visibility: "Taking orders",
     live: "Open",
     hidden: "Closed",

@@ -1,9 +1,10 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 
 import { useLanguages } from "@/features/reference/use-languages";
 import { t } from "@/i18n/translations";
+import { formatText, rejectedIn, type TextFormat } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
 import { cx, Input } from "./index";
@@ -39,6 +40,24 @@ import { cx, Input } from "./index";
  * each until neither is readable. That arrives with the help and legal screens
  * in Phase 7, and is deliberately **not** stubbed here: an unused `variant`
  * prop is a promise the component does not keep.
+ *
+ * ## `format` holds a field to the house style, live
+ *
+ * Opt-in per call site rather than on by default, and the line it draws is
+ * catalogue **names** against long-form **content**. A shop, a category, a tag,
+ * a section, a dish and its description are read by scanning a list, and a list
+ * where the casing drifts reads as three products — see `lib/text-format.ts`.
+ * A help answer or a privacy section is prose: forcing its case would be
+ * vandalism, and the characters it bans are ones prose legitimately contains.
+ *
+ * It applies as the operator types, not on save. A value normalised on the way
+ * to the database shows one thing in the box and stores another, and the first
+ * time anybody notices is when the list disagrees with the form they just
+ * submitted.
+ *
+ * The same prop turns on the character filter, because the two rules answer one
+ * question — what may a name look like — and a field that shouted but still
+ * accepted `<b>` would be half a rule.
  */
 export function LocalizedField({
   label,
@@ -50,6 +69,7 @@ export function LocalizedField({
   hint,
   error,
   optional = false,
+  format,
 }: {
   label: string;
   value: Localized;
@@ -80,9 +100,44 @@ export function LocalizedField({
   hint?: string;
   error?: string | null;
   optional?: boolean;
+  /**
+   * The house style this field is held to. See the note on the component.
+   *
+   * Unset means the value is stored exactly as typed, which is what every
+   * long-form field wants.
+   */
+  format?: TextFormat;
 }) {
   const id = useId();
   const languages = useLanguages();
+
+  /**
+   * The characters the last keystroke lost, if any.
+   *
+   * A filter that silently eats a character is the worst version of this: the
+   * key does nothing, and the operator presses it harder. Naming them — "+ and
+   * / cannot be used here" — is what turns a dead key into a rule. It clears
+   * itself on the next change that loses nothing, so it reads as feedback on
+   * what was just typed rather than as a standing error.
+   */
+  const [dropped, setDropped] = useState<string[]>([]);
+
+  /**
+   * One language's value, on its way in.
+   *
+   * Formatting here rather than in `onChange` at each call site: there are
+   * seven of those and there will be more, and the one that forgot would be a
+   * field that quietly kept its own rules.
+   */
+  function change(code: string, next: string) {
+    if (!format) {
+      onChange({ ...value, [code]: next });
+      return;
+    }
+
+    setDropped(rejectedIn(next));
+    onChange({ ...value, [code]: formatText(next, format) });
+  }
 
   if (!languages.data) {
     // A skeleton, not an English-only field. Rendering one input and adding the
@@ -174,7 +229,7 @@ export function LocalizedField({
                   placeholder={placeholder?.[language.code]}
                   value={text}
                   onChange={(event) =>
-                    onChange({ ...value, [language.code]: event.target.value })
+                    change(language.code, event.target.value)
                   }
                   aria-invalid={isMissing || undefined}
                   className={cx(
@@ -192,7 +247,7 @@ export function LocalizedField({
                   placeholder={placeholder?.[language.code]}
                   value={text}
                   onChange={(event) =>
-                    onChange({ ...value, [language.code]: event.target.value })
+                    change(language.code, event.target.value)
                   }
                   invalid={isMissing || Boolean(error)}
                   padding="ps-[42px] pe-md"
@@ -206,6 +261,13 @@ export function LocalizedField({
       {error ? (
         <p role="alert" className="ps-md text-[13px] font-medium text-danger">
           {error}
+        </p>
+      ) : dropped.length > 0 ? (
+        // Above the hint and below the error, in the one slot this field has
+        // for a message: what was just refused matters more than standing
+        // advice and less than a value that will not save.
+        <p role="alert" className="ps-md text-[13px] font-medium text-danger">
+          {t("form.rejectedChars", { chars: dropped.join(" ") })}
         </p>
       ) : partial ? (
         // Names the languages rather than saying "incomplete". The operator has

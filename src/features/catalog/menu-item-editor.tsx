@@ -298,6 +298,7 @@ export function MenuItemEditor({
             hint={t("menu.nameHint")}
             error={errors.name}
             maxLength={TEXT.name}
+            format="upper"
           />
           <LocalizedField
             label={t("menu.description")}
@@ -312,6 +313,7 @@ export function MenuItemEditor({
             hint={t("menu.descriptionHint")}
             error={errors.description}
             maxLength={TEXT.description}
+            format="sentence"
           />
         </div>
 

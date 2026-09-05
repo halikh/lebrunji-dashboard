@@ -1,6 +1,7 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { digitsOf } from "@/lib/phone";
+import { formatLocalized } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -114,6 +115,45 @@ export async function fetchStore(id: string): Promise<Store> {
   return toStore(data);
 }
 
+/*
+ * The house style, applied here as well as in the field.
+ *
+ * Not a duplicate of the form's rule — a second layer under it. `LocalizedField`
+ * formats as somebody types, which is the half that makes the rule *visible*;
+ * this is the half that makes it *true*. Bulk paste, the wizard, a future
+ * import and any screen written next all arrive here, and a rule enforced only
+ * by a component is a rule the next component does not have.
+ *
+ * See `lib/text-format.ts` for what the formats are and why.
+ */
+const NAME_FORMAT = "upper" as const;
+
+/**
+ * The two answers a shop cannot trade without — the same pair, and the same
+ * reasoning, as `requireTradeable` in `api/branches.ts`.
+ *
+ * A shop created by the wizard gets a branch of its own from `0101`'s trigger,
+ * so in practice these two rows carry the same number and the same pin on the
+ * day a shop is made. Refusing both here means neither can be the one that
+ * slipped through: the wizard writes the store, the trigger copies it, and a
+ * blank on this row would be a blank on that one.
+ */
+function requireTradeable(draft: {
+  whatsappPhone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}): void {
+  if (draft.whatsappPhone !== undefined && !digitsOf(draft.whatsappPhone ?? "")) {
+    throw new Error(t("branches.whatsappRequired"));
+  }
+  if (
+    (draft.latitude !== undefined || draft.longitude !== undefined) &&
+    (draft.latitude == null || draft.longitude == null)
+  ) {
+    throw new Error(t("branches.pinRequired"));
+  }
+}
+
 export type StoreDraft = {
   name: Localized;
   categoryId: string;
@@ -200,10 +240,13 @@ export async function createStore(
   countryId: string,
   sortOrder: number,
 ): Promise<string> {
+  requireTradeable(draft);
+
   const { data, error } = await getClient()
     .from("stores")
     .insert({
-      name: draft.name,
+      // Shops are shouted. See `NAME_FORMAT` below.
+      name: formatLocalized(draft.name, NAME_FORMAT),
       category_id: draft.categoryId,
       country_id: countryId,
       currency_code: draft.currencyCode,
@@ -276,8 +319,10 @@ export async function updateStore(
   id: string,
   patch: StorePatch,
 ): Promise<void> {
+  requireTradeable(patch);
+
   const row: Record<string, unknown> = {};
-  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.name !== undefined) row.name = formatLocalized(patch.name, NAME_FORMAT);
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
