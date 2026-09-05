@@ -7,8 +7,8 @@ import { getObject } from "@/lib/storage/bucket";
  *
  * ## Why this route exists at all
  *
- * `stores.image_url`, `menu_items.image_url`, `categories.image_url` and
- * `discounts.image_url` are plain text columns the **customer app** hands to an
+ * `stores.image_url`, `menu_items.image_url` and `discounts.image_url` are
+ * plain text columns the **customer app** hands to an
  * `<Image>` while signed out. They need a URL that works forever and needs no
  * credential.
  *
@@ -40,9 +40,18 @@ import { getObject } from "@/lib/storage/bucket";
  * in it — which, on a shared bucket, need not be an image at all.
  */
 
-/** Exactly what `POST /api/images` generates, and nothing else. */
+/**
+ * Exactly what `POST /api/images` generates — plus one name it no longer does.
+ *
+ * `categories` is where promotion pictures were uploaded before that folder was
+ * renamed to `promotions`. The rename does not move objects, and it must not:
+ * a key is written into `discounts.image_url` and the row goes on pointing at
+ * it forever. Dropping the old prefix here would 404 every promotion picture
+ * saved before the rename — a blank card in the customer app, with a URL that
+ * looks perfectly correct.
+ */
 const KEY =
-  /^(menu-items|stores|categories|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
+  /^(menu-items|stores|promotions|categories|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
 
 const TYPES: Record<string, string> = {
   jpg: "image/jpeg",

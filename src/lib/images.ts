@@ -11,7 +11,7 @@ import {
  * Pictures, from the browser into the object store.
  *
  * In `lib` rather than under `features/catalog`, because three features upload
- * into the same bucket — menu items, stores, categories — and because the
+ * into the same bucket — menu items, stores, promotions — and because the
  * `ImageUploader` primitive in `components/ui` needs it, which the lint
  * boundary forbids it from reaching into a feature to get.
  *
@@ -66,7 +66,7 @@ export type UploadedImage = {
  */
 export async function uploadImage(
   file: File,
-  folder: "menu-items" | "stores" | "categories",
+  folder: "menu-items" | "stores" | "promotions",
   options: {
     onProgress?: (fraction: number) => void;
     signal?: AbortSignal;

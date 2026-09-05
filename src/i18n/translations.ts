@@ -2024,13 +2024,26 @@ const en = {
    */
   branches: {
     tab: "Branches",
-    // The heading over the whole tab, which now carries the shop itself as
-    // well as the places it trades from — see `branches-tab.tsx`. The tab's
-    // own label stays "Branches": that is what somebody is looking for when
-    // they come here, and the shop's card is the first thing they see anyway.
-    title: "Shop and branches",
-    // The heading over the list, under the shop's own card.
-    places: "Branches",
+    // The two headings inside the panel. Opening a branch opens everything
+    // about the shop at that branch, read from the brand downward — so each
+    // half says whose answers it holds. Without them, renaming under "Hamra"
+    // reads as renaming Hamra, and it renames the shop.
+    shopSection: "The shop",
+    shopSectionHint: "Changing these changes every branch of it.",
+    branchSection: "This branch",
+    branchSectionHint: "True of this place only.",
+
+    // The two a branch may differ on since 0110. Both say what leaving them
+    // alone means, because "empty" and "the same as the shop" look identical
+    // in a form and are not the same thing at all.
+    imageSharedHint:
+      "The shop's picture. Choose one here to give this branch its own.",
+    imageOwnHint:
+      "This branch's own picture. Remove it to go back to the shop's.",
+    currency: "Prices in",
+    currencyHint:
+      "What this branch charges in. Its menu is quoted and its orders are charged in this — leave it on the shop's unless this place really does trade in another.",
+    currencySame: "Same as the shop ({code})",
     // Said once at the top, because "why is there a Branches tab on a shop with
     // one branch" is the first question this screen gets.
     intro:

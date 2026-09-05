@@ -50,12 +50,36 @@ export type Branch = {
   prepMaxMinutes: number;
   /** Where an order reaches this kitchen — digits, no `+`, as `wa.me` wants. */
   whatsappPhone: string | null;
+  /**
+   * This branch's own photograph, or null for the shop's.
+   *
+   * Null is not "no picture" — it is a **live reference** to the shop's, which
+   * is what `0110` chose over backfilling a copy: a shop that changes its
+   * picture changes every branch that has not set one, which is what "the same
+   * by default" has to mean once the default can move.
+   *
+   * So a row reading this must `?? store.imageUrl` rather than treat null as
+   * empty, and a form clearing it is saying "use the shop's" rather than
+   * "show nothing".
+   */
+  imageUrl: string | null;
+  /**
+   * What this branch prices in, or null for the shop's.
+   *
+   * The same live-reference rule as the picture above, and here it is money:
+   * `place_order`, `delivery_quote_for_branch` and `add_to_cart` all resolve
+   * `coalesce(branch, store)` since `0110`, so a value set here is charged as
+   * well as quoted. That symmetry is the whole point of the migration — see the
+   * note at the top of it, and section 9 of `tests/branch-pricing.sql`.
+   */
+  currencyCode: string | null;
   isActive: boolean;
   sortOrder: number;
 };
 
 const COLUMNS = `id, store_id, slug, name, latitude, longitude,
-  prep_min_minutes, prep_max_minutes, whatsapp_phone, is_active, sort_order`;
+  prep_min_minutes, prep_max_minutes, whatsapp_phone, image_url, currency_code,
+  is_active, sort_order`;
 
 function toBranch(row: Record<string, unknown>): Branch {
   return {
@@ -68,6 +92,8 @@ function toBranch(row: Record<string, unknown>): Branch {
     prepMinMinutes: row.prep_min_minutes as number,
     prepMaxMinutes: row.prep_max_minutes as number,
     whatsappPhone: (row.whatsapp_phone as string | null) ?? null,
+    imageUrl: (row.image_url as string | null) ?? null,
+    currencyCode: (row.currency_code as string | null) ?? null,
     isActive: row.is_active as boolean,
     sortOrder: row.sort_order as number,
   };
@@ -208,6 +234,10 @@ export type BranchDraft = {
   prepMinMinutes: number;
   prepMaxMinutes: number;
   whatsappPhone: string | null;
+  /** Null means the shop's — see the note on `Branch`. */
+  imageUrl: string | null;
+  /** Null means the shop's — see the note on `Branch`. */
+  currencyCode: string | null;
   isActive: boolean;
 };
 
@@ -233,6 +263,10 @@ export async function createBranch(
       whatsapp_phone: draft.whatsappPhone
         ? digitsOf(draft.whatsappPhone)
         : null,
+      // Null is written on purpose rather than copied from the shop: it is the
+      // reference that keeps a branch following the brand. See `Branch`.
+      image_url: draft.imageUrl,
+      currency_code: draft.currencyCode,
       is_active: draft.isActive,
       sort_order: sortOrder,
       // No `slug`: derived from the English name by the same trigger every
@@ -265,6 +299,12 @@ export async function updateBranch(
   if (patch.whatsappPhone !== undefined) {
     const digits = patch.whatsappPhone ? digitsOf(patch.whatsappPhone) : "";
     row.whatsapp_phone = digits || null;
+  }
+  // `null` is a value for both — it is how a branch is put back to following
+  // the shop — so what is tested is the key being absent, not the value.
+  if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
+  if (patch.currencyCode !== undefined) {
+    row.currency_code = patch.currencyCode;
   }
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   row.updated_at = new Date().toISOString();

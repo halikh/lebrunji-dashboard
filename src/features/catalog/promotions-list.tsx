@@ -714,7 +714,7 @@ function Form({
           <ImageUploader
             value={imageUrl}
             onChange={setImageUrl}
-            folder="categories"
+            folder="promotions"
             disabled={pending}
           />
         </Field>

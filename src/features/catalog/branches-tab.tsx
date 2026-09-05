@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, Field, Input, cx } from "@/components/ui";
+import { ImageUploader } from "@/components/ui/image-uploader";
+import { Select } from "@/components/ui/select";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Map } from "@/components/ui/map";
@@ -32,15 +34,18 @@ import {
 } from "@/lib/validation";
 
 import type { Branch, BranchDraft } from "./api/branches";
+import type { CurrencyChangeMode, Store } from "./api/stores";
 import { BranchMenuPanel } from "./branch-menu-panel";
 import { NoPinWarning } from "./no-pin-warning";
-import { StoreBrandForm } from "./store-brand";
+import { ShopFields, useSaveShop } from "./shop-fields";
 import {
   useArchiveBranch,
   useBranches,
   useCreateBranch,
   useUpdateBranch,
 } from "./use-branches";
+import { useMoney } from "@/features/reference/use-currencies";
+
 import { useStore } from "./use-stores";
 
 /**
@@ -62,23 +67,34 @@ import { useStore } from "./use-stores";
  * Then the rest of it. What Details had left was three fields — the shop's
  * name, its picture and its currency — on a tab of their own, next to a tab
  * carrying everything else about the same shop. Nothing in either label said
- * which one held the field you wanted. So the brand is the card at the top of
- * this screen now and the places are the list below it: the shop, then where
- * it trades. One tab, read downward.
+ * which one held the field you wanted.
  *
- * The card keeps its own Save, because it writes the `stores` row and the
- * editor below writes a branch — two writes, and a single button over both
- * would be claiming to do something it cannot.
+ * They are in the **panel** now rather than in a card above the list, which was
+ * the intermediate answer and kept the same split one level down. Opening a
+ * branch opens everything about the shop at that branch, read from the brand
+ * downward: what it is called, what it prices in, then what is true of this
+ * place. One panel, one Save — see `shop-fields.tsx` for why it is one and not
+ * two.
+ *
+ * ## And a branch may now differ on two of them
+ *
+ * `0110` gave `branches` an `image_url` and a `currency_code`, both nullable,
+ * both meaning "the shop's" when absent. Not a copy — a live reference, so a
+ * shop that changes either still moves every branch that has not set its own.
+ * Every read here is therefore `branch ?? store`, and the money path in the
+ * database resolves the same `coalesce` on the side that charges.
  */
 export function BranchesTab({ storeId }: { storeId: string }) {
   /**
-   * The shop the branches belong to, for the two things on a row that are the
-   * brand's rather than the place's.
+   * The shop the branches belong to — for the panel, which edits it, and for
+   * the two things on a row that fall back to it.
    *
-   * The **picture** is the shop's — a branch has none, and giving it one would
-   * be inviting a merchant to photograph nine shopfronts to fill a 46pt square.
-   * It is here so a branch row is recognisably the same object the shops list
-   * shows, which is where the operator has just come from.
+   * The **picture** is the branch's where it has set one and the shop's
+   * otherwise. It used to be the shop's full stop, on the reasoning that giving
+   * a branch its own would invite a merchant to photograph nine shopfronts to
+   * fill a 46pt square — which was right about the effort and wrong about who
+   * gets to decide. `0110` made it optional instead, so the default is still
+   * one photograph for the chain and a branch that wants its own may have it.
    *
    * The **category** is the shop's too, and it repeats down the column
    * unchanged. That is the point rather than an oversight: the meta line reads
@@ -114,19 +130,14 @@ export function BranchesTab({ storeId }: { storeId: string }) {
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
         <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h2 className="flex-grow text-[18px]">{t("branches.title")}</h2>
+          <h2 className="flex-grow text-[18px]">{t("branches.tab")}</h2>
           <Button onClick={guarded(() => setOpen("new"))}>
             {t("branches.add")}
           </Button>
         </div>
 
         <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-          {/* The shop, before the places. See the note on the file. */}
-          <StoreBrandForm storeId={storeId} />
-
-          <h3 className="mt-xxl ps-md text-[17px]">{t("branches.places")}</h3>
-
-          {/* Says why the list exists on a shop with one branch, which is the
+          {/* Says why the tab exists on a shop with one branch, which is the
               first question it gets. */}
           <p className="ps-md text-[13px] text-text-faint">
             {t("branches.intro")}
@@ -147,7 +158,7 @@ export function BranchesTab({ storeId }: { storeId: string }) {
             <BranchRow
               key={branch.id}
               branch={branch}
-              imageUrl={store.data?.imageUrl ?? null}
+              imageUrl={branch.imageUrl ?? store.data?.imageUrl ?? null}
               categoryName={store.data?.categoryName ?? ""}
               open={open === branch.id}
               onEdit={guarded(() => setOpen(branch.id))}
@@ -208,6 +219,7 @@ export function BranchesTab({ storeId }: { storeId: string }) {
               // half-typed pin.
               key={open}
               initial={editing}
+              store={store.data ?? null}
               pending={create.isPending || update.isPending}
               onCancel={guarded(() => setOpen(null))}
               onSave={(draft) => {
@@ -271,7 +283,7 @@ function BranchRow({
   soleBranch,
 }: {
   branch: Branch;
-  /** The **shop's** picture — a branch has none. See the call site. */
+  /** This branch's picture, already resolved against the shop's by the caller. */
   imageUrl: string | null;
   /** The shop's category, repeated down the column on purpose. */
   categoryName: string;
@@ -376,17 +388,29 @@ function BranchRow({
 
 function BranchEditor({
   initial,
+  store,
   pending,
   onSave,
   onCancel,
 }: {
   initial: Branch | null;
+  /**
+   * The shop this branch belongs to, or null while it is still loading.
+   *
+   * The panel edits it — see `ShopFields` — and the branch's own picture and
+   * currency are shown against it, because both fall back to it. Null only
+   * happens on the first paint, and the section simply is not drawn until the
+   * row arrives rather than rendering empty fields somebody could type into.
+   */
+  store: Store | null;
   pending: boolean;
   onSave: (draft: BranchDraft) => void;
   onCancel: () => void;
 }) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
+  const shop = useSaveShop();
+  const { currencies } = useMoney();
 
   const [name, setName] = useState<Localized>(initial?.name ?? {});
   const [whatsapp, setWhatsapp] = useState(initial?.whatsappPhone ?? "");
@@ -398,17 +422,58 @@ function BranchEditor({
       ? `${initial.latitude}, ${initial.longitude}`
       : "",
   );
+  /**
+   * This branch's own picture and currency — null for "the shop's".
+   *
+   * Null rather than the shop's values copied in, on both. A form that
+   * pre-filled them would save a copy the moment anything else on the panel
+   * changed, quietly turning a branch that follows the brand into one that no
+   * longer does. See the note on `Branch`.
+   */
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    initial?.imageUrl ?? null,
+  );
+  const [currencyCode, setCurrencyCode] = useState<string | null>(
+    initial?.currencyCode ?? null,
+  );
+
+  /** The shop's own answers, edited in the same panel and saved first. */
+  const [shopName, setShopName] = useState<Localized>(store?.name ?? {});
+  const [shopCurrency, setShopCurrency] = useState(store?.currencyCode ?? "");
+  /**
+   * What a currency change is *for*, defaulted to the common case.
+   *
+   * `keep` is the wrong-pick fix and is what almost every change will be.
+   * `convert` is a shop genuinely re-denominating, which happens once if ever —
+   * so it is the deliberate choice rather than the one you land on.
+   */
+  const [mode, setMode] = useState<CurrencyChangeMode>("keep");
 
   const [errors, setErrors] = useState<{
     name?: string;
+    shopName?: string;
     prep?: string;
     whatsapp?: string;
     pin?: string;
   }>({});
 
+  // `mode` is left out on purpose: it is a question *about* a currency change
+  // rather than a value of its own, and it cannot be reached without moving
+  // `shopCurrency` first — which is compared.
   useUnsavedChanges(
     changed(
-      { name, whatsapp, prepMin, prepMax, isActive, pin },
+      {
+        name,
+        whatsapp,
+        prepMin,
+        prepMax,
+        isActive,
+        pin,
+        imageUrl,
+        currencyCode,
+        shopName,
+        shopCurrency,
+      },
       {
         name: initial?.name ?? {},
         whatsapp: initial?.whatsappPhone ?? "",
@@ -419,6 +484,10 @@ function BranchEditor({
           initial && initial.latitude !== null && initial.longitude !== null
             ? `${initial.latitude}, ${initial.longitude}`
             : "",
+        imageUrl: initial?.imageUrl ?? null,
+        currencyCode: initial?.currencyCode ?? null,
+        shopName: store?.name ?? {},
+        shopCurrency: store?.currencyCode ?? "",
       },
     ),
   );
@@ -426,16 +495,25 @@ function BranchEditor({
   const located = parseLocation(pin);
   const coordinates = located.ok ? located : null;
 
-  function save() {
+  async function save() {
     const min = Number(prepMin);
     const max = Number(prepMax);
 
     const nameCheck = validateLocalizedText(name, codes, TEXT.name);
     const prepCheck = validatePrepWindow(min, max);
     const phoneCheck = validatePhone(digitsOf(whatsapp));
+    // Only when the shop is loaded. Nothing can have been typed into a section
+    // that was not drawn, so an absent store is not an empty name.
+    const shopNameCheck = store
+      ? validateLocalizedText(shopName, codes, TEXT.name)
+      : null;
 
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
+      shopName:
+        !shopNameCheck || shopNameCheck.ok
+          ? undefined
+          : t(shopNameCheck.key, shopNameCheck.params),
       prep: prepCheck.ok ? undefined : t(prepCheck.key, prepCheck.params),
       /*
        * Required now, where it used to be optional.
@@ -475,9 +553,27 @@ function BranchEditor({
     setErrors(found);
     if (Object.values(found).some(Boolean)) return;
 
-    // Both are checked above, so the fallbacks are unreachable — they are here
-    // because the columns are still nullable in the database and the types say
-    // so. See the note in the branch API about where that is enforced.
+    /*
+     * The shop first, and only what moved.
+     *
+     * Its currency rewrites every price in the shop and has to be atomic on its
+     * own, so it cannot be folded into the branch's write — see `useSaveShop`.
+     * Going first means a failure stops before the branch is touched: the
+     * reverse order would leave a branch saved against a shop whose prices did
+     * not move, which is a screen and a database disagreeing about money.
+     */
+    if (store && !(await shop.saveShop(store, {
+      name: shopName,
+      currencyCode: shopCurrency,
+      mode,
+    }))) {
+      return;
+    }
+
+    // The pin and the number are checked above, so their fallbacks are
+    // unreachable — they are here because the columns are still nullable in the
+    // database and the types say so. See `requireTradeable` in the branch API
+    // for where that is enforced on every path.
     onSave({
       name,
       latitude: coordinates?.latitude ?? null,
@@ -485,6 +581,8 @@ function BranchEditor({
       prepMinMinutes: min,
       prepMaxMinutes: max,
       whatsappPhone: whatsapp.trim(),
+      imageUrl,
+      currencyCode,
       isActive,
     });
   }
@@ -493,11 +591,39 @@ function BranchEditor({
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        save();
+        void save();
       }}
       className="flex min-h-0 flex-1 flex-col"
     >
       <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
+        {/* The brand first, then this place. Anything typed here changes the
+            shop and every branch of it, which is why the section says so. */}
+        {store && (
+          <>
+            <ShopFields
+              store={store}
+              name={shopName}
+              onName={setShopName}
+              nameError={errors.shopName}
+              currencyCode={shopCurrency}
+              onCurrencyCode={setShopCurrency}
+              mode={mode}
+              onMode={setMode}
+            />
+
+            <hr className="border-border" />
+
+            <div className="flex flex-col gap-xxs">
+              <h3 className="ps-md text-[17px]">
+                {t("branches.branchSection")}
+              </h3>
+              <p className="ps-md text-[12px] text-text-faint">
+                {t("branches.branchSectionHint")}
+              </p>
+            </div>
+          </>
+        )}
+
         <LocalizedField
           label={t("branches.name")}
           hint={t("branches.nameHint")}
@@ -507,6 +633,62 @@ function BranchEditor({
           error={errors.name}
           maxLength={TEXT.name}
         />
+
+        {/*
+          This branch's own picture, or the shop's.
+
+          The uploader is handed the resolved value, so the box is never empty
+          while the shop has a photograph — what an operator sees is what a
+          customer sees. Clearing it puts the branch back to following the shop
+          rather than to showing nothing, which is what `Remove` means here and
+          what the hint says.
+        */}
+        <Field
+          label={t("images.label")}
+          hint={
+            imageUrl
+              ? t("branches.imageOwnHint")
+              : t("branches.imageSharedHint")
+          }
+        >
+          <ImageUploader
+            value={imageUrl ?? store?.imageUrl ?? null}
+            onChange={setImageUrl}
+            folder="stores"
+            disabled={pending}
+          />
+        </Field>
+
+        {/*
+          And its currency, which is the same idea and is money.
+
+          The empty option is not a blank — it is "the same as the shop", named
+          with the shop's code in it so the consequence of leaving it alone is
+          on screen. `0110` resolves `coalesce(branch, store)` on the side that
+          quotes *and* the side that charges, so a value picked here is what the
+          customer pays in.
+        */}
+        <Field
+          label={t("branches.currency")}
+          hint={t("branches.currencyHint")}
+        >
+          <Select
+            value={currencyCode ?? ""}
+            onChange={(next) => setCurrencyCode(next || null)}
+            options={[
+              {
+                value: "",
+                label: t("branches.currencySame", {
+                  code: shopCurrency || store?.currencyCode || "",
+                }),
+              },
+              ...(currencies ?? []).map((one) => ({
+                value: one.code,
+                label: one.code,
+              })),
+            ]}
+          />
+        </Field>
 
         <Field
           label={t("branches.pin")}
@@ -591,7 +773,7 @@ function BranchEditor({
         <Button type="button" variant="secondary" onClick={onCancel}>
           {t("common.cancel")}
         </Button>
-        <Button type="submit" pending={pending}>
+        <Button type="submit" pending={pending || shop.pending}>
           {t("common.save")}
         </Button>
       </div>

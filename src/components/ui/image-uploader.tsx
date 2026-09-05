@@ -54,7 +54,7 @@ export function ImageUploader({
   /** The URL currently saved on the row, or chosen in this session. */
   value: string | null;
   onChange: (url: string | null) => void;
-  folder: "menu-items" | "stores" | "categories";
+  folder: "menu-items" | "stores" | "promotions";
   disabled?: boolean;
 }) {
   const field = useFieldWiring();
