@@ -15,6 +15,7 @@ import { Panel } from "@/components/ui/panel";
 import { useGuardedAction } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 
+import { NoPinWarning } from "./no-pin-warning";
 import { StoreWizard } from "./store-wizard";
 
 import type { Store } from "./api/stores";
@@ -279,26 +280,11 @@ function StoreRow({
             max: store.prepMaxMinutes,
           })}
         </span>
-        {store.latitude === null && (
-          // The consequence, not the fact. "No location" would read as
-          // cosmetic; this is money leaving on every order.
-          <span className="flex items-center gap-xs text-[12px] font-semibold text-danger">
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              aria-hidden
-            >
-              <path d="M12 8v5M12 16.5v.01" />
-              <circle cx="12" cy="12" r="9" />
-            </svg>
-            {t("catalogue.noPin")}
-          </span>
-        )}
+        {/* The consequence, not the fact. "No location" would read as
+            cosmetic; this is money leaving on every order. Shared with the
+            branch rows, which carry the same warning about the same money —
+            see `NoPinWarning`. */}
+        {store.latitude === null && <NoPinWarning />}
       </div>
 
       {/* Stacked, not side by side. They are two properties of the same shop

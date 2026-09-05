@@ -32,12 +32,14 @@ import {
 
 import type { Branch, BranchDraft } from "./api/branches";
 import { BranchMenuPanel } from "./branch-menu-panel";
+import { NoPinWarning } from "./no-pin-warning";
 import {
   useArchiveBranch,
   useBranches,
   useCreateBranch,
   useUpdateBranch,
 } from "./use-branches";
+import { useStore } from "./use-stores";
 
 /**
  * The places one shop trades from.
@@ -57,6 +59,23 @@ import {
  * true of the brand: the name, the picture, the category, the currency.
  */
 export function BranchesTab({ storeId }: { storeId: string }) {
+  /**
+   * The shop the branches belong to, for the two things on a row that are the
+   * brand's rather than the place's.
+   *
+   * The **picture** is the shop's — a branch has none, and giving it one would
+   * be inviting a merchant to photograph nine shopfronts to fill a 46pt square.
+   * It is here so a branch row is recognisably the same object the shops list
+   * shows, which is where the operator has just come from.
+   *
+   * The **category** is the shop's too, and it repeats down the column
+   * unchanged. That is the point rather than an oversight: the meta line reads
+   * the same on both screens, so nobody has to work out whether a branch can
+   * belong to a different one. (It cannot — `category_id` is on `stores`.)
+   *
+   * Already cached by the tab strip above, so this costs nothing.
+   */
+  const store = useStore(storeId);
   const branches = useBranches(storeId);
   const create = useCreateBranch(storeId);
   const update = useUpdateBranch(storeId);
@@ -111,6 +130,8 @@ export function BranchesTab({ storeId }: { storeId: string }) {
             <BranchRow
               key={branch.id}
               branch={branch}
+              imageUrl={store.data?.imageUrl ?? null}
+              categoryName={store.data?.categoryName ?? ""}
               open={open === branch.id}
               onEdit={guarded(() => setOpen(branch.id))}
               onShowMenu={guarded(() => setMenuFor(branch.id))}
@@ -224,6 +245,8 @@ export function BranchesTab({ storeId }: { storeId: string }) {
 
 function BranchRow({
   branch,
+  imageUrl,
+  categoryName,
   open,
   onEdit,
   onShowMenu,
@@ -231,6 +254,10 @@ function BranchRow({
   soleBranch,
 }: {
   branch: Branch;
+  /** The **shop's** picture — a branch has none. See the call site. */
+  imageUrl: string | null;
+  /** The shop's category, repeated down the column on purpose. */
+  categoryName: string;
   open: boolean;
   onEdit: () => void;
   onShowMenu: () => void;
@@ -252,22 +279,61 @@ function BranchRow({
         branch.isActive && open && "border-active",
       )}
     >
+      {/* The same 46pt square the shops list draws, greyed the same way when
+          the row is hidden — a branch row should read as the same kind of
+          object as the shop row the operator arrived from. The placeholder is
+          not optional: without it the rows of a shop that has no picture line
+          up differently from every other list in the app. */}
+      {imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageUrl}
+          alt=""
+          aria-hidden
+          className={cx(
+            "size-[46px] shrink-0 rounded-md object-cover",
+            !branch.isActive && "opacity-50 grayscale",
+          )}
+        />
+      ) : (
+        <div
+          aria-hidden
+          className="size-[46px] shrink-0 rounded-md bg-neutral-fill"
+        />
+      )}
+
       <button
         type="button"
         onClick={onEdit}
         className="flex min-w-0 flex-grow flex-col items-start gap-xxs text-left"
       >
-        <span className="text-[15px] font-semibold">{name}</span>
-        <span className="flex items-center gap-sm text-[13px] text-text-faint">
-          {/* An unpinned branch charges every order at the top distance band,
-              so it is called out rather than left as an empty space. */}
-          {!pinned && (
-            <span className="font-medium text-danger">
-              {t("branches.unpinned")}
+        <span className="flex items-center gap-sm">
+          <span className="truncate text-[15px] font-semibold">{name}</span>
+          {/* Said in words, not only in colour — the same badge the shops list
+              puts on a shop that is off the storefront. */}
+          {!branch.isActive && (
+            <span className="shrink-0 rounded-full bg-danger-wash px-sm text-[11px] font-bold text-danger">
+              {t("branches.hidden")}
             </span>
           )}
-          {!branch.isActive && <span>{t("branches.hidden")}</span>}
         </span>
+
+        {/* The shops list's meta line, with the half that is now the branch's.
+            The category is the brand's and repeats; the prep window is this
+            kitchen's, and since `0101` it is the only place it lives. */}
+        <span className="truncate text-[12px] text-text-faint">
+          {categoryName ? `${categoryName} · ` : ""}
+          {t("catalogue.prep", {
+            min: branch.prepMinMinutes,
+            max: branch.prepMaxMinutes,
+          })}
+        </span>
+
+        {/* An unpinned branch charges every order at the top distance band —
+            and since `0109` the distance is measured from *here*, so this is
+            the row where it actually bites. Same warning, same words as the
+            shops list. */}
+        {!pinned && <NoPinWarning />}
       </button>
 
       {/* Nothing on a one-branch shop — the row is the store, and both of these

@@ -2036,7 +2036,9 @@ const en = {
     lastOne:
       "A shop needs somewhere to trade from. Add another branch before closing this one.",
     pinHalf: "A pin needs both a latitude and a longitude.",
-    unpinned: "No pin",
+    // No `unpinned`. It said "No pin" — the fact rather than the cost — and the
+    // branch rows now use `catalogue.noPin`, which says what an unpinned place
+    // charges. One warning, one wording, on both screens that show it.
     count: "{count} branches",
     countOne: "1 branch",
     // Opens the panel below. Named for the question it answers rather than for
