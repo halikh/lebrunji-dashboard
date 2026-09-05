@@ -228,6 +228,34 @@ export async function createStore(
 
 export type StorePatch = {
   name?: Localized;
+  /**
+   * What the shop prices in.
+   *
+   * ## It re-labels; it does not convert
+   *
+   * `menu_items.price` and `item_options.price` are single integer columns in
+   * **minor units**, with no currency of their own — the shop's row is the only
+   * thing that says what they mean. So changing this changes the meaning of
+   * every price without changing a digit, and the shift is not just the
+   * exchange rate: USD carries two decimal places and LBP none, so a dish
+   * stored as `1500` reads as `$15.00` under one and `ل.ل1,500` under the
+   * other.
+   *
+   * That is deliberate for now, and the screen says so plainly rather than
+   * leaving it to be found on a customer's bill. It is also **reversible** —
+   * no row is rewritten, so switching back restores the previous meaning
+   * exactly, which is what makes an unconfirmed mistake recoverable.
+   *
+   * Converting properly is a different job: every price multiplied by the rate
+   * and restated at the new scale, in one transaction, which means an
+   * `api_v1_*` function in the app repo rather than a column write from here. A
+   * half-converted menu is worse than either currency.
+   *
+   * Past orders are unaffected whichever way this goes. `orders.currency_code`
+   * is a snapshot taken at checkout, so history keeps saying what was actually
+   * charged.
+   */
+  currencyCode?: string;
   /** Blank clears it. See `updateStore` on why that is null and not "". */
   whatsappPhone?: string | null;
   imageUrl?: string | null;
@@ -262,6 +290,11 @@ export async function updateStore(
 ): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
+  // Re-labels every price in the shop without rewriting one — see the note on
+  // `StorePatch.currencyCode`. The column is `not null references
+  // currencies(code)`, so an unknown code is refused by the foreign key rather
+  // than stored and discovered later by a formatter with no decimals to use.
+  if (patch.currencyCode !== undefined) row.currency_code = patch.currencyCode;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;

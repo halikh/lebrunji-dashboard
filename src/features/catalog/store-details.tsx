@@ -3,13 +3,16 @@
 import { useState } from "react";
 
 import { Button, Input } from "@/components/ui";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field } from "@/components/ui/field";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Map } from "@/components/ui/map";
 import { NumberInput } from "@/components/ui/number-input";
+import { Select } from "@/components/ui/select";
 import { digitsOf } from "@/features/drivers/api/couriers";
 import { useLanguages } from "@/features/reference/use-languages";
+import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
@@ -21,6 +24,7 @@ import {
 } from "@/lib/validation";
 
 import type { Store } from "./api/stores";
+import { useMenu } from "./use-menu";
 import { useStore, useUpdateStore } from "./use-stores";
 
 /**
@@ -77,6 +81,124 @@ export function StoreDetails({ storeId }: { storeId: string }) {
   // Keyed on the row, so arriving at a different shop rebuilds the form rather
   // than leaving the previous one's values in the fields.
   return <Form key={store.data.id} store={store.data} />;
+}
+
+/**
+ * What the shop prices in — and what changing it actually does.
+ *
+ * ## Why it is here at all
+ *
+ * The wizard asks for it once and nothing showed it again, so a shop's currency
+ * was invisible after the day it was created: an operator opening a shop
+ * somebody else set up could only infer it from a formatted price, and could
+ * not correct a wrong pick at all. Choosing the wrong one is a first-minute
+ * mistake, and it had no first-minute fix.
+ *
+ * ## Why it is not part of the Save below
+ *
+ * Every other field on this page is a fact about the shop that means the same
+ * thing before and after. This one re-reads every price the shop has. Folding
+ * it into a Save that also carries a renamed shop and a moved pin would make
+ * one button do two very different jobs, and the dangerous one would be the
+ * invisible half.
+ *
+ * ## Nothing is converted, and the screen says so
+ *
+ * Prices are minor units in a column with no currency of its own, so this
+ * changes what they mean without changing a digit — and across USD and LBP that
+ * is a decimal-scale shift as well as a rate. Rather than describing that, the
+ * warning shows it: a real price off this menu, rendered both ways.
+ *
+ * It is reversible — no row is rewritten — which is why an empty shop can
+ * change it with one press and a stocked one has to confirm. The friction is
+ * proportional to what is at stake, and for the case this exists for (a wrong
+ * pick, noticed immediately) there is nothing at stake yet.
+ */
+function CurrencySection({ store }: { store: Store }) {
+  const { currencies, format } = useMoney();
+  const menu = useMenu(store.id);
+  const update = useUpdateStore();
+
+  const [picked, setPicked] = useState(store.currencyCode);
+
+  // A priced dish off this very menu, so the example is this shop's money
+  // rather than a number I made up. Absent on a shop with no menu yet, which is
+  // exactly the shop that needs no warning.
+  const sample =
+    (menu.data ?? []).flatMap((section) => section.items)[0] ?? null;
+  const changed = picked !== "" && picked !== store.currencyCode;
+
+  function apply() {
+    update.mutate({
+      id: store.id,
+      patch: { currencyCode: picked },
+      name: store.name,
+    });
+  }
+
+  // The shop's name as a string: a confirmation names the thing that was
+  // clicked, which is the whole reason it catches the wrong row.
+  const example = {
+    name: pickLocalized(store.name),
+    to: picked,
+    before: sample ? format(sample.price, store.currencyCode) : "",
+    after: sample ? format(sample.price, picked) : "",
+  };
+
+  return (
+    <section className="flex flex-col gap-lg">
+      <h2 className="ps-md text-[17px]">{t("store.currencyTitle")}</h2>
+
+      <Field label={t("store.currency")} hint={t("store.currencyEditHint")}>
+        <Select
+          value={picked}
+          onChange={setPicked}
+          placeholder={t("store.pickCurrency")}
+          options={(currencies ?? []).map((one) => ({
+            value: one.code,
+            label: one.code,
+          }))}
+        />
+      </Field>
+
+      {/* Shown rather than described. "The scale differs" is a sentence an
+          operator can read and still not believe; "$15.00 will read as
+          ل.ل1,500" is the same fact in a form that cannot be misread. */}
+      {changed && sample && (
+        <p
+          role="status"
+          className="rounded-md border border-danger-wash bg-danger-wash/40 px-lg py-md text-[13px] text-text"
+        >
+          {t("store.currencyRelabels", example)}
+        </p>
+      )}
+
+      {changed &&
+        (sample ? (
+          <ConfirmButton
+            onConfirm={apply}
+            titleKey="store.currencyChangeTitle"
+            bodyKey="store.currencyChangeBody"
+            confirmKey="store.currencyChangeConfirm"
+            params={example}
+            triggerVariant="secondary"
+          >
+            {t("store.currencyApply", { code: picked })}
+          </ConfirmButton>
+        ) : (
+          // Nothing priced, nothing to misprice. The shop this feature exists
+          // for gets one press.
+          <Button
+            variant="secondary"
+            onClick={apply}
+            pending={update.isPending}
+            className="self-start"
+          >
+            {t("store.currencyApply", { code: picked })}
+          </Button>
+        ))}
+    </section>
+  );
 }
 
 function Form({ store }: { store: Store }) {
@@ -225,6 +347,8 @@ function Form({ store }: { store: Store }) {
               />
             </Field>
           </section>
+
+          <CurrencySection store={store} />
 
           <section className="flex flex-col gap-lg">
             <h2 className="ps-md text-[17px]">{t("store.prepTitle")}</h2>

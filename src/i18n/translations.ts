@@ -702,6 +702,36 @@ const en = {
     pickCurrency: "Choose a currency",
     currencyRequired: "A shop has to price in something.",
 
+    /*
+      Changing it after the fact — the details tab.
+
+      The wizard's hint above was accurate about the *rule* and, until now,
+      wrong about the world: there was no "later", because nothing on any screen
+      could change it. There is now, and these say what it does.
+
+      What it does is re-label. A price is minor units in a column with no
+      currency of its own, so the digits stay and their meaning moves — and
+      between USD and LBP that is a decimal-place shift as well as a rate, which
+      is why the warning shows a real price both ways instead of explaining it.
+      "The scale is different" is a sentence somebody can read and still not
+      believe. "$15.00 will read as ل.ل1,500" is not.
+
+      It also says how to undo it, in the same breath. Nothing is rewritten, so
+      switching back is exact — and an operator who has just realised their
+      mistake should not have to work that out while looking at a menu that has
+      gone wrong.
+    */
+    currencyTitle: "Currency",
+    currencyEditHint:
+      "What every price on this menu means. Changing it does not convert anything — the numbers stay as they are.",
+    currencyApply: "Change to {code}",
+    currencyRelabels:
+      "Nothing is converted. {before} will read as {after}, and every other price moves the same way.",
+    currencyChangeTitle: "Price {name} in {to}?",
+    currencyChangeBody:
+      "Every price keeps its digits and changes meaning: {before} becomes {after}. Past orders are unaffected. Switching back restores it exactly.",
+    currencyChangeConfirm: "Change the currency",
+
     prep: "Preparation time",
     prepMin: "Fastest, in minutes",
     prepMax: "Slowest, in minutes",
