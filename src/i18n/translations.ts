@@ -820,6 +820,9 @@ const en = {
    * on a screen somebody visits twice a year.
    */
   hours: {
+    // Only drawn when a shop has more than one, so it never appears on a shop
+    // that is not a chain.
+    forBranch: "Hours for",
     tab: "Hours",
     sunday: "Sunday",
     monday: "Monday",
@@ -2023,6 +2026,52 @@ const en = {
     unpinned: "No pin",
     count: "{count} branches",
     countOne: "1 branch",
+    // Opens the panel below. Named for the question it answers rather than for
+    // the tables behind it.
+    menuHere: "Menu here",
+    // A shop always has at least one after `0101`, so this is a schema that
+    // has not been migrated rather than an empty state to design for.
+    noneYet: "This shop has no branches yet.",
+  },
+
+  /**
+   * One branch's differences from the shared menu.
+   *
+   * The words avoid "override" and "exception" — true of the schema, and not
+   * how anybody describes a shop that has run out of something or charges more
+   * at the airport.
+   */
+  branchMenu: {
+    title: "Menu at {name}",
+    intro:
+      "The menu belongs to the shop and every branch serves it. Turn off what this branch does not, and fill in a price only where it charges something different.",
+    served: "Served",
+    notServed: "Not served",
+    // Said once under a section that is off, rather than on each row beneath
+    // it: the rows are already dimmed, and the sentence explains the dimming.
+    sectionOff: "The whole section is off here, so nothing in it is served.",
+    noMenu: "This shop has no menu yet.",
+    priceFor: "Price for {name} at this branch",
+    /**
+     * Copying a price list in from another branch.
+     *
+     * "Copy from" rather than "sync": it happens once, when it is pressed. A
+     * word implying a standing link would promise that later changes follow,
+     * which they do not.
+     */
+    copyFrom: "Copy prices from",
+    copyAll: "Copy whole menu",
+    copySection: "Copy section",
+    copyItem: "Copy",
+    // Says how many, because a bare "done" on something that rewrites a price
+    // list is not checkable.
+    copied: "{count} dishes now match {name}",
+    copyNone: "This shop has no other branch to copy from.",
+    // The expander on a dish. Loaded only when opened: most dishes are never
+    // asked about, and a menu is a lot of questions to fetch up front.
+    options: "Options",
+    noOptions: "This dish asks nothing.",
+    optionPriceFor: "Price for {name} at this branch",
   },
 
   confirm: {

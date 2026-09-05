@@ -5,10 +5,18 @@ import { getClient } from "@/lib/supabase/client";
  *
  * ## A missing row means closed, and that is the design
  *
- * `store_hours` holds one window per weekday it opens. A day with no row is a
- * day it does not open — `src/lib/store-hours.ts` in the app reads it exactly
- * that way, so "closed on Monday" is expressed by there being no Monday, not by
- * a row saying `00:00`–`00:00`.
+ * `branch_hours` holds one window per weekday a branch opens. A day with no row
+ * is a day it does not open — `src/lib/store-hours.ts` in the app reads it
+ * exactly that way, so "closed on Monday" is expressed by there being no
+ * Monday, not by a row saying `00:00`–`00:00`.
+ *
+ * ## Hours belong to a place, not to a brand
+ *
+ * They moved with `0101`. A chain whose Hamra branch shuts at ten and whose
+ * airport branch never does cannot say so with one timetable, and every shop
+ * that is not a chain is a shop with one branch — so this reads the same for
+ * both. `store_hours` still exists and still holds a copy until step three
+ * drops it; nothing here reads it.
  *
  * That is worth stating because it decides what saving means here: closing a
  * day is a **delete**, not an update, and a save has to do both.
@@ -29,11 +37,11 @@ export type DayHours = {
   closesAt: string;
 };
 
-export async function fetchStoreHours(storeId: string): Promise<DayHours[]> {
+export async function fetchBranchHours(branchId: string): Promise<DayHours[]> {
   const { data, error } = await getClient()
-    .from("store_hours")
+    .from("branch_hours")
     .select("day_of_week, opens_at, closes_at")
-    .eq("store_id", storeId)
+    .eq("branch_id", branchId)
     .order("day_of_week", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -46,7 +54,7 @@ export async function fetchStoreHours(storeId: string): Promise<DayHours[]> {
 }
 
 /**
- * Replaces a shop's whole week.
+ * Replaces one branch's whole week.
  *
  * ## Why the whole week and not the day that changed
  *
@@ -56,8 +64,10 @@ export async function fetchStoreHours(storeId: string): Promise<DayHours[]> {
  * twice leaves the same seven rows, which matters because it is more than one
  * request and any of them can be retried.
  *
- * The days that are open are upserted on `(store_id, day_of_week)`, which is
- * unique. The days that are closed are deleted in one statement — including the
+ * The days that are open are upserted on `(branch_id, day_of_week)`, which is
+ * unique — `branch_hours_branch_day_idx`, added in `0105` for this call and no
+ * other reason: an upsert with nothing to conflict on inserts a second Tuesday
+ * rather than replacing the first. The days that are closed are deleted in one statement — including the
  * ones that were already closed, which is a no-op and cheaper than working out
  * which of them changed.
  *
@@ -67,8 +77,8 @@ export async function fetchStoreHours(storeId: string): Promise<DayHours[]> {
  * than a broken one, the caller refetches on success *and* failure so the
  * screen shows whatever actually landed, and running it again fixes it.
  */
-export async function saveStoreHours(
-  storeId: string,
+export async function saveBranchHours(
+  branchId: string,
   week: DayHours[],
 ): Promise<void> {
   const client = getClient();
@@ -80,22 +90,22 @@ export async function saveStoreHours(
 
   if (closed.length > 0) {
     const { error } = await client
-      .from("store_hours")
+      .from("branch_hours")
       .delete()
-      .eq("store_id", storeId)
+      .eq("branch_id", branchId)
       .in("day_of_week", closed);
     if (error) throw new Error(error.message);
   }
 
   if (open.length > 0) {
-    const { error } = await client.from("store_hours").upsert(
+    const { error } = await client.from("branch_hours").upsert(
       open.map((day) => ({
-        store_id: storeId,
+        branch_id: branchId,
         day_of_week: day.dayOfWeek,
         opens_at: day.opensAt,
         closes_at: day.closesAt,
       })),
-      { onConflict: "store_id,day_of_week" },
+      { onConflict: "branch_id,day_of_week" },
     );
     if (error) throw new Error(error.message);
   }

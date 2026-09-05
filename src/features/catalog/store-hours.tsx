@@ -14,7 +14,11 @@ import { t } from "@/i18n/translations";
 import { BUSINESS_TIMEZONE, toWallClock } from "@/lib/time";
 import { isOpenAt, summarise, type DayWindow } from "@/lib/week";
 
-import { fetchStoreHours, saveStoreHours, type DayHours } from "./api/hours";
+import { Select } from "@/components/ui/select";
+import { pickLocalized } from "@/i18n/db-text";
+
+import { fetchBranchHours, saveBranchHours, type DayHours } from "./api/hours";
+import { useBranches } from "./use-branches";
 
 /**
  * A shop's week.
@@ -77,20 +81,92 @@ const DAY_KEYS = [
 
 type Draft = { open: boolean; opensAt: string; closesAt: string };
 
+/**
+ * The tab: which branch, then that branch's week.
+ *
+ * ## The picker hides itself on a shop that is not a chain
+ *
+ * Hours moved from the shop to the branch in `0101`, and most shops have
+ * exactly one — so a select with one option would be a control that can only be
+ * left where it is, on every shop in the catalogue, to serve the few that have
+ * two. With one branch this screen is what it always was.
+ *
+ * Defaults to the first branch rather than remembering a choice: the list is
+ * ordered, the first one is the one the shop thinks of as its own, and a
+ * remembered selection is a thing to be surprised by a week later.
+ */
 export function StoreHours({ storeId }: { storeId: string }) {
+  const branches = useBranches(storeId);
+  const rows = branches.data ?? [];
+  const [chosen, setChosen] = useState<string | null>(null);
+
+  const branchId = chosen ?? rows[0]?.id ?? null;
+
+  if (branches.isPending) {
+    return (
+      <div aria-hidden className="flex flex-col gap-sm p-xxl">
+        {WEEK.map((day) => (
+          <div
+            key={day}
+            className="h-[52px] rounded-md border border-border bg-surface opacity-60"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (branchId === null) {
+    // `0101` gives every shop a branch, so this is a schema that has not been
+    // migrated rather than an empty state anybody should meet.
+    return (
+      <p className="p-xxl text-[14px] text-text-faint">
+        {t("branches.noneYet")}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {rows.length > 1 && (
+        <div className="flex shrink-0 items-center gap-md border-b border-border bg-surface px-xxl py-lg">
+          <span className="shrink-0 text-[13px] font-semibold text-text-soft">
+            {t("hours.forBranch")}
+          </span>
+          <span className="w-[240px]">
+            <Select
+              value={branchId}
+              onChange={setChosen}
+              options={rows.map((branch) => ({
+                value: branch.id,
+                label: pickLocalized(branch.name),
+              }))}
+              aria-label={t("hours.forBranch")}
+            />
+          </span>
+        </div>
+      )}
+
+      {/* Keyed, so switching branch starts from that branch's week rather than
+          resuming the previous one's half-edited grid. */}
+      <BranchHours key={branchId} branchId={branchId} />
+    </div>
+  );
+}
+
+function BranchHours({ branchId }: { branchId: string }) {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
   const hours = useQuery({
-    queryKey: ["store-hours", storeId],
-    queryFn: () => fetchStoreHours(storeId),
+    queryKey: ["branch-hours", branchId],
+    queryFn: () => fetchBranchHours(branchId),
   });
 
   const save = useMutation({
-    mutationFn: (week: DayHours[]) => saveStoreHours(storeId, week),
+    mutationFn: (week: DayHours[]) => saveBranchHours(branchId, week),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["store-hours", storeId],
+        queryKey: ["branch-hours", branchId],
       });
       toast.success(t("hours.saved"));
     },
@@ -101,10 +177,10 @@ export function StoreHours({ storeId }: { storeId: string }) {
     },
     onSettled: () => {
       // On failure as well as success, so a half-applied week — which is
-      // possible, see `saveStoreHours` — shows what actually landed rather than
+      // possible, see `saveBranchHours` — shows what actually landed rather than
       // what was asked for.
       void queryClient.invalidateQueries({
-        queryKey: ["store-hours", storeId],
+        queryKey: ["branch-hours", branchId],
       });
     },
   });

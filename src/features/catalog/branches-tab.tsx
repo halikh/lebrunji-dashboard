@@ -31,6 +31,7 @@ import {
 } from "@/lib/validation";
 
 import type { Branch, BranchDraft } from "./api/branches";
+import { BranchMenuPanel } from "./branch-menu-panel";
 import {
   useArchiveBranch,
   useBranches,
@@ -64,9 +65,19 @@ export function BranchesTab({ storeId }: { storeId: string }) {
 
   /** The row being edited, `"new"` while one is being added, or nothing. */
   const [open, setOpen] = useState<string | null>(null);
+  /**
+   * The branch whose menu differences are being looked at.
+   *
+   * A separate panel from the editor rather than a tab inside it: the editor is
+   * a form with a Save, and this is a list of switches that write as they are
+   * flipped. Putting them behind one header would make the Save look as though
+   * it governed both.
+   */
+  const [menuFor, setMenuFor] = useState<string | null>(null);
 
   const rows = branches.data ?? [];
   const editing = rows.find((row) => row.id === open) ?? null;
+  const showingMenu = rows.find((row) => row.id === menuFor) ?? null;
 
   return (
     <div className="relative flex h-full">
@@ -102,6 +113,7 @@ export function BranchesTab({ storeId }: { storeId: string }) {
               branch={branch}
               open={open === branch.id}
               onEdit={guarded(() => setOpen(branch.id))}
+              onShowMenu={guarded(() => setMenuFor(branch.id))}
               onClose={async () => {
                 await archive.mutateAsync({
                   id: branch.id,
@@ -160,6 +172,31 @@ export function BranchesTab({ storeId }: { storeId: string }) {
           </>
         )}
       </Panel>
+
+      <Panel
+        open={menuFor !== null}
+        onClose={() => setMenuFor(null)}
+        label={
+          showingMenu
+            ? t("branchMenu.title", { name: pickLocalized(showingMenu.name) })
+            : t("branches.menuHere")
+        }
+      >
+        {showingMenu && (
+          <>
+            <PanelHeader
+              title={t("branchMenu.title", {
+                name: pickLocalized(showingMenu.name),
+              })}
+              onClose={() => setMenuFor(null)}
+            />
+            {/* Not guarded by `useUnsavedChanges`: every switch here has already
+                written by the time the panel is closed, so there is never
+                anything unsaved to lose. */}
+            <BranchMenuPanel branch={showingMenu} storeId={storeId} />
+          </>
+        )}
+      </Panel>
     </div>
   );
 }
@@ -168,12 +205,14 @@ function BranchRow({
   branch,
   open,
   onEdit,
+  onShowMenu,
   onClose,
   canClose,
 }: {
   branch: Branch;
   open: boolean;
   onEdit: () => void;
+  onShowMenu: () => void;
   onClose: () => Promise<void>;
   canClose: boolean;
 }) {
@@ -208,6 +247,10 @@ function BranchRow({
           {!branch.isActive && <span>{t("branches.hidden")}</span>}
         </span>
       </button>
+
+      <Button variant="primary-quiet" size="sm" onClick={onShowMenu}>
+        {t("branches.menuHere")}
+      </Button>
 
       <ConfirmButton
         onConfirm={onClose}
