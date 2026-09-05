@@ -11,7 +11,6 @@ import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
 import { PanelHeader } from "@/components/ui/panel-header";
-import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { useLanguages } from "@/features/reference/use-languages";
@@ -20,13 +19,11 @@ import { t } from "@/i18n/translations";
 import { SEARCH, TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
-import { applyOrder } from "./api/menu";
 import { TAG_TONES, type Tag, type TagDraft, type TagTone } from "./api/tags";
 import { TagChip } from "./tag-chip";
 import {
   useArchiveTag,
   useCreateTag,
-  useReorderTags,
   useTags,
   useUpdateTag,
 } from "./use-tags";
@@ -34,13 +31,17 @@ import {
 /**
  * The tag vocabulary — the chips a dish can be given.
  *
- * ## Why the order is the most consequential control here
+ * ## Why there is no ordering here
  *
- * `sort_order` decides the order a dish's chips read in, on **every** dish at
- * once. Not per dish: a tag's position is a property of the vocabulary, so
- * "Popular" precedes "Spicy" everywhere rather than on the dishes where
- * somebody happened to click it first. Dragging a row here changes the whole
- * menu, which is why the list is the screen and the form is a panel beside it.
+ * There used to be: rows were dragged, and a tag's position was a property of
+ * the vocabulary rather than of a dish. It was removed because the result was
+ * never visible. The app shows two or three chips on one dish, never the
+ * vocabulary end to end, so an operator arranging fifty tags was doing careful
+ * work whose only effect was which of two chips came first.
+ *
+ * Newest first instead. The reason to open this screen is almost always a tag
+ * just added — to check it, rename it, fix its tone — so the row wanted is the
+ * one at the top rather than one to be found. See `fetchTags`.
  *
  * ## Retiring one is safe, and the count is what makes that clear
  *
@@ -54,13 +55,6 @@ import {
  * every dish that had it rather than asking for thirty-four re-tags.
  */
 export function TagsList() {
-  /**
-   * The term, and the mode it puts the list in.
-   *
-   * Searching and reordering cannot both be on: a position among matches is not
-   * a position in the vocabulary, so dragging while filtered would write a
-   * `sort_order` nobody chose. The handles go away and the list says why.
-   */
   const [search, setSearch] = useState("");
   const searching = search.trim().length >= SEARCH.minTerm;
 
@@ -68,7 +62,6 @@ export function TagsList() {
   const create = useCreateTag();
   const update = useUpdateTag();
   const archive = useArchiveTag();
-  const reorder = useReorderTags();
 
   /**
    * The row the panel is editing, or `"new"` while one is being added.
@@ -83,17 +76,6 @@ export function TagsList() {
   const rows = tags.data ?? [];
   const editing = rows.find((row) => row.id === open) ?? null;
 
-  const order = useReorder({
-    ids: rows.map((row) => row.id),
-    onReorder: (ids) => {
-      const { next, updates } = applyOrder(rows, ids);
-      reorder.mutate({ updates, next });
-    },
-    labelOf: (id) =>
-      pickLocalized(rows.find((row) => row.id === id)?.name ?? {}),
-    disabled: searching,
-  });
-
   return (
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
@@ -107,7 +89,6 @@ export function TagsList() {
             onChange: setSearch,
             placeholder: t("tags.search"),
           }}
-          hint={t("tags.reorderHint")}
           action={
             <Button onClick={() => setOpen("new")}>{t("tags.add")}</Button>
           }
@@ -141,17 +122,11 @@ export function TagsList() {
             </div>
           )}
 
-          {order.instructions}
-
-          {order
-            .ordered(rows, (row) => row.id)
-            .map((row) => (
+          {rows.map((row) => (
               <Row
                 key={row.id}
                 tag={row}
                 open={open === row.id}
-                rowProps={order.rowProps}
-                handleProps={order.handleProps}
                 onEdit={() => setOpen(row.id)}
                 onToggleActive={() => {
                   setOpen(null);
@@ -199,7 +174,7 @@ export function TagsList() {
                   );
                 } else {
                   create.mutate(
-                    { draft, sortOrder: rows.length },
+                    { draft },
                     { onSuccess: () => setOpen(null) },
                   );
                 }
@@ -213,19 +188,9 @@ export function TagsList() {
   );
 }
 
-type ReorderProps = {
-  rowProps: (
-    id: string,
-    className?: string,
-  ) => { "data-reorder-id": string; className: string };
-  handleProps: (id: string) => Record<string, unknown>;
-};
-
 function Row({
   tag,
   open,
-  rowProps,
-  handleProps,
   onEdit,
   onToggleActive,
   onArchive,
@@ -235,29 +200,22 @@ function Row({
   onEdit: () => void;
   onToggleActive: () => void;
   onArchive: () => Promise<void>;
-} & ReorderProps) {
+}) {
   const name = pickLocalized(tag.name);
 
-  const row = rowProps(
-    tag.id,
-    cx(
-      ROW,
+  const className = cx(
+    ROW,
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
       !tag.isActive && "border-danger-wash bg-danger-wash/30",
       open &&
         "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
-      tag.isActive && !open && "border-border",
-      tag.isActive && open && "border-active",
-    ),
+    tag.isActive && !open && "border-border",
+    tag.isActive && open && "border-active",
   );
 
   return (
-    <div {...row}>
-      <button {...handleProps(tag.id)}>
-        <GripIcon />
-      </button>
-
+    <div className={className}>
       <button
         type="button"
         onClick={onEdit}

@@ -11,7 +11,6 @@ import {
   archiveTag,
   createTag,
   fetchTags,
-  setTagOrder,
   updateTag,
   type Tag,
   type TagDraft,
@@ -61,8 +60,7 @@ export function useCreateTag() {
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: (input: { draft: TagDraft; sortOrder: number }) =>
-      createTag(input.draft, input.sortOrder),
+    mutationFn: (input: { draft: TagDraft }) => createTag(input.draft),
     onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: tagKeys.all });
       toast.success(t("tags.added", { name: pickLocalized(input.draft.name) }));
@@ -157,50 +155,3 @@ export function useArchiveTag() {
   });
 }
 
-/**
- * Committing a new order.
- *
- * Optimistic, because the operator has just dragged a row into place and let
- * go. `onSettled` refetches on success *and* failure, which is what makes the
- * several non-atomic writes behind it honest.
- *
- * The order matters more than it looks: it is the order a dish's chips appear
- * in, on every dish at once, so this is the one control that decides whether
- * "Popular" or "Spicy" is read first across the whole app.
- */
-export function useReorderTags() {
-  const queryClient = useQueryClient();
-  const toast = useToasts();
-
-  return useMutation({
-    mutationFn: (input: {
-      updates: { id: string; sortOrder: number }[];
-      next: Tag[];
-    }) => setTagOrder(input.updates),
-
-    onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: tagKeys.all });
-      const snapshot = queryClient.getQueriesData<Tag[]>({
-        queryKey: tagKeys.all,
-      });
-      queryClient.setQueriesData<Tag[]>(
-        { queryKey: tagKeys.list("") },
-        input.next,
-      );
-      return { snapshot };
-    },
-
-    onError: (error, _input, context) => {
-      for (const [key, rows] of context?.snapshot ?? []) {
-        queryClient.setQueryData(key, rows);
-      }
-      toast.danger(
-        error instanceof Error ? error.message : t("reorder.failed"),
-      );
-    },
-
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: tagKeys.all });
-    },
-  });
-}

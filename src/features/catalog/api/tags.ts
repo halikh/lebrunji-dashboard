@@ -52,7 +52,6 @@ export type Tag = {
   name: Localized;
   tone: TagTone;
   isActive: boolean;
-  sortOrder: number;
   /**
    * How many live dishes carry it.
    *
@@ -64,7 +63,7 @@ export type Tag = {
   usedBy: number;
 };
 
-const COLUMNS = `id, slug, name, tone, is_active, sort_order,
+const COLUMNS = `id, slug, name, tone, is_active,
    menu_item_tag_links ( count )`;
 
 /**
@@ -74,10 +73,21 @@ const COLUMNS = `id, slug, name, tone, is_active, sort_order,
  * the rule every list in this dashboard follows. Both languages, because an
  * operator who knows the chip as حار must find it by typing حار.
  *
- * Not paginated, and deliberately: the list is ordered by `sort_order`, which
- * the operator sets by dragging, and a drag across a page boundary is not a
- * gesture that exists. A tag vocabulary is also bounded by what fits on a chip
- * row — a shop with two hundred tags has a different problem, and it is not one
+ * ## Newest first, since nobody curates the order any more
+ *
+ * The list used to come back in `sort_order`, which the operator set by
+ * dragging. That went with `0100`: the app shows two or three chips on one
+ * dish and never the vocabulary end to end, so arranging fifty tags was careful
+ * work whose result was never visible anywhere.
+ *
+ * `created_at desc` rather than alphabetical, because of why this screen gets
+ * opened. It is almost always a tag just added — to check how the chip reads,
+ * fix its tone, correct the Arabic — and that row is then the first one rather
+ * than one to go looking for. A vocabulary is also searched more than it is
+ * browsed, and the box above handles that.
+ *
+ * Still not paginated. A tag vocabulary is bounded by what fits on a chip row;
+ * a shop with two hundred tags has a different problem, and it is not one
  * paging would fix.
  */
 export async function fetchTags(search?: string | null): Promise<Tag[]> {
@@ -98,7 +108,7 @@ export async function fetchTags(search?: string | null): Promise<Tag[]> {
     );
   }
 
-  const { data, error } = await query.order("sort_order", { ascending: true });
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) throw new Error(`Could not read the tags: ${error.message}`);
 
@@ -108,7 +118,6 @@ export async function fetchTags(search?: string | null): Promise<Tag[]> {
     name: (row.name as Localized) ?? {},
     tone: (row.tone as TagTone) ?? "neutral",
     isActive: row.is_active as boolean,
-    sortOrder: row.sort_order as number,
     usedBy: countOf(row.menu_item_tag_links),
   }));
 }
@@ -137,31 +146,26 @@ export type TagDraft = {
   isActive: boolean;
 };
 
-export async function createTag(
-  draft: TagDraft,
-  sortOrder: number,
-): Promise<void> {
+export async function createTag(draft: TagDraft): Promise<void> {
   const { error } = await getClient().from("menu_item_tags").insert({
     name: draft.name,
     tone: draft.tone,
     is_active: draft.isActive,
-    sort_order: sortOrder,
-    // No `slug`: `0071`'s trigger derives one from the English name inside the
-    // insert's own transaction, which is the only way to make it unique without
-    // racing another tab.
+    // No `slug`: `0071`'s trigger derives one from the English name
+    // inside the insert's own transaction, which is the only way to make it
+    // unique without racing another tab.
   });
 
   if (error) throw new Error(friendly(error.message));
 }
 
-export type TagPatch = Partial<TagDraft> & { sortOrder?: number };
+export type TagPatch = Partial<TagDraft>;
 
 export async function updateTag(id: string, patch: TagPatch): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.tone !== undefined) row.tone = patch.tone;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
-  if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 
   const { error } = await getClient()
     .from("menu_item_tags")
@@ -196,25 +200,6 @@ export async function archiveTag(id: string): Promise<void> {
   if (error) throw new Error(friendly(error.message));
 }
 
-/** The same shape as every other reorder here — see `setSortOrder` in `menu.ts`. */
-export async function setTagOrder(
-  updates: { id: string; sortOrder: number }[],
-): Promise<void> {
-  if (updates.length === 0) return;
-
-  const client = getClient();
-  const results = await Promise.all(
-    updates.map(({ id, sortOrder }) =>
-      client
-        .from("menu_item_tags")
-        .update({ sort_order: sortOrder })
-        .eq("id", id),
-    ),
-  );
-
-  const failure = results.find((result) => result.error);
-  if (failure?.error) throw new Error(friendly(failure.error.message));
-}
 
 /**
  * Puts a dish's tags exactly where the form says they should be.

@@ -987,7 +987,6 @@ const en = {
       "The chip disappears from all {count} item(s) straight away. They keep the tag, so this is reversible in one click.",
     hideConfirm: "Hide it",
     search: "Search tags",
-    reorderHint: "Drag the rows to reorder. Searching turns that off.",
     searchNone: "No tag matches {term}.",
     formLabel: "Tag details",
     failedTitle: "Could not load the tags",

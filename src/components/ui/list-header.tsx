@@ -66,30 +66,50 @@ export function ListHeader({
   return (
     <div
       className={[
-        "grid shrink-0 items-center border-b border-border bg-surface px-xxl py-lg",
+        "grid shrink-0 border-b border-border bg-surface px-xxl py-lg",
         // Heading, box, action. The middle column takes the slack; `minmax(0,…)`
         // rather than a bare `1fr` so a long value in the box shrinks it instead
         // of pushing the action off the end.
         "grid-cols-[auto_minmax(0,1fr)_auto]",
+        // Two rows: the controls, then the hint. Sized to their contents, so a
+        // screen without a hint has no second row to leave a gap.
+        "grid-rows-[auto_auto]",
         "gap-x-lg gap-y-xxs",
       ].join(" ")}
     >
-      <h1 className="text-[24px]">{title}</h1>
+      {/*
+        Every cell is placed by hand rather than left to auto-placement.
+
+        The row each item sits in is the whole point of this component — the
+        heading centres on row one, which is the box's row, and *not* on the
+        hint below it. Auto-placement would arrive at the same answer today and
+        quietly stop doing so the moment somebody adds a cell or renders the
+        action conditionally. Saying it outright costs three class names.
+
+        `items-center` is per-item for the same reason: it belongs to the three
+        things sharing row one, and setting it on the container would also
+        apply to the hint, which has no one to be centred against.
+      */}
+      <h1 className="col-start-1 row-start-1 self-center text-[24px]">
+        {title}
+      </h1>
 
       <SearchInput
+        className="col-start-2 row-start-1 self-center"
         value={search.value}
         onChange={search.onChange}
         placeholder={search.placeholder}
       />
 
-      {action}
+      {action && (
+        <div className="col-start-3 row-start-1 self-center">{action}</div>
+      )}
 
       {hint && (
-        // Second row of the box's column. `col-start-2` is what keeps it under
-        // the box rather than under the heading, and the inset matches the one
-        // `Field` uses so the sentence lines up with the text a person types
+        // Under the box, in the box's own column — the inset matches the one
+        // `Field` uses, so the sentence lines up with the text a person types
         // rather than with the border around it.
-        <span className="col-start-2 ps-md text-[12px] text-text-faint">
+        <span className="col-start-2 row-start-2 ps-md text-[12px] text-text-faint">
           {hint}
         </span>
       )}
