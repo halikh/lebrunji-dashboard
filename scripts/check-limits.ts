@@ -40,7 +40,6 @@ import { loadLocalEnv } from './load-env';
 const EXPECTED: Record<string, number> = {
   stores_name_len: TEXT.name,
   categories_name_len: TEXT.name,
-  categories_tagline_len: TEXT.tagline,
   category_kinds_name_len: TEXT.name,
   menu_sections_title_len: TEXT.title,
   menu_items_name_len: TEXT.name,

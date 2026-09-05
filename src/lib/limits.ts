@@ -30,8 +30,6 @@
 export const TEXT = {
   /** Store, category, item, option — anything with a short display name. */
   name: 80,
-  /** `categories.tagline`. */
-  tagline: 160,
   /** `menu_items.description`. */
   description: 500,
   /** `menu_sections.title`, `option_groups.title`. */

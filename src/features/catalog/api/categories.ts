@@ -1,6 +1,6 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
-import { localizedOrNull, type Localized } from "@/lib/validation";
+import type { Localized } from "@/lib/validation";
 
 /**
  * Categories — the tiles on the app's home screen.
@@ -36,7 +36,6 @@ export type Category = {
   slug: string;
   kindId: string;
   name: Localized;
-  tagline: Localized;
   isActive: boolean;
   /**
    * Whether a shop in this category shows its menu's section tabs.
@@ -49,7 +48,7 @@ export type Category = {
   sortOrder: number;
 };
 
-const COLUMNS = `id, slug, category_kind_id, name, tagline,
+const COLUMNS = `id, slug, category_kind_id, name,
    is_active, has_menu_nav, sort_order`;
 
 /**
@@ -90,7 +89,6 @@ export async function fetchCategories(
       [
         `name->>en.ilike.${like}`,
         `name->>ar.ilike.${like}`,
-        `tagline->>en.ilike.${like}`,
         `slug.ilike.${like}`,
       ].join(","),
     );
@@ -105,7 +103,6 @@ export async function fetchCategories(
     slug: row.slug as string,
     kindId: row.category_kind_id as string,
     name: (row.name as Localized) ?? {},
-    tagline: (row.tagline as Localized) ?? {},
     isActive: row.is_active as boolean,
     hasMenuNav: row.has_menu_nav as boolean,
     sortOrder: row.sort_order as number,
@@ -130,7 +127,6 @@ export async function fetchCategoryKinds(): Promise<CategoryKind[]> {
 export type CategoryDraft = {
   kindId: string;
   name: Localized;
-  tagline: Localized;
   isActive: boolean;
   hasMenuNav: boolean;
 };
@@ -144,8 +140,6 @@ export async function createCategory(
     .insert({
       category_kind_id: draft.kindId,
       name: draft.name,
-      // Null when blank, never `{}` — see `localizedOrNull`.
-      tagline: localizedOrNull(draft.tagline),
       is_active: draft.isActive,
       has_menu_nav: draft.hasMenuNav,
       sort_order: sortOrder,
@@ -165,7 +159,6 @@ export async function updateCategory(
   const row: Record<string, unknown> = {};
   if (patch.kindId !== undefined) row.category_kind_id = patch.kindId;
   if (patch.name !== undefined) row.name = patch.name;
-  if (patch.tagline !== undefined) row.tagline = localizedOrNull(patch.tagline);
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.hasMenuNav !== undefined) row.has_menu_nav = patch.hasMenuNav;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;

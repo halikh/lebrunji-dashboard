@@ -96,11 +96,13 @@ describe("validateLocalizedText", () => {
 
   it("requires nothing at all when the column is nullable", () => {
     expect(
-      validateLocalizedText({}, languages, TEXT.tagline, { optional: true }).ok,
+      validateLocalizedText({}, languages, TEXT.paymentMethodDetail, {
+        optional: true,
+      }).ok,
     ).toBe(true);
     // …but half of an optional value is still half a value.
     expect(
-      validateLocalizedText({ en: "Fresh" }, languages, TEXT.tagline, {
+      validateLocalizedText({ en: "Fresh" }, languages, TEXT.paymentMethodDetail, {
         optional: true,
       }).ok,
     ).toBe(false);

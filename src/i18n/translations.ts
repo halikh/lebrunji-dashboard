@@ -872,8 +872,6 @@ const en = {
     tab: "Categories",
     add: "New category",
     name: "Name",
-    tagline: "Tagline",
-    taglineHint: "A line under the name on the home screen. Optional.",
     kind: "Kind",
     kindHint: "Groups categories in the app. Set by migration, not here.",
     pickKind: "Choose a kind",

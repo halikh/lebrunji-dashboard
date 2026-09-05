@@ -47,8 +47,8 @@ import {
  * ## The form opens beside the list, as it does for a menu item
  *
  * The flow study called for editing inline, in the row. A category carries two
- * languages of name, two of tagline, a picture, a kind and three switches, and
- * growing a row to fit that reflows every row beneath it — the same reason the
+ * languages of name, a kind and three switches, and growing a row to fit that
+ * reflows every row beneath it — the same reason the
  * menu item editor moved out of the row. The panel keeps what mattered about
  * the inline idea, which was never editing *within* the row: it was not losing
  * your place in the list.
@@ -275,13 +275,10 @@ function Row({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
+        className="flex min-w-0 flex-grow text-left"
       >
         <span className="truncate text-[15px] font-semibold">
           {pickLocalized(category.name)}
-        </span>
-        <span className="truncate text-[12px] text-text-faint">
-          {pickLocalized(category.tagline)}
         </span>
       </button>
 
@@ -340,7 +337,6 @@ function Editor({
   const codes = languages.data?.map((language) => language.code) ?? [];
 
   const [name, setName] = useState<Localized>(initial?.name ?? {});
-  const [tagline, setTagline] = useState<Localized>(initial?.tagline ?? {});
   const [kindId, setKindId] = useState(initial?.kindId ?? "");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [hasMenuNav, setHasMenuNav] = useState(initial?.hasMenuNav ?? true);
@@ -362,7 +358,6 @@ function Editor({
 
     onSave({
       name,
-      tagline,
       kindId,
       isActive,
       hasMenuNav,
@@ -379,16 +374,6 @@ function Editor({
           maxLength={TEXT.name}
           error={errors.name}
           placeholder={{ en: "Restaurants", ar: "مطاعم" }}
-        />
-
-        <LocalizedField
-          label={t("categories.tagline")}
-          value={tagline}
-          onChange={setTagline}
-          maxLength={TEXT.tagline}
-          hint={t("categories.taglineHint")}
-          optional
-          placeholder={{ en: "Grills, mezze and more", ar: "مشاوي ومازة" }}
         />
 
         <Field
