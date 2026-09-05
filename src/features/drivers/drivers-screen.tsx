@@ -7,7 +7,11 @@ import { useState } from "react";
 import { Button, Field, Input, cx } from "@/components/ui";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
+import {
+  changed,
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
 import { ROW } from "@/components/ui/row";
 import { Panel } from "@/components/ui/panel";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -120,6 +124,7 @@ export function DriversScreen() {
 
   /** The row being edited, `"new"` for the one being added, or nothing. */
   const [open, setOpen] = useState<string | null>(null);
+  const guarded = useGuardedAction();
 
   const searching = search.trim().length >= SEARCH.minTerm;
   const matching = couriers.data ?? [];
@@ -176,7 +181,9 @@ export function DriversScreen() {
             onChange={setSearch}
             placeholder={t("drivers.search")}
           />
-          <Button onClick={() => setOpen("new")}>{t("drivers.add")}</Button>
+          <Button onClick={guarded(() => setOpen("new"))}>
+            {t("drivers.add")}
+          </Button>
         </div>
 
         {/* The same strip the queue and the customers list use — same shape,
@@ -231,7 +238,7 @@ export function DriversScreen() {
               key={courier.id}
               courier={courier}
               open={open === courier.id}
-              onEdit={() => setOpen(courier.id)}
+              onEdit={guarded(() => setOpen(courier.id))}
               onOverride={(value) =>
                 save.mutate({
                   id: courier.id,
@@ -266,14 +273,14 @@ export function DriversScreen() {
 
       <Panel
         open={open !== null}
-        onClose={() => setOpen(null)}
+        onClose={guarded(() => setOpen(null))}
         label={editing ? t("drivers.edit") : t("drivers.add")}
       >
         {open !== null && (
           <>
             <PanelHeader
               title={editing ? editing.name : t("drivers.add")}
-              onClose={() => setOpen(null)}
+              onClose={guarded(() => setOpen(null))}
             />
 
             <DriverEditor
@@ -284,7 +291,7 @@ export function DriversScreen() {
               key={open}
               initial={editing}
               pending={save.isPending}
-              onCancel={() => setOpen(null)}
+              onCancel={guarded(() => setOpen(null))}
               onSave={(draft) =>
                 save.mutate(
                   { id: editing?.id ?? null, draft, name: draft.name },

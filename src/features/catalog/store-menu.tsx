@@ -1,6 +1,8 @@
 "use client";
 
 import { useId, useState } from "react";
+
+import { useGuardedAction } from "@/components/unsaved-changes";
 import { createPortal } from "react-dom";
 
 import { Button, cx } from "@/components/ui";
@@ -149,6 +151,7 @@ export function StoreMenu({
    * A null id means adding rather than editing, in both cases.
    */
   const [open, setOpen] = useState<PanelTarget | null>(null);
+  const guarded = useGuardedAction();
 
   /**
    * How many dishes have been added through this panel.
@@ -236,7 +239,7 @@ export function StoreMenu({
   const panel = (
     <Panel
       open={open !== null}
-      onClose={() => setOpen(null)}
+      onClose={guarded(() => setOpen(null))}
       label={t("menu.formLabel")}
     >
       {open && (
@@ -265,7 +268,7 @@ export function StoreMenu({
                     but a visible affordance is what people look for first. */}
             <button
               type="button"
-              onClick={() => setOpen(null)}
+              onClick={guarded(() => setOpen(null))}
               aria-label={t("common.close")}
               className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft hover:bg-neutral-fill lg:flex"
             >
@@ -298,7 +301,7 @@ export function StoreMenu({
                   { onSuccess: () => setOpen(null) },
                 )
               }
-              onCancel={() => setOpen(null)}
+              onCancel={guarded(() => setOpen(null))}
             />
           ) : (
             <MenuItemEditor
@@ -361,7 +364,7 @@ export function StoreMenu({
                         { onSuccess: () => setAdded((count) => count + 1) },
                       )
               }
-              onCancel={() => setOpen(null)}
+              onCancel={guarded(() => setOpen(null))}
             />
           )}
         </>
@@ -504,9 +507,9 @@ export function StoreMenu({
                     <Button
                       variant="primary-quiet"
                       size="sm"
-                      onClick={() =>
-                        setOpen({ kind: "section", sectionId: section.id })
-                      }
+                      onClick={guarded(() =>
+                        setOpen({ kind: "section", sectionId: section.id }),
+                      )}
                     >
                       {t("menu.renameSection")}
                     </Button>
@@ -541,13 +544,13 @@ export function StoreMenu({
                       {},
                   )}
                   open={open?.kind === "item" && open.itemId === item.id}
-                  onEdit={() =>
+                  onEdit={guarded(() =>
                     setOpen({
                       kind: "item",
                       sectionId: item.sectionId,
                       itemId: item.id,
-                    })
-                  }
+                    }),
+                  )}
                   onToggle={() =>
                     update.mutate({
                       id: item.id,
@@ -579,9 +582,9 @@ export function StoreMenu({
                   carried={sectionOrder.movingId === section.id}
                   rowProps={sectionOrder.rowProps}
                   handleProps={sectionOrder.handleProps}
-                  onRename={() =>
-                    setOpen({ kind: "section", sectionId: section.id })
-                  }
+                  onRename={guarded(() =>
+                    setOpen({ kind: "section", sectionId: section.id }),
+                  )}
                   onArchiveSection={async () => {
                     setOpen(null);
                     await archiveSection.mutateAsync({
@@ -590,16 +593,18 @@ export function StoreMenu({
                     });
                   }}
                   onReorderItems={(ids) => reorderItems(section.id, ids)}
-                  onEdit={(itemId) =>
-                    setOpen({ kind: "item", sectionId: section.id, itemId })
+                  onEdit={(itemId: string) =>
+                    guarded(() =>
+                      setOpen({ kind: "item", sectionId: section.id, itemId }),
+                    )()
                   }
-                  onAdd={() =>
+                  onAdd={guarded(() =>
                     setOpen({
                       kind: "item",
                       sectionId: section.id,
                       itemId: null,
-                    })
-                  }
+                    }),
+                  )}
                   decimals={decimalsOf(store.data?.currencyCode ?? "")}
                   bulk={{
                     pending: createItems.isPending,
@@ -633,7 +638,7 @@ export function StoreMenu({
               price="none"
               decimals={null}
               pending={createSections.isPending}
-              onCancel={() => setAddingMode("none")}
+              onCancel={guarded(() => setAddingMode("none"))}
               onSubmit={(rows) =>
                 createSections.mutate(
                   {
@@ -661,7 +666,7 @@ export function StoreMenu({
                   { onSuccess: () => setAdding(false) },
                 )
               }
-              onCancel={() => setAdding(false)}
+              onCancel={guarded(() => setAdding(false))}
             />
           )}
         </div>
@@ -741,6 +746,7 @@ function Section({
 
   /** Whether this section's paste box is open. Per section, not per menu. */
   const [pasting, setPasting] = useState(false);
+  const guarded = useGuardedAction();
 
   const itemOrder = useReorder({
     ids: section.items.map((item) => item.id),
@@ -864,7 +870,7 @@ function Section({
           price="required"
           decimals={decimals}
           pending={bulk.pending}
-          onCancel={() => setPasting(false)}
+          onCancel={guarded(() => setPasting(false))}
           onSubmit={(rows) => {
             bulk.add(
               section.id,

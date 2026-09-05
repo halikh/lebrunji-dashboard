@@ -12,6 +12,7 @@ import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Button } from "@/components/ui";
 import { pickLocalized } from "@/i18n/db-text";
 import { Panel } from "@/components/ui/panel";
+import { useGuardedAction } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 
 import { StoreWizard } from "./store-wizard";
@@ -48,6 +49,7 @@ export function StoresList() {
    * after a reload, because the state that made it meaningful is gone.
    */
   const [adding, setAdding] = useState(false);
+  const guarded = useGuardedAction();
 
   return (
     // A row, not a column: the panel is a *sibling* of the list, which is what
@@ -141,7 +143,7 @@ export function StoresList() {
 
       <Panel
         open={adding}
-        onClose={() => setAdding(false)}
+        onClose={guarded(() => setAdding(false))}
         label={t("store.add")}
       >
         {adding && (
@@ -150,7 +152,7 @@ export function StoresList() {
               <h2 className="flex-grow text-[20px]">{t("store.add")}</h2>
               <button
                 type="button"
-                onClick={() => setAdding(false)}
+                onClick={guarded(() => setAdding(false))}
                 aria-label={t("common.close")}
                 className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft hover:bg-neutral-fill lg:flex"
               >

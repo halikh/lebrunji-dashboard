@@ -17,6 +17,7 @@ import { Select } from "@/components/ui/select";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 
 import { Toggle } from "@/components/ui/toggle";
+import { useConfirmLeave } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t, type TranslationKey } from "@/i18n/translations";
@@ -80,6 +81,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
 
 export function SettingsScreen() {
   const router = useRouter();
+  const confirmLeave = useConfirmLeave();
   const pathname = usePathname();
   const params = useSearchParams();
 
@@ -88,13 +90,21 @@ export function SettingsScreen() {
     ? (requested as TabKey)
     : "help";
 
+  /**
+   * Switching tabs unmounts whatever is in the current one, so it is a way out
+   * of a form even though the URL barely moves. Guarded here rather than on each
+   * tab button: there is one `show`, and there are five tabs.
+   */
   function show(next: TabKey) {
-    const query = new URLSearchParams(params);
-    if (next === "help") query.delete("tab");
-    else query.set("tab", next);
-    const search = query.toString();
-    router.replace(search ? `${pathname}?${search}` : pathname, {
-      scroll: false,
+    void confirmLeave().then((leave) => {
+      if (!leave) return;
+      const query = new URLSearchParams(params);
+      if (next === "help") query.delete("tab");
+      else query.set("tab", next);
+      const search = query.toString();
+      router.replace(search ? `${pathname}?${search}` : pathname, {
+        scroll: false,
+      });
     });
   }
 

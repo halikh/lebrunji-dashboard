@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { useConfirmLeave } from "@/components/unsaved-changes";
+
 import { cx } from "@/components/ui";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -65,6 +67,7 @@ export function StoreScreen({ storeId }: { storeId: string }) {
   const [panelSlot, setPanelSlot] = useState<HTMLElement | null>(null);
   const store = useStore(storeId);
   const router = useRouter();
+  const confirmLeave = useConfirmLeave();
   const pathname = usePathname();
   const params = useSearchParams();
 
@@ -73,13 +76,21 @@ export function StoreScreen({ storeId }: { storeId: string }) {
     ? (requested as TabKey)
     : "menu";
 
+  /**
+   * Switching tabs unmounts whatever is in the current one, so it is a way out
+   * of a form even though the URL barely moves. Guarded here rather than on each
+   * tab button: there is one `show`, and there are five tabs.
+   */
   function show(next: TabKey) {
-    const query = new URLSearchParams(params);
-    if (next === "menu") query.delete("tab");
-    else query.set("tab", next);
-    const search = query.toString();
-    router.replace(search ? `${pathname}?${search}` : pathname, {
-      scroll: false,
+    void confirmLeave().then((leave) => {
+      if (!leave) return;
+      const query = new URLSearchParams(params);
+      if (next === "menu") query.delete("tab");
+      else query.set("tab", next);
+      const search = query.toString();
+      router.replace(search ? `${pathname}?${search}` : pathname, {
+        scroll: false,
+      });
     });
   }
 

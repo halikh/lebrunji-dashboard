@@ -11,7 +11,10 @@ import { reveal } from "@/components/ui/reveal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useMoney } from "@/features/reference/use-currencies";
-import { useUnsavedChanges } from "@/components/unsaved-changes";
+import {
+  useConfirmLeave,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 import { convertMoney, formatMoney } from "@/lib/money";
 import { formatDateTime } from "@/lib/time";
@@ -35,19 +38,28 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export function PricingScreen() {
   const router = useRouter();
+  const confirmLeave = useConfirmLeave();
   const pathname = usePathname();
   const params = useSearchParams();
 
   const requested = params.get("tab");
   const tab: TabKey = requested === "ladder" ? "ladder" : "rate";
 
+  /**
+   * Switching tabs unmounts whatever is in the current one, so it is a way out
+   * of a form even though the URL barely moves. Guarded here rather than on
+   * each tab button: there is one `show`.
+   */
   function show(next: TabKey) {
-    const query = new URLSearchParams(params);
-    if (next === "rate") query.delete("tab");
-    else query.set("tab", next);
-    const search = query.toString();
-    router.replace(search ? `${pathname}?${search}` : pathname, {
-      scroll: false,
+    void confirmLeave().then((leave) => {
+      if (!leave) return;
+      const query = new URLSearchParams(params);
+      if (next === "rate") query.delete("tab");
+      else query.set("tab", next);
+      const search = query.toString();
+      router.replace(search ? `${pathname}?${search}` : pathname, {
+        scroll: false,
+      });
     });
   }
 

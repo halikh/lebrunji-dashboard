@@ -7,7 +7,10 @@ import { Button, Field, cx } from "@/components/ui";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { useToasts } from "@/components/ui/toast";
-import { useUnsavedChanges } from "@/components/unsaved-changes";
+import {
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { useMenu } from "@/features/catalog/use-menu";
@@ -101,6 +104,7 @@ export function AmendOrder({
    */
   const [swapPrices, setSwapPrices] = useState<Record<string, number>>({});
   const [note, setNote] = useState("");
+  const guarded = useGuardedAction();
 
   // Absent keys mean unchanged, so an amendment that has been opened and not
   // touched is not unsaved work. `swapOptions` and `swapPrices` are left out:
@@ -191,7 +195,7 @@ export function AmendOrder({
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={guarded(onClose)}
       labelledBy={titleId}
       className="w-[min(640px,92vw)]"
     >
@@ -307,7 +311,7 @@ export function AmendOrder({
               finishes rather than where it starts — and every other dialog in
               the dashboard puts them there. */}
           <div className="flex items-center justify-end gap-sm">
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="secondary" onClick={guarded(onClose)}>
               {t("common.cancel")}
             </Button>
             <Button

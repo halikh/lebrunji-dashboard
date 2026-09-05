@@ -19,7 +19,11 @@ import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
 import { parseLocation } from "@/lib/location";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
+import {
+  changed,
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
 import { digitsOf } from "@/lib/phone";
 import {
   validateLocalizedText,
@@ -95,6 +99,7 @@ export function StoreWizard({
   const codes = languages.data?.map((language) => language.code) ?? [];
 
   const [step, setStep] = useState<Step>(0);
+  const guarded = useGuardedAction();
 
   const [name, setName] = useState<Localized>({});
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -502,8 +507,13 @@ export function StoreWizard({
         <Button
           variant="secondary"
           disabled={create.isPending}
-          onClick={() =>
-            step === 0 ? onClose() : setStep((current) => (current - 1) as Step)
+          // Step 0's Cancel only. `onClose` is also what a *successful*
+          // create calls, so guarding the prop itself would ask the operator
+          // whether to discard the shop they had just made.
+          onClick={
+            step === 0
+              ? guarded(onClose)
+              : () => setStep((current) => (current - 1) as Step)
           }
         >
           {step === 0 ? t("common.cancel") : t("store.back")}

@@ -23,11 +23,14 @@ import { t } from "@/i18n/translations";
  *
  * ## What it guards, and how each is different
  *
- * There are three ways out of a form, and only two of them can be asked about
- * in this product's own words:
- *
- * - **A link.** Every navigation inside the dashboard is an `<a>`, so the click
- *   is caught here, held, and the dialog below decides whether it proceeds.
+ * - **A link.** Caught by the document listener below, held, and released or
+ *   not by the dialog. This covers moving between *pages*.
+ * - **Everything else that leaves a form**, which is most of it and none of it
+ *   a link: the tab strips are `<button>` calling `router.replace`, a Cancel
+ *   calls `setOpen(null)`, a panel's X calls `onClose`, and clicking a second
+ *   driver swaps a keyed editor out from under the first. Those are named one
+ *   at a time with `useGuardedAction` — see the note on it for why they cannot
+ *   be caught by a listener.
  * - **Signing out.** Already a confirmation; it grows a sentence when there is
  *   something to lose. See `SignOutButton`.
  * - **Closing the tab, or reloading.** `beforeunload`, which is the *browser's*
@@ -35,6 +38,18 @@ import { t } from "@/i18n/translations";
  *   text years ago precisely because it was used to trap people. So that one
  *   looks like the browser rather than like this app, and there is no way to
  *   make it not.
+ *
+ * ## What is deliberately not guarded
+ *
+ * A **save that landed**. Several screens pass one `onClose` to both the Cancel
+ * button and the mutation's `onSuccess`; guarding the prop rather than the
+ * button would ask an operator whether to discard the thing they had just
+ * successfully created. Where those share a handler, the call sites guard the
+ * button and leave `onSuccess` alone.
+ *
+ * A **search box or a filter**. Both write the URL through `router.replace` on
+ * every keystroke, and neither leaves anything. Guarding navigation wholesale
+ * would put a dialog in front of typing.
  *
  * ## What it does not guard
  *
@@ -269,6 +284,42 @@ export function useConfirmLeave(): () => Promise<boolean> {
   return useMemo(
     () => guard?.confirmLeave ?? (() => Promise.resolve(true)),
     [guard],
+  );
+}
+
+/**
+ * Wraps an action so it asks before discarding work.
+ *
+ * ## Why this exists next to the link guard
+ *
+ * The document listener above catches anchors, and for a while that looked like
+ * it caught everything — every *page* in this dashboard is reached by one. It
+ * is not how you leave a **form**. The tab strips are `<button>` calling
+ * `router.replace`, a Cancel calls `setOpen(null)`, a panel's X calls `onClose`:
+ * three ways out that never touch an `<a>`, and all three are more likely than
+ * clicking the rail.
+ *
+ * There is no listener that catches those without also catching Save, so they
+ * are named one at a time. This makes naming one cheap:
+ *
+ * ```tsx
+ * const guarded = useGuardedAction();
+ * <Button onClick={guarded(() => setOpen(null))}>Cancel</Button>
+ * ```
+ *
+ * The action runs unchanged when nothing is dirty, so wrapping something that
+ * turns out never to need it costs a resolved promise.
+ */
+export function useGuardedAction(): (action: () => void) => () => void {
+  const confirmLeave = useConfirmLeave();
+
+  return useCallback(
+    (action: () => void) => () => {
+      void confirmLeave().then((leave) => {
+        if (leave) action();
+      });
+    },
+    [confirmLeave],
   );
 }
 

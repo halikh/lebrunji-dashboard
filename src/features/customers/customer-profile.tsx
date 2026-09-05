@@ -18,6 +18,7 @@ import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { Map as PinMap } from "@/components/ui/map";
 import { Price } from "@/features/reference/price";
 import { useMoney } from "@/features/reference/use-currencies";
+import { useConfirmLeave } from "@/components/unsaved-changes";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
 import { formatPhone } from "@/lib/phone";
@@ -104,6 +105,7 @@ function label(code: string | null): string {
 
 export function CustomerProfile({ id }: { id: string }) {
   const router = useRouter();
+  const confirmLeave = useConfirmLeave();
   const pathname = usePathname();
   const params = useSearchParams();
 
@@ -118,13 +120,21 @@ export function CustomerProfile({ id }: { id: string }) {
    * Switching a tab is not a journey: Back should return to the customers list
    * rather than walk through the tabs somebody looked at on the way.
    */
+  /**
+   * Switching tabs unmounts whatever is in the current one, so it is a way out
+   * of a form even though the URL barely moves. Guarded here rather than on
+   * each tab button: there is one `show`.
+   */
   function show(next: ProfileTab) {
-    const query = new URLSearchParams(params);
-    if (next === "overview") query.delete("tab");
-    else query.set("tab", next);
-    const search = query.toString();
-    router.replace(search ? `${pathname}?${search}` : pathname, {
-      scroll: false,
+    void confirmLeave().then((leave) => {
+      if (!leave) return;
+      const query = new URLSearchParams(params);
+      if (next === "overview") query.delete("tab");
+      else query.set("tab", next);
+      const search = query.toString();
+      router.replace(search ? `${pathname}?${search}` : pathname, {
+        scroll: false,
+      });
     });
   }
 
