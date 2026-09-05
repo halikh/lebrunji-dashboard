@@ -121,11 +121,32 @@ export function BranchesTab({ storeId }: { storeId: string }) {
                   live: rows.length,
                 });
               }}
-              // The last one cannot go: a shop with no branches is listed, has
-              // a menu, and has nowhere for an order to arrive. Disabled here
-              // and refused again in the mutation, because a stale list is the
-              // one case a disabled button does not cover.
-              canClose={rows.length > 1}
+              /**
+               * Whether this row is the whole shop.
+               *
+               * A shop that has never been thought about as a chain has exactly
+               * the one branch migration `0101` gave it, named after itself —
+               * which is what the merchant sees here, and it reads as the store
+               * rather than as a place the store trades from. Neither action on
+               * the row means anything in that state:
+               *
+               * - **Close** was already impossible. A shop with no branches is
+               *   listed, has a menu, and has nowhere for an order to arrive, so
+               *   the button was rendered at 40% and swallowed its own clicks —
+               *   a control whose only job was to look unavailable.
+               * - **Menu here** offers to hide items and override prices *at
+               *   this branch*, and there is nothing to differ from. Every
+               *   override would apply everywhere the shop trades, which is what
+               *   the Menu tab already edits.
+               *
+               * Both come back the moment a second branch exists, including on
+               * this row: once there are two places, the first one is a place
+               * like any other and its menu really can differ.
+               *
+               * `archiveBranch` still refuses the last branch on its own — a
+               * stale list is the one case a hidden button does not cover.
+               */
+              soleBranch={rows.length === 1}
             />
           ))}
         </div>
@@ -207,14 +228,15 @@ function BranchRow({
   onEdit,
   onShowMenu,
   onClose,
-  canClose,
+  soleBranch,
 }: {
   branch: Branch;
   open: boolean;
   onEdit: () => void;
   onShowMenu: () => void;
   onClose: () => Promise<void>;
-  canClose: boolean;
+  /** The shop's only branch — see the call site. Renders no actions. */
+  soleBranch: boolean;
 }) {
   const name = pickLocalized(branch.name);
   const pinned = branch.latitude !== null && branch.longitude !== null;
@@ -248,23 +270,28 @@ function BranchRow({
         </span>
       </button>
 
-      <Button variant="primary-quiet" size="sm" onClick={onShowMenu}>
-        {t("branches.menuHere")}
-      </Button>
+      {/* Nothing on a one-branch shop — the row is the store, and both of these
+          are answers to questions only a chain can ask. See the call site. */}
+      {!soleBranch && (
+        <>
+          <Button variant="primary-quiet" size="sm" onClick={onShowMenu}>
+            {t("branches.menuHere")}
+          </Button>
 
-      <ConfirmButton
-        onConfirm={onClose}
-        titleKey="branches.closeTitle"
-        bodyKey="branches.closeBody"
-        confirmKey="branches.closeConfirm"
-        params={{ name }}
-        variant="danger"
-        triggerVariant="danger-quiet"
-        size="sm"
-        className={cx(!canClose && "pointer-events-none opacity-40")}
-      >
-        {t("branches.closeConfirm")}
-      </ConfirmButton>
+          <ConfirmButton
+            onConfirm={onClose}
+            titleKey="branches.closeTitle"
+            bodyKey="branches.closeBody"
+            confirmKey="branches.closeConfirm"
+            params={{ name }}
+            variant="danger"
+            triggerVariant="danger-quiet"
+            size="sm"
+          >
+            {t("branches.closeConfirm")}
+          </ConfirmButton>
+        </>
+      )}
     </div>
   );
 }

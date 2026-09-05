@@ -64,9 +64,14 @@ const TABS: { key: Kind; labelKey: TranslationKey }[] = [
   { key: "items", labelKey: "archive.items" },
   { key: "groups", labelKey: "archive.groups" },
   { key: "options", labelKey: "archive.options" },
+  // Last, because it is the rarest and the least like the others: the four
+  // before it are the menu coming apart, and this is a place the shop stopped
+  // trading from. An operator scanning for a missing dish should not have to
+  // read past it.
+  { key: "branches", labelKey: "archive.branches" },
 ];
 
-type Kind = "all" | "sections" | "items" | "groups" | "options";
+type Kind = "all" | "sections" | "items" | "groups" | "options" | "branches";
 
 export function StoreArchive({ storeId }: { storeId: string }) {
   /**
@@ -91,7 +96,8 @@ export function StoreArchive({ storeId }: { storeId: string }) {
     data.sections.length === 0 &&
     data.items.length === 0 &&
     data.groups.length === 0 &&
-    data.options.length === 0;
+    data.options.length === 0 &&
+    data.branches.length === 0;
 
   if (archive.isError) {
     return (
@@ -118,11 +124,13 @@ export function StoreArchive({ storeId }: { storeId: string }) {
       (data?.sections.length ?? 0) +
       (data?.items.length ?? 0) +
       (data?.groups.length ?? 0) +
-      (data?.options.length ?? 0),
+      (data?.options.length ?? 0) +
+      (data?.branches.length ?? 0),
     sections: data?.sections.length ?? 0,
     items: data?.items.length ?? 0,
     groups: data?.groups.length ?? 0,
     options: data?.options.length ?? 0,
+    branches: data?.branches.length ?? 0,
   };
 
   /** Whether a section is drawn at all — "All", or the one that was picked. */
@@ -311,6 +319,44 @@ export function StoreArchive({ storeId }: { storeId: string }) {
                   restore.option.mutateAsync({
                     id: option.id,
                     name: option.name,
+                  })
+                }
+              />
+            </div>
+          ))}
+        </Group>
+
+        {/* Last, and the only group here that is not part of the menu: a closed
+            branch is a place the shop stopped trading from. It is on this
+            screen anyway, because somebody looking for something that has gone
+            does not know which table it was in — the argument that put
+            withdrawn questions beside archived dishes. */}
+        <Group
+          title={t("archive.branches")}
+          rows={showing("branches") ? counts.branches : 0}
+        >
+          {data?.branches.map((branch) => (
+            <div key={branch.id} className={ROW_STATIC}>
+              <span className="flex min-w-0 flex-grow flex-col gap-xxs">
+                <span className="truncate text-[15px] font-semibold">
+                  {pickLocalized(branch.name)}
+                </span>
+                <span className="truncate text-[12px] text-text-faint">
+                  {/* "Closed", not "Archived" — the Branches tab calls the
+                      button "Close branch", and the archive should not rename
+                      the thing it is showing the way back from. */}
+                  {t("archive.closedOn", {
+                    when: formatDate(branch.archivedAt),
+                  })}
+                </span>
+              </span>
+              <Restore
+                name={pickLocalized(branch.name)}
+                body="archive.restoreBranch"
+                onConfirm={() =>
+                  restore.branch.mutateAsync({
+                    id: branch.id,
+                    name: branch.name,
                   })
                 }
               />

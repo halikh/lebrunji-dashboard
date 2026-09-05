@@ -5,6 +5,7 @@ import { PAGE } from "@/lib/limits";
 import { localizedOrNull, type Localized } from "@/lib/validation";
 import { asPriceUnit, type PriceUnit } from "@/lib/units";
 
+import { fetchArchivedBranches, type ArchivedBranch } from "./branches";
 import { setItemTags } from "./tags";
 
 /**
@@ -760,6 +761,16 @@ export type Archive = {
   items: ArchivedItem[];
   groups: WithdrawnGroup[];
   options: WithdrawnOption[];
+  /**
+   * Closed branches.
+   *
+   * Fetched through `api/branches.ts` rather than spelled out below, so the
+   * `branches` column names stay in the one file that owns them. It is here
+   * rather than in a query of its own because an operator hunting for something
+   * that has gone does not know which table it was in — the same argument that
+   * put withdrawn questions on this screen next to archived dishes.
+   */
+  branches: ArchivedBranch[];
 };
 
 /**
@@ -777,6 +788,11 @@ export type Archive = {
  */
 export async function fetchArchive(storeId: string): Promise<Archive> {
   const client = getClient();
+
+  // Alongside the four below rather than after them: it is one more independent
+  // question about the same shop, and awaiting it separately would add a round
+  // trip's wait to a screen that already pays for one.
+  const branches = fetchArchivedBranches(storeId);
 
   const [sections, items, groups, options] = await Promise.all([
     client
@@ -860,6 +876,10 @@ export async function fetchArchive(storeId: string): Promise<Archive> {
         itemCount: asArray(group?.menu_item_option_group_links).length,
       };
     }),
+    // Awaited here rather than in the destructure above, so its own rejection
+    // message survives — the loop above rewrites the other four into one
+    // sentence, and "could not read the branches" is more use than that.
+    branches: await branches,
   };
 }
 

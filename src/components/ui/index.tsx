@@ -78,16 +78,25 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // reads as near-black poured across a whole button.
   danger: "bg-danger-action text-on-active hover:brightness-95",
   /**
-   * Destructive, without the fill.
+   * Destructive, on a wash rather than a fill — `danger`'s half of the same
+   * pattern `primary-quiet` is.
    *
    * For a destructive action that repeats down a list. `danger` filled is right
    * for the one action on a screen; a column of filled red buttons is a page
    * nobody reads, and the warning stops meaning anything by the fourth row.
    *
+   * It was `bg-transparent`, which is what `quiet` means unprefixed — and that
+   * put it out of step with the only thing it ever appears beside. On the
+   * branch row it sits next to a `primary-quiet` button, so one of the pair had
+   * a ground and the other did not, and the red one read as unavailable rather
+   * than as the quieter of two live controls. In this palette `X-quiet` is X's
+   * wash; `quiet` is the transparent one.
+   *
    * `danger`, not `danger-action`, because this is **type**: the darker red is
-   * the one tuned for text on cream, where it clears 7.4:1.
+   * the one tuned for text on cream, and on the tint behind it here it is well
+   * clear of 4.5:1.
    */
-  "danger-quiet": "bg-transparent text-danger hover:bg-danger-wash",
+  "danger-quiet": "bg-danger-wash text-danger hover:brightness-95",
   /**
    * A filled ground without the weight of the primary action.
    *

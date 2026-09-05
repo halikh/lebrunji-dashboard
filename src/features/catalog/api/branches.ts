@@ -93,6 +93,70 @@ export async function fetchBranches(storeId: string): Promise<Branch[]> {
   return (data ?? []).map((row) => toBranch(row as Record<string, unknown>));
 }
 
+/**
+ * A branch that has been closed — the shop archive's fifth kind.
+ *
+ * Same shape as the rows beside it there: a name, and when it went. The pin and
+ * the prep window are deliberately not carried; they are what the *editor* is
+ * for, and the archive's only question is whether to bring this one back.
+ */
+export type ArchivedBranch = {
+  id: string;
+  name: Localized;
+  archivedAt: string;
+};
+
+/**
+ * The branches this shop has closed.
+ *
+ * Read here rather than in `api/menu.ts` beside the rest of the shop archive,
+ * so the column names stay in this file — the same rule the header states, and
+ * the reason a rename is one edit.
+ *
+ * There is nothing to check on the way back, unlike a dish and its section: a
+ * branch belongs to a store that is on screen, and a store cannot be archived
+ * while it has live branches to strand.
+ */
+export async function fetchArchivedBranches(
+  storeId: string,
+): Promise<ArchivedBranch[]> {
+  const { data, error } = await getClient()
+    .from("branches")
+    .select("id, name, deleted_at")
+    .eq("store_id", storeId)
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false });
+
+  if (error) throw new Error(`Could not read the branches: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    name: (row.name as Localized) ?? {},
+    archivedAt: row.deleted_at as string,
+  }));
+}
+
+/**
+ * Reopens a closed branch.
+ *
+ * The mirror of {@link archiveBranch}, and it needs no guard: closing was the
+ * dangerous direction — it can strand a shop with nowhere for an order to
+ * arrive — and reopening only ever adds a place back.
+ *
+ * It returns **as it was**, its price overrides and hidden items included,
+ * which is the whole reason closing is soft. What it does not return with is
+ * custom: `is_active` is a separate switch, so a branch closed while hidden
+ * comes back hidden, and the editor is where that is changed.
+ */
+export async function restoreBranch(id: string): Promise<void> {
+  const { error } = await getClient()
+    .from("branches")
+    .update({ deleted_at: null })
+    .eq("id", id);
+
+  if (error) throw new Error(friendly(error.message));
+}
+
 export type BranchDraft = {
   name: Localized;
   latitude: number | null;

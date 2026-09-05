@@ -1023,6 +1023,10 @@ const en = {
     items: "Items",
     groups: "Questions",
     options: "Choices",
+    // The shop archive's fifth kind, and the only one that is not menu. A
+    // closed branch is a place, so the filter says "Branches" rather than
+    // borrowing one of the menu's words.
+    branches: "Branches",
     stores: "Shops",
     categories: "Categories",
     tags: "Tags",
@@ -1038,6 +1042,10 @@ const en = {
     onDish: "on {name}",
     inQuestion: "{question} · {dish}",
     archivedOn: "Archived {when}",
+    // A branch is *closed*, not archived — that is what the button on the
+    // Branches tab says, and the archive should not rename the thing it is
+    // offering the way back from.
+    closedOn: "Closed {when}",
     restore: "Bring back",
     /*
       Confirmations on every "Bring back".
@@ -1054,6 +1062,10 @@ const en = {
     restoreItem: "It appears on the menu again and customers can order it.",
     restoreGroup: "It is asked again whenever this item is ordered.",
     restoreOption: "It is offered again as an answer to this question.",
+    // Says what comes back *with* it, because that is the surprising part and
+    // the reason closing a branch is soft in the first place.
+    restoreBranch:
+      "It trades again, with the prices and hidden items it had. If it was hidden when you closed it, it comes back hidden.",
     restoreStore:
       "It appears in the app again and customers can order from it.",
     restoreCategory:
@@ -1085,9 +1097,10 @@ const en = {
     restored: "{name} is back on the menu",
     sectionRestored: "{name} is back",
     offered: "{name} is offered again",
+    branchRestored: "{name} is trading again",
     emptyTitle: "Nothing put away",
     emptyBody:
-      "Archived sections and items, and withdrawn questions and choices, collect here.",
+      "Archived sections and items, withdrawn questions and choices, and closed branches collect here.",
     failedTitle: "Could not load the archive",
   },
 

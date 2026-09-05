@@ -29,7 +29,9 @@ import {
   type MenuSectionDraft,
   type SortUpdate,
 } from "./api/menu";
+import { restoreBranch } from "./api/branches";
 import { updateItemOption, updateOptionGroup } from "./api/options";
+import { branchKeys } from "./use-branches";
 
 export const menuKeys = {
   all: ["menu"] as const,
@@ -360,7 +362,9 @@ export function useArchive(storeId: string) {
  * rather than as a button that does nothing.
  *
  * `["options"]` as well as the menu key: a withdrawn choice coming back changes
- * the Options tab, which is keyed separately.
+ * the Options tab, which is keyed separately. The branch list and the shop list
+ * are keyed separately again, for the same reason — a reopened branch is a row
+ * back on the Branches tab and a different count beside the shop's name.
  */
 export function useRestore(storeId: string) {
   const queryClient = useQueryClient();
@@ -377,6 +381,8 @@ export function useRestore(storeId: string) {
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
     void queryClient.invalidateQueries({ queryKey: ["options"] });
+    void queryClient.invalidateQueries({ queryKey: branchKeys.list(storeId) });
+    void queryClient.invalidateQueries({ queryKey: ["stores"] });
   }
 
   const item = useMutation({
@@ -421,5 +427,25 @@ export function useRestore(storeId: string) {
     ...settle,
   });
 
-  return { item, section, group, option };
+  /**
+   * Reopening a closed branch.
+   *
+   * No refusal to report, unlike the item: closing was the direction that could
+   * strand a shop, and this only ever puts a place back. It comes back with its
+   * price overrides and its hidden items intact — which is what makes closing
+   * one a decision rather than a demolition.
+   */
+  const branch = useMutation({
+    mutationFn: (input: { id: string; name: Localized }) =>
+      restoreBranch(input.id),
+    onSuccess: (_result, input) => {
+      refresh();
+      toast.success(
+        t("archive.branchRestored", { name: pickLocalized(input.name) }),
+      );
+    },
+    ...settle,
+  });
+
+  return { item, section, group, option, branch };
 }
