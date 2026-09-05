@@ -61,10 +61,30 @@ export type Scope = {
   targetId: string | null;
 };
 
+/**
+ * The screens that advertise a promotion. Mirrors `discounts_placements_known`.
+ *
+ * Advertising, not eligibility: `discount_for_order` does not read this, so a
+ * promotion placed nowhere still applies at checkout. An empty list is
+ * therefore a real answer — a discount that is given without being announced.
+ */
+export const PLACEMENTS = ["home", "store", "cart"] as const;
+
+export type Placement = (typeof PLACEMENTS)[number];
+
 export type Promotion = {
   id: string;
   slug: string;
-  imageUrl: string | null;
+  /**
+   * The card, per language, or null for a promotion with no artwork.
+   *
+   * Both locales or neither — the wording is baked into the picture (`0013`),
+   * so one file cannot serve two languages. `0113` made this a translated
+   * column like every other.
+   */
+  imageUrl: Localized | null;
+  /** Where the card is shown. See `PLACEMENTS`. */
+  placements: Placement[];
   /** ISO instants, or null for open-ended. */
   startsAt: string | null;
   endsAt: string | null;
@@ -94,7 +114,7 @@ export type Promotion = {
   redeemed: number;
 };
 
-const COLUMNS = `id, slug, image_url, starts_at, ends_at, is_active, priority,
+const COLUMNS = `id, slug, image_url, placements, starts_at, ends_at, is_active, priority,
    kind, value, min_subtotal, max_discount,
    max_redemptions_per_user, max_redemptions_total, is_first_order_only,
    discount_scopes ( scope_type, target_id ),
@@ -134,7 +154,10 @@ export async function fetchPromotions(
   return (data ?? []).map((row) => ({
     id: row.id as string,
     slug: row.slug as string,
-    imageUrl: (row.image_url as string | null) ?? null,
+    imageUrl: (row.image_url as Localized | null) ?? null,
+    placements: ((row.placements as Placement[] | null) ?? []).filter(
+      (one): one is Placement => (PLACEMENTS as readonly string[]).includes(one),
+    ),
     startsAt: (row.starts_at as string | null) ?? null,
     endsAt: (row.ends_at as string | null) ?? null,
     isActive: row.is_active as boolean,
@@ -161,7 +184,9 @@ export async function fetchPromotions(
 export type PromotionDraft = {
   /** The English label the slug is derived from. Never shown to a customer. */
   name: string;
-  imageUrl: string | null;
+  /** Both languages, or null for no card at all. See `Promotion.imageUrl`. */
+  imageUrl: Localized | null;
+  placements: Placement[];
   startsAt: string | null;
   endsAt: string | null;
   isActive: boolean;
@@ -205,6 +230,7 @@ export async function createPromotion(
     .insert({
       slug: slugify(draft.name),
       image_url: draft.imageUrl,
+      placements: draft.placements,
       starts_at: draft.startsAt,
       ends_at: draft.endsAt,
       is_active: draft.isActive,
@@ -235,6 +261,7 @@ export async function updatePromotion(
   // `null` is a value for all of these — no picture, no start, no cap — so what
   // is tested is the key being absent, not the value being falsy.
   if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
+  if (patch.placements !== undefined) row.placements = patch.placements;
   if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;

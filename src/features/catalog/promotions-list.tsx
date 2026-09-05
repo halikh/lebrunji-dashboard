@@ -11,7 +11,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { DateField } from "@/components/ui/date-field";
 import { Field } from "@/components/ui/field";
-import { ImageUploader } from "@/components/ui/image-uploader";
+import { LocalizedImageField } from "@/components/ui/localized-image-field";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Panel } from "@/components/ui/panel";
@@ -27,13 +27,17 @@ import { Toggle } from "@/components/ui/toggle";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { useLanguages } from "@/features/reference/use-languages";
 import { SEARCH } from "@/lib/limits";
+import type { Localized } from "@/lib/validation";
 import { formatDate } from "@/lib/time";
 
 import {
+  PLACEMENTS,
   PROMOTION_KINDS,
   fetchDishesByIds,
   searchDishes,
+  type Placement,
   type Promotion,
   type PromotionDraft,
   type PromotionKind,
@@ -285,12 +289,16 @@ function Row({
       {/* Wide, because that is the shape it is on the home screen and the
           picture is the whole content — a thumbnail would show the middle of a
           card and tell nobody whether it reads. */}
-      {promotion.imageUrl ? (
+      {pickLocalized(promotion.imageUrl ?? {}) ? (
         // The one picture in the dashboard the operator is really judging
         // rather than recognising: artwork that does not read is the whole
         // failure mode of a promotion, and 128 by 64 is not enough to tell.
+        //
+        // One language's card on the row — the operator's own — because a row
+        // is for recognising the promotion. Both are in the editor, which is
+        // where they are being judged.
         <PreviewImage
-          src={promotion.imageUrl}
+          src={pickLocalized(promotion.imageUrl ?? {})}
           name={promotion.slug}
           className={cx(
             "h-[64px] w-[128px] rounded-md",
@@ -561,10 +569,25 @@ function Form({
 
   const stores = useStores("");
   const categories = useCategories("");
+  // For the artwork check below: a card needs one file per language, and the
+  // languages are a table rather than a constant.
+  const languages = useLanguages();
+  const codes = languages.data?.map((language) => language.code) ?? [];
 
   const [name, setName] = useState(initial?.slug ?? "");
-  const [imageUrl, setImageUrl] = useState<string | null>(
+  const [imageUrl, setImageUrl] = useState<Localized | null>(
     initial?.imageUrl ?? null,
+  );
+  /**
+   * Where the card is shown, and nothing about who gets the discount.
+   *
+   * `discount_for_order` does not read this — an unplaced promotion still
+   * applies at checkout — so the field is about advertising and says so. A new
+   * promotion starts on Home, which is where every promotion has been shown
+   * since `0053`.
+   */
+  const [placements, setPlacements] = useState<Placement[]>(
+    initial?.placements ?? ["home"],
   );
   const [startsAt, setStartsAt] = useState<string | null>(
     initial?.startsAt ?? null,
@@ -625,6 +648,7 @@ function Form({
     value?: string;
     window?: string;
     targets?: string;
+    image?: string;
   }>({});
 
   /** `freeDelivery` takes the delivery fee, so there is no amount to set. */
@@ -666,14 +690,31 @@ function Form({
         scopeType !== "order" && targets.length === 0
           ? t("promotions.targetsRequired")
           : undefined,
+
+      // Both cards or neither. `discounts_image_url_locales` refuses a
+      // half-filled object, so without this the save comes back as a constraint
+      // name — and the operator has no way to know it is about the picture.
+      image:
+        imageUrl && codes.some((code) => !(imageUrl[code] ?? "").trim())
+          ? t("promotions.imageBothLanguages")
+          : undefined,
     };
 
     setErrors(found);
-    if (found.name || found.value || found.window || found.targets) return;
+    if (
+      found.name ||
+      found.value ||
+      found.window ||
+      found.targets ||
+      found.image
+    ) {
+      return;
+    }
 
     onSave({
       name: name.trim(),
       imageUrl,
+      placements,
       startsAt,
       endsAt,
       isActive,
@@ -710,13 +751,91 @@ function Form({
           />
         </Field>
 
-        <Field label={t("images.label")} hint={t("promotions.imageHint")}>
-          <ImageUploader
-            value={imageUrl}
-            onChange={setImageUrl}
-            folder="promotions"
-            disabled={pending}
-          />
+        {/* One card per language, because the words are inside the picture —
+            `0013` dropped a discount's text columns on exactly that reasoning,
+            so an Arabic customer shown the English card is looking at an advert
+            they cannot read. See `LocalizedImageField`. */}
+        <LocalizedImageField
+          label={t("images.label")}
+          hint={t("promotions.imageHint")}
+          value={imageUrl}
+          onChange={setImageUrl}
+          folder="promotions"
+          disabled={pending}
+          error={errors.image}
+        />
+
+        {/*
+          Where the card is shown — a decision, not something derived.
+
+          Toggles rather than a select: the answers are not exclusive, a
+          promotion can reasonably be on two screens, and all three fit at once.
+          Each says what it means, because "Store" alone does not distinguish
+          "on the shop's page" from "for a shop's promotion".
+        */}
+        <Field label={t("promotions.placement")} hint={t("promotions.placementHint")}>
+          <div className="flex flex-col gap-sm">
+            {PLACEMENTS.map((option) => {
+              const on = placements.includes(option);
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() =>
+                    setPlacements((current) =>
+                      current.includes(option)
+                        ? current.filter((one) => one !== option)
+                        : // Kept in the declared order rather than appended, so
+                          // the value written does not depend on the order the
+                          // operator happened to click in.
+                          PLACEMENTS.filter(
+                            (one) => one === option || current.includes(one),
+                          ),
+                    )
+                  }
+                  aria-pressed={on}
+                  className={cx(
+                    "flex items-start gap-md rounded-md border px-lg py-md text-start",
+                    on
+                      ? "border-active bg-active-wash"
+                      : "border-border bg-surface hover:border-active",
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className={cx(
+                      "mt-[2px] flex size-[18px] shrink-0 items-center justify-center rounded-sm border",
+                      on ? "border-active bg-active-fill" : "border-border",
+                    )}
+                  >
+                    {on && (
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="var(--color-on-active)"
+                        strokeWidth={3}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M4 12l6 6L20 6" />
+                      </svg>
+                    )}
+                  </span>
+
+                  <span className="flex min-w-0 flex-col gap-xxs">
+                    <span className="text-[14px] font-semibold text-text">
+                      {t(`promotions.placements.${option}`)}
+                    </span>
+                    <span className="text-[12px] text-text-faint">
+                      {t(`promotions.placementsHint.${option}`)}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </Field>
 
         <Section title={t("promotions.discountSection")}>

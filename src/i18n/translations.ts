@@ -1517,7 +1517,32 @@ const en = {
     nameHint:
       "Your own label for it, never shown to a customer. Cannot be changed later.",
     nameRequired: "Give it a name so you can find it again.",
-    imageHint: "The card as it appears on the home screen. Wide, not square.",
+    // One card per language, because the wording is inside the picture — `0013`
+    // dropped a discount's text columns on exactly that reasoning.
+    imageHint: "The card as customers see it. Wide, not square — one per language.",
+    imageBothLanguages:
+      "A card is needed in every language, or none at all — the words are inside the picture.",
+
+    /**
+     * Where the card is shown.
+     *
+     * Says out loud that this is advertising and not eligibility, because the
+     * two are one word apart and getting them confused means a merchant
+     * unticking a box and expecting the discount to stop being given.
+     */
+    placement: "Show it on",
+    placementHint:
+      "Where customers see the card. It does not change who gets the discount — an unplaced promotion still applies at checkout.",
+    placements: {
+      home: "Home",
+      store: "The shop's page",
+      cart: "The basket",
+    },
+    placementsHint: {
+      home: "The rail near the top, to everyone.",
+      store: "On the page of a shop this promotion covers — where somebody is already looking.",
+      cart: "Above the basket, where a minimum spend is a number the customer can act on.",
+    },
 
     search: "Search promotions",
     // The slug is the only text a promotion has: 0013 dropped the label,
