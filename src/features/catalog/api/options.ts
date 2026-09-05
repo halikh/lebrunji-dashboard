@@ -51,6 +51,27 @@ import type { Localized } from "@/lib/validation";
  * Where a question sits is a fact about *this dish*, so `sort_order` on the
  * link is what the screens read. The group's own `sort_order` is only the
  * default a new link copies.
+ *
+ * ## And so are two facts about its answers
+ *
+ * `0094` shared the question and left its answers global: `is_active` withdrew
+ * a choice from every dish asking it, and `is_default` opened all twenty on the
+ * same one. Both are wrong for the case the sharing exists to serve — "Choose a
+ * size" is the same question across twenty pizzas *and* two of them have no
+ * Large.
+ *
+ * `0096` puts those two facts where the position already is:
+ *
+ * - `menu_item_option_exclusions` — a choice this dish does not offer, though
+ *   it asks the question. No row is the normal case, so a choice added to a
+ *   common question is offered everywhere that question is asked.
+ * - `menu_item_option_group_links.default_option_id` — what this dish opens the
+ *   question on. Null falls back to `item_options.is_default`.
+ *
+ * Neither replaces the group-wide switch. Withdrawing a choice still takes it
+ * off every dish, which is what "we have stopped doing Large" means; an
+ * exclusion is what "this one never had it" means, and the two are different
+ * sentences.
  */
 
 export type ItemOption = {
@@ -82,6 +103,75 @@ export type OptionGroup = {
 const GROUP_COLUMNS = `id, title, mode, min_selections, max_selections,
    is_active, sort_order,
    item_options ( id, name, price, is_active, is_default, sort_order )`;
+
+/** One exclusion, flattened out of the embed PostgREST returns it in. */
+export type Exclusion = {
+  itemId: string;
+  groupId: string;
+  optionId: string;
+};
+
+/**
+ * Exclusion rows, bucketed by question and then by item.
+ *
+ * Separate from the read that fetches them because this is the part with a
+ * decision in it, and the part that fails quietly: a bucket hung on the wrong
+ * key does not throw, it draws every choice as offered on a dish that does not
+ * offer them, which looks exactly like a shop that has set none.
+ *
+ * An item with nothing excluded gets no entry. The callers read a missing entry
+ * and an empty set the same way, and not writing one keeps the map the size of
+ * the exceptions rather than the size of the menu.
+ */
+export function groupExclusions(
+  rows: Exclusion[],
+): Map<string, Map<string, Set<string>>> {
+  const byGroup = new Map<string, Map<string, Set<string>>>();
+
+  for (const row of rows) {
+    let byItem = byGroup.get(row.groupId);
+    if (!byItem) {
+      byItem = new Map<string, Set<string>>();
+      byGroup.set(row.groupId, byItem);
+    }
+
+    let optionIds = byItem.get(row.itemId);
+    if (!optionIds) {
+      optionIds = new Set<string>();
+      byItem.set(row.itemId, optionIds);
+    }
+    optionIds.add(row.optionId);
+  }
+
+  return byGroup;
+}
+
+/**
+ * One question's answers as a single dish sees them.
+ *
+ * Two facts applied at once, because they interact: a dish's own default is
+ * meaningless on a choice it does not offer, and resolving the default before
+ * dropping the excluded rows would leave a group whose default is a row that is
+ * no longer in it.
+ *
+ * `pinnedDefaultId` of null is the ordinary case and means the group's own
+ * `isDefault` stands — which is what every dish nobody has singled out follows.
+ */
+export function offeredOn(
+  choices: ItemOption[],
+  notOffered: ReadonlySet<string>,
+  pinnedDefaultId: string | null,
+): ItemOption[] {
+  return choices
+    .filter((choice) => !notOffered.has(choice.id))
+    .map((choice) => ({
+      ...choice,
+      isDefault:
+        pinnedDefaultId === null
+          ? choice.isDefault
+          : choice.id === pinnedDefaultId,
+    }));
+}
 
 /**
  * Which dishes in a shop have questions, and how many.
@@ -131,27 +221,74 @@ export async function fetchOptionCounts(
  * A choice that was on an order being amended may since have been withdrawn,
  * and the line still has to render it. An `is_active` clause in the query would
  * make the picker right and the amendment blank.
+ *
+ * ## Excluded rows do *not* come back, and that is not the same thing
+ *
+ * A withdrawn choice is one the shop has stopped doing, and an order placed
+ * before it stopped still has to be readable. A choice excluded here was never
+ * on this dish at all, so no line of any age can hold one — and since `0096`
+ * `api_v1_amend_order` refuses them. Returning them would put a chip in the
+ * substitution picker that the save then rejects, which is the worst of the
+ * three states available: offered, refused, and offered-then-refused.
+ *
+ * The line's own history does not come through here. `fetchOrder` reads the
+ * names off `order_line_options`, so what was chosen stays legible whatever the
+ * menu has since done.
  */
 export async function fetchItemOptionGroups(
   itemId: string,
 ): Promise<OptionGroup[]> {
-  // From the links, so the order is this dish's own: `sort_order` on the link
-  // is where the question sits *here*, and a common question is second on one
-  // dish and fifth on another.
-  const { data, error } = await getClient()
-    .from("menu_item_option_group_links")
-    .select(`sort_order, option_groups!inner ( ${GROUP_COLUMNS} )`)
-    .eq("menu_item_id", itemId)
-    .order("sort_order", { ascending: true });
+  const client = getClient();
 
-  if (error) throw new Error(`Could not read the options: ${error.message}`);
+  const [links, exclusions] = await Promise.all([
+    // From the links, so the order is this dish's own: `sort_order` on the link
+    // is where the question sits *here*, and a common question is second on one
+    // dish and fifth on another.
+    client
+      .from("menu_item_option_group_links")
+      .select(
+        `sort_order, default_option_id, option_groups!inner ( ${GROUP_COLUMNS} )`,
+      )
+      .eq("menu_item_id", itemId)
+      .order("sort_order", { ascending: true }),
+    client
+      .from("menu_item_option_exclusions")
+      .select("item_option_id")
+      .eq("menu_item_id", itemId),
+  ]);
 
-  return (data ?? []).flatMap((link) => {
+  if (links.error) {
+    throw new Error(`Could not read the options: ${links.error.message}`);
+  }
+  // Failing rather than assuming nothing is excluded: that assumption draws a
+  // picker offering a choice this dish does not have, and the operator finds
+  // out when the amendment is refused.
+  if (exclusions.error) {
+    throw new Error(`Could not read the options: ${exclusions.error.message}`);
+  }
+
+  const notOffered = new Set(
+    (exclusions.data ?? []).map((row) => row.item_option_id as string),
+  );
+
+  return (links.data ?? []).flatMap((link) => {
     const group = one(link.option_groups);
     if (!group) return [];
+
     // The link's position wins over the group's, which is only the default a
     // new link copies.
-    return [toGroup({ ...group, sort_order: link.sort_order })];
+    const mapped = toGroup({ ...group, sort_order: link.sort_order });
+
+    return [
+      {
+        ...mapped,
+        options: offeredOn(
+          mapped.options,
+          notOffered,
+          link.default_option_id as string | null,
+        ),
+      },
+    ];
   });
 }
 
@@ -402,6 +539,12 @@ export async function setDefaultOption(
  * `option_groups_selection_range` is the one they will meet: a floor above the
  * ceiling is unsatisfiable, and the database says so in terms of a constraint
  * name rather than in terms of the two boxes on screen.
+ *
+ * `0096`'s refusals fall through to the last line on purpose. A CHECK has only
+ * a name to offer, so it has to be translated here; a trigger raises a sentence
+ * it wrote itself — "This item would have no choices left for that question" —
+ * and re-mapping that on a substring would be a second copy of the wording,
+ * kept in a different repository from the first.
  */
 function friendly(message: string): string {
   if (message.includes("selection_range")) return t("options.rangeImpossible");
@@ -493,44 +636,196 @@ export type StoreQuestion = {
   choices: ItemOption[];
   /** The items asking it. Empty is a real state: a question offered nowhere. */
   itemIds: string[];
+  /**
+   * Per item, the choices that item does not offer — `0096`'s exclusions.
+   *
+   * An item with nothing excluded is absent rather than present-and-empty, so
+   * the common case costs nothing to represent. Callers read it as "what is
+   * missing here", never as "what is offered here": the offered set is the
+   * question's choices minus this, and deriving it the other way would need a
+   * row per (item, choice) pair the shop has never had a reason to write.
+   */
+  notOfferedOn: Map<string, Set<string>>;
+  /**
+   * Per item, the choice that item opens the question on.
+   *
+   * Absent means the group's own `isDefault` answers for it, which is every
+   * item until somebody says otherwise. The two are kept apart rather than
+   * flattened into one effective value, because the screen has to be able to
+   * say *which* it is showing — an item pinned to Medium keeps Medium when the
+   * shared default moves, and that is a fact worth being able to see.
+   */
+  defaultOn: Map<string, string>;
 };
 
 export async function fetchStoreQuestions(
   storeId: string,
 ): Promise<StoreQuestion[]> {
-  const { data, error } = await getClient()
-    .from("option_groups")
-    .select(
-      `id, title, mode, min_selections, max_selections, is_active, sort_order,
-       menu_item_option_group_links ( menu_item_id ),
-       item_options ( id, name, price, is_active, is_default, sort_order )`,
-    )
-    .eq("store_id", storeId)
-    .order("sort_order", { ascending: true });
+  const client = getClient();
 
-  if (error) throw new Error(`Could not read the questions: ${error.message}`);
+  /*
+   * Two reads rather than one embed.
+   *
+   * An exclusion hangs off `item_options`, so reaching it from `option_groups`
+   * means embedding it under the choices — which returns every *other* item's
+   * exclusions for those same choices, on a common question multiplied by every
+   * dish asking it, and leaves the regrouping to be done here regardless. One
+   * flat read of the shop's exclusions is smaller and says what it is.
+   */
+  const [groups, exclusions] = await Promise.all([
+    client
+      .from("option_groups")
+      .select(
+        `id, title, mode, min_selections, max_selections, is_active, sort_order,
+         menu_item_option_group_links ( menu_item_id, default_option_id ),
+         item_options ( id, name, price, is_active, is_default, sort_order )`,
+      )
+      .eq("store_id", storeId)
+      .order("sort_order", { ascending: true }),
+    client
+      .from("menu_item_option_exclusions")
+      .select(
+        `menu_item_id, item_option_id,
+         item_options!inner ( option_group_id, option_groups!inner ( store_id ) )`,
+      )
+      .eq("item_options.option_groups.store_id", storeId),
+  ]);
 
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    title: (row.title as Localized) ?? {},
-    mode: row.mode as OptionGroupMode,
-    minSelections: (row.min_selections as number) ?? 0,
-    maxSelections: (row.max_selections as number | null) ?? null,
-    isActive: row.is_active as boolean,
-    choices: asArray(row.item_options)
-      .map((option) => ({
-        id: option.id as string,
-        name: (option.name as Localized) ?? {},
-        price: option.price as number,
-        isActive: option.is_active as boolean,
-        isDefault: option.is_default as boolean,
-        sortOrder: option.sort_order as number,
-      }))
-      .sort((a, b) => a.sortOrder - b.sortOrder),
-    itemIds: asArray(row.menu_item_option_group_links).map(
-      (link) => link.menu_item_id as string,
-    ),
-  }));
+  if (groups.error) {
+    throw new Error(`Could not read the questions: ${groups.error.message}`);
+  }
+  // Failing rather than carrying on with none. An empty exclusion map is
+  // indistinguishable from a shop that has set none, and the screen would show
+  // every choice offered on every dish — the exact state this read exists to
+  // contradict, drawn with no sign that anything went wrong.
+  if (exclusions.error) {
+    throw new Error(`Could not read the questions: ${exclusions.error.message}`);
+  }
+
+  const excludedByGroup = groupExclusions(
+    (exclusions.data ?? []).flatMap((row) => {
+      // The group id arrives nested under the choice, because that is the only
+      // way to reach it: an exclusion names a choice, and which question the
+      // choice answers is the choice's own fact.
+      const choice = one(row.item_options);
+      if (!choice) return [];
+
+      return [
+        {
+          itemId: row.menu_item_id as string,
+          groupId: choice.option_group_id as string,
+          optionId: row.item_option_id as string,
+        },
+      ];
+    }),
+  );
+
+  return (groups.data ?? []).map((row) => {
+    const links = asArray(row.menu_item_option_group_links);
+    const defaultOn = new Map<string, string>();
+    for (const link of links) {
+      const optionId = link.default_option_id as string | null;
+      if (optionId !== null) defaultOn.set(link.menu_item_id as string, optionId);
+    }
+
+    return {
+      id: row.id as string,
+      title: (row.title as Localized) ?? {},
+      mode: row.mode as OptionGroupMode,
+      minSelections: (row.min_selections as number) ?? 0,
+      maxSelections: (row.max_selections as number | null) ?? null,
+      isActive: row.is_active as boolean,
+      choices: asArray(row.item_options)
+        .map((option) => ({
+          id: option.id as string,
+          name: (option.name as Localized) ?? {},
+          price: option.price as number,
+          isActive: option.is_active as boolean,
+          isDefault: option.is_default as boolean,
+          sortOrder: option.sort_order as number,
+        }))
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+      itemIds: links.map((link) => link.menu_item_id as string),
+      notOfferedOn:
+        excludedByGroup.get(row.id as string) ?? new Map<string, Set<string>>(),
+      defaultOn,
+    };
+  });
+}
+
+/**
+ * Whether one item offers one of a common question's choices.
+ *
+ * ## Not the same switch as `isActive`, and not a smaller one
+ *
+ * `isActive` is the shop saying it has stopped doing Large. This is the shop
+ * saying *this* dish never had one. They are different sentences about
+ * different things, and collapsing them would mean either withdrawing Large
+ * from twenty pizzas to fix two, or having no way to say the second at all —
+ * which was the state before `0096`.
+ *
+ * ## A row means "no"
+ *
+ * Offering a choice again is deleting the row that said it was not offered,
+ * rather than writing one that says it is. It keeps the empty table meaning
+ * "every choice is offered wherever its question is asked", which is what makes
+ * a choice added to a common question appear on all twenty dishes without
+ * twenty more writes.
+ *
+ * The database refuses two things here, and the messages it raises are meant to
+ * be read: excluding a choice on an item that is not asked the question, and
+ * excluding the last one an item had — for which the answer is to take the
+ * whole question off that item, not to empty it.
+ */
+export async function setChoiceOfferedOn(
+  itemId: string,
+  optionId: string,
+  offered: boolean,
+): Promise<void> {
+  const client = getClient();
+
+  if (offered) {
+    const { error } = await client
+      .from("menu_item_option_exclusions")
+      .delete()
+      .eq("menu_item_id", itemId)
+      .eq("item_option_id", optionId);
+    if (error) throw new Error(friendly(error.message));
+    return;
+  }
+
+  const { error } = await client.from("menu_item_option_exclusions").upsert(
+    { menu_item_id: itemId, item_option_id: optionId },
+    // Excluding what is already excluded is not an error worth raising — two
+    // presses of the same switch should settle on one row, not fail on the
+    // second.
+    { onConflict: "menu_item_id,item_option_id", ignoreDuplicates: true },
+  );
+  if (error) throw new Error(friendly(error.message));
+}
+
+/**
+ * Which choice one item opens a question on, or none of its own.
+ *
+ * `null` clears it and hands the item back to the group's `is_default`. That is
+ * a distinct act from pinning it to whatever the group currently says: a
+ * cleared item follows the shared default when it next moves, and a pinned one
+ * does not. Without a way to clear, the only route back from "Medium on this
+ * pizza" would be pinning it to today's shared answer, which reads as undone
+ * and silently stops tracking.
+ */
+export async function setItemDefaultOption(
+  itemId: string,
+  groupId: string,
+  optionId: string | null,
+): Promise<void> {
+  const { error } = await getClient()
+    .from("menu_item_option_group_links")
+    .update({ default_option_id: optionId })
+    .eq("menu_item_id", itemId)
+    .eq("option_group_id", groupId);
+
+  if (error) throw new Error(friendly(error.message));
 }
 
 /**

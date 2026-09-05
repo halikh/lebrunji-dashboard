@@ -24,7 +24,7 @@ import {
   type Localized,
 } from "@/lib/validation";
 
-import type { OptionGroupMode, StoreQuestion } from "./api/options";
+import type { ItemOption, OptionGroupMode, StoreQuestion } from "./api/options";
 import { BulkForm } from "./bulk-form";
 import { useMenu } from "./use-menu";
 import {
@@ -289,6 +289,7 @@ function ItemQuestions({
               key={group.id}
               group={group}
               storeId={storeId}
+              itemId={itemId}
               open={open === group.id}
               onToggle={() =>
                 setOpen((current) => (current === group.id ? null : group.id))
@@ -317,24 +318,39 @@ function ItemQuestions({
   );
 }
 
+/** Nothing excluded — the state almost every (item, question) pair is in. */
+const OFFERS_EVERYTHING: ReadonlySet<string> = new Set<string>();
+
 /** One question: its rules, then its answers. */
 function Question({
   group,
   storeId,
+  itemId,
   open,
   onToggle,
   onPickItems,
 }: {
   group: StoreQuestion;
   storeId: string;
+  /**
+   * The item the list is filtered to, or null for the whole shop.
+   *
+   * It is what makes the two per-item facts editable. Without a dish in view
+   * there is no answer to "offered *where*", and a switch that had to guess
+   * would be a switch that changed a dish nobody was looking at.
+   */
+  itemId: string | null;
   open: boolean;
   onToggle: () => void;
   /** Opens the picker that says which items ask this. */
   onPickItems: () => void;
 }) {
   const store = useStore(storeId);
-  const { format } = useMoney();
   const update = useUpdateOptionGroup();
+  // One set of mutations for the whole question, handed down to its rows. Six
+  // choices calling `useItemOptions` themselves would be six copies of six
+  // mutations, each with its own pending state, for six rows that write to the
+  // same two tables.
   const options = useItemOptions();
 
   /**
@@ -369,6 +385,42 @@ function Question({
    * or the header would promise choices the expanded list does not show.
    */
   const choices = group.choices.filter((option) => option.isActive);
+
+  /**
+   * The two facts that belong to this dish rather than to the question.
+   *
+   * `notOffered` is what this dish does not have of a common question's
+   * answers; `pinned` is the answer it opens on, where it has been given one of
+   * its own. Both are empty for a dish nobody has singled out, which is nearly
+   * all of them.
+   */
+  const notOffered =
+    itemId === null
+      ? OFFERS_EVERYTHING
+      : (group.notOfferedOn.get(itemId) ?? OFFERS_EVERYTHING);
+  const pinned = itemId === null ? null : (group.defaultOn.get(itemId) ?? null);
+
+  /**
+   * The dish whose own switches are shown beside each answer, or none.
+   *
+   * A question one dish asks gets none: taking a choice off the only dish that
+   * asks it is what the group-wide Withdrawn switch already does, and two
+   * switches on one row meaning the same thing is worse than one.
+   *
+   * The last two clauses are not decoration. A common question can be narrowed
+   * back to a single dish — the exclusions it made survive, because they are
+   * still true of that dish — and without them the controls that created those
+   * rows would vanish while the storefront went on honouring them. A dish would
+   * be missing a choice with nothing on this screen able to say why.
+   */
+  const perItemDish =
+    itemId !== null &&
+    (group.itemIds.length > 1 || notOffered.size > 0 || pinned !== null)
+      ? itemId
+      : null;
+
+  /** What this dish actually offers — the summary count, and the empty test. */
+  const offeredHere = choices.filter((option) => !notOffered.has(option.id));
 
   return (
     <section
@@ -427,7 +479,10 @@ function Question({
                     ? "options.required"
                     : "options.optional",
                 ),
-                t("options.count", { count: choices.length }),
+                // What this dish offers, not what the question holds. On a
+                // pizza with no Large, "3 choices" would be the number on the
+                // other nineteen and a promise this one does not keep.
+                t("options.count", { count: offeredHere.length }),
                 // Where it is asked. The fact that makes this list a shop's
                 // questions rather than one dish's — and the one that says
                 // whether an edit here touches one item or twenty.
@@ -586,7 +641,45 @@ function Question({
                 {t("commonOptions.editsEverywhere", {
                   count: group.itemIds.length,
                 })}
+                {/* The exception to the sentence before it, said in the same
+                    breath. Without it "editing a choice changes it on all
+                    twenty" reads as a rule with no way round, which is what
+                    sent operators off to build a second copy of the question. */}
+                {perItemDish !== null && ` ${t("commonOptions.exceptOffered")}`}
               </p>
+            )}
+
+            {/* Only where it is true, and it says which choice — "this item has
+                its own default" without naming it is a state the operator would
+                have to go and find. */}
+            {perItemDish !== null && pinned !== null && (
+              <div className="flex flex-wrap items-center gap-sm ps-md">
+                <span className="text-[12px] text-text-faint">
+                  {t("commonOptions.ownDefault", {
+                    name: pickLocalized(
+                      group.choices.find((option) => option.id === pinned)
+                        ?.name ?? {},
+                    ),
+                  })}
+                </span>
+                {/* Clearing is a different act from pressing "Make default" on
+                    whichever choice the question currently opens on: a cleared
+                    item follows the shared answer the next time it moves, and a
+                    pinned one silently stops. */}
+                <Button
+                  variant="primary-quiet"
+                  size="sm"
+                  onClick={() =>
+                    options.defaultHere.mutate({
+                      itemId: perItemDish,
+                      groupId: group.id,
+                      optionId: null,
+                    })
+                  }
+                >
+                  {t("commonOptions.useSharedDefault")}
+                </Button>
+              </div>
             )}
 
             {choices.length === 0 && (
@@ -620,88 +713,21 @@ function Question({
                   onCancel={() => setEditingChoice(null)}
                 />
               ) : (
-                <div
+                <ChoiceRow
                   key={option.id}
-                  className={cx(
-                    "flex flex-wrap items-center gap-md rounded-md border px-lg py-md",
-                    option.isActive
-                      ? "border-border"
-                      : "border-danger-wash bg-danger-wash/30",
-                  )}
-                >
-                  <span className="min-w-0 flex-grow truncate text-[14px]">
-                    {pickLocalized(option.name)}
-                  </span>
-
-                  <span className="shrink-0 text-[13px] tabular-nums text-text-soft">
-                    {/* Free in words. `$0.00` on a choice reads as a price somebody
-                  forgot to fill in. */}
-                    {option.price === 0
-                      ? t("options.free")
-                      : `+ ${format(option.price, currencyCode)}`}
-                  </span>
-
-                  {/* Which answer the sheet opens on. Only meaningful where the
-                customer must answer and may pick one — an optional question
-                opens on nothing, which is the point of it being optional. */}
-                  {group.minSelections >= 1 &&
-                    group.mode === "single" &&
-                    (option.isDefault ? (
-                      <span className="shrink-0 rounded-full bg-accent-wash px-md py-xxs text-[12px] font-semibold text-accent-deep">
-                        {t("options.isDefault")}
-                      </span>
-                    ) : (
-                      <Button
-                        variant="primary-quiet"
-                        size="sm"
-                        onClick={() =>
-                          options.makeDefault.mutate({
-                            groupId: group.id,
-                            optionId: option.id,
-                          })
-                        }
-                      >
-                        {t("options.makeDefault")}
-                      </Button>
-                    ))}
-
-                  {/* Named for a screen reader, because a group of six choices is
-                    six identical "Edit"s otherwise. */}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setEditingChoice(option.id)}
-                    aria-label={t("options.editChoiceLabel", {
-                      name: pickLocalized(option.name),
-                    })}
-                  >
-                    {t("options.editChoice")}
-                  </Button>
-
-                  <ConfirmToggle
-                    on={option.isActive}
-                    onChange={() =>
-                      options.edit.mutateAsync({
-                        id: option.id,
-                        patch: { isActive: !option.isActive },
-                      })
-                    }
-                    labelOn={t("options.offeredGroup")}
-                    labelOff={t("options.withdrawn")}
-                    params={{ name: pickLocalized(option.name) }}
-                    whenTurningOn={{
-                      titleKey: "options.offerChoiceTitle",
-                      bodyKey: "options.offerChoiceBody",
-                      confirmKey: "options.offerChoiceConfirm",
-                    }}
-                    whenTurningOff={{
-                      titleKey: "options.withdrawChoiceTitle",
-                      bodyKey: "options.withdrawChoiceBody",
-                      confirmKey: "options.withdrawChoiceConfirm",
-                    }}
-                    className="w-[124px]"
-                  />
-                </div>
+                  option={option}
+                  group={group}
+                  perItemDish={perItemDish}
+                  offeredHere={!notOffered.has(option.id)}
+                  isDefaultHere={
+                    perItemDish !== null && pinned !== null
+                      ? option.id === pinned
+                      : option.isDefault
+                  }
+                  currencyCode={currencyCode}
+                  options={options}
+                  onEdit={() => setEditingChoice(option.id)}
+                />
               ),
             )}
 
@@ -772,6 +798,172 @@ function Question({
         </div>
       </Collapse>
     </section>
+  );
+}
+
+/**
+ * One answer, with everything that can be said about it in one row.
+ *
+ * ## Two switches that are not the same switch
+ *
+ * **Offered / Withdrawn** is the shop's answer about the choice: Large is no
+ * longer done, on any dish, and it moves to the Archive tab. It asks first,
+ * because it changes what a customer sees on a shop that is open and the
+ * failure is silent from this side.
+ *
+ * **Offered here / Not here** is this dish's answer about the same choice: the
+ * question is right for it, Large is not. It does not ask, because it is small
+ * and local — one dish, reversible by pressing it again, and the row stays on
+ * screen saying which way it went. A confirmation for that would be a dialog
+ * per pizza on a job whose whole shape is "tick the two that have no Large".
+ *
+ * It appears only with a dish in view. Without one there is nothing for "here"
+ * to mean, and the group-wide switch beside it is the one that answers.
+ */
+function ChoiceRow({
+  option,
+  group,
+  perItemDish,
+  offeredHere,
+  isDefaultHere,
+  currencyCode,
+  options,
+  onEdit,
+}: {
+  option: ItemOption;
+  group: StoreQuestion;
+  /** The dish this row's local switches act on, or null when none are shown. */
+  perItemDish: string | null;
+  offeredHere: boolean;
+  /** Resolved: this dish's own default where it has one, the group's otherwise. */
+  isDefaultHere: boolean;
+  currencyCode: string;
+  options: ReturnType<typeof useItemOptions>;
+  onEdit: () => void;
+}) {
+  const { format } = useMoney();
+  const name = pickLocalized(option.name);
+
+  return (
+    <div
+      className={cx(
+        "flex flex-wrap items-center gap-md rounded-md border px-lg py-md",
+        // Dashed and muted rather than the danger wash a withdrawn row gets:
+        // nothing is wrong here. The choice is fine and this dish does not have
+        // it, which is a different thing from a choice the shop has stopped
+        // doing — and drawing them the same way would say the shop had.
+        offeredHere
+          ? "border-border"
+          : "border-dashed border-border bg-neutral-fill/40",
+      )}
+    >
+      <span
+        className={cx(
+          "min-w-0 flex-grow truncate text-[14px]",
+          !offeredHere && "text-text-faint",
+        )}
+      >
+        {name}
+      </span>
+
+      <span className="shrink-0 text-[13px] tabular-nums text-text-soft">
+        {/* Free in words. `$0.00` on a choice reads as a price somebody forgot
+            to fill in. */}
+        {option.price === 0
+          ? t("options.free")
+          : `+ ${format(option.price, currencyCode)}`}
+      </span>
+
+      {/* Which answer the sheet opens on. Only meaningful where the customer
+          must answer and may pick one — an optional question opens on nothing,
+          which is the point of it being optional — and only on a choice this
+          dish actually has. */}
+      {group.minSelections >= 1 &&
+        group.mode === "single" &&
+        offeredHere &&
+        (isDefaultHere ? (
+          <span className="shrink-0 rounded-full bg-accent-wash px-md py-xxs text-[12px] font-semibold text-accent-deep">
+            {t(perItemDish === null ? "options.isDefault" : "options.defaultHere")}
+          </span>
+        ) : (
+          <Button
+            variant="primary-quiet"
+            size="sm"
+            onClick={() =>
+              // With a dish in view this pins that dish and leaves the other
+              // nineteen alone; without one it is the question's own answer,
+              // which is what every dish that has not been pinned follows.
+              perItemDish === null
+                ? options.makeDefault.mutate({
+                    groupId: group.id,
+                    optionId: option.id,
+                  })
+                : options.defaultHere.mutate({
+                    itemId: perItemDish,
+                    groupId: group.id,
+                    optionId: option.id,
+                  })
+            }
+          >
+            {t(
+              perItemDish === null
+                ? "options.makeDefault"
+                : "options.makeDefaultHere",
+            )}
+          </Button>
+        ))}
+
+      {/* Named for a screen reader, because a group of six choices is six
+          identical "Edit"s otherwise. */}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onEdit}
+        aria-label={t("options.editChoiceLabel", { name })}
+      >
+        {t("options.editChoice")}
+      </Button>
+
+      {perItemDish !== null && (
+        <Toggle
+          on={offeredHere}
+          onChange={() =>
+            options.offerHere.mutate({
+              itemId: perItemDish,
+              optionId: option.id,
+              offered: !offeredHere,
+            })
+          }
+          labelOn={t("options.offeredHere")}
+          labelOff={t("options.notHere")}
+          className="w-[136px]"
+        />
+      )}
+
+      <ConfirmToggle
+        on={option.isActive}
+        onChange={() =>
+          options.edit.mutateAsync({
+            id: option.id,
+            patch: { isActive: !option.isActive },
+          })
+        }
+        labelOn={t("options.offeredGroup")}
+        labelOff={t("options.withdrawn")}
+        params={{ name }}
+        whenTurningOn={{
+          titleKey: "options.offerChoiceTitle",
+          bodyKey: "options.offerChoiceBody",
+          confirmKey: "options.offerChoiceConfirm",
+        }}
+        whenTurningOff={{
+          titleKey: "options.withdrawChoiceTitle",
+          bodyKey: "options.withdrawChoiceBody",
+          confirmKey: "options.withdrawChoiceConfirm",
+        }}
+        className="w-[124px]"
+      />
+    </div>
   );
 }
 

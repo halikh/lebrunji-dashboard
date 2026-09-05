@@ -14,6 +14,8 @@ import {
   fetchItemOptionGroups,
   fetchOptionCounts,
   fetchStoreQuestions,
+  setChoiceOfferedOn,
+  setItemDefaultOption,
   setQuestionItems,
   setDefaultOption,
   updateItemOption,
@@ -176,7 +178,34 @@ export function useItemOptions() {
     ...settle,
   });
 
-  return { add, addMany, edit, makeDefault };
+  /**
+   * Offering one of a common question's choices on one item, or not.
+   *
+   * Silent on success like the rest of them: the row it acts on is on screen
+   * and changes as it is pressed. Failure speaks, and here it has something to
+   * say — the database refuses an exclusion that would leave an item with
+   * nothing to answer with, and the message names the way out.
+   */
+  const offerHere = useMutation({
+    mutationFn: (input: {
+      itemId: string;
+      optionId: string;
+      offered: boolean;
+    }) => setChoiceOfferedOn(input.itemId, input.optionId, input.offered),
+    ...settle,
+  });
+
+  /** Which choice one item opens a question on. `null` restores the shared one. */
+  const defaultHere = useMutation({
+    mutationFn: (input: {
+      itemId: string;
+      groupId: string;
+      optionId: string | null;
+    }) => setItemDefaultOption(input.itemId, input.groupId, input.optionId),
+    ...settle,
+  });
+
+  return { add, addMany, edit, makeDefault, offerHere, defaultHere };
 }
 
 export type { OptionGroup };

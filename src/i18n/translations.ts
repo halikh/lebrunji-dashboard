@@ -1091,6 +1091,19 @@ const en = {
     // obviously not local — the whole point is that it is not.
     editsEverywhere:
       "Editing a choice here changes it on all {count} items asking this question.",
+    // The exception to the sentence above, said in the same breath. Without it
+    // "an edit changes all twenty" reads as a rule with no way round — which is
+    // what sent operators off to build a second copy of the question for the
+    // two dishes that needed it slightly different.
+    exceptOffered:
+      "Whether each choice is offered, and which one this item opens on, are set here for this item alone.",
+    // Named, because "this item has its own default" without saying which one
+    // is a state the operator would have to go and find.
+    ownDefault: "This item opens on {name}.",
+    // Not the same as pressing "Make default here" on whatever the question
+    // currently opens on: a cleared item follows the shared answer the next
+    // time it moves, and a pinned one silently stops.
+    useSharedDefault: "Use the shared default",
     noChoices: "no choices yet",
     manage: "Choose items",
     withdrawnMark: "Withdrawn",
@@ -1237,6 +1250,23 @@ const en = {
       "Withdrawn questions and choices are on the Archive tab.",
     isDefault: "Default",
     makeDefault: "Make default",
+    /*
+      The per-item pair, and why the words differ from the two above them.
+
+      "Withdrawn" is the shop saying it has stopped doing Large — on every dish,
+      and the row moves to the Archive tab. "Not here" is this dish saying it
+      never had one, while the other nineteen carry on offering it. Same choice,
+      two different sentences, so two different words: calling both of them
+      "Withdrawn" would make the smaller act look like the larger one.
+
+      "Default here" likewise. A question opens on one answer, and until 0096
+      that answer was the same on all twenty dishes asking it — including the
+      two with no Large to open on.
+    */
+    offeredHere: "Offered here",
+    notHere: "Not here",
+    defaultHere: "Default here",
+    makeDefaultHere: "Make default here",
     failedTitle: "Could not load the options",
     groupAdded: "{name} created",
     // The one constraint an operator can actually hit: a floor above the
