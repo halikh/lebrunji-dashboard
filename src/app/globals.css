@@ -465,6 +465,35 @@ dialog[open]::backdrop {
  * would mean keeping a closed panel in the tree holding stale order data —
  * a cost out of all proportion to a 220ms flourish nobody is waiting for.
  */
+/**
+ * The navigation spinner, held back.
+ *
+ * A route's `loading.tsx` mounts the moment a navigation starts, and Suspense
+ * offers no way to defer that — so the spinner is mounted invisible and fades
+ * in only once the wait has lasted long enough to be worth reporting. Most
+ * navigations against a warm cache finish well inside the delay and the
+ * customer sees nothing at all, which is the point: a spinner that flashes for
+ * 80ms reads as something breaking.
+ *
+ * `both`, so it holds at zero opacity for the delay rather than showing first.
+ */
+@keyframes loader-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: loader-in var(--duration-fade) ease-out 200ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The delay is the useful half and it is not motion — keep it, drop the
+     fade. */
+  .animate-fade-in {
+    animation: loader-in 1ms linear 200ms both;
+  }
+}
+
 @keyframes panel-in {
   from {
     opacity: 0;

@@ -33,6 +33,30 @@ import { appSettingsKey, useAppSettings, useClock } from "./use-clock";
  * adjusting in another tab. The switch commits; the window has its own Save
  * because two selects are one decision.
  */
+/**
+ * Which "saved" a save was.
+ *
+ * Every control on this tab wrote the same word. Three of them sit on one
+ * screen and two can be pressed a second apart, so the toast said something had
+ * been saved without saying which — and a stack of identical "Saved" pills is
+ * the one shape that cannot answer the question it raises. Naming the thing
+ * costs three strings and makes the second toast informative rather than
+ * confusing.
+ *
+ * Keyed off what the patch actually touched, so a caller cannot pass the wrong
+ * label: the patch *is* the answer.
+ */
+function savedKey(patch: Partial<AppSettings>) {
+  if (patch.clock24h !== undefined) return "general.savedClock" as const;
+  if (patch.notificationSoundUrl !== undefined) {
+    return "general.savedSound" as const;
+  }
+  if (patch.openHour !== undefined || patch.closeHour !== undefined) {
+    return "general.savedHours" as const;
+  }
+  return "general.saved" as const;
+}
+
 export function GeneralTab() {
   const queryClient = useQueryClient();
   const toast = useToasts();
@@ -44,9 +68,9 @@ export function GeneralTab() {
 
   const save = useMutation({
     mutationFn: (patch: Partial<AppSettings>) => updateAppSettings(patch),
-    onSuccess: () => {
+    onSuccess: (_result, patch) => {
       void queryClient.invalidateQueries({ queryKey: appSettingsKey });
-      toast.success(t("general.saved"));
+      toast.success(t(savedKey(patch)));
     },
     onError: (error) =>
       toast.danger(
@@ -239,8 +263,14 @@ function SoundPicker({
           {url ? t("general.soundReplace") : t("general.soundChoose")}
         </Button>
 
+        {/* Blue, where "Choose an MP3" beside it is grey.
+            
+            In this palette blue is what can be acted on and grey is a ground
+            with no opinion — and of the two controls here this is the one that
+            *does* something on the spot. The other opens a file picker on the
+            way to a save. Same reason the back control wears it. */}
         <Button
-          variant="secondary"
+          variant="primary-quiet"
           disabled={busy}
           onClick={() => {
             // The real thing: the same function the queue calls, so what is

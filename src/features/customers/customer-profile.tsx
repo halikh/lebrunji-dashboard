@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type ReactNode } from "react";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import { BackLink } from "@/components/ui/back-link";
 import { Button, cx } from "@/components/ui";
 import { ROW } from "@/components/ui/row";
@@ -534,9 +535,10 @@ export function CustomerProfile({ id }: { id: string }) {
             )}
 
             {orders.isSuccess && orderRows.length === 0 && (
-              <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[13px] text-text-soft">
-                {t("customers.noOrders")}
-              </p>
+              <EmptyState
+                titleKey="customers.noOrders"
+                mood="waiting"
+              />
             )}
 
             {orderRows.map((order) => (
@@ -555,9 +557,10 @@ export function CustomerProfile({ id }: { id: string }) {
 
         <div className={cx("p-xxl", tab !== "addresses" && "hidden")}>
           {row.addresses.length === 0 ? (
-            <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[13px] text-text-soft">
-              {t("customers.noAddresses")}
-            </p>
+            <EmptyState
+              titleKey="customers.noAddresses"
+              mood="waiting"
+            />
           ) : (
             // A grid, because each card is a map and a map wants width. One
             // column of full-width maps would be one address per screen.
@@ -584,9 +587,10 @@ export function CustomerProfile({ id }: { id: string }) {
             )}
 
             {redemptions.isSuccess && redemptions.data.length === 0 && (
-              <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[13px] text-text-soft">
-                {t("customers.noPromotions")}
-              </p>
+              <EmptyState
+                titleKey="customers.noPromotions"
+                mood="waiting"
+              />
             )}
 
             {redemptions.isSuccess && redemptions.data.length > 0 && (

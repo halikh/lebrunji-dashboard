@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button, Input, cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
 import { ROW } from "@/components/ui/row";
@@ -151,9 +152,11 @@ export function TagsList() {
           ))}
 
           {searching && rows.length === 0 && (
-            <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
-              {t("tags.searchNone", { term: search.trim() })}
-            </p>
+            <EmptyState
+              titleKey="tags.searchNone"
+              params={{ term: search.trim() }}
+              mood="lost"
+            />
           )}
         </div>
       </div>

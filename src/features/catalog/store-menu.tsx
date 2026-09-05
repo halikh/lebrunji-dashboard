@@ -475,9 +475,11 @@ export function StoreMenu({
               {matches.data?.sections.length === 0 &&
                 matches.data.items.length === 0 &&
                 !matches.isFetching && (
-                  <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
-                    {t("menu.searchNone", { term: search.trim() })}
-                  </p>
+                  <EmptyState
+                    titleKey="menu.searchNone"
+                    params={{ term: search.trim() }}
+                    mood="lost"
+                  />
                 )}
 
               {/* Sections first. A heading matching the term is the broader

@@ -8,6 +8,7 @@ import { useConfirmLeave } from "@/components/unsaved-changes";
 import { cx } from "@/components/ui";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { BackLink } from "@/components/ui/back-link";
+import { Copyable } from "@/components/ui/copyable";
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -160,12 +161,40 @@ export function StoreScreen({ storeId }: { storeId: string }) {
                 {store.data ? pickLocalized(store.data.name) : ""}
               </h1>
               {store.data && (
-                <span className="truncate text-[12px] text-text-faint">
-                  {store.data.categoryName} ·{" "}
-                  {t("catalogue.prep", {
-                    min: store.data.prepMinMinutes,
-                    max: store.data.prepMaxMinutes,
-                  })}
+                <span className="flex flex-wrap items-center gap-sm text-[12px] text-text-faint">
+                  <span className="truncate">
+                    {store.data.categoryName} ·{" "}
+                    {t("catalogue.prep", {
+                      min: store.data.prepMinMinutes,
+                      max: store.data.prepMaxMinutes,
+                    })}
+                  </span>
+
+                  {/*
+                    The number an order is sent to, on the page about the shop.
+
+                    It is the one fact here an operator needs to *act* on —
+                    ringing a kitchen that has not acknowledged an order — and
+                    it was two tabs away, on the branch that owns it. Copyable
+                    rather than plain text, because the next thing anybody does
+                    with a phone number is put it somewhere else.
+
+                    Absent is a real state and says so: a shop with no number
+                    cannot be sent orders at all, which is worth reading on the
+                    header rather than discovering from an order that never
+                    arrived.
+                  */}
+                  {store.data.whatsappPhone ? (
+                    <Copyable
+                      value={`+${store.data.whatsappPhone}`}
+                      label={t("store.copyWhatsapp")}
+                      className="text-[12px]"
+                    />
+                  ) : (
+                    <span className="rounded-full bg-danger-wash px-sm font-semibold text-danger">
+                      {t("store.noWhatsapp")}
+                    </span>
+                  )}
                 </span>
               )}
             </div>

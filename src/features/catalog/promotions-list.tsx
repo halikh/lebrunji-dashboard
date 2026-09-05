@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, Input, cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
@@ -193,9 +194,11 @@ export function PromotionsList() {
               />
             ))}
           {searching && rows.length === 0 && (
-            <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
-              {t("promotions.searchNone", { term: search.trim() })}
-            </p>
+            <EmptyState
+              titleKey="promotions.searchNone"
+              params={{ term: search.trim() }}
+              mood="lost"
+            />
           )}
           {/* Where a new promotion actually goes: the end of the list, which is
               also the lowest priority. The pinned bar below is a shortcut to

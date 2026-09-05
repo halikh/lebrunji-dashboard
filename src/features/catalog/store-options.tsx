@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button, cx } from "@/components/ui";
 import { Collapse } from "@/components/ui/collapse";
 import { Field } from "@/components/ui/field";
@@ -97,49 +98,69 @@ export function StoreOptions({ storeId }: { storeId: string }) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-      <div className="flex flex-col gap-lg p-xxl lg:w-[380px] lg:shrink-0 lg:overflow-y-auto">
+    /*
+      Stacked, not split.
+     *
+     * It was a 380px column of filters beside the questions, and the two never
+     * agreed about what the screen was: the left side had two short selects and
+     * a paragraph, the right had the whole list, and the column stayed
+     * full-height and mostly empty however few questions there were. On a shop
+     * with one question it was a third of the screen holding a dropdown.
+     *
+     * The filters are a bar now — both selects on one line, the list under
+     * them, full width. That is also the order the work happens in: narrow,
+     * then read. A filter beside its results asks the operator to look sideways
+     * for the cause of what changed.
+     */
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 flex-col gap-lg border-b border-border bg-surface p-xxl">
         <p className="ps-md text-[13px] text-text-faint">
           {t("options.tabHint")}
         </p>
 
-        <Field label={t("options.section")} hint={t("options.sectionHint")}>
-          <Select
-            value={sectionId ?? ""}
-            onChange={(value) => choose({ section: value || null })}
-            placeholder={t("options.pickSection")}
-            isClearable
-            options={sections.map((one) => ({
-              value: one.id,
-              label: pickLocalized(one.title),
-            }))}
-          />
-        </Field>
-
-        {section && (
-          <Field label={t("options.item")} hint={t("options.itemHint")}>
+        {/* Side by side, and each capped rather than sharing the width
+            equally: a section name and a dish name are short, and two selects
+            stretched across a wide monitor would be a filter bar that reads as
+            the page's main content. They wrap on a narrow one. */}
+        <div className="flex flex-wrap items-start gap-lg [&>*]:w-[320px] [&>*]:max-w-full">
+          <Field label={t("options.section")} hint={t("options.sectionHint")}>
             <Select
-              value={itemId ?? ""}
-              onChange={(value) => choose({ item: value || null })}
-              placeholder={t("options.pickItem")}
+              value={sectionId ?? ""}
+              onChange={(value) => choose({ section: value || null })}
+              placeholder={t("options.pickSection")}
               isClearable
-              options={section.items.map((one) => ({
+              options={sections.map((one) => ({
                 value: one.id,
-                label: pickLocalized(one.name),
-                // The marker. A dish with no questions looks complete
-                // everywhere else in the dashboard; this is the only place it
-                // can be seen at a glance.
-                note:
-                  (counts.data?.get(one.id) ?? 0) === 0
-                    ? t("options.noneSet")
-                    : undefined,
+                label: pickLocalized(one.title),
               }))}
             />
           </Field>
-        )}
+
+          {section && (
+            <Field label={t("options.item")} hint={t("options.itemHint")}>
+              <Select
+                value={itemId ?? ""}
+                onChange={(value) => choose({ item: value || null })}
+                placeholder={t("options.pickItem")}
+                isClearable
+                options={section.items.map((one) => ({
+                  value: one.id,
+                  label: pickLocalized(one.name),
+                  // The marker. A dish with no questions looks complete
+                  // everywhere else in the dashboard; this is the only place it
+                  // can be seen at a glance.
+                  note:
+                    (counts.data?.get(one.id) ?? 0) === 0
+                      ? t("options.noneSet")
+                      : undefined,
+                }))}
+              />
+            </Field>
+          )}
+        </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col border-t border-border lg:border-s lg:border-t-0">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Always a list. It used to say "pick a section" into an empty panel,
             which was the only thing this screen could do before a question
             could be asked on more than one item — there was no shop-wide view
@@ -248,9 +269,7 @@ function ItemQuestions({
         )}
 
         {groups.isSuccess && offered.length === 0 && !adding && (
-          <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
-            {t("options.noQuestions")}
-          </p>
+          <EmptyState titleKey="options.noQuestions" mood="waiting" />
         )}
 
         {/* Said only when something is actually missing from the list, so it is

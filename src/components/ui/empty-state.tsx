@@ -1,4 +1,4 @@
-import { t, type TranslationKey } from "@/i18n/translations";
+import { t, type Params, type TranslationKey } from "@/i18n/translations";
 
 import { cx } from "./index";
 
@@ -13,15 +13,38 @@ import { cx } from "./index";
  * `mood` is which face the mascot pulls. It is a small thing and it is the
  * reason an empty queue reads as *quiet* rather than as *broken*, which is the
  * single most common misreading of a blank screen.
+ *
+ * ## It is the only empty state now
+ *
+ * There was a second one, and it was written out eleven times: a dashed box
+ * with one muted line in it. Two idioms for one state, so a customer's empty
+ * order list and an empty archive looked like different kinds of nothing — and
+ * the dashed box in particular read as a *drop target*, a place something was
+ * supposed to go, rather than as a report that there is nothing to show.
+ *
+ * So `bodyKey` is optional and `params` exists: those eleven had a single line
+ * and some of them name a search term, and both had to be expressible here or
+ * the copies would have stayed.
  */
 export function EmptyState({
   titleKey,
   bodyKey,
+  params,
   mood = "waiting",
   className,
 }: {
   titleKey: TranslationKey;
-  bodyKey: TranslationKey;
+  /**
+   * A second line, where there is one worth writing.
+   *
+   * Optional because plenty of these are complete in one sentence — "No
+   * categories match 'pizz'" says the finding and the reason together — and a
+   * body invented to fill the slot is the kind of line that gets read once and
+   * then never again.
+   */
+  bodyKey?: TranslationKey;
+  /** Filled into both lines. Usually the search term that found nothing. */
+  params?: Params;
   mood?: "waiting" | "done" | "lost";
   className?: string;
 }) {
@@ -34,8 +57,10 @@ export function EmptyState({
     >
       <Placeholder mood={mood} />
       <div className="flex max-w-[380px] flex-col gap-xs">
-        <h2 className="text-[18px]">{t(titleKey)}</h2>
-        <p className="text-[14px] text-text-soft">{t(bodyKey)}</p>
+        <h2 className="text-[18px]">{t(titleKey, params)}</h2>
+        {bodyKey && (
+          <p className="text-[14px] text-text-soft">{t(bodyKey, params)}</p>
+        )}
       </div>
     </div>
   );

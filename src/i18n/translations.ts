@@ -410,7 +410,21 @@ const en = {
    */
   general: {
     tab: "General",
+    /**
+     * Named, not "Saved".
+     *
+     * Three controls on this tab wrote the same word, and two of them can be
+     * pressed a second apart — so a stack of identical pills said something had
+     * happened without saying what. See `savedKey`.
+     *
+     * `saved` stays as the fallback for a patch that touches something no
+     * message has been written for yet, which is better than a toast that says
+     * nothing at all.
+     */
     saved: "Saved",
+    savedClock: "Clock format saved",
+    savedHours: "Ordering hours saved",
+    savedSound: "New-order sound saved",
 
     clockTitle: "Times",
     clockLabel: "Clock",
@@ -801,7 +815,11 @@ const en = {
     whatsappHint:
       "Where an order is sent so the kitchen can start. Without one this shop cannot be sent orders.",
     whatsappPlaceholder: "70123456",
-    prepWindow: "Kitchen takes",
+    prepWindow: "Store takes",
+    // On the shop's header. The number an order is sent to is the one fact up
+    // there somebody acts on, and it used to live two tabs away on the branch.
+    copyWhatsapp: "Copy the WhatsApp number",
+    noWhatsapp: "No WhatsApp number",
     // Says what the number is *for*, which the label cannot: this is the range
     // the app quotes a customer before they order.
     prepHint: "The range the app quotes with the delivery estimate.",
@@ -2121,7 +2139,7 @@ const en = {
     pin: "Where it is",
     pinHint:
       "Delivery is charged from here. Without a pin every order from this branch is charged at the top distance band.",
-    prep: "Kitchen takes",
+    prep: "Store takes",
     prepHint:
       "The range the app quotes with the delivery estimate for this branch.",
     whatsapp: "WhatsApp number",

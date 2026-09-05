@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button, cx } from "@/components/ui";
 import { BarChart, HBarList, HeatGrid } from "@/components/ui/chart";
 import { DateRangeField } from "@/components/ui/date-field";
@@ -688,8 +689,9 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 /** Nothing to draw is a sentence, never an empty box that looks broken. */
 function Empty() {
   return (
-    <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[13px] text-text-soft">
-      {t("reports.nothingYet")}
-    </p>
+    <EmptyState
+      titleKey="reports.nothingYet"
+      mood="waiting"
+    />
   );
 }

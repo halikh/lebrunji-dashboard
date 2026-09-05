@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button, cx } from "@/components/ui";
 import { SearchInput } from "@/components/ui/search-input";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -252,9 +253,11 @@ function HelpTab() {
           {order.instructions}
 
           {searching && rows.length === 0 && (
-            <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
-              {t("content.searchNone", { term: search.trim() })}
-            </p>
+            <EmptyState
+              titleKey="content.searchNone"
+              params={{ term: search.trim() }}
+              mood="lost"
+            />
           )}
 
           {order
@@ -657,9 +660,11 @@ function LegalTab() {
           {order.instructions}
 
           {searching && rows.length === 0 && (
-            <p className="rounded-md border border-dashed border-border px-lg py-xl text-center text-[14px] text-text-soft">
-              {t("content.searchNone", { term: search.trim() })}
-            </p>
+            <EmptyState
+              titleKey="content.searchNone"
+              params={{ term: search.trim() }}
+              mood="lost"
+            />
           )}
 
           {order
