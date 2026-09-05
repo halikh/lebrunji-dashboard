@@ -20,8 +20,15 @@ import { t } from "@/i18n/translations";
 import { SEARCH, TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
-import { TAG_TONES, type Tag, type TagDraft, type TagTone } from "./api/tags";
-import { TagChip } from "./tag-chip";
+import {
+  TAG_INKS,
+  TAG_TONES,
+  type Tag,
+  type TagDraft,
+  type TagInk,
+  type TagTone,
+} from "./api/tags";
+import { INK_CONTRAST, INK_FLOOR, TagChip, inkFor } from "./tag-chip";
 import { useArchiveTag, useCreateTag, useTags, useUpdateTag } from "./use-tags";
 
 /**
@@ -277,6 +284,20 @@ function Editor({
 
   const [name, setName] = useState<Localized>(initial?.name ?? {});
   const [tone, setTone] = useState<TagTone>(initial?.tone ?? "neutral");
+  /**
+   * The ink, resolved rather than left null.
+   *
+   * A row may carry null — "whatever the tone measures well against" — and the
+   * form does not show that as a third state. It shows the answer that is
+   * currently being drawn, and saving writes it back explicitly: the moment a
+   * merchant has looked at the chip and pressed Save is the moment the choice
+   * stops being a default.
+   *
+   * Re-derived when the tone changes below, because the sensible ink for grape
+   * is not the sensible ink for sun, and carrying the old one across would be
+   * the form quietly making the worse choice on their behalf.
+   */
+  const [ink, setInk] = useState<TagInk>(inkFor(tone, initial?.ink ?? null));
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
 
   const [errors, setErrors] = useState<{ name?: string }>({});
@@ -321,7 +342,7 @@ function Editor({
     setErrors(found);
     if (found.name) return;
 
-    onSave({ name, tone, isActive });
+    onSave({ name, tone, ink, isActive });
   }
 
   return (
@@ -341,16 +362,81 @@ function Editor({
         <Field label={t("tags.toneLabel")} hint={t("tags.toneHint")}>
           <Select
             value={tone}
-            onChange={(next) => setTone(next as TagTone)}
+            onChange={(next) => {
+              const picked = next as TagTone;
+              setTone(picked);
+              // The ink follows the ground. See the note on `ink`.
+              setInk(inkFor(picked, null));
+            }}
             options={TAG_TONES.map((option) => ({
               value: option,
               // The label is what the control filters on and what a screen
               // reader says; `render` is what the eye gets. Both are needed —
               // an option recognisable only by sight cannot be typed for.
               label: t(`tags.tones.${option}`),
-              render: <TagChip tone={option} label={previewLabel} />,
+              render: (
+                <TagChip
+                  tone={option}
+                  ink={inkFor(option, null)}
+                  label={previewLabel}
+                />
+              ),
             }))}
           />
+        </Field>
+
+        {/*
+          The other half of the chip, chosen the same way the tone is — by
+          looking at it.
+
+          Two buttons rather than a select, because there are exactly two
+          answers and both fit on the screen at once: the choice is a
+          *comparison*, and a dropdown that shows one at a time is the one shape
+          that cannot be compared. Each is the real chip, in the real ground,
+          with what it measures written under it.
+        */}
+        <Field label={t("tags.inkLabel")} hint={t("tags.inkHint")}>
+          <div className="flex items-stretch gap-sm">
+            {TAG_INKS.map((option) => {
+              const ratio = INK_CONTRAST[tone][option];
+              const poor = ratio < INK_FLOOR;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setInk(option)}
+                  aria-pressed={ink === option}
+                  className={cx(
+                    "flex flex-1 flex-col items-center gap-sm rounded-md border p-lg",
+                    ink === option
+                      ? "border-active shadow-[0_0_0_3px_var(--color-active-wash)]"
+                      : "border-border hover:border-active",
+                  )}
+                >
+                  <TagChip tone={tone} ink={option} label={previewLabel} />
+
+                  <span className="text-[12px] font-semibold text-text">
+                    {t(`tags.inks.${option}`)}
+                  </span>
+
+                  {/* The number, not a verdict. A merchant is allowed the
+                      quieter pairing — it is their brand — and the honest way
+                      to offer it is with the figure beside it rather than a
+                      control that refuses. */}
+                  <span
+                    className={cx(
+                      "text-[11px] tabular-nums",
+                      poor ? "font-semibold text-danger" : "text-text-faint",
+                    )}
+                  >
+                    {poor
+                      ? t("tags.inkTooLow", { ratio: ratio.toFixed(1) })
+                      : t("tags.inkRatio", { ratio: ratio.toFixed(1) })}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </Field>
 
         <Field

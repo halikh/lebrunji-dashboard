@@ -47,11 +47,35 @@ export const TAG_TONES = [
 
 export type TagTone = (typeof TAG_TONES)[number];
 
+/**
+ * Which ink a chip's words take. Mirrors `menu_item_tags_ink_known`.
+ *
+ * A role, not a colour — `dark` is the theme's ink and `light` is white, so
+ * re-tuning the palette moves every chip without a data migration. The same
+ * reasoning `tone` was named for.
+ */
+export const TAG_INKS = ["dark", "light"] as const;
+
+export type TagInk = (typeof TAG_INKS)[number];
+
 export type Tag = {
   id: string;
   slug: string;
   name: Localized;
   tone: TagTone;
+  /**
+   * The ink, or null for whatever the tone measures well against.
+   *
+   * Null is a live reference rather than a default — `0112` chose it over
+   * backfilling a copy for the reason `0110` did: a copy is the answer *as of
+   * today*, so a later change to what a tone looks like would leave every old
+   * row holding a choice nobody made.
+   *
+   * A tag saved through this screen never keeps it: the editor shows the
+   * resolved value and writes it back explicitly, which is the point at which a
+   * merchant has actually looked at the thing.
+   */
+  ink: TagInk | null;
   isActive: boolean;
   /**
    * How many live dishes carry it.
@@ -64,7 +88,7 @@ export type Tag = {
   usedBy: number;
 };
 
-const COLUMNS = `id, slug, name, tone, is_active,
+const COLUMNS = `id, slug, name, tone, ink, is_active,
    menu_item_tag_links ( count )`;
 
 /**
@@ -118,6 +142,7 @@ export async function fetchTags(search?: string | null): Promise<Tag[]> {
     slug: row.slug as string,
     name: (row.name as Localized) ?? {},
     tone: (row.tone as TagTone) ?? "neutral",
+    ink: (row.ink as TagInk | null) ?? null,
     isActive: row.is_active as boolean,
     usedBy: countOf(row.menu_item_tag_links),
   }));
@@ -180,6 +205,7 @@ function requireEmoji(name: Localized): void {
 export type TagDraft = {
   name: Localized;
   tone: TagTone;
+  ink: TagInk;
   isActive: boolean;
 };
 
@@ -190,6 +216,7 @@ export async function createTag(draft: TagDraft): Promise<void> {
   const { error } = await getClient().from("menu_item_tags").insert({
     name,
     tone: draft.tone,
+    ink: draft.ink,
     is_active: draft.isActive,
     // No `slug`: `0071`'s trigger derives one from the English name
     // inside the insert's own transaction, which is the only way to make it
@@ -209,6 +236,7 @@ export async function updateTag(id: string, patch: TagPatch): Promise<void> {
     row.name = name;
   }
   if (patch.tone !== undefined) row.tone = patch.tone;
+  if (patch.ink !== undefined) row.ink = patch.ink;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
 
   const { error } = await getClient()
@@ -307,6 +335,7 @@ function friendly(message: string): string {
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("_len")) return t("dbError.tooLong");
   if (message.includes("tone_known")) return t("tags.unknownTone");
+  if (message.includes("ink_known")) return t("tags.unknownInk");
   // A dish already carrying the tag. Reached only by two tabs saving the same
   // item at once, and the right answer is that the intended state is the state:
   // the link exists, which is what was asked for.

@@ -3,7 +3,7 @@
 import { cx } from "@/components/ui";
 import { pickLocalized } from "@/i18n/db-text";
 
-import type { TagTone } from "./api/tags";
+import type { TagInk, TagTone } from "./api/tags";
 import { useTagVocabulary } from "./use-tags";
 
 /**
@@ -55,20 +55,66 @@ import { useTagVocabulary } from "./use-tags";
 const GROUND: Record<TagTone, string> = {
   // The one that stays quiet, and still a ground: a tag with no particular
   // emphasis should read as a chip rather than as loose text beside a name.
-  neutral: "bg-neutral-fill text-text",
-  accent: "bg-accent text-text",
-  yellow: "bg-yellow text-text",
-  active: "bg-active text-text",
-  info: "bg-info text-on-info",
+  neutral: "bg-neutral-fill",
+  accent: "bg-accent",
+  yellow: "bg-yellow",
+  active: "bg-active",
+  info: "bg-info",
 };
+
+/**
+ * The two inks, written out for the same reason the grounds are: a class name
+ * assembled at runtime is one Tailwind never sees in the source, so the utility
+ * is never generated and the words come out inheriting whatever is around them.
+ */
+const INK: Record<TagInk, string> = {
+  dark: "text-text",
+  light: "text-on-info",
+};
+
+/**
+ * What each pairing measures, so the screen can say so.
+ *
+ * Against `#1e1b18` ink and `#ffffff`, and the numbers are the reason the
+ * defaults are what they are. A merchant may pick the other one — the point of
+ * `0112` is that it is their call — and the editor puts the figure next to the
+ * choice rather than refusing it or letting it be made blind.
+ *
+ * 4.5:1 is the bar for text this small; anything under it is a chip somebody
+ * will squint at on a phone in daylight.
+ */
+export const INK_CONTRAST: Record<TagTone, Record<TagInk, number>> = {
+  neutral: { dark: 15.0, light: 1.2 },
+  accent: { dark: 6.9, light: 2.6 },
+  yellow: { dark: 11.2, light: 1.6 },
+  active: { dark: 5.7, light: 3.1 },
+  info: { dark: 3.3, light: 5.3 },
+};
+
+/** The lowest ratio a 12px label may be drawn at. */
+export const INK_FLOOR = 4.5;
+
+/**
+ * The tag's own ink, or the one its tone measures well against.
+ *
+ * Null is what a row carries until somebody has chosen — see `Tag.ink`. Grape
+ * is the one tone whose default is white: dark on it is 3.3:1 and fails, which
+ * is exactly what `--color-on-info` already says.
+ */
+export function inkFor(tone: TagTone, ink: TagInk | null): TagInk {
+  return ink ?? (tone === "info" ? "light" : "dark");
+}
 
 export function TagChip({
   label,
   tone,
+  ink = null,
   className,
 }: {
   label: string;
   tone: TagTone;
+  /** The tag's own ink, or null for the tone's. */
+  ink?: TagInk | null;
   className?: string;
 }) {
   return (
@@ -78,6 +124,7 @@ export function TagChip({
         // one of the five needs a different one. See the table above.
         "inline-flex max-w-[160px] items-center truncate rounded-sm px-sm py-[1px] text-[12px] font-semibold",
         GROUND[tone] ?? GROUND.neutral,
+        INK[inkFor(tone, ink)],
         className,
       )}
     >
@@ -115,7 +162,12 @@ export function ItemTags({ ids }: { ids: readonly string[] }) {
   return (
     <span className="flex flex-wrap items-center gap-xs">
       {mine.map((tag) => (
-        <TagChip key={tag.id} tone={tag.tone} label={pickLocalized(tag.name)} />
+        <TagChip
+          key={tag.id}
+          tone={tag.tone}
+          ink={tag.ink}
+          label={pickLocalized(tag.name)}
+        />
       ))}
     </span>
   );

@@ -999,6 +999,25 @@ const en = {
     archiveConfirm: "Archive",
     // A count on the row is what turns "retire this" from a guess into a
     // decision. Zero is said in words rather than as "0 dishes", because
+    /**
+     * The ink — the other half of a chip, chosen by looking at it.
+     *
+     * The ratio is shown rather than the choice being refused: a merchant is
+     * allowed the quieter pairing, and the honest way to offer it is with the
+     * measurement beside it. 4.5:1 is the bar for a 12px label.
+     */
+    inkLabel: "Words",
+    inkHint: "Which reads better on the colour you picked.",
+    inkRatio: "{ratio}:1 contrast",
+    inkTooLow: "{ratio}:1 — hard to read",
+    inks: {
+      dark: "Black",
+      light: "White",
+    },
+    // A value the check constraint refuses. Reached only by a stale tab or a
+    // hand-made request, and it says which column rather than echoing Postgres.
+    unknownInk: "That is not a colour a tag's words can be.",
+
     // The emoji rule. Said as what a tag *is* rather than as a refusal — the
     // hint carries it before the error has to.
     needsEmoji: "Every tag carries an emoji. Add one to the {language} name.",
