@@ -1006,6 +1006,22 @@ const en = {
      * allowed the quieter pairing, and the honest way to offer it is with the
      * measurement beside it. 4.5:1 is the bar for a 12px label.
      */
+    /**
+     * The ground, which stopped being one of five in `0114`.
+     *
+     * The roles are still offered first, as presets — they are the colours that
+     * already agree with the rest of a phone screen — and the picker is the
+     * escape hatch for a brand colour the palette does not have.
+     */
+    colorLabel: "Colour",
+    colorHint:
+      "The five are the app's own, and a tag on one of them follows the palette if it ever changes. Pick your own for a brand colour.",
+    colorCustom: "Pick a colour",
+    colorHex: "Colour, as a hex code",
+    // The shape check refusing a value. Reached by pasting something that is
+    // not a colour, so it says what one looks like.
+    badColor: "A colour has to be six hex digits, like #14b87f.",
+
     inkLabel: "Words",
     inkHint: "Which reads better on the colour you picked.",
     inkRatio: "{ratio}:1 contrast",
@@ -1533,6 +1549,10 @@ const en = {
     placement: "Show it on",
     placementHint:
       "Where customers see the card. It does not change who gets the discount — an unplaced promotion still applies at checkout.",
+    // The switch's two words. The same pair on all three, because this is one
+    // property being turned on and off rather than two named states.
+    placementOn: "Shown",
+    placementOff: "Hidden",
     placements: {
       home: "Home",
       store: "The shop's page",

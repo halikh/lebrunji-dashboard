@@ -3,7 +3,7 @@ import { t } from "@/i18n/translations";
 import { getClient } from "@/lib/supabase/client";
 import type { Localized } from "@/lib/validation";
 
-import type { TagTone } from "./tags";
+import type { TagInk, TagTone } from "./tags";
 
 /**
  * What the catalogue as a whole has put away.
@@ -52,6 +52,8 @@ export type ArchivedTag = {
   name: Localized;
   /** The palette role, so an archived tag is drawn as the chip it was. */
   tone: TagTone;
+  /** Null for the tone's own — see `Tag.ink`. */
+  ink: TagInk | null;
   archivedAt: string;
 };
 
@@ -97,7 +99,7 @@ export async function fetchCatalogueArchive(): Promise<CatalogueArchive> {
 
     client
       .from("menu_item_tags")
-      .select("id, name, tone, deleted_at")
+      .select("id, name, tone, ink, deleted_at")
       .not("deleted_at", "is", null)
       .order("deleted_at", { ascending: false }),
 
@@ -135,6 +137,7 @@ export async function fetchCatalogueArchive(): Promise<CatalogueArchive> {
       id: row.id as string,
       name: (row.name as Localized) ?? {},
       tone: (row.tone as TagTone) ?? "neutral",
+      ink: (row.ink as TagInk | null) ?? null,
       archivedAt: row.deleted_at as string,
     })),
     promotions: (promotions.data ?? []).map((row) => ({

@@ -73,7 +73,11 @@ export function FilterTab({
         active && tone ? { background: tone.wash, color: tone.ink } : undefined
       }
       className={cx(
-        "flex shrink-0 items-center gap-sm whitespace-nowrap rounded-t-md px-lg py-sm text-[14px] font-semibold",
+        // 15px and a deeper pad. A tab strip is the coarsest navigation on a
+        // screen and it was set at the size of a hint — small enough that the
+        // selected one had to be found rather than seen, and a small target for
+        // something pressed on the way into every task.
+        "flex shrink-0 items-center gap-sm whitespace-nowrap rounded-t-md px-lg py-md text-[15px] font-semibold",
         active && !tone && "bg-active-wash text-active-ink",
         !active && "text-text-soft hover:bg-neutral-fill",
       )}
@@ -160,7 +164,10 @@ export function SectionTab({
       onClick={onClick}
       onKeyDown={onKeyDown}
       className={cx(
-        "border-b-2 pb-sm text-[14px] font-semibold",
+        // The same bump `FilterTab` took, and it has to be the same: the two
+        // idioms sit on different screens but a customer profile and a store
+        // page should not disagree about how big a tab is.
+        "border-b-2 pb-md text-[15px] font-semibold",
         active
           ? "border-active text-text"
           : "border-transparent text-text-soft hover:text-text",

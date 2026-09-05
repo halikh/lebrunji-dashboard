@@ -1,6 +1,7 @@
 "use client";
 
 import { cx } from "@/components/ui";
+import { bestInk } from "@/lib/contrast";
 import { pickLocalized } from "@/i18n/db-text";
 
 import type { TagInk, TagTone } from "./api/tags";
@@ -26,16 +27,21 @@ import { useTagVocabulary } from "./use-tags";
  *
  * | tone    | ground          | ink   | ratio   |
  * | ------- | --------------- | ----- | ------- |
- * | neutral | sand `#f0eae1`  | ink   | 15.0:1  |
- * | accent  | mint `#14b87f`  | ink   | 6.9:1   |
- * | yellow  | sun  `#ffc634`  | ink   | 11.2:1  |
- * | active  | coral `#ff5a3c` | ink   | 5.7:1   |
+ * | neutral | sand `#f0eae1`  | ink   | 14.3:1  |
+ * | accent  | mint `#14b87f`  | ink   | 6.7:1   |
+ * | yellow  | sun  `#ffc634`  | ink   | 10.9:1  |
+ * | active  | coral `#ff5a3c` | ink   | 5.5:1   |
  * | info    | grape `#6c4bf5` | white | 5.3:1   |
  *
  * Every one clears 4.5:1, which is the bar for text this small. Grape is the
- * one that flips: ink on it is 3.3:1 and fails, white on it passes — which is
+ * one that flips: ink on it is 3.2:1 and fails, white on it passes — which is
  * exactly what `--color-on-info` already says, and why the ink is read from the
  * palette's own `on-*` role rather than picked here.
+ *
+ * These five are now only *defaults*. `0114` let a tag carry any colour, so the
+ * figures a merchant is shown come from `lib/contrast.ts` measuring the pair in
+ * front of them — this table is what the roles happen to measure, not the set
+ * of possibilities.
  *
  * The two that look like exceptions are not. `bg-active` is coral at full
  * strength carrying **ink**, not the white `--color-on-active` names — white on
@@ -63,6 +69,24 @@ const GROUND: Record<TagTone, string> = {
 };
 
 /**
+ * What each role actually paints, transcribed from `theme.css`.
+ *
+ * Needed as *values* rather than class names since `0114`: a preset swatch has
+ * to be drawn, the colour input needs somewhere to start when a tag is still
+ * following its role, and the contrast a merchant is shown has to be measured
+ * against a real hex. The classes above still do the painting for a tag that
+ * has no colour of its own — this is the same five colours, said the other way,
+ * for the things a class name cannot do.
+ */
+export const TONE_HEX: Record<TagTone, string> = {
+  neutral: "#f0eae1",
+  accent: "#14b87f",
+  yellow: "#ffc634",
+  active: "#ff5a3c",
+  info: "#6c4bf5",
+};
+
+/**
  * The two inks, written out for the same reason the grounds are: a class name
  * assembled at runtime is one Tailwind never sees in the source, so the utility
  * is never generated and the words come out inheriting whatever is around them.
@@ -73,48 +97,62 @@ const INK: Record<TagInk, string> = {
 };
 
 /**
- * What each pairing measures, so the screen can say so.
- *
- * Against `#1e1b18` ink and `#ffffff`, and the numbers are the reason the
- * defaults are what they are. A merchant may pick the other one — the point of
- * `0112` is that it is their call — and the editor puts the figure next to the
- * choice rather than refusing it or letting it be made blind.
- *
- * 4.5:1 is the bar for text this small; anything under it is a chip somebody
- * will squint at on a phone in daylight.
- */
-export const INK_CONTRAST: Record<TagTone, Record<TagInk, number>> = {
-  neutral: { dark: 15.0, light: 1.2 },
-  accent: { dark: 6.9, light: 2.6 },
-  yellow: { dark: 11.2, light: 1.6 },
-  active: { dark: 5.7, light: 3.1 },
-  info: { dark: 3.3, light: 5.3 },
-};
-
-/** The lowest ratio a 12px label may be drawn at. */
-export const INK_FLOOR = 4.5;
-
-/**
  * The tag's own ink, or the one its tone measures well against.
  *
  * Null is what a row carries until somebody has chosen — see `Tag.ink`. Grape
  * is the one tone whose default is white: dark on it is 3.3:1 and fails, which
  * is exactly what `--color-on-info` already says.
  */
-export function inkFor(tone: TagTone, ink: TagInk | null): TagInk {
-  return ink ?? (tone === "info" ? "light" : "dark");
+export function inkFor(
+  tone: TagTone,
+  ink: TagInk | null,
+  color?: string | null,
+): TagInk {
+  if (ink) return ink;
+  // A colour the palette has never seen has no recorded answer, so it is
+  // measured. `bestInk` is the same arithmetic the app falls back to, so the
+  // two cannot disagree about a tag nobody has chosen an ink for.
+  if (color) return bestInk(color);
+  return tone === "info" ? "light" : "dark";
+}
+
+/** The ground a tag is actually drawn on: its own colour, or its role's. */
+export function groundOf(tone: TagTone, color: string | null): string {
+  return color ?? TONE_HEX[tone];
 }
 
 export function TagChip({
   label,
   tone,
-  ink = null,
+  ink,
+  color = null,
   className,
 }: {
   label: string;
   tone: TagTone;
-  /** The tag's own ink, or null for the tone's. */
-  ink?: TagInk | null;
+  /**
+   * The tag's own ground, or null for its role's.
+   *
+   * Inline rather than a class, and it has to be: Tailwind generates from what
+   * it can read in the source, and `#7b1f3a` was chosen by a merchant after the
+   * build. The same reason `tab.tsx` paints the order-status ramp with custom
+   * properties.
+   */
+  color?: string | null;
+  /**
+   * The tag's own ink, or null for the tone's.
+   *
+   * **Required, with no default.** It had one — `= null` — and the result was
+   * that three of the five call sites never passed it and quietly drew the
+   * tone's ink instead of the merchant's, including the vocabulary list where
+   * the choice is *made*. A default here is a prop the next call site will
+   * forget in exactly the same way, and the failure is invisible: a chip in the
+   * wrong ink still looks like a chip.
+   *
+   * `null` is still the answer for "whatever the tone measures well against" —
+   * it just has to be said out loud.
+   */
+  ink: TagInk | null;
   className?: string;
 }) {
   return (
@@ -123,10 +161,13 @@ export function TagChip({
         // No `text-text` here any more — the ink is part of the tone, because
         // one of the five needs a different one. See the table above.
         "inline-flex max-w-[160px] items-center truncate rounded-sm px-sm py-[1px] text-[12px] font-semibold",
-        GROUND[tone] ?? GROUND.neutral,
-        INK[inkFor(tone, ink)],
+        // The class only when there is no colour of its own — otherwise it
+        // would be a background the inline style has to fight.
+        !color && (GROUND[tone] ?? GROUND.neutral),
+        INK[inkFor(tone, ink, color)],
         className,
       )}
+      style={color ? { background: color } : undefined}
     >
       {label}
     </span>
@@ -166,6 +207,7 @@ export function ItemTags({ ids }: { ids: readonly string[] }) {
           key={tag.id}
           tone={tag.tone}
           ink={tag.ink}
+          color={tag.color}
           label={pickLocalized(tag.name)}
         />
       ))}

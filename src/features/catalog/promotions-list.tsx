@@ -138,7 +138,8 @@ export function PromotionsList() {
             onChange: setSearch,
             placeholder: t("promotions.search"),
           }}
-          hint={t("promotions.reorderHint")}
+          // Gone when there is nothing to sort — see `sortable`.
+          hint={order.sortable ? t("promotions.reorderHint") : undefined}
           action={
             <Button onClick={() => setOpen("new")}>
               {t("promotions.add")}
@@ -773,68 +774,58 @@ function Form({
           Each says what it means, because "Store" alone does not distinguish
           "on the shop's page" from "for a shop's promotion".
         */}
-        <Field label={t("promotions.placement")} hint={t("promotions.placementHint")}>
-          <div className="flex flex-col gap-sm">
-            {PLACEMENTS.map((option) => {
-              const on = placements.includes(option);
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() =>
+        <Field
+          label={t("promotions.placement")}
+          hint={t("promotions.placementHint")}
+        >
+          {/*
+            One switch per screen, not a set of checkboxes.
+
+            The answers are not exclusive — a promotion can reasonably be on two
+            screens — and each one is independently on or off, which is what a
+            switch says and a checkbox only implies. It also matches every other
+            on/off in the product: the shop's Live, the tag's, the promotion's
+            own. A second idiom for the same question is one more thing to read.
+
+            Each carries its own line, because "The shop's page" does not say
+            *which* shops, and the answer — the ones this promotion covers — is
+            the difference between a useful placement and a puzzling one.
+          */}
+          <div className="flex flex-col gap-md">
+            {PLACEMENTS.map((option) => (
+              <div
+                key={option}
+                className="flex items-start justify-between gap-lg rounded-md border border-border bg-surface px-lg py-md"
+              >
+                <span className="flex min-w-0 flex-col gap-xxs">
+                  <span className="text-[14px] font-semibold text-text">
+                    {t(`promotions.placements.${option}`)}
+                  </span>
+                  <span className="text-[12px] text-text-faint">
+                    {t(`promotions.placementsHint.${option}`)}
+                  </span>
+                </span>
+
+                <Toggle
+                  on={placements.includes(option)}
+                  onChange={() =>
                     setPlacements((current) =>
                       current.includes(option)
                         ? current.filter((one) => one !== option)
                         : // Kept in the declared order rather than appended, so
                           // the value written does not depend on the order the
-                          // operator happened to click in.
+                          // operator happened to press them in.
                           PLACEMENTS.filter(
                             (one) => one === option || current.includes(one),
                           ),
                     )
                   }
-                  aria-pressed={on}
-                  className={cx(
-                    "flex items-start gap-md rounded-md border px-lg py-md text-start",
-                    on
-                      ? "border-active bg-active-wash"
-                      : "border-border bg-surface hover:border-active",
-                  )}
-                >
-                  <span
-                    aria-hidden
-                    className={cx(
-                      "mt-[2px] flex size-[18px] shrink-0 items-center justify-center rounded-sm border",
-                      on ? "border-active bg-active-fill" : "border-border",
-                    )}
-                  >
-                    {on && (
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="var(--color-on-active)"
-                        strokeWidth={3}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M4 12l6 6L20 6" />
-                      </svg>
-                    )}
-                  </span>
-
-                  <span className="flex min-w-0 flex-col gap-xxs">
-                    <span className="text-[14px] font-semibold text-text">
-                      {t(`promotions.placements.${option}`)}
-                    </span>
-                    <span className="text-[12px] text-text-faint">
-                      {t(`promotions.placementsHint.${option}`)}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
+                  labelOn={t("promotions.placementOn")}
+                  labelOff={t("promotions.placementOff")}
+                  className="w-[104px] shrink-0"
+                />
+              </div>
+            ))}
           </div>
         </Field>
 

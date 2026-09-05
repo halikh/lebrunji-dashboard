@@ -111,7 +111,9 @@ export function CategoriesList() {
             onChange: setSearch,
             placeholder: t("categories.search"),
           }}
-          hint={t("categories.reorderHint")}
+          // Gone when there is nothing to sort — one row, or a filtered
+          // list. See `sortable` on `useReorder`.
+          hint={order.sortable ? t("categories.reorderHint") : undefined}
           action={
             <Button onClick={() => setOpen("new")}>
               {t("categories.add")}

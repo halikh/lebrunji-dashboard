@@ -228,7 +228,11 @@ export function CatalogueArchive() {
                   and an archived one should be recognisable as the thing that
                   was taken off forty menu rows. */}
               <span className="shrink-0">
-                <TagChip tone={tag.tone} label={pickLocalized(tag.name)} />
+                <TagChip
+                  tone={tag.tone}
+                  ink={tag.ink}
+                  label={pickLocalized(tag.name)}
+                />
               </span>
               <Identity
                 name={pickLocalized(tag.name)}

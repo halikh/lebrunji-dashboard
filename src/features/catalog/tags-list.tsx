@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Button, cx } from "@/components/ui";
+import { Button, Input, cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -11,10 +11,15 @@ import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Panel } from "@/components/ui/panel";
 import { PanelHeader } from "@/components/ui/panel-header";
-import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
+import {
+  CONTRAST_FLOOR,
+  INK_HEX,
+  bestInk,
+  contrastRatio,
+} from "@/lib/contrast";
 import { hasEmoji } from "@/lib/text-format";
 import { t } from "@/i18n/translations";
 import { SEARCH, TEXT } from "@/lib/limits";
@@ -28,7 +33,7 @@ import {
   type TagInk,
   type TagTone,
 } from "./api/tags";
-import { INK_CONTRAST, INK_FLOOR, TagChip, inkFor } from "./tag-chip";
+import { TONE_HEX, TagChip, groundOf, inkFor } from "./tag-chip";
 import { useArchiveTag, useCreateTag, useTags, useUpdateTag } from "./use-tags";
 
 /**
@@ -224,7 +229,7 @@ function Row({
         {/* The chip itself, at the size a phone draws it. The row shows the
             thing rather than describing it — a tone named in words would ask
             the operator to picture the result of their own setting. */}
-        <TagChip label={name} tone={tag.tone} />
+        <TagChip label={name} tone={tag.tone} ink={tag.ink} />
 
         <span className="truncate text-[12px] text-text-faint">
           {tag.usedBy === 0
@@ -297,7 +302,21 @@ function Editor({
    * is not the sensible ink for sun, and carrying the old one across would be
    * the form quietly making the worse choice on their behalf.
    */
-  const [ink, setInk] = useState<TagInk>(inkFor(tone, initial?.ink ?? null));
+  /**
+   * The tag's own ground, or null while it is still following its role.
+   *
+   * Null is not "no colour" — it is a live reference to whatever the palette
+   * calls the tone, which is what keeps a preset worth picking. So choosing a
+   * swatch clears this rather than storing its hex, and only a colour the
+   * palette does not have becomes a value. See `Tag.color`.
+   */
+  const [color, setColor] = useState<string | null>(initial?.color ?? null);
+  const [ink, setInk] = useState<TagInk>(
+    inkFor(tone, initial?.ink ?? null, initial?.color ?? null),
+  );
+
+  /** What the chip is actually painted in right now, preset or custom. */
+  const ground = groundOf(tone, color);
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
 
   const [errors, setErrors] = useState<{ name?: string }>({});
@@ -342,7 +361,7 @@ function Editor({
     setErrors(found);
     if (found.name) return;
 
-    onSave({ name, tone, ink, isActive });
+    onSave({ name, tone, ink, color, isActive });
   }
 
   return (
@@ -359,30 +378,122 @@ function Editor({
           placeholder={{ en: "🌶️ Spicy", ar: "🌶️ حار" }}
         />
 
-        <Field label={t("tags.toneLabel")} hint={t("tags.toneHint")}>
-          <Select
-            value={tone}
-            onChange={(next) => {
-              const picked = next as TagTone;
-              setTone(picked);
-              // The ink follows the ground. See the note on `ink`.
-              setInk(inkFor(picked, null));
-            }}
-            options={TAG_TONES.map((option) => ({
-              value: option,
-              // The label is what the control filters on and what a screen
-              // reader says; `render` is what the eye gets. Both are needed —
-              // an option recognisable only by sight cannot be typed for.
-              label: t(`tags.tones.${option}`),
-              render: (
-                <TagChip
-                  tone={option}
-                  ink={inkFor(option, null)}
-                  label={previewLabel}
+        {/*
+          The ground, as a colour rather than as one of five.
+
+          It was a `Select` over the five palette roles, and `0114` is the
+          admission that those roles were doing two jobs: naming a meaning in
+          *this product's* vocabulary, and choosing a paint. Only the first was
+          ever really true of a merchant's own label — "Halal" is not one of the
+          app's five states, and a chain's house green is not the app's mint.
+
+          The five stay as **presets**, first and one press away, because they
+          are the colours that already agree with everything else on a phone.
+          Picking one writes `null` rather than its hex, so a tag left on a
+          preset still follows the palette if the palette ever moves. The custom
+          swatch is the escape hatch, not the default.
+        */}
+        <Field label={t("tags.colorLabel")} hint={t("tags.colorHint")}>
+          <div className="flex flex-col gap-md">
+            <div className="flex flex-wrap items-center gap-sm">
+              {TAG_TONES.map((option) => {
+                const on = color === null && tone === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    title={t(`tags.tones.${option}`)}
+                    aria-label={t(`tags.tones.${option}`)}
+                    aria-pressed={on}
+                    onClick={() => {
+                      setTone(option);
+                      // Back to following the role — see the note on `color`.
+                      setColor(null);
+                      setInk(inkFor(option, null));
+                    }}
+                    className={cx(
+                      "size-[34px] rounded-full border-2",
+                      on ? "border-active" : "border-border hover:border-active",
+                    )}
+                    style={{ background: TONE_HEX[option] }}
+                  />
+                );
+              })}
+
+              {/*
+                The native picker, which is the right tool here: it is the one
+                every operating system already taught this person to use, it
+                carries an eyedropper on the desktops that have one, and a
+                hand-rolled wheel would be a worse version of it that also has
+                to be reachable from a keyboard.
+
+                A label wrapping the input rather than a button beside it, so
+                the swatch *is* the control and the two cannot drift apart.
+              */}
+              <label
+                className={cx(
+                  "relative flex size-[34px] cursor-pointer items-center justify-center rounded-full border-2",
+                  color ? "border-active" : "border-border hover:border-active",
+                )}
+                style={{ background: ground }}
+                title={t("tags.colorCustom")}
+              >
+                <input
+                  type="color"
+                  value={ground}
+                  onChange={(event) => {
+                    const picked = event.target.value;
+                    setColor(picked);
+                    // The ink follows the ground, measured rather than looked
+                    // up — the palette has no recorded answer for a colour it
+                    // has never seen.
+                    setInk(bestInk(picked));
+                  }}
+                  aria-label={t("tags.colorCustom")}
+                  className="absolute inset-0 cursor-pointer opacity-0"
                 />
-              ),
-            }))}
-          />
+                {!color && (
+                  <svg
+                    aria-hidden
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--color-text)"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                )}
+              </label>
+            </div>
+
+            {/* Typed as well as picked: a brand colour arrives as six
+                characters in an email, and hunting for it on a wheel is worse
+                than pasting it. Anything that is not a colour yet is simply not
+                applied — a half-typed `#1e` is somebody mid-word, not a
+                mistake to report. */}
+            <span className="w-[140px]">
+              <Input
+                value={color ?? ""}
+                onChange={(event) => {
+                  const typed = event.target.value.trim();
+                  if (typed === "") {
+                    setColor(null);
+                    setInk(inkFor(tone, null));
+                    return;
+                  }
+                  const hex = typed.startsWith("#") ? typed : `#${typed}`;
+                  setColor(hex);
+                  if (/^#[0-9a-fA-F]{6}$/.test(hex)) setInk(bestInk(hex));
+                }}
+                placeholder={TONE_HEX[tone]}
+                aria-label={t("tags.colorHex")}
+                className="font-mono text-[13px] tabular-nums"
+              />
+            </span>
+          </div>
         </Field>
 
         {/*
@@ -398,8 +509,11 @@ function Editor({
         <Field label={t("tags.inkLabel")} hint={t("tags.inkHint")}>
           <div className="flex items-stretch gap-sm">
             {TAG_INKS.map((option) => {
-              const ratio = INK_CONTRAST[tone][option];
-              const poor = ratio < INK_FLOOR;
+              // Measured against the colour actually chosen, not looked up:
+              // since `0114` the ground can be anything, and a table has
+              // nothing to say about a merchant's own hex.
+              const ratio = contrastRatio(ground, INK_HEX[option]);
+              const poor = ratio < CONTRAST_FLOOR;
               return (
                 <button
                   key={option}
@@ -413,7 +527,12 @@ function Editor({
                       : "border-border hover:border-active",
                   )}
                 >
-                  <TagChip tone={tone} ink={option} label={previewLabel} />
+                  <TagChip
+                    tone={tone}
+                    ink={option}
+                    color={color}
+                    label={previewLabel}
+                  />
 
                   <span className="text-[12px] font-semibold text-text">
                     {t(`tags.inks.${option}`)}

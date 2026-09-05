@@ -76,6 +76,16 @@ export type Tag = {
    * merchant has actually looked at the thing.
    */
   ink: TagInk | null;
+  /**
+   * The chip's ground as `#rrggbb`, or null for whatever this palette calls
+   * the tag's tone.
+   *
+   * `0114`. The same live-reference rule as `ink` above, and it is what keeps
+   * the five roles worth having: picking a preset writes **null** rather than
+   * its hex, so a tag left on "accent" still moves if the app's mint ever does.
+   * Only a colour the palette does not have is stored as one.
+   */
+  color: string | null;
   isActive: boolean;
   /**
    * How many live dishes carry it.
@@ -88,7 +98,7 @@ export type Tag = {
   usedBy: number;
 };
 
-const COLUMNS = `id, slug, name, tone, ink, is_active,
+const COLUMNS = `id, slug, name, tone, ink, color, is_active,
    menu_item_tag_links ( count )`;
 
 /**
@@ -143,6 +153,7 @@ export async function fetchTags(search?: string | null): Promise<Tag[]> {
     name: (row.name as Localized) ?? {},
     tone: (row.tone as TagTone) ?? "neutral",
     ink: (row.ink as TagInk | null) ?? null,
+    color: (row.color as string | null) ?? null,
     isActive: row.is_active as boolean,
     usedBy: countOf(row.menu_item_tag_links),
   }));
@@ -206,6 +217,8 @@ export type TagDraft = {
   name: Localized;
   tone: TagTone;
   ink: TagInk;
+  /** Null for the tone's own colour — see `Tag.color`. */
+  color: string | null;
   isActive: boolean;
 };
 
@@ -217,6 +230,7 @@ export async function createTag(draft: TagDraft): Promise<void> {
     name,
     tone: draft.tone,
     ink: draft.ink,
+    color: draft.color,
     is_active: draft.isActive,
     // No `slug`: `0071`'s trigger derives one from the English name
     // inside the insert's own transaction, which is the only way to make it
@@ -237,6 +251,9 @@ export async function updateTag(id: string, patch: TagPatch): Promise<void> {
   }
   if (patch.tone !== undefined) row.tone = patch.tone;
   if (patch.ink !== undefined) row.ink = patch.ink;
+  // `null` is a value here — it is how a tag is put back to following its
+  // tone — so what is tested is the key being absent, not the value.
+  if (patch.color !== undefined) row.color = patch.color;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
 
   const { error } = await getClient()
@@ -336,6 +353,7 @@ function friendly(message: string): string {
   if (message.includes("_len")) return t("dbError.tooLong");
   if (message.includes("tone_known")) return t("tags.unknownTone");
   if (message.includes("ink_known")) return t("tags.unknownInk");
+  if (message.includes("color_shape")) return t("tags.badColor");
   // A dish already carrying the tag. Reached only by two tabs saving the same
   // item at once, and the right answer is that the intended state is the state:
   // the link exists, which is what was asked for.

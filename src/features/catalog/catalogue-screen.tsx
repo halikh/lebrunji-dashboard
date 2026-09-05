@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { cx } from "@/components/ui";
+import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { useConfirmLeave } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 
@@ -88,42 +89,27 @@ export function CatalogueScreen() {
         <h1 className="text-[24px]">{t("catalogue.title")}</h1>
 
         {/*
-          A real tab list, not links styled as tabs. The distinction is the
-          keyboard: a tab list is arrowed through, and only the selected tab is
-          in the tab order — which is what stops a two-tab strip costing two
-          stops on the way to the content every time.
+          `SectionTab`, not a hand-rolled button.
+
+          These are the *chapters* of the catalogue rather than buckets of a
+          list, which is the distinction `tab.tsx` draws — and drawing them here
+          meant this strip and the store screen's were two copies of the same
+          twenty lines, free to drift in size. They had, by two pixels.
         */}
         <div role="tablist" className="-mb-px flex gap-lg">
-          {TABS.map(({ key, labelKey }) => {
-            const selected = tab === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => show(key)}
-                onKeyDown={(event) => {
-                  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
-                    return;
-                  }
-                  event.preventDefault();
-                  const at = TABS.findIndex((one) => one.key === tab);
-                  const step = event.key === "ArrowRight" ? 1 : -1;
-                  show(TABS[(at + step + TABS.length) % TABS.length].key);
-                }}
-                className={cx(
-                  "border-b-2 pb-sm text-[14px] font-semibold",
-                  selected
-                    ? "border-active text-text"
-                    : "border-transparent text-text-soft hover:text-text",
-                )}
-              >
-                {t(labelKey)}
-              </button>
-            );
-          })}
+          {TABS.map(({ key, labelKey }) => (
+            <SectionTab
+              key={key}
+              label={t(labelKey)}
+              active={tab === key}
+              onClick={() => show(key)}
+              onKeyDown={tabArrowHandler(
+                TABS.map((one) => one.key),
+                tab,
+                show,
+              )}
+            />
+          ))}
         </div>
       </div>
 

@@ -213,9 +213,14 @@ function HelpTab() {
               onChange={setSearch}
               placeholder={t("content.searchHelp")}
             />
-            <span className="ps-md text-[12px] text-text-faint">
-              {t("content.reorderHint")}
-            </span>
+            {/* Gone when there is nothing to sort — one row, or a filtered
+                list. An instruction nobody can follow reads as a control that
+                is broken. See `sortable` on `useReorder`. */}
+            {order.sortable ? (
+              <span className="ps-md text-[12px] text-text-faint">
+                {t("content.reorderHint")}
+              </span>
+            ) : null}
           </div>
           <Button onClick={() => setOpen("new")}>
             {t("content.addTopic")}
@@ -623,9 +628,14 @@ function LegalTab() {
               onChange={setSearch}
               placeholder={t("content.searchLegal")}
             />
-            <span className="ps-md text-[12px] text-text-faint">
-              {t("content.reorderHint")}
-            </span>
+            {/* Gone when there is nothing to sort — one row, or a filtered
+                list. An instruction nobody can follow reads as a control that
+                is broken. See `sortable` on `useReorder`. */}
+            {order.sortable ? (
+              <span className="ps-md text-[12px] text-text-faint">
+                {t("content.reorderHint")}
+              </span>
+            ) : null}
           </div>
 
           <Button onClick={() => setOpen("new")}>

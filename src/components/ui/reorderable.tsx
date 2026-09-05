@@ -186,6 +186,16 @@ export function useReorder({
 
   const instructionsId = useId();
 
+  /**
+   * Whether there is anything to sort at all.
+   *
+   * One row has nowhere to go, so every affordance for moving it is a promise
+   * the list cannot keep. `disabled` is the other half — searching switches
+   * reordering off, because a position among *matches* is not a position on the
+   * screen customers see.
+   */
+  const sortable = !disabled && ids.length > 1;
+
   const signature = ids.join(",");
   const draft = preview?.signature === signature ? preview.order : null;
 
@@ -926,6 +936,26 @@ export function useReorder({
     (id: string) => ({
       type: "button" as const,
       disabled,
+      /*
+       * Gone entirely on a list of one.
+       *
+       * A grip is a promise that the row can be moved somewhere, and on a
+       * single-row list there is nowhere: the gesture starts, nothing happens,
+       * and the operator is left wondering what they did wrong. `disabled`
+       * would be nearly as bad — a greyed handle says "not now", which invites
+       * a hunt for the thing that would enable it.
+       *
+       * Set **here** rather than at each call site. Six lists render this
+       * button and a seventh will be written; a rule that has to be repeated on
+       * every one of them is a rule the seventh forgets, and the failure is
+       * invisible because a handle that does nothing still looks like a handle.
+       *
+       * `hidden` rather than returning null, because the call sites spread this
+       * onto a button they own. It takes the element out of the layout *and*
+       * out of the accessibility tree, so the flex gap does not reserve a slot
+       * and the keyboard does not stop on it.
+       */
+      hidden: !sortable,
       "aria-label": t("reorder.handle", { name: labelOf(id) }),
       "aria-describedby": instructionsId,
       // Not `aria-grabbed`, which is deprecated and unimplemented. Pressed
@@ -944,6 +974,7 @@ export function useReorder({
     }),
     [
       disabled,
+      sortable,
       grabbed,
       instructionsId,
       labelOf,
@@ -974,6 +1005,17 @@ export function useReorder({
     ordered,
     rowProps,
     handleProps,
+    /**
+     * Whether there is anything to sort.
+     *
+     * False for a list of one — there is nowhere to move the only row — and
+     * false while reordering is switched off, which is what searching does.
+     *
+     * `handleProps` already hides the grip on its own, so a list needs this
+     * only for the things *around* the rows: the "drag to reorder" hint reads
+     * as an instruction nobody can follow when there is one row on screen.
+     */
+    sortable,
     /**
      * The row currently being carried, if any.
      *

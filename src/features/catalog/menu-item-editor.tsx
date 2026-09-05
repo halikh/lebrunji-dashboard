@@ -415,7 +415,11 @@ export function MenuItemEditor({
                 // reads; the chip is what the eye picks out of a list of five.
                 label: pickLocalized(tag.name),
                 render: (
-                  <TagChip tone={tag.tone} label={pickLocalized(tag.name)} />
+                  <TagChip
+                    tone={tag.tone}
+                    ink={tag.ink}
+                    label={pickLocalized(tag.name)}
+                  />
                 ),
               }))}
             />

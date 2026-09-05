@@ -127,7 +127,17 @@ export function StoreHours({ storeId }: { storeId: string }) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    /*
+      `h-full`, not `flex-1` — the note that used to sit on `BranchHours` below,
+      moved up to the element it is actually about.
+     *
+     * The tab pane around this is an ordinary block (`min-h-0 flex-1` on a
+     * div), so `flex-1` here meant nothing at all: this column grew to fit
+     * seven rows of pickers, the scroll container inside it never had a bound
+     * to scroll against, and the Save bar pinned to its foot went below the
+     * fold — on the one screen where it must not.
+     */
+    <div className="flex h-full min-h-0 flex-col">
       {rows.length > 1 && (
         <div className="flex shrink-0 items-center gap-md border-b border-border bg-surface px-xxl py-lg">
           <span className="shrink-0 text-[13px] font-semibold text-text-soft">
@@ -307,13 +317,17 @@ function Grid({
   }
 
   return (
-    // `h-full`, not `flex-1`.
-    //
-    // `flex-1` only means anything inside a flex container, and the tab wrapper
-    // around this is an ordinary block — so the pane grew to fit its content
-    // and pushed the Save row off the bottom of the screen, which is the one
-    // place it must never be.
-    <div className="flex h-full min-h-0 flex-col">
+    /*
+      `flex-1`, not `h-full` — and it is the opposite of what the wrapper above
+      needs, which is the whole point.
+     *
+     * That one meets a block parent and has to claim its height. This one is a
+     * child of *it*, a flex column that may also be carrying a branch picker
+     * above — so `h-full` would be 100% of a box this element does not have to
+     * itself, and the Save bar would hang exactly the picker's height below the
+     * bottom of the screen. `flex-1` takes what is left instead.
+     */
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* The grid sets the hours; the panel beside it reads them back.
           Seven rows of switches and pickers is the right shape for *setting* a
           week and the wrong one for *checking* it — "Mon–Fri 11:00–23:00,
