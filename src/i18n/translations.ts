@@ -1359,8 +1359,6 @@ const en = {
     amount: "Amount",
     atCurrent: "Now",
     atNew: "After",
-    sampleAmount: "{amount} {code}",
-    allIn: "All figures in {other}.",
     rateConfirmTitle: "Change the rate?",
     // The arithmetic, not a reassurance. An operator can check a worked example
     // against what they expected; they cannot check a bare number.

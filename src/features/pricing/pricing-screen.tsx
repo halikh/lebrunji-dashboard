@@ -12,6 +12,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useMoney } from "@/features/reference/use-currencies";
 import { t } from "@/i18n/translations";
+import { convertMoney, formatMoney } from "@/lib/money";
 import { formatDateTime } from "@/lib/time";
 
 import type { Band } from "./api/pricing";
@@ -242,13 +243,29 @@ function Rate() {
  * What the rate does to real amounts.
  *
  * A rate is an abstraction until it is multiplied by something. "89,500" is a
- * number nobody can sanity-check; "a 12.50 dish becomes 1,118,750" is a line a
- * merchant either recognises or does not — and recognising it is the only way a
- * mistyped digit gets caught before it reaches a customer.
+ * number nobody can sanity-check; "a $12.50 dish becomes ل.ل1,118,750" is a line
+ * a merchant either recognises or does not — and recognising it is the only way
+ * a mistyped digit gets caught before it reaches a customer.
  *
  * The second column is the rate **as typed**, before it is saved, so the two can
  * be compared side by side. That is the whole reason this sits beside the field
  * rather than under it, and why it appears only once the number has changed.
+ *
+ * ## Every figure is written by its own currency
+ *
+ * Both columns go through `formatMoney` and the `currencies` row behind them,
+ * so how many decimals a figure carries is `decimal_digits` — two for USD, none
+ * for LBP — along with the symbol and both separators. It used to be
+ * `toLocaleString`, hard-coded to two decimals on the left and none on the
+ * right, which is correct only for the pairing this catalogue happens to run: a
+ * base currency with cents converting into one without. Swap the two and the
+ * preview silently dropped the cents off every converted figure, on the one
+ * screen whose entire job is being checked against what somebody expected.
+ *
+ * The arithmetic is `convertMoney` — the same function the storefront converts
+ * with — rather than a multiplication written out here, so the preview and the
+ * app round the same way and reconcile the two currencies' decimal places the
+ * same way.
  */
 function Conversions({
   base,
@@ -261,9 +278,22 @@ function Conversions({
   current: number;
   next: number;
 }) {
+  const { currencies } = useMoney();
+
+  const from = currencies?.find((one) => one.code === base);
+  const to = currencies?.find((one) => one.code === other);
+
+  // Nothing rather than a guess, for the reason `decimalsOf` gives: a figure
+  // formatted against an assumed scale is indistinguishable from a real one,
+  // and this panel exists to be read as a fact. The rate editor beside it is
+  // the screen; this is the check, and a check nobody can trust is worse than
+  // a check that arrives a moment later.
+  if (!from || !to) return null;
+
   // A spread of the amounts this catalogue deals in: a coffee, a dish, a large
   // order, a week of them. Round numbers, because the point is to be
-  // recognisable rather than exact.
+  // recognisable rather than exact — said in the base currency's major units,
+  // and rounded to what that currency can actually hold.
   const samples = [2, 12.5, 50, 500];
   const changed = Math.abs(next - current) > 0.0000005;
 
@@ -281,41 +311,39 @@ function Conversions({
       <div className="flex max-w-[520px] flex-col gap-xs rounded-md border border-border bg-surface p-lg">
         <div className="flex items-baseline gap-md border-b border-border pb-sm text-[12px] font-bold uppercase tracking-wide text-text-faint">
           <span className="flex-grow">{t("pricing.amount")}</span>
-          <span className="w-[120px] text-end">{t("pricing.atCurrent")}</span>
+          <span className="w-[140px] text-end">{t("pricing.atCurrent")}</span>
           {changed && (
-            <span className="w-[120px] text-end text-active-deep">
+            <span className="w-[140px] text-end text-active-deep">
               {t("pricing.atNew")}
             </span>
           )}
         </div>
 
-        {samples.map((amount) => (
-          <div
-            key={amount}
-            className="flex items-baseline gap-md py-xs text-[14px]"
-          >
-            <span className="flex-grow tabular-nums">
-              {t("pricing.sampleAmount", {
-                amount: amount.toLocaleString("en-GB", {
-                  minimumFractionDigits: 2,
-                }),
-                code: base,
-              })}
-            </span>
-            <span className="w-[120px] text-end tabular-nums text-text-soft">
-              {Math.round(amount * current).toLocaleString("en-GB")}
-            </span>
-            {changed && (
-              <span className="w-[120px] text-end font-semibold tabular-nums text-active-deep">
-                {Math.round(amount * next).toLocaleString("en-GB")}
-              </span>
-            )}
-          </div>
-        ))}
+        {samples.map((amount) => {
+          // Minor units of the base currency — the only form the rest of this
+          // happens in, because `convertMoney` takes and returns them and it is
+          // where the two currencies' decimal places are reconciled.
+          const minor = Math.round(amount * 10 ** from.decimalDigits);
 
-        <span className="pt-sm text-[12px] text-text-faint">
-          {t("pricing.allIn", { other })}
-        </span>
+          return (
+            <div
+              key={amount}
+              className="flex items-baseline gap-md py-xs text-[14px]"
+            >
+              <span className="flex-grow tabular-nums">
+                {formatMoney(minor, from)}
+              </span>
+              <span className="w-[140px] text-end tabular-nums text-text-soft">
+                {formatMoney(convertMoney(minor, from, { ...to, rate: current }), to)}
+              </span>
+              {changed && (
+                <span className="w-[140px] text-end font-semibold tabular-nums text-active-deep">
+                  {formatMoney(convertMoney(minor, from, { ...to, rate: next }), to)}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </aside>
   );
