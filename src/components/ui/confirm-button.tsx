@@ -110,12 +110,7 @@ export function ConfirmButton({
    *   screen whose whole purpose is that one button.
    */
   triggerVariant?:
-    | "quiet"
-    | "secondary"
-    | "primary"
-    | "danger"
-    | "danger-quiet"
-    | "accent";
+    "quiet" | "secondary" | "primary" | "danger" | "danger-quiet" | "accent";
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);

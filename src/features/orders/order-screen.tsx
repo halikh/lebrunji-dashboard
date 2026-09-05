@@ -8,7 +8,7 @@ import { Copyable } from "@/components/ui/copyable";
 import { useConfirmLeave } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
-import { formatDayAndTime } from "@/lib/time";
+import { useClock } from "@/features/settings/use-clock";
 
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import type { TranslationKey } from "@/i18n/translations";
@@ -49,6 +49,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
 ];
 
 export function OrderScreen({ id }: { id: string }) {
+  const clock = useClock();
   const statuses = useOrderStatuses();
   const order = useOrder(id);
 
@@ -142,7 +143,7 @@ export function OrderScreen({ id }: { id: string }) {
               <Copyable value={order.data.code} label={t("orders.copyCode")} />
             </h1>
             <span className="text-[13px] text-text-faint">
-              {t("orders.placed")} {formatDayAndTime(order.data.placedAt)}
+              {t("orders.placed")} {clock.dayAndTime(order.data.placedAt)}
             </span>
           </div>
 

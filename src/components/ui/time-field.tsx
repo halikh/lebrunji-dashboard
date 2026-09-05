@@ -2,6 +2,7 @@
 
 import DatePicker from "react-datepicker";
 
+import { useClock } from "@/features/settings/use-clock";
 import { t } from "@/i18n/translations";
 
 import { useFieldWiring } from "./field";
@@ -48,7 +49,7 @@ export function TimeField({
   invalid,
   className,
 }: {
-  /** `HH:MM`, 24-hour. */
+  /** `HH:MM`, 24-hour — what the column holds, whatever the picker shows. */
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -56,6 +57,7 @@ export function TimeField({
   className?: string;
 }) {
   const field = useFieldWiring();
+  const clock = useClock();
   const isInvalid = invalid ?? field?.invalid ?? false;
 
   return (
@@ -68,17 +70,25 @@ export function TimeField({
       showTimeSelectOnly
       timeIntervals={15}
       timeCaption={t("hours.time")}
-      // 24-hour, stated rather than inherited. The whole point is that the
-      // shop's hours read the same on every machine.
-      dateFormat="HH:mm"
-      timeFormat="HH:mm"
-      placeholderText="09:00"
+      // The shop's format, stated rather than inherited — which is the same
+      // point as before, made against the right authority. The machine's
+      // locale is still not consulted; what decides is `app_settings`, so the
+      // hours read identically on every laptop that opens the dashboard and
+      // read the way this shop writes times.
+      //
+      // `h:mm aa` is date-fns for `2:32 PM`, which is character for character
+      // what `formatClockString` produces — the picker and the summary above it
+      // are showing the same hours and must not disagree about how.
+      dateFormat={clock.clock24h ? "HH:mm" : "h:mm aa"}
+      timeFormat={clock.clock24h ? "HH:mm" : "h:mm aa"}
+      placeholderText={clock.clock24h ? "09:00" : "9:00 AM"}
       aria-describedby={field?.describedBy}
       // The library types this as a string, which is what the attribute is in
       // HTML — React would have taken the boolean.
       aria-invalid={isInvalid ? "true" : undefined}
       className={cx(
-        "w-[104px] rounded-md border bg-surface px-md py-sm text-[14px] tabular-nums",
+        clock.clock24h ? "w-[104px]" : "w-[124px]",
+        "rounded-md border bg-surface px-md py-sm text-[14px] tabular-nums",
         isInvalid ? "border-danger" : "border-border",
         className,
       )}

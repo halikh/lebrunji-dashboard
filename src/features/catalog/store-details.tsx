@@ -2,29 +2,18 @@
 
 import { useState } from "react";
 
-import { Button, Input } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { Field } from "@/components/ui/field";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
-import { Map } from "@/components/ui/map";
-import { NumberInput } from "@/components/ui/number-input";
-import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
-import { digitsOf } from "@/lib/phone";
 import { useLanguages } from "@/features/reference/use-languages";
 import { useMoney } from "@/features/reference/use-currencies";
-import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
-import { parseLocation } from "@/lib/location";
 import { restatePrice } from "@/lib/money";
-import {
-  validateLocalizedText,
-  validatePhone,
-  validatePrepWindow,
-  type Localized,
-} from "@/lib/validation";
+import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import type { CurrencyChangeMode, Store } from "./api/stores";
 import { useMenu } from "./use-menu";
@@ -40,14 +29,47 @@ import { useSetStoreCurrency, useStore, useUpdateStore } from "./use-stores";
  * editing, because after the first day you come here to change one thing. This
  * is that page. A shop is created a handful of times ever and edited for years.
  *
- * ## The pin is the one that costs money
+ * ## The place is not here any more
  *
- * `latitude` and `longitude` are null until somebody sets them, and that is not
- * cosmetic. With no pin `delivery_quote` cannot work out a distance, and
- * `delivery_fee_for_km` charges an unknown distance at the **top band** — so an
- * unpinned shop quietly overcharges every customer it has, and nobody finds out
- * from this screen. It says so, in place, rather than leaving it to be
- * discovered on somebody's bill.
+ * The pin, the prep window and the WhatsApp number moved to the Branches tab
+ * with `0101`. All three are facts about an address, and a shop with two
+ * addresses cannot answer any of them once. What is left here is the brand:
+ * the name, the picture, the category and the currency, which are the same
+ * wherever it trades.
+ *
+ * ## Why it is here at all
+ *
+ * The wizard asks for it once and nothing showed it again, so a shop's currency
+ * was invisible after the day it was created: an operator opening a shop
+ * somebody else set up could only infer it from a formatted price, and could
+ * not correct a wrong pick at all. Choosing the wrong one is a first-minute
+ * mistake, and it had no first-minute fix.
+ *
+ * ## It saves with the page, and that is the whole point
+ *
+ * The first version of this gave the currency its own apply button, on the
+ * reasoning that it is more consequential than a renamed shop and deserved its
+ * own deliberate act. That reasoning was fine and the result was a bug: the
+ * page has one large Save at the bottom, so an operator changed the dropdown,
+ * pressed Save, watched every other field save, and saw the currency snap back
+ * on the refetch. A field that ignores the page's Save button is a field that
+ * does not work, however well argued.
+ *
+ * So there is one Save and it saves everything. The consequence is shown in
+ * place instead, live, the moment the value differs.
+ *
+ * ## Nothing is converted, and the screen says so
+ *
+ * Prices are minor units in a column with no currency of its own, so this
+ * changes what they mean without changing a digit — and across USD and LBP that
+ * is a decimal-scale shift as well as a rate. Rather than describing that, the
+ * warning shows it: a real price off this menu, rendered both ways. "The scale
+ * differs" is a sentence somebody can read and still not believe.
+ *
+ * No modal, deliberately. It hangs off the page's Save, which also carries
+ * unrelated edits, so a dialog would interrupt somebody who only fixed a
+ * typo in the name. The change is exactly reversible — no row is rewritten —
+ * and the warning is unmissable and sits against the control that caused it.
  */
 export function StoreDetails({ storeId }: { storeId: string }) {
   const store = useStore(storeId);
@@ -86,43 +108,6 @@ export function StoreDetails({ storeId }: { storeId: string }) {
   return <Form key={store.data.id} store={store.data} />;
 }
 
-/**
- * What the shop prices in — and what changing it actually does.
- *
- * ## Why it is here at all
- *
- * The wizard asks for it once and nothing showed it again, so a shop's currency
- * was invisible after the day it was created: an operator opening a shop
- * somebody else set up could only infer it from a formatted price, and could
- * not correct a wrong pick at all. Choosing the wrong one is a first-minute
- * mistake, and it had no first-minute fix.
- *
- * ## It saves with the page, and that is the whole point
- *
- * The first version of this gave the currency its own apply button, on the
- * reasoning that it is more consequential than a renamed shop and deserved its
- * own deliberate act. That reasoning was fine and the result was a bug: the
- * page has one large Save at the bottom, so an operator changed the dropdown,
- * pressed Save, watched every other field save, and saw the currency snap back
- * on the refetch. A field that ignores the page's Save button is a field that
- * does not work, however well argued.
- *
- * So there is one Save and it saves everything. The consequence is shown in
- * place instead, live, the moment the value differs.
- *
- * ## Nothing is converted, and the screen says so
- *
- * Prices are minor units in a column with no currency of its own, so this
- * changes what they mean without changing a digit — and across USD and LBP that
- * is a decimal-scale shift as well as a rate. Rather than describing that, the
- * warning shows it: a real price off this menu, rendered both ways. "The scale
- * differs" is a sentence somebody can read and still not believe.
- *
- * No modal, deliberately. It hangs off the page's Save, which also carries
- * unrelated edits, so a dialog would interrupt somebody who only fixed a
- * typo in the name. The change is exactly reversible — no row is rewritten —
- * and the warning is unmissable and sits against the control that caused it.
- */
 function CurrencySection({
   value,
   onChange,
@@ -250,45 +235,24 @@ function Form({ store }: { store: Store }) {
    */
   const [mode, setMode] = useState<CurrencyChangeMode>("keep");
   const [imageUrl, setImageUrl] = useState<string | null>(store.imageUrl);
-  const [whatsapp, setWhatsapp] = useState(store.whatsappPhone ?? "");
-  const [prepMin, setPrepMin] = useState(String(store.prepMinMinutes));
-  const [prepMax, setPrepMax] = useState(String(store.prepMaxMinutes));
-  const [pin, setPin] = useState(
-    store.latitude !== null && store.longitude !== null
-      ? `${store.latitude}, ${store.longitude}`
-      : "",
-  );
 
   // `mode` is left out on purpose: it is a question *about* a currency change
   // rather than a value of its own, and it cannot be reached without moving
   // `currencyCode` first — which is compared.
   useUnsavedChanges(
     changed(
-      { name, currencyCode, imageUrl, whatsapp, prepMin, prepMax, pin },
+      { name, currencyCode, imageUrl },
       {
         name: store.name,
         currencyCode: store.currencyCode,
         imageUrl: store.imageUrl,
-        whatsapp: store.whatsappPhone ?? "",
-        prepMin: String(store.prepMinMinutes),
-        prepMax: String(store.prepMaxMinutes),
-        pin:
-          store.latitude !== null && store.longitude !== null
-            ? `${store.latitude}, ${store.longitude}`
-            : "",
       },
     ),
   );
 
   const [errors, setErrors] = useState<{
     name?: string;
-    prep?: string;
-    whatsapp?: string;
-    pin?: string;
   }>({});
-
-  const located = parseLocation(pin);
-  const coordinates = located.ok ? located : null;
 
   const currencyMoved =
     currencyCode !== "" && currencyCode !== store.currencyCode;
@@ -325,43 +289,14 @@ function Form({ store }: { store: Store }) {
       : null;
 
   async function save() {
-    const min = Number(prepMin);
-    const max = Number(prepMax);
-
     const nameCheck = validateLocalizedText(name, codes, TEXT.name);
-    const prepCheck = validatePrepWindow(min, max);
-    const phoneCheck = validatePhone(digitsOf(whatsapp));
 
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
-      prep: prepCheck.ok ? undefined : t(prepCheck.key, prepCheck.params),
-      // Empty is fine — the field is optional. The rule itself lives in
-      // `validatePhone`, which is the CHECK constraint's, so the wizard and the
-      // driver form cannot drift from this one.
-      whatsapp:
-        whatsapp.trim() === "" || phoneCheck.ok
-          ? undefined
-          : t(phoneCheck.key, phoneCheck.params),
-      // An empty box is "no pin", which is a legitimate state — a shop can be
-      // saved without one, with the warning above. Text that is not a location
-      // is not, and saving null for it would look exactly like success while
-      // leaving the shop unpinned.
-      //
-      // The two failures are told apart, because one of them has an obvious
-      // next step and the other does not: a shortened link needs opening once,
-      // and saying so beats "that is not a coordinate pair" about something
-      // that plainly is a map link.
-      pin: located.ok
-        ? undefined
-        : located.reason === "empty"
-          ? undefined
-          : located.reason === "shortened"
-            ? t("store.pinShortened")
-            : t("store.pinInvalid"),
     };
 
     setErrors(found);
-    if (found.name || found.prep || found.pin || found.whatsapp) return;
+    if (found.name) return;
 
     /*
      * The currency first, and only if it moved.
@@ -396,13 +331,6 @@ function Form({ store }: { store: Store }) {
       patch: {
         name,
         imageUrl,
-        whatsappPhone: whatsapp.trim() || null,
-        prepMinMinutes: min,
-        prepMaxMinutes: max,
-        // Both or neither. Half a pin is a row that passes every constraint and
-        // means nothing.
-        latitude: coordinates?.latitude ?? null,
-        longitude: coordinates?.longitude ?? null,
       },
       name: store.name,
     });
@@ -481,111 +409,7 @@ function Form({ store }: { store: Store }) {
             onModeChange={setMode}
             preview={preview}
           />
-
-          <section className="flex flex-col gap-lg">
-            <h2 className="ps-md text-[17px]">{t("store.prepTitle")}</h2>
-
-            {/* One field would be a lie — a kitchen quotes a range, and the app
-              shows both ends of it. The error belongs to the pair rather than
-              to either box, because "the smaller one is bigger" is not a fact
-              about one number. */}
-            <Field
-              label={t("store.prepWindow")}
-              hint={t("store.prepHint")}
-              error={errors.prep}
-            >
-              <div className="flex items-center gap-sm">
-                <NumberInput
-                  value={prepMin}
-                  onChange={(event) => setPrepMin(event.target.value)}
-                  min={1}
-                  placeholder="15"
-                  className="w-[96px]"
-                />
-                <span className="text-[14px] text-text-soft">
-                  {t("store.prepTo")}
-                </span>
-                <NumberInput
-                  value={prepMax}
-                  onChange={(event) => setPrepMax(event.target.value)}
-                  min={1}
-                  placeholder="30"
-                  className="w-[96px]"
-                />
-                <span className="text-[14px] text-text-soft">
-                  {t("store.minutes")}
-                </span>
-              </div>
-            </Field>
-
-            {/* Where the order is sent so the kitchen can start. Optional, and
-                the hint says what happens without it rather than leaving an
-                empty field to be wondered about — a shop with no number simply
-                does not appear on the send list. */}
-            <Field
-              label={t("store.whatsapp")}
-              hint={t("store.whatsappHint")}
-              error={errors.whatsapp}
-            >
-              <PhoneInput
-                value={whatsapp}
-                onChange={setWhatsapp}
-                placeholder={t("store.whatsappPlaceholder")}
-              />
-            </Field>
-          </section>
         </div>
-
-        {/* Sticky, so the map stays in view while the fields on the left are
-            worked through. It is the reference the other column is edited
-            against, not a section that comes after it. */}
-        <section className="flex flex-col gap-lg p-xxl pt-0 lg:sticky lg:top-0 lg:flex-1 lg:self-start lg:ps-0 lg:pt-xxl">
-          <h2 className="ps-md text-[17px]">{t("store.locationTitle")}</h2>
-
-          {/* Said here, not left to be found on a customer's bill. */}
-          {!coordinates && (
-            <p
-              role="status"
-              className="rounded-md border border-danger-wash bg-danger-wash/40 px-lg py-md text-[13px] text-text"
-            >
-              {t("store.noPinWarning")}
-            </p>
-          )}
-
-          <Field
-            label={t("store.pin")}
-            hint={t("store.pinHint")}
-            error={errors.pin}
-          >
-            {/*
-              One box taking a pasted pair, rather than two number fields.
-              Nobody knows a shop's latitude; they get it by right-clicking the
-              place in Google Maps, where "33.8938, 35.5018" is what lands on
-              the clipboard. Splitting it into two fields makes the operator cut
-              that string in half by hand, which is a step that exists only
-              because of how the form was drawn.
-            */}
-            <Input
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-              placeholder="33.8938, 35.5018"
-              inputMode="text"
-            />
-          </Field>
-
-          {/* As tall as the column allows. A map the size of a thumbnail
-              answers "is there a pin"; a large one answers "is it the right
-              building", which is the question that matters — and it is the
-              reason this column exists rather than the fields simply being
-              wider. */}
-          <Map
-            latitude={coordinates?.latitude ?? null}
-            longitude={coordinates?.longitude ?? null}
-            label={pickLocalized(name)}
-            emptyKey="store.noPinYet"
-            className="min-h-[240px] w-full flex-1 rounded-md"
-          />
-        </section>
       </div>
 
       {/* Pinned, like the item editor's. On a form this long the operator

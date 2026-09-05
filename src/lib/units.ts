@@ -70,7 +70,8 @@ const SCALE: Record<PriceUnit, { canonical: PriceUnit; factor: number }> = {
  * the vocabulary reads as "no unit" rather than crashing a menu.
  */
 export function asPriceUnit(value: unknown): PriceUnit | null {
-  return typeof value === "string" && (PRICE_UNITS as readonly string[]).includes(value)
+  return typeof value === "string" &&
+    (PRICE_UNITS as readonly string[]).includes(value)
     ? (value as PriceUnit)
     : null;
 }

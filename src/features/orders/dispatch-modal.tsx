@@ -18,6 +18,8 @@ import { formatPhone } from "@/lib/phone";
 import { isOpenNow } from "@/lib/week";
 
 import type { Order, OrderLine } from "./api/orders";
+import { useClock } from "@/features/settings/use-clock";
+
 import { dispatchMessage, kitchenMessage, whatsappLink } from "./dispatch";
 
 /**
@@ -67,6 +69,7 @@ export function DispatchModal({
   onClose: () => void;
 }) {
   const titleId = useId();
+  const clock = useClock();
   const { currencies } = useMoney();
   const record = useRecordDispatch();
 
@@ -101,6 +104,10 @@ export function DispatchModal({
   const message = dispatchMessage(
     { ...order, lines },
     currencies?.find((one) => one.code === order.currencyCode),
+    // The driver reads this on their own phone, so it is the *shop's* format
+    // that has to reach it — the message is composed here and sent from a
+    // device that has no idea what this setting says.
+    clock.clock24h,
   );
 
   return (
@@ -151,7 +158,11 @@ export function DispatchModal({
                   key={portion.id}
                   href={whatsappLink(
                     portion.storeWhatsapp,
-                    kitchenMessage({ ...order, lines }, portion.id),
+                    kitchenMessage(
+                      { ...order, lines },
+                      portion.id,
+                      clock.clock24h,
+                    ),
                   )}
                   target="_blank"
                   rel="noreferrer"

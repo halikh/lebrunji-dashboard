@@ -175,7 +175,11 @@ export const BUSINESS_DAY_STARTS_AT = 8;
  * are already Beirut's, so nothing about offsets or the machine's zone reaches
  * the answer.
  */
-function shiftDate(instant: Date): { year: number; month: number; day: number } {
+function shiftDate(instant: Date): {
+  year: number;
+  month: number;
+  day: number;
+} {
   const clock = toWallClock(instant);
   const rolled = new Date(
     Date.UTC(
@@ -237,13 +241,29 @@ export function isSameBusinessDay(a: Date, b: Date): boolean {
 // Every formatter names the zone. A screen that showed one time in Beirut and
 // another in the machine's zone would be worse than one that got them all
 // wrong, because the inconsistency is what nobody notices.
-
-const timeFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: BUSINESS_TIMEZONE,
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
+//
+// ## Why `clock24h` is an argument rather than something this module reads
+//
+// It is `app_settings.clock_24h`. It arrives over the network and it can change
+// while the dashboard is open. A module-level copy would have to be told when
+// it moved, and every screen that had already rendered would go on showing the
+// old format until something unrelated re-rendered it — which is a subtler
+// version of the bug this had, where the toggle was written to the database and
+// read by nothing.
+//
+// Passing it in makes it ordinary React data instead: `useClock()` reads it from
+// the query cache, and the toggle invalidating that cache re-renders every
+// screen that shows a time. It also keeps this file pure, so `dispatchMessage`
+// — which is not a component and formats a time into a WhatsApp message — can
+// be handed the same value its caller is rendering with.
+//
+// ## And why the 12-hour form is written out here rather than left to `Intl`
+//
+// `hour12: true` gives `2:32 pm` under `en-GB` and `2:32 PM` under `en-US`, and
+// which of those an engine produces moves with its ICU version. Those strings
+// also have to agree with `TimeField`, whose picker is formatted by a date-fns
+// pattern inside a library. So the shape is spelled once, below, and everything
+// that shows a time matches by construction rather than by coincidence.
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: BUSINESS_TIMEZONE,
@@ -252,28 +272,73 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
-const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+const dayMonthFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: BUSINESS_TIMEZONE,
   day: "numeric",
   month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
 });
 
-/** `14:32` */
-export function formatTime(instant: Date | string): string {
-  return timeFormatter.format(asDate(instant));
+/**
+ * An hour and a minute, in the shop's format.
+ *
+ * The one place either shape is written. `% 12` alone gets the two ends of the
+ * day wrong — midnight and noon both land on `0`, and `0:30 AM` is not a time
+ * anybody writes.
+ */
+function clockLabel(hour: number, minute: number, clock24h: boolean): string {
+  const minutes = String(minute).padStart(2, "0");
+  if (clock24h) return `${String(hour).padStart(2, "0")}:${minutes}`;
+  const twelve = hour % 12 === 0 ? 12 : hour % 12;
+  return `${twelve}:${minutes} ${hour < 12 ? "AM" : "PM"}`;
 }
 
-/** `30 Aug 2026` */
+/** `14:32`, or `2:32 PM`. */
+export function formatTime(instant: Date | string, clock24h: boolean): string {
+  const clock = toWallClock(asDate(instant));
+  return clockLabel(clock.hour, clock.minute, clock24h);
+}
+
+/** `30 Aug 2026` — no clock in it, so the shop's format cannot reach it. */
 export function formatDate(instant: Date | string): string {
   return dateFormatter.format(asDate(instant));
 }
 
-/** `30 Aug, 14:32` */
-export function formatDateTime(instant: Date | string): string {
-  return dateTimeFormatter.format(asDate(instant));
+/** `30 Aug, 14:32`, or `30 Aug, 2:32 PM`. */
+export function formatDateTime(
+  instant: Date | string,
+  clock24h: boolean,
+): string {
+  const date = asDate(instant);
+  return `${dayMonthFormatter.format(date)}, ${formatTime(date, clock24h)}`;
+}
+
+/**
+ * A stored `HH:MM` in the shop's format.
+ *
+ * Opening hours are **text**, not instants — `store_hours.opens_at` is a wall
+ * clock with no date and no zone, and `courier_hours` is the same. So this
+ * takes the string apart rather than going anywhere near `Date`: there is no
+ * instant to convert, and inventing one to borrow a formatter is how a shop
+ * that opens at nine starts opening at eight for half the year.
+ *
+ * Anything that is not `HH:MM` comes back untouched. These strings are also
+ * half-typed in a picker, and a formatter that returned `NaN:00 PM` mid-edit
+ * would be worse than one that shows what is there.
+ */
+export function formatClockString(value: string, clock24h: boolean): string {
+  const parts = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!parts) return value;
+
+  const hour = Number(parts[1]);
+  const minute = Number(parts[2]);
+  if (hour > 23 || minute > 59) return value;
+
+  return clockLabel(hour, minute, clock24h);
+}
+
+/** A whole hour on its own — `08:00`, or `8:00 AM`. */
+export function formatHour(hour: number, clock24h: boolean): string {
+  return clockLabel(hour, 0, clock24h);
 }
 
 /**
@@ -401,14 +466,17 @@ export function formatRelative(
  */
 export function formatDayAndTime(
   instant: Date | string,
+  clock24h: boolean,
   now: Date = new Date(),
 ): string {
   const date = asDate(instant);
-  if (isSameBusinessDay(date, now)) return `Today, ${formatTime(date)}`;
-  if (isSameBusinessDay(date, startOfBusinessDayPlus(-1, now))) {
-    return `Yesterday, ${formatTime(date)}`;
+  if (isSameBusinessDay(date, now)) {
+    return `Today, ${formatTime(date, clock24h)}`;
   }
-  return formatDateTime(date);
+  if (isSameBusinessDay(date, startOfBusinessDayPlus(-1, now))) {
+    return `Yesterday, ${formatTime(date, clock24h)}`;
+  }
+  return formatDateTime(date, clock24h);
 }
 
 /** ISO strings arrive from PostgREST; `Date`s come from the code. */

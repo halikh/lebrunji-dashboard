@@ -336,7 +336,8 @@ export async function createOptionGroup(
   if (error) throw new Error(friendly(error.message));
 
   const id = data.id as string;
-  if (draft.itemIds.length > 0) await offerGroupOn(id, draft.itemIds, sortOrder);
+  if (draft.itemIds.length > 0)
+    await offerGroupOn(id, draft.itemIds, sortOrder);
   return id;
 }
 
@@ -699,7 +700,9 @@ export async function fetchStoreQuestions(
   // every choice offered on every dish — the exact state this read exists to
   // contradict, drawn with no sign that anything went wrong.
   if (exclusions.error) {
-    throw new Error(`Could not read the questions: ${exclusions.error.message}`);
+    throw new Error(
+      `Could not read the questions: ${exclusions.error.message}`,
+    );
   }
 
   const excludedByGroup = groupExclusions(
@@ -725,7 +728,8 @@ export async function fetchStoreQuestions(
     const defaultOn = new Map<string, string>();
     for (const link of links) {
       const optionId = link.default_option_id as string | null;
-      if (optionId !== null) defaultOn.set(link.menu_item_id as string, optionId);
+      if (optionId !== null)
+        defaultOn.set(link.menu_item_id as string, optionId);
     }
 
     return {

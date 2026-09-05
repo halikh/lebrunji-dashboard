@@ -135,17 +135,15 @@ export async function createCategory(
   draft: CategoryDraft,
   sortOrder: number,
 ): Promise<void> {
-  const { error } = await getClient()
-    .from("categories")
-    .insert({
-      category_kind_id: draft.kindId,
-      name: draft.name,
-      is_active: draft.isActive,
-      has_menu_nav: draft.hasMenuNav,
-      sort_order: sortOrder,
-      // No `slug`: the trigger from migration 0071 derives one from the English
-      // name and makes it unique, which a client cannot do without racing.
-    });
+  const { error } = await getClient().from("categories").insert({
+    category_kind_id: draft.kindId,
+    name: draft.name,
+    is_active: draft.isActive,
+    has_menu_nav: draft.hasMenuNav,
+    sort_order: sortOrder,
+    // No `slug`: the trigger from migration 0071 derives one from the English
+    // name and makes it unique, which a client cannot do without racing.
+  });
 
   if (error) throw new Error(friendly(error.message));
 }

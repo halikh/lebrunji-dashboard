@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { t } from "@/i18n/translations";
-import { formatDayAndTime } from "@/lib/time";
+import { useClock } from "@/features/settings/use-clock";
 import { Price } from "@/features/reference/price";
 
 import { fetchAmendments, fetchHandovers } from "./api/history";
@@ -35,6 +35,7 @@ import type { Order } from "./api/orders";
  * rather than showing two empty headings.
  */
 export function OrderHistory({ order }: { order: Order }) {
+  const clock = useClock();
   const amendments = useQuery({
     queryKey: ["orders", order.id, "amendments"],
     queryFn: () => fetchAmendments(order.id),
@@ -133,7 +134,7 @@ export function OrderHistory({ order }: { order: Order }) {
           className="flex flex-col gap-xs rounded-lg border border-border bg-surface p-lg"
         >
           <span className="text-[12px] text-text-faint">
-            {formatDayAndTime(entry.at)}
+            {clock.dayAndTime(entry.at)}
           </span>
           {entry.node}
         </div>

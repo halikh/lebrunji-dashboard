@@ -108,16 +108,16 @@ describe("offeredOn", () => {
 
   it("keeps the question's own default when the dish has not been pinned", () => {
     const shown = offeredOn(SIZES, new Set(["large"]), null);
-    expect(shown.filter((choice) => choice.isDefault).map((c) => c.id)).toEqual([
-      "medium",
-    ]);
+    expect(shown.filter((choice) => choice.isDefault).map((c) => c.id)).toEqual(
+      ["medium"],
+    );
   });
 
   it("lets a dish open on its own answer instead", () => {
     const shown = offeredOn(SIZES, nothingExcluded, "small");
-    expect(shown.filter((choice) => choice.isDefault).map((c) => c.id)).toEqual([
-      "small",
-    ]);
+    expect(shown.filter((choice) => choice.isDefault).map((c) => c.id)).toEqual(
+      ["small"],
+    );
   });
 
   it("clears the question's default when the dish pins another", () => {

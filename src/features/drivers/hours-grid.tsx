@@ -3,6 +3,7 @@
 import { Toggle } from "@/components/ui/toggle";
 import { TimeField } from "@/components/ui/time-field";
 import { cx } from "@/components/ui";
+import { useClock } from "@/features/settings/use-clock";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { BUSINESS_TIMEZONE } from "@/lib/time";
 import { isOpenNow, summarise } from "@/lib/week";
@@ -58,6 +59,7 @@ export function HoursGrid({
   week: DayHours[];
   onChange: (next: DayHours[]) => void;
 }) {
+  const clock = useClock();
   const dayOf = (index: number) =>
     week.find((one) => one.dayOfWeek === index) ?? null;
 
@@ -153,7 +155,7 @@ export function HoursGrid({
                   }
                 >
                   {span.open
-                    ? `${span.opensAt}–${span.closesAt}`
+                    ? `${clock.hhmm(span.opensAt)}–${clock.hhmm(span.closesAt)}`
                     : t("hours.closed")}
                 </span>
               </li>

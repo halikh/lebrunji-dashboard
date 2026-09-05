@@ -6,7 +6,7 @@ import { Button } from "@/components/ui";
 import { Copyable } from "@/components/ui/copyable";
 import { Panel } from "@/components/ui/panel";
 import { t } from "@/i18n/translations";
-import { formatDayAndTime } from "@/lib/time";
+import { useClock } from "@/features/settings/use-clock";
 
 import { OrderActions, OrderBody, PanelSkeleton } from "./order-detail";
 import { useOrder, useOrderStatuses } from "./use-orders";
@@ -39,6 +39,7 @@ export function OrderPanel({
   orderId: string | null;
   onClose: () => void;
 }) {
+  const clock = useClock();
   const statuses = useOrderStatuses();
   const order = useOrder(orderId);
 
@@ -75,7 +76,7 @@ export function OrderPanel({
                 />
               </h2>
               <span className="text-[13px] text-text-faint">
-                {t("orders.placed")} {formatDayAndTime(order.data.placedAt)}
+                {t("orders.placed")} {clock.dayAndTime(order.data.placedAt)}
               </span>
 
               {/* The way out to the full page. Quiet and small: it leaves the

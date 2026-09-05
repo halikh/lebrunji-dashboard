@@ -11,6 +11,7 @@ import { TimeField } from "@/components/ui/time-field";
 import { useUnsavedChanges } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 
+import { useClock } from "@/features/settings/use-clock";
 import { BUSINESS_TIMEZONE, toWallClock } from "@/lib/time";
 import { isOpenAt, summarise, type DayWindow } from "@/lib/week";
 
@@ -230,6 +231,7 @@ function Grid({
   pending: boolean;
   onSave: (week: DayHours[]) => void;
 }) {
+  const clock = useClock();
   const [week, setWeek] = useState<Draft[]>(() =>
     WEEK.map((day) => {
       const row = saved.find((one) => one.dayOfWeek === day);
@@ -403,8 +405,8 @@ function Grid({
               fullWidth
             >
               {t("hours.copyToAll", {
-                opens: template.opensAt,
-                closes: template.closesAt,
+                opens: clock.hhmm(template.opensAt),
+                closes: clock.hhmm(template.closesAt),
               })}
             </Button>
           )}
@@ -460,6 +462,7 @@ function Summary({
   /** Rendered under "Right now" — see the call site. */
   children?: ReactNode;
 }) {
+  const clock = useClock();
   const windows = toWindows(week);
   const now = toWallClock(new Date());
 
@@ -534,7 +537,7 @@ function Summary({
                 }
               >
                 {span.open
-                  ? `${span.opensAt}–${span.closesAt}`
+                  ? `${clock.hhmm(span.opensAt)}–${clock.hhmm(span.closesAt)}`
                   : t("hours.closed")}
               </span>
             </li>

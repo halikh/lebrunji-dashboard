@@ -22,7 +22,8 @@ import { useConfirmLeave } from "@/components/unsaved-changes";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
 import { formatPhone } from "@/lib/phone";
-import { formatDate, formatDateTime, formatMonthKey } from "@/lib/time";
+import { useClock } from "@/features/settings/use-clock";
+import { formatDate, formatMonthKey } from "@/lib/time";
 
 import type {
   CustomerAddress,
@@ -104,6 +105,7 @@ function label(code: string | null): string {
 }
 
 export function CustomerProfile({ id }: { id: string }) {
+  const clock = useClock();
   const router = useRouter();
   const confirmLeave = useConfirmLeave();
   const pathname = usePathname();
@@ -308,7 +310,7 @@ export function CustomerProfile({ id }: { id: string }) {
             />
 
             <span className="text-[12px] text-text-faint">
-              {t("customers.joined", { when: formatDateTime(row.createdAt) })}
+              {t("customers.joined", { when: clock.dateTime(row.createdAt) })}
             </span>
 
             <StatusChip customer={row} />

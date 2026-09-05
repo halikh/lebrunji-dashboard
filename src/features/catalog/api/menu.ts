@@ -675,8 +675,7 @@ function toItem(row: Record<string, unknown>): MenuItem {
     // `numeric` arrives as a string from PostgREST — it is arbitrary precision
     // and JSON has no type for that. Parsed once here rather than in each
     // screen, where the first one to forget would compare "500" to 500.
-    unitQuantity:
-      row.unit_quantity == null ? null : Number(row.unit_quantity),
+    unitQuantity: row.unit_quantity == null ? null : Number(row.unit_quantity),
     sortOrder: row.sort_order as number,
     // An embed with nothing in it comes back as `[]`, so an untagged dish and
     // a dish whose links were not asked for look identical here. Every read
@@ -943,6 +942,7 @@ function firstItemName(links: unknown): Localized {
 
 function one(value: unknown): Record<string, unknown> | undefined {
   if (Array.isArray(value)) return value[0] as Record<string, unknown>;
-  if (value && typeof value === "object") return value as Record<string, unknown>;
+  if (value && typeof value === "object")
+    return value as Record<string, unknown>;
   return undefined;
 }

@@ -92,8 +92,7 @@ export type BulkProblemKey =
   | "bulk.duplicate";
 
 export type BulkParse =
-  | { ok: true; rows: ParsedRow[] }
-  | { ok: false; problems: LineProblem[] };
+  { ok: true; rows: ParsedRow[] } | { ok: false; problems: LineProblem[] };
 
 /**
  * Turns the textarea's contents into rows, or into a list of problems.
@@ -219,7 +218,10 @@ export function parseBulkRows(
  * truncation, and the same expression `MoneyInput` uses, so a price typed into
  * the box and the same price pasted into the list land on the same integer.
  */
-function toMinorUnits(typed: string | undefined, decimals: number | null): number | null {
+function toMinorUnits(
+  typed: string | undefined,
+  decimals: number | null,
+): number | null {
   if (typed === undefined || typed === "") return 0;
   if (decimals === null) return null;
 

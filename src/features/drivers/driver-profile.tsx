@@ -14,11 +14,8 @@ import { t } from "@/i18n/translations";
 import { Price } from "@/features/reference/price";
 import { statusTone } from "@/lib/order-status";
 import { formatPhone } from "@/lib/phone";
-import {
-  formatDayAndTime,
-  startOfBusinessDay,
-  startOfBusinessDayPlus,
-} from "@/lib/time";
+import { useClock } from "@/features/settings/use-clock";
+import { startOfBusinessDay, startOfBusinessDayPlus } from "@/lib/time";
 
 import { isOverridden, isTakingOrders, type Courier } from "./api/couriers";
 import { DriverEditor } from "./drivers-screen";
@@ -54,6 +51,7 @@ import { useCourier, useDispatches, useSaveCourier } from "./use-couriers";
  */
 
 export function DriverProfile({ id }: { id: string }) {
+  const clock = useClock();
   const courier = useCourier(id);
   const dispatches = useDispatches(id);
   const save = useSaveCourier();
@@ -223,7 +221,7 @@ export function DriverProfile({ id }: { id: string }) {
                       </Link>
                       <span className="truncate text-[12px] text-text-faint">
                         {t("drivers.handedAt", {
-                          when: formatDayAndTime(row.dispatchedAt),
+                          when: clock.dayAndTime(row.dispatchedAt),
                         })}
                       </span>
                     </div>

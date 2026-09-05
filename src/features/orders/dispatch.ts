@@ -57,6 +57,7 @@ export function whatsappLink(phone: string, message: string): string {
 export function dispatchMessage(
   order: Order & { lines: OrderLine[] },
   currency: Currency | undefined,
+  clock24h: boolean,
 ): string {
   const money = (minor: number) =>
     currency ? formatMoney(minor, currency) : null;
@@ -64,7 +65,9 @@ export function dispatchMessage(
   const lines: string[] = [];
 
   lines.push(t("dispatch.heading", { code: order.code }));
-  lines.push(t("dispatch.placed", { when: formatDateTime(order.placedAt) }));
+  lines.push(
+    t("dispatch.placed", { when: formatDateTime(order.placedAt, clock24h) }),
+  );
   lines.push("");
 
   lines.push(
@@ -173,12 +176,15 @@ export function dispatchMessage(
 export function kitchenMessage(
   order: Order & { lines: OrderLine[] },
   storeId: string,
+  clock24h: boolean,
 ): string {
   const portion = order.stores.find((one) => one.id === storeId);
   const lines: string[] = [];
 
   lines.push(t("dispatch.kitchenHeading", { code: order.code }));
-  lines.push(t("dispatch.placed", { when: formatDateTime(order.placedAt) }));
+  lines.push(
+    t("dispatch.placed", { when: formatDateTime(order.placedAt, clock24h) }),
+  );
 
   // A first name, not the full one. The bag needs a label; the shop does not
   // need a customer.

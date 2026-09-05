@@ -115,58 +115,68 @@ export function AccountScreen() {
 
       {tab === "general" && <GeneralTab />}
 
-      <div
-        className={cx(
-          "flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl",
-          tab === "general" && "hidden",
-        )}
-      >
-        {/* Full width and first: which account these two forms are about is the
-          thing to establish before either of them is filled in. */}
-        <section className="flex flex-col gap-xs rounded-md border border-border bg-surface p-lg">
-          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
-            {t("account.signedInAs")}
-          </h2>
-          <p className="text-[17px] font-semibold">
-            {account.data?.email ?? t("common.loading")}
-          </p>
-        </section>
+      {/* Unmounted on General, not hidden with a class.
 
-        {/* One at a time, not side by side. They were a two-column grid, which
-            was right when the page was only these two forms: the same
-            current-password field, the same shape, and stacking them put the
-            second below the fold. With tabs the choice is made above, so
-            showing both would be offering it twice.
+          Everything below is a password box or an email box, and `hidden` left
+          all four of them in the DOM sitting just after the two hour selects.
+          Chrome does not need a field to be visible to decide a page carries a
+          credential form, and the username it fills is the text input nearest
+          the passwords — which, on the General tab, is "Closes at". So the
+          operator opened this page and found their own email typed over the
+          closing hour, and the autofill wrote React state on the way in, which
+          is what put an unsaved-changes dialog on a tab that has no Save.
 
-            Siblings rather than a swapped child, so a half-typed password
-            survives a look at the email form and back. */}
-        <div className={cx(tab !== "password" && "hidden")}>
-          <Change
-            title={t("account.passwordTitle")}
-            blurb={t("account.passwordBlurb")}
-            submit={t("account.changePassword")}
-            fields="password"
-            onDone={() => toast.success(t("account.passwordChanged"))}
-          />
+          The two forms below stay siblings, so the state the note on them is
+          about still survives moving between Password and Email. */}
+      {tab !== "general" && (
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+          {/* Full width and first: which account these two forms are about is
+              the thing to establish before either of them is filled in. */}
+          <section className="flex flex-col gap-xs rounded-md border border-border bg-surface p-lg">
+            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+              {t("account.signedInAs")}
+            </h2>
+            <p className="text-[17px] font-semibold">
+              {account.data?.email ?? t("common.loading")}
+            </p>
+          </section>
+
+          {/* One at a time, not side by side. They were a two-column grid,
+              which was right when the page was only these two forms: the same
+              current-password field, the same shape, and stacking them put the
+              second below the fold. With tabs the choice is made above, so
+              showing both would be offering it twice.
+
+              Siblings rather than a swapped child, so a half-typed password
+              survives a look at the email form and back. */}
+          <div className={cx(tab !== "password" && "hidden")}>
+            <Change
+              title={t("account.passwordTitle")}
+              blurb={t("account.passwordBlurb")}
+              submit={t("account.changePassword")}
+              fields="password"
+              onDone={() => toast.success(t("account.passwordChanged"))}
+            />
+          </div>
+
+          <div className={cx(tab !== "email" && "hidden")}>
+            <Change
+              title={t("account.emailTitle")}
+              blurb={t("account.emailBlurb")}
+              submit={t("account.changeEmail")}
+              fields="email"
+              onDone={() => {
+                // Not "saved": the address does not move until the link in the new
+                // inbox is followed.
+                toast.info(t("account.emailPending"));
+                void queryClient.invalidateQueries({
+                  queryKey: ["account", "me"],
+                });
+              }}
+            />
+          </div>
         </div>
-
-        <div className={cx(tab !== "email" && "hidden")}>
-          <Change
-            title={t("account.emailTitle")}
-            blurb={t("account.emailBlurb")}
-            submit={t("account.changeEmail")}
-            fields="email"
-            onDone={() => {
-              // Not "saved": the address does not move until the link in the new
-              // inbox is followed.
-              toast.info(t("account.emailPending"));
-              void queryClient.invalidateQueries({
-                queryKey: ["account", "me"],
-              });
-            }}
-          />
-        </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatDate,
+  formatClockString,
+  formatHour,
   formatTime,
   fromWallClock,
   isSameBusinessDay,
@@ -258,8 +260,13 @@ describe("isSameBusinessDay", () => {
 
 describe("formatting", () => {
   it("shows the Beirut clock, not the machine’s", () => {
-    expect(formatTime("2026-01-15T12:00:00Z")).toBe("14:00");
-    expect(formatTime("2026-07-15T12:00:00Z")).toBe("15:00");
+    expect(formatTime("2026-01-15T12:00:00Z", true)).toBe("14:00");
+    expect(formatTime("2026-07-15T12:00:00Z", true)).toBe("15:00");
+  });
+
+  it("shows the same instant on a 12-hour clock", () => {
+    expect(formatTime("2026-01-15T12:00:00Z", false)).toBe("2:00 PM");
+    expect(formatTime("2026-07-15T12:00:00Z", false)).toBe("3:00 PM");
   });
 
   it("shows the Beirut date", () => {
@@ -348,5 +355,50 @@ describe("formatMonthKey", () => {
 
   it("survives a key it does not recognise rather than rendering undefined", () => {
     expect(formatMonthKey("2026-13")).toBe("13 26");
+  });
+});
+
+/**
+ * The shop's clock format, which is a setting and not a constant.
+ *
+ * `app_settings.clock_24h` used to be written to the database and read by
+ * nothing — the dashboard formatted everything at `hour12: false` regardless.
+ * These are the cases that were wrong in the obvious implementation of the fix:
+ * midnight and noon both give `0` under `% 12`, and `0:30 AM` is not a time.
+ */
+describe("the 12-hour clock", () => {
+  it("names midnight and noon", () => {
+    expect(formatClockString("00:30", false)).toBe("12:30 AM");
+    expect(formatClockString("12:30", false)).toBe("12:30 PM");
+    expect(formatClockString("00:00", false)).toBe("12:00 AM");
+  });
+
+  it("drops the leading zero on the hour but keeps it on the minute", () => {
+    expect(formatClockString("09:05", false)).toBe("9:05 AM");
+    expect(formatClockString("21:05", false)).toBe("9:05 PM");
+  });
+
+  it("leaves a 24-hour string exactly as stored", () => {
+    expect(formatClockString("09:05", true)).toBe("09:05");
+    expect(formatClockString("23:59", true)).toBe("23:59");
+  });
+
+  /**
+   * These strings are half-typed in a picker and come back out of it. A
+   * formatter that answered `NaN:00 PM` mid-edit would put that in the summary
+   * the operator is reading to check their own work.
+   */
+  it("hands back anything that is not a time", () => {
+    expect(formatClockString("", false)).toBe("");
+    expect(formatClockString("9:", false)).toBe("9:");
+    expect(formatClockString("25:00", false)).toBe("25:00");
+    expect(formatClockString("09:99", false)).toBe("09:99");
+  });
+
+  it("formats a whole hour for the trading window", () => {
+    expect(formatHour(8, true)).toBe("08:00");
+    expect(formatHour(8, false)).toBe("8:00 AM");
+    expect(formatHour(0, false)).toBe("12:00 AM");
+    expect(formatHour(2, false)).toBe("2:00 AM");
   });
 });

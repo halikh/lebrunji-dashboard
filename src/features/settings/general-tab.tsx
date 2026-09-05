@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 
 import { Button, Field, cx } from "@/components/ui";
@@ -14,11 +14,8 @@ import { uploadSound } from "@/lib/images";
 import { SOUND } from "@/lib/limits";
 import { BUSINESS_TIMEZONE } from "@/lib/time";
 
-import {
-  fetchAppSettings,
-  updateAppSettings,
-  type AppSettings,
-} from "./api/app-settings";
+import { updateAppSettings, type AppSettings } from "./api/app-settings";
+import { appSettingsKey, useAppSettings, useClock } from "./use-clock";
 
 /**
  * The three settings that belong to the business rather than to a row.
@@ -40,18 +37,15 @@ export function GeneralTab() {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
-  const settings = useQuery({
-    queryKey: ["app-settings"],
-    queryFn: fetchAppSettings,
-    // Read by every screen that formats a time. It changes when somebody
-    // decides it does, and this screen invalidates it when they do.
-    staleTime: 10 * 60_000,
-  });
+  // The same query every screen that shows a time is reading, so the
+  // invalidation below is what re-formats all of them.
+  const settings = useAppSettings();
+  const clock = useClock();
 
   const save = useMutation({
     mutationFn: (patch: Partial<AppSettings>) => updateAppSettings(patch),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["app-settings"] });
+      void queryClient.invalidateQueries({ queryKey: appSettingsKey });
       toast.success(t("general.saved"));
     },
     onError: (error) =>
@@ -118,7 +112,7 @@ export function GeneralTab() {
               <Select
                 value={openHour}
                 onChange={setOpen}
-                options={HOURS}
+                options={hourOptions(clock.hour)}
                 disabled={!current}
               />
             </Field>
@@ -129,7 +123,7 @@ export function GeneralTab() {
               <Select
                 value={closeHour}
                 onChange={setClose}
-                options={HOURS}
+                options={hourOptions(clock.hour)}
                 disabled={!current}
               />
             </Field>
@@ -161,8 +155,8 @@ export function GeneralTab() {
         {Number(closeHour) <= Number(openHour) && (
           <p className="text-[12px] font-semibold text-active-ink">
             {t("general.overnight", {
-              open: label(Number(openHour)),
-              close: label(Number(closeHour)),
+              open: clock.hour(Number(openHour)),
+              close: clock.hour(Number(closeHour)),
             })}
           </p>
         )}
@@ -311,19 +305,22 @@ function SoundPicker({
   );
 }
 
-/** `00` to `23`, as the select wants them. */
-const HOURS = Array.from({ length: 24 }, (_, hour) => ({
-  value: String(hour),
-  label: label(hour),
-}));
-
 /**
- * An hour on a 24-hour clock, always.
+ * `00` to `23`, in the shop's own format.
  *
- * Not the shop's own `clock24h` setting: this control *sets* that kind of
- * thing, and a picker whose labels changed as you changed the format would be
- * a mirror looking at itself. `08:00` is unambiguous either way.
+ * These labels used to be 24-hour always, on the grounds that a picker whose
+ * labels moved as you changed the format directly above it was a mirror looking
+ * at itself. That was the wrong call. The toggle promises the dashboard reads
+ * times the way this shop writes them, and a shop that reads `8:00 PM` should
+ * not have to translate its own closing time back into `20` to set it — the two
+ * controls sitting together is what makes the change legible, not what makes it
+ * confusing.
+ *
+ * The *value* is the hour, and it never moves. Only the label does.
  */
-function label(hour: number): string {
-  return `${String(hour).padStart(2, "0")}:00`;
+function hourOptions(label: (hour: number) => string) {
+  return Array.from({ length: 24 }, (_, hour) => ({
+    value: String(hour),
+    label: label(hour),
+  }));
 }

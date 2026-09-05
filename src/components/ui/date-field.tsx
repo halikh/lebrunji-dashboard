@@ -2,6 +2,7 @@
 
 import DatePicker from "react-datepicker";
 
+import { useClock } from "@/features/settings/use-clock";
 import { t } from "@/i18n/translations";
 import { BUSINESS_TIMEZONE, fromWallClock, toWallClock } from "@/lib/time";
 
@@ -51,6 +52,7 @@ export function DateField({
   className?: string;
 }) {
   const field = useFieldWiring();
+  const clock = useClock();
   const isInvalid = invalid ?? field?.invalid ?? false;
 
   return (
@@ -63,16 +65,22 @@ export function DateField({
         showTimeSelect
         timeIntervals={30}
         timeCaption={t("hours.time")}
-        // 24-hour and day-first, stated rather than inherited. The whole point
-        // is that a date reads the same to everybody who opens the dashboard.
-        dateFormat="dd MMM yyyy, HH:mm"
-        timeFormat="HH:mm"
+        // Day-first always, and the clock in the shop's format. Both are
+        // stated rather than inherited: what a date reads like should be the
+        // same for everybody who opens the dashboard, and `app_settings` — not
+        // the machine's locale — is what settles the half of it that is a
+        // choice.
+        dateFormat={
+          clock.clock24h ? "dd MMM yyyy, HH:mm" : "dd MMM yyyy, h:mm aa"
+        }
+        timeFormat={clock.clock24h ? "HH:mm" : "h:mm aa"}
         placeholderText={t("promotions.noDate")}
         isClearable
         aria-describedby={field?.describedBy}
         aria-invalid={isInvalid ? "true" : undefined}
         className={cx(
-          "w-[220px] rounded-md border bg-surface px-md py-sm text-[14px] tabular-nums",
+          clock.clock24h ? "w-[220px]" : "w-[240px]",
+          "rounded-md border bg-surface px-md py-sm text-[14px] tabular-nums",
           isInvalid ? "border-danger" : "border-border",
           className,
         )}

@@ -17,7 +17,7 @@ import {
 } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 import { convertMoney, formatMoney } from "@/lib/money";
-import { formatDateTime } from "@/lib/time";
+import { useClock } from "@/features/settings/use-clock";
 
 import type { Band } from "./api/pricing";
 import { useLadder, useRates, useSaveLadder, useSetRate } from "./use-pricing";
@@ -135,6 +135,7 @@ export function PricingScreen() {
  * against what they expected in a way they cannot check a bare figure.
  */
 function Rate() {
+  const clock = useClock();
   const rates = useRates();
   const save = useSetRate();
 
@@ -199,7 +200,7 @@ function Rate() {
             mean anything. */}
           <span className="text-[13px] text-text-faint">
             {t("pricing.rateAsOf", {
-              when: formatDateTime(other.rateUpdatedAt),
+              when: clock.dateTime(other.rateUpdatedAt),
             })}
           </span>
         </div>
