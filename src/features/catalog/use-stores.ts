@@ -12,7 +12,9 @@ import {
   fetchStore,
   createStore,
   fetchStores,
+  setStoreCurrency,
   updateStore,
+  type CurrencyChangeMode,
   type Store,
   type StorePatch,
   type StoreDraft,
@@ -143,6 +145,58 @@ export function useUpdateStore() {
 
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: storeKeys.all });
+    },
+  });
+}
+
+/**
+ * Moves a shop to another currency, restating its prices.
+ *
+ * ## No optimistic update, unlike every other store write
+ *
+ * The others change one field and the row on screen is the whole result. This
+ * one rewrites every price in the shop, and the dashboard holds those prices in
+ * a different cache — the menu, the questions, the option counts. Guessing the
+ * new numbers here would mean reimplementing the database's arithmetic in an
+ * `onMutate`, and being wrong there would show the operator a menu that has not
+ * happened.
+ *
+ * So it waits, then invalidates broadly: the shop itself, and the catalogue
+ * whose figures have just moved under it.
+ */
+export function useSetStoreCurrency() {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  return useMutation({
+    mutationFn: (input: {
+      storeId: string;
+      currencyCode: string;
+      mode: CurrencyChangeMode;
+      /** Named in the toast — see `useUpdateStore`. */
+      name: Localized;
+    }) => setStoreCurrency(input.storeId, input.currencyCode, input.mode),
+
+    onSuccess: (_result, input) => {
+      void queryClient.invalidateQueries({ queryKey: storeKeys.all });
+      // Every price the operator can see. `menu` carries the dish prices and
+      // `options` the choice prices; both have just been rewritten by the
+      // database, and a stale one would show the old scale beside the new
+      // currency — which is the exact confusion this feature exists to end.
+      void queryClient.invalidateQueries({ queryKey: ["menu"] });
+      void queryClient.invalidateQueries({ queryKey: ["options"] });
+      toast.success(
+        t("store.currencyChanged", {
+          name: pickLocalized(input.name),
+          code: input.currencyCode,
+        }),
+      );
+    },
+
+    onError: (error) => {
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      );
     },
   });
 }

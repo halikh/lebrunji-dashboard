@@ -228,34 +228,20 @@ export async function createStore(
 
 export type StorePatch = {
   name?: Localized;
-  /**
-   * What the shop prices in.
+  /*
+   * No `currencyCode`, and that is the point.
    *
-   * ## It re-labels; it does not convert
+   * It was here briefly, as a plain column write, and it was wrong by a factor
+   * of a hundred. Prices are minor units in columns with no currency of their
+   * own, so moving the shop moves the meaning of every one of them: `$12.00` is
+   * the integer `1200`, and LBP has no decimal places, so the same row reads as
+   * `ل.ل1,200` — not the `ل.ل12` the operator meant.
    *
-   * `menu_items.price` and `item_options.price` are single integer columns in
-   * **minor units**, with no currency of their own — the shop's row is the only
-   * thing that says what they mean. So changing this changes the meaning of
-   * every price without changing a digit, and the shift is not just the
-   * exchange rate: USD carries two decimal places and LBP none, so a dish
-   * stored as `1500` reads as `$15.00` under one and `ل.ل1,500` under the
-   * other.
-   *
-   * That is deliberate for now, and the screen says so plainly rather than
-   * leaving it to be found on a customer's bill. It is also **reversible** —
-   * no row is rewritten, so switching back restores the previous meaning
-   * exactly, which is what makes an unconfirmed mistake recoverable.
-   *
-   * Converting properly is a different job: every price multiplied by the rate
-   * and restated at the new scale, in one transaction, which means an
-   * `api_v1_*` function in the app repo rather than a column write from here. A
-   * half-converted menu is worse than either currency.
-   *
-   * Past orders are unaffected whichever way this goes. `orders.currency_code`
-   * is a snapshot taken at checkout, so history keeps saying what was actually
-   * charged.
+   * Changing it is therefore a rewrite of the whole catalogue, and it belongs
+   * in one transaction: see {@link setStoreCurrency}. Migration `0097` also
+   * refuses a bare `currency_code` update at the database, so this is not a
+   * convention anybody can drift away from.
    */
-  currencyCode?: string;
   /** Blank clears it. See `updateStore` on why that is null and not "". */
   whatsappPhone?: string | null;
   imageUrl?: string | null;
@@ -290,11 +276,6 @@ export async function updateStore(
 ): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
-  // Re-labels every price in the shop without rewriting one — see the note on
-  // `StorePatch.currencyCode`. The column is `not null references
-  // currencies(code)`, so an unknown code is refused by the foreign key rather
-  // than stored and discovered later by a formatter with no decimals to use.
-  if (patch.currencyCode !== undefined) row.currency_code = patch.currencyCode;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
@@ -318,6 +299,55 @@ export async function updateStore(
   }
 
   const { error } = await getClient().from("stores").update(row).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/** What restating a shop's prices is *for* — see {@link setStoreCurrency}. */
+export type CurrencyChangeMode = "keep" | "convert";
+
+/**
+ * Moves a shop to another currency and restates every live price it has.
+ *
+ * ## Why this is an RPC and not a column write
+ *
+ * The column alone would be a lie. `menu_items.price` and `item_options.price`
+ * carry no currency, so the shop's row is the only thing that says what they
+ * mean — and USD keeps two decimal places where LBP keeps none, so `$12.00`
+ * (stored `1200`) becomes `ل.ل1,200` by doing nothing at all. The operator who
+ * picked the wrong currency and typed `12` meaning twelve lira gets 1,200.
+ *
+ * So the prices move with it, and they must all move or none of them: a menu
+ * with its dishes restated and its choices not is worse than either currency,
+ * and it is exactly what a loop of updates leaves behind on a dropped
+ * connection. `api_v1_set_store_currency` (migration 0097) does it in one
+ * transaction, and a trigger there refuses the bare column write so this cannot
+ * be bypassed by the next person to write a store form.
+ *
+ * ## The two modes are not variations on each other
+ *
+ * - `keep` — the digits are already right and only the label was wrong.
+ *   `1200` → `12`.
+ * - `convert` — the dish must go on being worth what it was worth.
+ *   `1200` → `1076400`.
+ *
+ * They differ by the exchange rate, so there is no sensible default and the
+ * caller says which. {@link restatePrice} is the same arithmetic in TypeScript,
+ * used to show the operator both outcomes before either happens.
+ *
+ * Order history is untouched — `orders.currency_code` is a snapshot of what was
+ * actually charged, and a receipt that changes later is not a receipt.
+ */
+export async function setStoreCurrency(
+  storeId: string,
+  currencyCode: string,
+  mode: CurrencyChangeMode,
+): Promise<void> {
+  const { error } = await getClient().rpc("api_v1_set_store_currency", {
+    p_store_id: storeId,
+    p_currency_code: currencyCode,
+    p_mode: mode,
+  });
+
   if (error) throw new Error(error.message);
 }
 

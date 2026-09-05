@@ -720,17 +720,35 @@ const en = {
       switching back is exact — and an operator who has just realised their
       mistake should not have to work that out while looking at a menu that has
       gone wrong.
+
+      There is no confirmation dialog and no apply button of its own. The first
+      attempt had both, and the apply button was a bug: the page carries one
+      large Save, so the dropdown was changed, Save was pressed, every other
+      field saved, and the currency snapped back. A field that ignores the
+      page's Save is a field that does not work.
     */
     currencyTitle: "Currency",
     currencyEditHint:
-      "What every price on this menu means. Changing it does not convert anything — the numbers stay as they are.",
-    currencyApply: "Change to {code}",
-    currencyRelabels:
-      "Nothing is converted. {before} will read as {after}, and every other price moves the same way.",
-    currencyChangeTitle: "Price {name} in {to}?",
-    currencyChangeBody:
-      "Every price keeps its digits and changes meaning: {before} becomes {after}. Past orders are unaffected. Switching back restores it exactly.",
-    currencyChangeConfirm: "Change the currency",
+      "What every price on this menu means. Changing it restates them all, so say which way below.",
+    currencyMoved:
+      "Every price in this shop will be rewritten. {before} is one of them — choose what should happen to it:",
+    /*
+      Two answers, each shown as what it does rather than what it is called.
+
+      Describing the difference does not work. "Restate the digits" and "convert
+      at the rate" are the same sentence to anybody who has not thought about
+      minor units, and the operator has not — they picked the wrong currency and
+      want it fixed. "$12.00 becomes ل.ل12" against "$12.00 becomes
+      ل.ل1,076,400" needs no explaining, and the wrong one is unmistakable.
+    */
+    currencyKeep: "The prices are already right — only the currency was wrong",
+    currencyConvert: "Convert them, so each item is worth what it was worth",
+    currencyBecomes: "{before} becomes {after}",
+    // Said once, quietly, under both. It applies whichever is chosen and it is
+    // the one part that cannot be undone by switching back.
+    currencyLossy:
+      "Past orders are unaffected. Where the new currency has fewer decimals, anything after the decimal point is lost for good.",
+    currencyChanged: "{name} now prices in {code}",
 
     prep: "Preparation time",
     prepMin: "Fastest, in minutes",

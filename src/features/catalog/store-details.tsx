@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import { Button, Input } from "@/components/ui";
-import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Field } from "@/components/ui/field";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
@@ -17,15 +16,16 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
 import { parseLocation } from "@/lib/location";
+import { restatePrice } from "@/lib/money";
 import {
   validateLocalizedText,
   validatePrepWindow,
   type Localized,
 } from "@/lib/validation";
 
-import type { Store } from "./api/stores";
+import type { CurrencyChangeMode, Store } from "./api/stores";
 import { useMenu } from "./use-menu";
-import { useStore, useUpdateStore } from "./use-stores";
+import { useSetStoreCurrency, useStore, useUpdateStore } from "./use-stores";
 
 /**
  * A shop's own settings, as opposed to what it sells.
@@ -94,56 +94,50 @@ export function StoreDetails({ storeId }: { storeId: string }) {
  * not correct a wrong pick at all. Choosing the wrong one is a first-minute
  * mistake, and it had no first-minute fix.
  *
- * ## Why it is not part of the Save below
+ * ## It saves with the page, and that is the whole point
  *
- * Every other field on this page is a fact about the shop that means the same
- * thing before and after. This one re-reads every price the shop has. Folding
- * it into a Save that also carries a renamed shop and a moved pin would make
- * one button do two very different jobs, and the dangerous one would be the
- * invisible half.
+ * The first version of this gave the currency its own apply button, on the
+ * reasoning that it is more consequential than a renamed shop and deserved its
+ * own deliberate act. That reasoning was fine and the result was a bug: the
+ * page has one large Save at the bottom, so an operator changed the dropdown,
+ * pressed Save, watched every other field save, and saw the currency snap back
+ * on the refetch. A field that ignores the page's Save button is a field that
+ * does not work, however well argued.
+ *
+ * So there is one Save and it saves everything. The consequence is shown in
+ * place instead, live, the moment the value differs.
  *
  * ## Nothing is converted, and the screen says so
  *
  * Prices are minor units in a column with no currency of its own, so this
  * changes what they mean without changing a digit — and across USD and LBP that
  * is a decimal-scale shift as well as a rate. Rather than describing that, the
- * warning shows it: a real price off this menu, rendered both ways.
+ * warning shows it: a real price off this menu, rendered both ways. "The scale
+ * differs" is a sentence somebody can read and still not believe.
  *
- * It is reversible — no row is rewritten — which is why an empty shop can
- * change it with one press and a stocked one has to confirm. The friction is
- * proportional to what is at stake, and for the case this exists for (a wrong
- * pick, noticed immediately) there is nothing at stake yet.
+ * No modal, deliberately. It hangs off the page's Save, which also carries
+ * unrelated edits, so a dialog would interrupt somebody who only fixed a
+ * typo in the name. The change is exactly reversible — no row is rewritten —
+ * and the warning is unmissable and sits against the control that caused it.
  */
-function CurrencySection({ store }: { store: Store }) {
-  const { currencies, format } = useMoney();
-  const menu = useMenu(store.id);
-  const update = useUpdateStore();
-
-  const [picked, setPicked] = useState(store.currencyCode);
-
-  // A priced dish off this very menu, so the example is this shop's money
-  // rather than a number I made up. Absent on a shop with no menu yet, which is
-  // exactly the shop that needs no warning.
-  const sample =
-    (menu.data ?? []).flatMap((section) => section.items)[0] ?? null;
-  const changed = picked !== "" && picked !== store.currencyCode;
-
-  function apply() {
-    update.mutate({
-      id: store.id,
-      patch: { currencyCode: picked },
-      name: store.name,
-    });
-  }
-
-  // The shop's name as a string: a confirmation names the thing that was
-  // clicked, which is the whole reason it catches the wrong row.
-  const example = {
-    name: pickLocalized(store.name),
-    to: picked,
-    before: sample ? format(sample.price, store.currencyCode) : "",
-    after: sample ? format(sample.price, picked) : "",
-  };
+function CurrencySection({
+  value,
+  onChange,
+  mode,
+  onModeChange,
+  preview,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+  mode: CurrencyChangeMode;
+  onModeChange: (mode: CurrencyChangeMode) => void;
+  /**
+   * A real price off this menu under each answer, or null when there is nothing
+   * to restate — a shop with no dishes, or a currency that has not moved.
+   */
+  preview: { before: string; keep: string; convert: string } | null;
+}) {
+  const { currencies } = useMoney();
 
   return (
     <section className="flex flex-col gap-lg">
@@ -151,8 +145,8 @@ function CurrencySection({ store }: { store: Store }) {
 
       <Field label={t("store.currency")} hint={t("store.currencyEditHint")}>
         <Select
-          value={picked}
-          onChange={setPicked}
+          value={value}
+          onChange={onChange}
           placeholder={t("store.pickCurrency")}
           options={(currencies ?? []).map((one) => ({
             value: one.code,
@@ -161,43 +155,73 @@ function CurrencySection({ store }: { store: Store }) {
         />
       </Field>
 
-      {/* Shown rather than described. "The scale differs" is a sentence an
-          operator can read and still not believe; "$15.00 will read as
-          ل.ل1,500" is the same fact in a form that cannot be misread. */}
-      {changed && sample && (
-        <p
-          role="status"
-          className="rounded-md border border-danger-wash bg-danger-wash/40 px-lg py-md text-[13px] text-text"
-        >
-          {t("store.currencyRelabels", example)}
-        </p>
-      )}
+      {preview && (
+        <div className="flex flex-col gap-md rounded-md border border-danger-wash bg-danger-wash/40 px-lg py-lg">
+          <p role="status" className="text-[13px] text-text">
+            {t("store.currencyMoved", { before: preview.before })}
+          </p>
 
-      {changed &&
-        (sample ? (
-          <ConfirmButton
-            onConfirm={apply}
-            titleKey="store.currencyChangeTitle"
-            bodyKey="store.currencyChangeBody"
-            confirmKey="store.currencyChangeConfirm"
-            params={example}
-            triggerVariant="secondary"
-          >
-            {t("store.currencyApply", { code: picked })}
-          </ConfirmButton>
-        ) : (
-          // Nothing priced, nothing to misprice. The shop this feature exists
-          // for gets one press.
-          <Button
-            variant="secondary"
-            onClick={apply}
-            pending={update.isPending}
-            className="self-start"
-          >
-            {t("store.currencyApply", { code: picked })}
-          </Button>
-        ))}
+          {/*
+            Both answers, each showing what it does to a real price off this
+            menu. Describing the difference does not work — "restate the digits"
+            and "convert at the rate" are the same sentence to anybody who has
+            not thought about minor units. "12 becomes ل.ل12" against "12
+            becomes ل.ل1,076,400" needs no explaining at all.
+          */}
+          <ChoiceOfMode
+            checked={mode === "keep"}
+            onSelect={() => onModeChange("keep")}
+            label={t("store.currencyKeep")}
+            result={t("store.currencyBecomes", {
+              before: preview.before,
+              after: preview.keep,
+            })}
+          />
+          <ChoiceOfMode
+            checked={mode === "convert"}
+            onSelect={() => onModeChange("convert")}
+            label={t("store.currencyConvert")}
+            result={t("store.currencyBecomes", {
+              before: preview.before,
+              after: preview.convert,
+            })}
+          />
+
+          <p className="text-[12px] text-text-faint">
+            {t("store.currencyLossy")}
+          </p>
+        </div>
+      )}
     </section>
+  );
+}
+
+/** One of the two answers, with what it does to a real price. */
+function ChoiceOfMode({
+  checked,
+  onSelect,
+  label,
+  result,
+}: {
+  checked: boolean;
+  onSelect: () => void;
+  label: string;
+  result: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-sm text-[13px]">
+      <input
+        type="radio"
+        name="currency-mode"
+        checked={checked}
+        onChange={onSelect}
+        className="mt-[2px] size-[16px] shrink-0 accent-[var(--color-active)]"
+      />
+      <span className="flex min-w-0 flex-col gap-xxs">
+        <span className="font-semibold text-text">{label}</span>
+        <span className="tabular-nums text-text-soft">{result}</span>
+      </span>
+    </label>
   );
 }
 
@@ -205,8 +229,23 @@ function Form({ store }: { store: Store }) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
   const update = useUpdateStore();
+  const setCurrency = useSetStoreCurrency();
+  const { format, currencies } = useMoney();
+  // Only for the worked example below. Cached — the Menu tab has usually
+  // already loaded it — and its absence costs nothing: no sample, no warning,
+  // which is the right answer for a shop with no menu anyway.
+  const menu = useMenu(store.id);
 
   const [name, setName] = useState<Localized>(store.name);
+  const [currencyCode, setCurrencyCode] = useState(store.currencyCode);
+  /**
+   * What the change is *for*, defaulted to the common case.
+   *
+   * `keep` is the wrong-pick fix and is what almost every change here will be.
+   * `convert` is a shop genuinely re-denominating, which happens once if ever —
+   * so it is the deliberate choice rather than the one you land on.
+   */
+  const [mode, setMode] = useState<CurrencyChangeMode>("keep");
   const [imageUrl, setImageUrl] = useState<string | null>(store.imageUrl);
   const [whatsapp, setWhatsapp] = useState(store.whatsappPhone ?? "");
   const [prepMin, setPrepMin] = useState(String(store.prepMinMinutes));
@@ -227,7 +266,38 @@ function Form({ store }: { store: Store }) {
   const located = parseLocation(pin);
   const coordinates = located.ok ? located : null;
 
-  function save() {
+  const currencyMoved =
+    currencyCode !== "" && currencyCode !== store.currencyCode;
+
+  /**
+   * A real price off this menu under each answer.
+   *
+   * Null when the currency has not moved, or when the shop has nothing priced —
+   * and the second case is the one this feature exists for. A shop created five
+   * minutes ago has nothing to misprice, so it gets no question and no friction.
+   *
+   * `restatePrice` is the same arithmetic `api_v1_set_store_currency` runs, so
+   * these figures are what will actually be written. A preview computed any
+   * other way would be a promise rather than a preview.
+   */
+  const sample =
+    (menu.data ?? []).flatMap((section) => section.items)[0] ?? null;
+  const from = currencies?.find((one) => one.code === store.currencyCode);
+  const into = currencies?.find((one) => one.code === currencyCode);
+
+  const preview =
+    currencyMoved && sample && from && into
+      ? {
+          before: format(sample.price, from.code),
+          keep: format(restatePrice(sample.price, from, into, "keep"), into.code),
+          convert: format(
+            restatePrice(sample.price, from, into, "convert"),
+            into.code,
+          ),
+        }
+      : null;
+
+  async function save() {
     const min = Number(prepMin);
     const max = Number(prepMax);
 
@@ -264,6 +334,34 @@ function Form({ store }: { store: Store }) {
 
     setErrors(found);
     if (found.name || found.prep || found.pin || found.whatsapp) return;
+
+    /*
+     * The currency first, and only if it moved.
+     *
+     * Two writes rather than one, because they are two different things: the
+     * currency rewrites every price in the shop and has to be atomic on its
+     * own, while the rest is a handful of columns on this row. Neither can be
+     * folded into the other.
+     *
+     * It goes first so a failure stops here. The reverse order would leave the
+     * shop renamed and its prices in a currency the operator was told had
+     * changed — a screen and a database disagreeing about money.
+     */
+    if (currencyMoved) {
+      try {
+        await setCurrency.mutateAsync({
+          storeId: store.id,
+          currencyCode,
+          mode,
+          name: store.name,
+        });
+      } catch {
+        // Already reported by the mutation's own toast. Returning here is what
+        // stops the rest of the save from running on a shop whose prices did
+        // not move.
+        return;
+      }
+    }
 
     update.mutate({
       id: store.id,
@@ -348,7 +446,13 @@ function Form({ store }: { store: Store }) {
             </Field>
           </section>
 
-          <CurrencySection store={store} />
+          <CurrencySection
+            value={currencyCode}
+            onChange={setCurrencyCode}
+            mode={mode}
+            onModeChange={setMode}
+            preview={preview}
+          />
 
           <section className="flex flex-col gap-lg">
             <h2 className="ps-md text-[17px]">{t("store.prepTitle")}</h2>
@@ -461,7 +565,10 @@ function Form({ store }: { store: Store }) {
       {/* Pinned, like the item editor's. On a form this long the operator
           should never have to scroll to find Save. */}
       <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
-        <Button onClick={save} pending={update.isPending}>
+        <Button
+          onClick={() => void save()}
+          pending={update.isPending || setCurrency.isPending}
+        >
           {t("store.save")}
         </Button>
       </div>

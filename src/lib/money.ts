@@ -118,3 +118,43 @@ export function convertMoney(
   const scale = 10 ** (to.decimalDigits - from.decimalDigits);
   return Math.round(minorUnits * (to.rate / from.rate) * scale);
 }
+
+/**
+ * How a shop's stored price changes when the shop changes currency.
+ *
+ * Two intents, and they differ by the exchange rate — which on this catalogue
+ * is a factor of ~89,700, so picking the wrong one is not a near miss.
+ *
+ * - **`keep`** — the digits are already the number the merchant means and only
+ *   the label was wrong. `1200` (`$12.00`) becomes `12` (`ل.ل12`). This is the
+ *   fix for a currency picked wrongly at creation, where the operator typed
+ *   `12` meaning twelve lira.
+ * - **`convert`** — the dish must go on being worth what it was worth, so the
+ *   rate applies too. `1200` becomes `1076400` (`ل.ل1,076,400`).
+ *
+ * Neither is safe as a default for the other, which is why the caller says.
+ *
+ * ## It has to agree with the database, digit for digit
+ *
+ * `api_v1_set_store_currency` (migration 0097) is what actually rewrites the
+ * rows; this exists so the screen can show the outcome *before* that happens.
+ * A preview that disagreed with the write would be worse than no preview —
+ * it would be a promise. The factor here is the factor there:
+ * `10^(to − from)` for `keep`, times the rate ratio for `convert`, rounded
+ * once at the end.
+ *
+ * **Lossy when the new currency has fewer decimal places**, and not
+ * recoverable: `$12.34` restated into a currency with no subunit is `12`, and
+ * coming back gives `$12.00`.
+ */
+export function restatePrice(
+  minorUnits: number,
+  from: ConvertibleCurrency,
+  to: ConvertibleCurrency,
+  mode: "keep" | "convert",
+): number {
+  if (from.code === to.code) return minorUnits;
+  if (mode === "convert") return convertMoney(minorUnits, from, to);
+
+  return Math.round(minorUnits * 10 ** (to.decimalDigits - from.decimalDigits));
+}
