@@ -125,7 +125,7 @@ export function TagChip({
   label,
   tone,
   ink,
-  color = null,
+  color,
   className,
 }: {
   label: string;
@@ -133,12 +133,19 @@ export function TagChip({
   /**
    * The tag's own ground, or null for its role's.
    *
+   * **Required, with no default** — the same rule `ink` above carries, and for
+   * the same reason it carries it. `ink` was given a `= null` default and three
+   * of five call sites then drew the wrong thing silently; this prop was added
+   * with the identical default and immediately did the identical thing to the
+   * vocabulary row. A chip in the wrong colour still looks like a chip, so
+   * nothing about it says it is wrong.
+   *
    * Inline rather than a class, and it has to be: Tailwind generates from what
    * it can read in the source, and `#7b1f3a` was chosen by a merchant after the
    * build. The same reason `tab.tsx` paints the order-status ramp with custom
    * properties.
    */
-  color?: string | null;
+  color: string | null;
   /**
    * The tag's own ink, or null for the tone's.
    *

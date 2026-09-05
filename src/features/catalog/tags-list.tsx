@@ -229,7 +229,12 @@ function Row({
         {/* The chip itself, at the size a phone draws it. The row shows the
             thing rather than describing it — a tone named in words would ask
             the operator to picture the result of their own setting. */}
-        <TagChip label={name} tone={tag.tone} ink={tag.ink} />
+        <TagChip
+          label={name}
+          tone={tag.tone}
+          ink={tag.ink}
+          color={tag.color}
+        />
 
         <span className="truncate text-[12px] text-text-faint">
           {tag.usedBy === 0

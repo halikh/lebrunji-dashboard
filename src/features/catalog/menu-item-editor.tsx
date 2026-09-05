@@ -418,6 +418,7 @@ export function MenuItemEditor({
                   <TagChip
                     tone={tag.tone}
                     ink={tag.ink}
+                    color={tag.color}
                     label={pickLocalized(tag.name)}
                   />
                 ),

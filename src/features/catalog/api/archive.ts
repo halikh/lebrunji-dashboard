@@ -54,6 +54,8 @@ export type ArchivedTag = {
   tone: TagTone;
   /** Null for the tone's own — see `Tag.ink`. */
   ink: TagInk | null;
+  /** Null for the tone's own colour — see `Tag.color`. */
+  color: string | null;
   archivedAt: string;
 };
 
@@ -99,7 +101,7 @@ export async function fetchCatalogueArchive(): Promise<CatalogueArchive> {
 
     client
       .from("menu_item_tags")
-      .select("id, name, tone, ink, deleted_at")
+      .select("id, name, tone, ink, color, deleted_at")
       .not("deleted_at", "is", null)
       .order("deleted_at", { ascending: false }),
 
@@ -138,6 +140,7 @@ export async function fetchCatalogueArchive(): Promise<CatalogueArchive> {
       name: (row.name as Localized) ?? {},
       tone: (row.tone as TagTone) ?? "neutral",
       ink: (row.ink as TagInk | null) ?? null,
+      color: (row.color as string | null) ?? null,
       archivedAt: row.deleted_at as string,
     })),
     promotions: (promotions.data ?? []).map((row) => ({

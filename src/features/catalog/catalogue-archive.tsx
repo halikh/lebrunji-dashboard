@@ -231,6 +231,7 @@ export function CatalogueArchive() {
                 <TagChip
                   tone={tag.tone}
                   ink={tag.ink}
+                  color={tag.color}
                   label={pickLocalized(tag.name)}
                 />
               </span>
