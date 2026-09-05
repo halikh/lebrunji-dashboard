@@ -7,6 +7,10 @@ import { Button, Input, cx } from "@/components/ui";
 import { Field } from "@/components/ui/field";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { useToasts } from "@/components/ui/toast";
+import {
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
 import { GeneralTab } from "@/features/settings/general-tab";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { PASSWORD } from "@/lib/limits";
@@ -60,6 +64,9 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
 
 export function AccountScreen() {
   const [tab, setTab] = useState<TabKey>("general");
+  // These tabs are local state rather than the URL, so there is no `show()` to
+  // guard the way the other screens have — the button is the whole switch.
+  const guarded = useGuardedAction();
 
   const toast = useToasts();
   const queryClient = useQueryClient();
@@ -95,7 +102,7 @@ export function AccountScreen() {
               key={key}
               label={t(labelKey)}
               active={tab === key}
-              onClick={() => setTab(key)}
+              onClick={guarded(() => setTab(key))}
               onKeyDown={tabArrowHandler(
                 TABS.map((one) => one.key),
                 tab,
@@ -190,6 +197,10 @@ function Change({
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
+
+  // Short and quick to retype, but it is still a form somebody is part way
+  // through, and the tab strip above would empty it without a word.
+  useUnsavedChanges(current !== "" || next !== "" || confirm !== "");
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<{
     current?: string;

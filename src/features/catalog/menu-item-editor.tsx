@@ -434,17 +434,21 @@ export function MenuItemEditor({
             />
           </Field>
 
-          {/* After the fields that say what the dish *is*, and separated,
-              because these are a different kind of edit: they change the shop's
-              own list of questions, not this row. */}
-          <div className="flex flex-col gap-lg border-t border-border pt-lg">
-            <Field label={t("options.title")} hint={t("options.hint")}>
-              <ItemOptions
-                storeId={storeId}
-                itemId={itemId}
-                sectionId={sectionId}
-              />
-            </Field>
+          {/* The way through to the Options page, and nothing else.
+              No label and no hint: a `Field` is a thing on this form with a
+              value, and dressing the link as one said the panel had options in
+              it — when the point is that it does not. Options belong to the
+              Options tab, which is where the whole of that job lives.
+
+              The rule above it stays, so the link does not read as the last
+              field of the form it is not part of. The button says what it does
+              in full, which is why nothing above it has to. */}
+          <div className="border-t border-border pt-lg">
+            <ItemOptions
+              storeId={storeId}
+              itemId={itemId}
+              sectionId={sectionId}
+            />
           </div>
 
           <Field

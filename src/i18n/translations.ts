@@ -1219,8 +1219,6 @@ const en = {
     // everywhere else, so this is the only place it can be seen at a glance.
     noneSet: "no options yet",
     noQuestions: "Nothing here yet.",
-    title: "Options",
-    hint: "Questions asked when this item is ordered — a size, extras, something left out.",
     saveFirst: "Save this item first, then set up its options.",
     openFor: "Set up this item's options",
     chooseOne: "Choose one",
