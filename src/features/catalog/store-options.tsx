@@ -65,6 +65,14 @@ import { useStore } from "./use-stores";
  * rather than to two empty selects and a memory test.
  */
 export function StoreOptions({ storeId }: { storeId: string }) {
+  /**
+   * Whether the new-question form is open.
+   *
+   * Held here rather than in the list, because the button that opens it sits in
+   * the filter bar above — see the note beside it. The list still owns the
+   * form; it just no longer owns the switch.
+   */
+  const [adding, setAdding] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -113,50 +121,70 @@ export function StoreOptions({ storeId }: { storeId: string }) {
      * for the cause of what changed.
      */
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-lg border-b border-border bg-surface p-xxl">
-        <p className="ps-md text-[13px] text-text-faint">
-          {t("options.tabHint")}
-        </p>
-
+      {/* No ground and no rule.
+          
+          A filter bar is not a *section* of the page — it is how you narrow the
+          one thing on it — and a white slab with a line under it announced it
+          as the first of two blocks. On the page's own cream it reads as what
+          it is: the controls, and then the result. The spacing below is what
+          separates them now. */}
+      <div className="flex shrink-0 flex-col gap-lg px-xxl pb-lg pt-xxl">
         {/* Side by side, and each capped rather than sharing the width
             equally: a section name and a dish name are short, and two selects
             stretched across a wide monitor would be a filter bar that reads as
             the page's main content. They wrap on a narrow one. */}
-        <div className="flex flex-wrap items-start gap-lg [&>*]:w-[320px] [&>*]:max-w-full">
-          <Field label={t("options.section")} hint={t("options.sectionHint")}>
-            <Select
-              value={sectionId ?? ""}
-              onChange={(value) => choose({ section: value || null })}
-              placeholder={t("options.pickSection")}
-              isClearable
-              options={sections.map((one) => ({
-                value: one.id,
-                label: pickLocalized(one.title),
-              }))}
-            />
-          </Field>
-
-          {section && (
-            <Field label={t("options.item")} hint={t("options.itemHint")}>
+        <div className="flex flex-wrap items-end gap-lg">
+          {/* `items-end`, so the button's baseline sits with the selects'
+              rather than with their labels. The selects keep a fixed width and
+              the button takes what it needs — a "New question" stretched to
+              320px would read as a third filter. */}
+          <span className="w-[320px] max-w-full">
+            <Field label={t("options.section")}>
               <Select
-                value={itemId ?? ""}
-                onChange={(value) => choose({ item: value || null })}
-                placeholder={t("options.pickItem")}
+                value={sectionId ?? ""}
+                onChange={(value) => choose({ section: value || null })}
+                placeholder={t("options.pickSection")}
                 isClearable
-                options={section.items.map((one) => ({
+                options={sections.map((one) => ({
                   value: one.id,
-                  label: pickLocalized(one.name),
-                  // The marker. A dish with no questions looks complete
-                  // everywhere else in the dashboard; this is the only place it
-                  // can be seen at a glance.
-                  note:
-                    (counts.data?.get(one.id) ?? 0) === 0
-                      ? t("options.noneSet")
-                      : undefined,
+                  label: pickLocalized(one.title),
                 }))}
               />
             </Field>
+          </span>
+
+          {section && (
+            <span className="w-[320px] max-w-full">
+              <Field label={t("options.item")}>
+                <Select
+                  value={itemId ?? ""}
+                  onChange={(value) => choose({ item: value || null })}
+                  placeholder={t("options.pickItem")}
+                  isClearable
+                  options={section.items.map((one) => ({
+                    value: one.id,
+                    label: pickLocalized(one.name),
+                    // The marker. A dish with no questions looks complete
+                    // everywhere else in the dashboard; this is the only place it
+                    // can be seen at a glance.
+                    note:
+                      (counts.data?.get(one.id) ?? 0) === 0
+                        ? t("options.noneSet")
+                        : undefined,
+                  }))}
+                />
+              </Field>
+            </span>
           )}
+
+          {/* The action beside the filters rather than pinned to the foot.
+              A sticky bar is right for a *form* — it keeps Save reachable down
+              a long page — and this is a list with one thing you can add to it.
+              Down there it was a full-width coral band under a list of two
+              rows, which read as the most important thing on the screen. */}
+          <Button onClick={() => setAdding(true)} disabled={adding}>
+            {t("options.addGroup")}
+          </Button>
         </div>
       </div>
 
@@ -167,6 +195,8 @@ export function StoreOptions({ storeId }: { storeId: string }) {
             for it to fall back to. Now there is, and it is the default. */}
         <ItemQuestions
           key={item?.id ?? "all"}
+          adding={adding}
+          onAddingChange={setAdding}
           storeId={storeId}
           itemId={item?.id ?? null}
           itemName={
@@ -199,10 +229,15 @@ export function StoreOptions({ storeId }: { storeId: string }) {
  * showed. Nothing was taken away — the previous view is one selection deep.
  */
 function ItemQuestions({
+  adding,
+  onAddingChange,
   storeId,
   itemId,
   itemName,
 }: {
+  /** Whether the new-question form is showing. Owned by the screen above. */
+  adding: boolean;
+  onAddingChange: (open: boolean) => void;
   storeId: string;
   /** Null when no item is picked: the list is then the whole shop's. */
   itemId: string | null;
@@ -212,7 +247,9 @@ function ItemQuestions({
   const groups = useStoreQuestions(storeId);
   const menu = useMenu(storeId);
   const setItems = useSetQuestionItems();
-  const [adding, setAdding] = useState(false);
+  // Lifted to the screen, because the button that turns it on now lives up
+  // beside the filters rather than at the foot of this list.
+  const setAdding = onAddingChange;
   /** Which question's item picker is open. One at a time — it is a menu. */
   const [picking, setPicking] = useState<string | null>(null);
 
@@ -326,12 +363,6 @@ function ItemQuestions({
             onDone={() => setAdding(false)}
           />
         )}
-      </div>
-
-      <div className="flex shrink-0 items-center border-t border-border bg-surface p-lg">
-        <Button fullWidth onClick={() => setAdding(true)} disabled={adding}>
-          {t("options.addGroup")}
-        </Button>
       </div>
     </div>
   );

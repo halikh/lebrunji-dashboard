@@ -1313,15 +1313,9 @@ const en = {
 
   options: {
     tab: "Options",
-    tabHint:
-      "Every question this shop asks. Narrow to a section or one item to see only its own.",
     section: "Section",
-    sectionHint:
-      "Narrows the list of items below, and the questions on the right.",
     pickSection: "Choose a section",
     item: "Item",
-    itemHint:
-      "Shows only the questions this item asks. Clear it to see them all.",
     pickItem: "Choose an item",
     // The marker in the picker. A dish with no questions looks complete
     // everywhere else, so this is the only place it can be seen at a glance.
