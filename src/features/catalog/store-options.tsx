@@ -128,7 +128,18 @@ export function StoreOptions({ storeId }: { storeId: string }) {
           as the first of two blocks. On the page's own cream it reads as what
           it is: the controls, and then the result. The spacing below is what
           separates them now. */}
-      <div className="flex shrink-0 flex-col gap-lg px-xxl pb-lg pt-xxl">
+      {/*
+        As short as this bar can be, because everything it takes comes off the
+        list.
+
+        This tab has less room than any other in the shop: the page header, the
+        tab strip and this bar are all fixed, and what is left is the only part
+        that scrolls. Three things were spending it — the labels over these
+        selects, this bar's padding, and a heading the list repeated. All three
+        are gone, which is about a hundred points, or two more questions on
+        screen.
+      */}
+      <div className="flex shrink-0 flex-col gap-lg px-xxl py-lg">
         {/* Side by side, and each capped rather than sharing the width
             equally: a section name and a dish name are short, and two selects
             stretched across a wide monitor would be a filter bar that reads as
@@ -138,42 +149,44 @@ export function StoreOptions({ storeId }: { storeId: string }) {
               rather than with their labels. The selects keep a fixed width and
               the button takes what it needs — a "New question" stretched to
               320px would read as a third filter. */}
+          {/* No `Field` label: "Section" over a box that already reads "Choose
+              a section" is the same word twice, and the second one costs a line
+              of a screen with none to spare. `aria-label` keeps it named for a
+              screen reader, which is what the label was really doing. */}
           <span className="w-[320px] max-w-full">
-            <Field label={t("options.section")}>
-              <Select
-                value={sectionId ?? ""}
-                onChange={(value) => choose({ section: value || null })}
-                placeholder={t("options.pickSection")}
-                isClearable
-                options={sections.map((one) => ({
-                  value: one.id,
-                  label: pickLocalized(one.title),
-                }))}
-              />
-            </Field>
+            <Select
+              aria-label={t("options.section")}
+              value={sectionId ?? ""}
+              onChange={(value) => choose({ section: value || null })}
+              placeholder={t("options.pickSection")}
+              isClearable
+              options={sections.map((one) => ({
+                value: one.id,
+                label: pickLocalized(one.title),
+              }))}
+            />
           </span>
 
           {section && (
             <span className="w-[320px] max-w-full">
-              <Field label={t("options.item")}>
-                <Select
-                  value={itemId ?? ""}
-                  onChange={(value) => choose({ item: value || null })}
-                  placeholder={t("options.pickItem")}
-                  isClearable
-                  options={section.items.map((one) => ({
-                    value: one.id,
-                    label: pickLocalized(one.name),
-                    // The marker. A dish with no questions looks complete
-                    // everywhere else in the dashboard; this is the only place it
-                    // can be seen at a glance.
-                    note:
-                      (counts.data?.get(one.id) ?? 0) === 0
-                        ? t("options.noneSet")
-                        : undefined,
-                  }))}
-                />
-              </Field>
+              <Select
+                aria-label={t("options.item")}
+                value={itemId ?? ""}
+                onChange={(value) => choose({ item: value || null })}
+                placeholder={t("options.pickItem")}
+                isClearable
+                options={section.items.map((one) => ({
+                  value: one.id,
+                  label: pickLocalized(one.name),
+                  // The marker. A dish with no questions looks complete
+                  // everywhere else in the dashboard; this is the only place it
+                  // can be seen at a glance.
+                  note:
+                    (counts.data?.get(one.id) ?? 0) === 0
+                      ? t("options.noneSet")
+                      : undefined,
+                }))}
+              />
             </span>
           )}
 
@@ -287,8 +300,19 @@ function ItemQuestions({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
-        <h2 className="ps-md text-[20px]">{itemName}</h2>
+      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto px-xxl pb-xxl pt-lg">
+        {/*
+          Only when it says something new.
+          
+          With no item picked this heading is the shop's name — which is already
+          the page's `h1`, two rows above it, in bigger type. It was the screen
+          telling the operator where they are for the second time, and charging
+          a heading's height for it.
+          
+          With an item picked it is the answer to "whose questions are these",
+          which nothing else on screen gives, so it stays.
+        */}
+        {itemId && <h2 className="ps-md text-[20px]">{itemName}</h2>}
 
         {groups.isPending && (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
