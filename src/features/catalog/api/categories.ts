@@ -1,3 +1,5 @@
+import { PAGE } from "@/lib/limits";
+import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { formatLocalized } from "@/lib/text-format";
@@ -48,6 +50,21 @@ export type Category = {
   hasMenuNav: boolean;
   sortOrder: number;
   /**
+   * The category's own artwork, or null for the app's.
+   *
+   * `0117`. The app keeps a table of a tint, an ink and a glyph per slug, and
+   * these three override it — a category added in the database used to render
+   * in a derived colour with a generic glyph until the next app release, and an
+   * app release goes through a store review.
+   *
+   * Null is a **live reference** to the app's own table rather than a missing
+   * value, which is why nothing here is defaulted: a category left alone still
+   * follows the palette if the palette moves.
+   */
+  emptyIconUrl: string | null;
+  emptyBackgroundColor: string | null;
+  storeTextColor: string | null;
+  /**
    * How many live shops are in this category.
    *
    * Read with the row rather than on demand, for the reason `archiveCategory`
@@ -71,6 +88,7 @@ export type Category = {
 // would have done exactly that).
 const COLUMNS = `id, slug, category_kind_id, name,
    is_active, has_menu_nav, sort_order,
+   empty_icon_url, empty_background_color, store_text_color,
    stores ( count )`;
 
 /**
@@ -106,19 +124,18 @@ export async function fetchCategories(
     // On the embed, not on this row — see `COLUMNS`.
     .is("stores.deleted_at", null);
 
-  const term = search?.trim();
-  if (term) {
-    const like = `%${term}%`;
-    query = query.or(
-      [
-        `name->>en.ilike.${like}`,
-        `name->>ar.ilike.${like}`,
-        `slug.ilike.${like}`,
-      ].join(","),
-    );
-  }
+  // `likeAny` rather than an interpolated string: a category called
+  // "Cafes, bakeries" would otherwise end the condition at the comma and the
+  // whole filter would be refused. See `lib/search.ts`.
+  const term = searchTerm(search);
+  if (term) query = query.or(likeAny(["name->>en", "name->>ar", "slug"], term));
 
-  const { data, error } = await query.order("sort_order", { ascending: true });
+  const { data, error } = await query
+    .order("sort_order", { ascending: true })
+    // Capped, not paged — the order is `sort_order`, which an operator sets by
+    // dragging, and a position within a page is not a position on the home
+    // screen. `fetchStores` writes the argument out in full.
+    .limit(PAGE.cap);
 
   if (error) throw new Error(`Could not read the categories: ${error.message}`);
 
@@ -130,6 +147,9 @@ export async function fetchCategories(
     isActive: row.is_active as boolean,
     hasMenuNav: row.has_menu_nav as boolean,
     sortOrder: row.sort_order as number,
+    emptyIconUrl: (row.empty_icon_url as string | null) ?? null,
+    emptyBackgroundColor: (row.empty_background_color as string | null) ?? null,
+    storeTextColor: (row.store_text_color as string | null) ?? null,
     usedBy: countOf(row.stores),
   }));
 }
@@ -188,21 +208,30 @@ export type CategoryDraft = {
   name: Localized;
   isActive: boolean;
   hasMenuNav: boolean;
+  /** See `Category` — null means the app's own table decides. */
+  emptyIconUrl: string | null;
+  emptyBackgroundColor: string | null;
+  storeTextColor: string | null;
 };
 
 export async function createCategory(
   draft: CategoryDraft,
   sortOrder: number,
 ): Promise<void> {
-  const { error } = await getClient().from("categories").insert({
-    category_kind_id: draft.kindId,
-    name: formatLocalized(draft.name, NAME_FORMAT),
-    is_active: draft.isActive,
-    has_menu_nav: draft.hasMenuNav,
-    sort_order: sortOrder,
-    // No `slug`: the trigger from migration 0071 derives one from the English
-    // name and makes it unique, which a client cannot do without racing.
-  });
+  const { error } = await getClient()
+    .from("categories")
+    .insert({
+      category_kind_id: draft.kindId,
+      name: formatLocalized(draft.name, NAME_FORMAT),
+      is_active: draft.isActive,
+      has_menu_nav: draft.hasMenuNav,
+      empty_icon_url: draft.emptyIconUrl,
+      empty_background_color: draft.emptyBackgroundColor,
+      store_text_color: draft.storeTextColor,
+      sort_order: sortOrder,
+      // No `slug`: the trigger from migration 0071 derives one from the English
+      // name and makes it unique, which a client cannot do without racing.
+    });
 
   if (error) throw new Error(friendly(error.message));
 }
@@ -215,9 +244,17 @@ export async function updateCategory(
 ): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.kindId !== undefined) row.category_kind_id = patch.kindId;
-  if (patch.name !== undefined) row.name = formatLocalized(patch.name, NAME_FORMAT);
+  if (patch.name !== undefined)
+    row.name = formatLocalized(patch.name, NAME_FORMAT);
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.hasMenuNav !== undefined) row.has_menu_nav = patch.hasMenuNav;
+  // Written when present, `null` included — clearing one is how a category is
+  // put back to following the app's own table.
+  if (patch.emptyIconUrl !== undefined) row.empty_icon_url = patch.emptyIconUrl;
+  if (patch.emptyBackgroundColor !== undefined)
+    row.empty_background_color = patch.emptyBackgroundColor;
+  if (patch.storeTextColor !== undefined)
+    row.store_text_color = patch.storeTextColor;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 
   const { error } = await getClient()

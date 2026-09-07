@@ -1,3 +1,5 @@
+import { PAGE } from "@/lib/limits";
+import { likeAny } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -147,7 +149,13 @@ export async function fetchPromotions(
     query = query.ilike("slug", `%${term}%`);
   }
 
-  const { data, error } = await query.order("priority", { ascending: true });
+  const { data, error } = await query
+    .order("priority", { ascending: true })
+    // Capped, not paged. `priority` is what the operator arranges and a
+    // position within a page is not one — see `fetchStores`, which writes the
+    // argument out. A marketplace running two hundred live promotions has a
+    // problem paging would not fix.
+    .limit(PAGE.cap);
 
   if (error) throw new Error(`Could not read the promotions: ${error.message}`);
 
@@ -156,7 +164,8 @@ export async function fetchPromotions(
     slug: row.slug as string,
     imageUrl: (row.image_url as Localized | null) ?? null,
     placements: ((row.placements as Placement[] | null) ?? []).filter(
-      (one): one is Placement => (PLACEMENTS as readonly string[]).includes(one),
+      (one): one is Placement =>
+        (PLACEMENTS as readonly string[]).includes(one),
     ),
     startsAt: (row.starts_at as string | null) ?? null,
     endsAt: (row.ends_at as string | null) ?? null,
@@ -452,12 +461,9 @@ export async function searchDishes(
     .order("sort_order", { ascending: true })
     .limit(50);
 
-  if (cleaned) {
-    const like = `%${cleaned}%`;
-    query = query.or(
-      [`name->>en.ilike.${like}`, `name->>ar.ilike.${like}`].join(","),
-    );
-  }
+  // Quoted, so a dish called "Kibbeh, fried" narrows the list rather than
+  // breaking the filter — see `lib/search.ts`.
+  if (cleaned) query = query.or(likeAny(["name->>en", "name->>ar"], cleaned));
 
   const { data, error } = await query;
   if (error) throw new Error(`Could not search dishes: ${error.message}`);

@@ -1,19 +1,18 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { useConfirmLeave } from "@/components/unsaved-changes";
 
 import { cx } from "@/components/ui";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { BackLink } from "@/components/ui/back-link";
-import { Copyable } from "@/components/ui/copyable";
-import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
 import { BranchesTab } from "./branches-tab";
+import { StoreFacts, StoreThumb } from "./store-identity";
 import { StoreArchive } from "./store-archive";
 import { StoreHours } from "./store-hours";
 import { StoreMenu } from "./store-menu";
@@ -73,14 +72,6 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export function StoreScreen({ storeId }: { storeId: string }) {
-  /**
-   * Where the menu's panel is portalled to — see the slot at the bottom.
-   *
-   * State, not a ref: a ref does not re-render, so the first paint would have
-   * a null target and the panel would never move. The callback fires when the
-   * node is attached, and the panel is closed on that first render anyway.
-   */
-  const [panelSlot, setPanelSlot] = useState<HTMLElement | null>(null);
   const store = useStore(storeId);
   const router = useRouter();
   const confirmLeave = useConfirmLeave();
@@ -91,6 +82,42 @@ export function StoreScreen({ storeId }: { storeId: string }) {
   const tab: TabKey = TABS.some((one) => one.key === requested)
     ? (requested as TabKey)
     : "menu";
+
+  /**
+   * Which tabs have been opened on this visit.
+   *
+   * ## The two things this reconciles
+   *
+   * The panes used to be siblings, all mounted, with the inactive ones hidden
+   * — which kept the menu's scroll position across a look at the settings and
+   * back, and paid for it by running **every** tab's queries on arrival. A shop
+   * page opened on the menu fetched the menu, the questions and the opening
+   * hours, of which two were for tabs nobody had pressed.
+   *
+   * Mounting on each visit instead would have fixed that and given back the
+   * problem the siblings were solving: a remount refetches, loses the
+   * operator's place, and flashes a skeleton at somebody returning to a screen
+   * they were just on.
+   *
+   * A tab is mounted the first time it is opened and stays mounted after — so
+   * nothing is fetched until it is asked for, and nothing is thrown away once
+   * it has been. Only the first visit to a tab costs a wait, which is the visit
+   * that was always going to.
+   *
+   * `Archive` and `Branches` are still mounted only while open, and keep their
+   * own reasons for it below.
+   */
+  const [visited, setVisited] = useState<Set<TabKey>>(() => new Set([tab]));
+
+  // Adjusted during render rather than in an effect — React's own pattern for
+  // state that follows a prop, and the one the compiler's
+  // `set-state-in-effect` rule exists to push code towards. An effect would
+  // render the new tab empty once and then again with its pane, which is a
+  // visible flash of nothing on every first visit to a tab.
+  //
+  // A new Set rather than a mutation, because the re-render is keyed on the
+  // reference; the guard is what stops it looping.
+  if (!visited.has(tab)) setVisited(new Set(visited).add(tab));
 
   /**
    * Switching tabs unmounts whatever is in the current one, so it is a way out
@@ -143,59 +170,25 @@ export function StoreScreen({ storeId }: { storeId: string }) {
             The prep window comes with the category because it is on that same
             line in the list. It is the shop's own default; a branch may differ,
             and the Branches tab is where that shows.
+
+            Both halves live in `store-identity` now, because the pages *under*
+            this one — a branch, a branch's menu — had the same hole and no
+            answer to it. This is still where the answer was worked out.
           */}
           <div className="flex items-center gap-lg">
-            {store.data &&
-              (store.data.imageUrl ? (
-                <PreviewImage
-                  src={store.data.imageUrl}
-                  name={pickLocalized(store.data.name)}
-                  className="size-[52px] rounded-md"
-                />
-              ) : (
-                <ImagePlaceholder className="size-[52px] rounded-md" />
-              ))}
+            {store.data && (
+              <StoreThumb
+                store={store.data}
+                className="size-[52px] rounded-md"
+              />
+            )}
 
             <div className="flex min-w-0 flex-col gap-xxs">
               <h1 className="truncate text-[24px]">
                 {store.data ? pickLocalized(store.data.name) : ""}
               </h1>
               {store.data && (
-                <span className="flex flex-wrap items-center gap-sm text-[12px] text-text-faint">
-                  <span className="truncate">
-                    {store.data.categoryName} ·{" "}
-                    {t("catalogue.prep", {
-                      min: store.data.prepMinMinutes,
-                      max: store.data.prepMaxMinutes,
-                    })}
-                  </span>
-
-                  {/*
-                    The number an order is sent to, on the page about the shop.
-
-                    It is the one fact here an operator needs to *act* on —
-                    ringing a kitchen that has not acknowledged an order — and
-                    it was two tabs away, on the branch that owns it. Copyable
-                    rather than plain text, because the next thing anybody does
-                    with a phone number is put it somewhere else.
-
-                    Absent is a real state and says so: a shop with no number
-                    cannot be sent orders at all, which is worth reading on the
-                    header rather than discovering from an order that never
-                    arrived.
-                  */}
-                  {store.data.whatsappPhone ? (
-                    <Copyable
-                      value={`+${store.data.whatsappPhone}`}
-                      label={t("store.copyWhatsapp")}
-                      className="text-[12px]"
-                    />
-                  ) : (
-                    <span className="rounded-full bg-danger-wash px-sm font-semibold text-danger">
-                      {t("store.noWhatsapp")}
-                    </span>
-                  )}
-                </span>
+                <StoreFacts store={store.data} />
               )}
             </div>
           </div>
@@ -224,56 +217,65 @@ export function StoreScreen({ storeId }: { storeId: string }) {
         </div>
 
         {/* The panes are siblings rather than one swapped child, so the menu's
-            scroll position and its open panel survive a look at the settings
-            and back. `hidden` rather than unmounting: remounting would refetch,
-            lose the operator's place, and flash a skeleton at somebody
-            returning to a screen they were just on. */}
-        <div className={cx("min-h-0 flex-1", tab !== "menu" && "hidden")}>
-          <StoreMenu storeId={storeId} panelSlot={panelSlot} />
-        </div>
-        {/* Mounted only when open, like Archive: it has no scroll position or
-            open panel worth preserving, and its query would otherwise run on
-            every visit to every shop. */}
+            scroll position survives a look at the settings and back — and each
+            one waits to exist until it has been opened. See `visited`. */}
+        <Pane show={tab === "menu"} mounted={visited.has("menu")}>
+          <StoreMenu storeId={storeId} />
+        </Pane>
+        {/* Mounted only when open, like Archive: it has no scroll position
+            worth preserving, and its query would otherwise run on every visit
+            to every shop. */}
         {tab === "branches" && (
           <div className="min-h-0 flex-1">
             <BranchesTab storeId={storeId} />
           </div>
         )}
-        <div className={cx("min-h-0 flex-1", tab !== "options" && "hidden")}>
+        <Pane show={tab === "options"} mounted={visited.has("options")}>
           <StoreOptions storeId={storeId} />
-        </div>
-        <div className={cx("min-h-0 flex-1", tab !== "hours" && "hidden")}>
+        </Pane>
+        <Pane show={tab === "hours"} mounted={visited.has("hours")}>
           <StoreHours storeId={storeId} />
-        </div>
+        </Pane>
         {/* Mounted only when it is open, unlike its siblings. They stay mounted
-            to keep a scroll position and an open panel across a tab switch;
-            this one has neither, and its query would otherwise run on every
-            visit to a shop to answer a question nobody asked. */}
+            to keep a scroll position across a tab switch; this one has none,
+            and its query would otherwise run on every visit to a shop to answer
+            a question nobody asked. */}
         {tab === "archive" && (
           <div className="min-h-0 flex-1">
             <StoreArchive storeId={storeId} />
           </div>
         )}
       </div>
-
-      {/*
-        Where the menu's panel is rendered, by a portal from inside `StoreMenu`.
-
-        A portal rather than lifting the panel's state up here. Everything it
-        needs — which dish is open, the section being renamed, the save
-        mutations, the counter that clears the form after "add another" — is
-        `StoreMenu`'s, and hoisting a hundred lines of JSX and eight pieces of
-        state to move a box up by the height of a header would be a large
-        change to working code for a layout reason. The portal moves the DOM
-        node and leaves the React tree alone.
-
-        `display: contents` so the slot itself lays nothing out: the panel
-        becomes a flex child of the row, which is what makes it a full-height
-        column beside the page rather than a box inside it. On a phone the panel
-        is `absolute inset-0` and now resolves against this row — so it covers
-        the shop's header too, which is what a full-screen panel should do.
-      */}
-      <div ref={setPanelSlot} className="contents" />
     </div>
+  );
+}
+
+/**
+ * One tab's pane: absent until it has been opened, hidden after.
+ *
+ * The two states are genuinely different and the distinction is the point.
+ * **Not mounted** is a tab that has never been asked for, and it costs nothing
+ * — no query, no render. **Hidden** is a tab that has been read and left, and
+ * it keeps everything: its rows, its scroll position, and the queries already
+ * answered.
+ *
+ * `hidden` as a class rather than the attribute, because the pane is a flex
+ * child and `display: none` is what has to win — which is what Tailwind's
+ * `hidden` sets, in the same place the surrounding classes are set.
+ */
+function Pane({
+  show,
+  mounted,
+  children,
+}: {
+  show: boolean;
+  /** Whether this tab has ever been opened — see `visited`. */
+  mounted: boolean;
+  children: ReactNode;
+}) {
+  if (!mounted) return null;
+
+  return (
+    <div className={cx("min-h-0 flex-1", !show && "hidden")}>{children}</div>
   );
 }

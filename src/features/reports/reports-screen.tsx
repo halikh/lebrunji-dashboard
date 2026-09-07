@@ -688,10 +688,5 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 
 /** Nothing to draw is a sentence, never an empty box that looks broken. */
 function Empty() {
-  return (
-    <EmptyState
-      titleKey="reports.nothingYet"
-      mood="waiting"
-    />
-  );
+  return <EmptyState titleKey="reports.nothingYet" mood="waiting" />;
 }

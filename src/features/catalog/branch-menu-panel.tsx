@@ -8,10 +8,12 @@ import { useState } from "react";
 
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
+import { EditorPage } from "@/components/ui/editor-page";
 import { t } from "@/i18n/translations";
 
 import type { Branch } from "./api/branches";
 import type { BranchMenuOverrides } from "./api/branch-menu";
+import { ShopLine, StoreFacts, StoreThumb } from "./store-identity";
 import { useBranches } from "./use-branches";
 import { useMenu } from "./use-menu";
 import { useStore } from "./use-stores";
@@ -57,7 +59,77 @@ import {
  * moment the menu changes, and the branch would quietly hold last month's
  * number.
  */
-export function BranchMenuPanel({
+/**
+ * One branch's menu differences, on a page of its own.
+ *
+ * No Save and no footer: every switch and every price box below writes as it is
+ * changed, so there is nothing held back to lose — which is also why leaving is
+ * not guarded.
+ */
+export function BranchMenuScreen({
+  storeId,
+  branchId,
+}: {
+  storeId: string;
+  branchId: string;
+}) {
+  const branches = useBranches(storeId);
+  const branch = branches.data?.find((one) => one.id === branchId) ?? null;
+  // The shop this branch belongs to, for the header — a cache read, since the
+  // panel below already runs this query.
+  const store = useStore(storeId);
+
+  const listHref = `/catalogue/${storeId}?tab=branches`;
+
+  if (!branch) {
+    return (
+      <EditorPage
+        title={t("branches.menuHere")}
+        backHref={listHref}
+        backLabel={t("branches.tab")}
+      >
+        {branches.isPending ? (
+          <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
+        ) : (
+          <p className="text-[14px] text-text-soft">{t("branches.notFound")}</p>
+        )}
+      </EditorPage>
+    );
+  }
+
+  return (
+    <EditorPage
+      title={t("branchMenu.title", { name: pickLocalized(branch.name) })}
+      backHref={`${listHref}&focus=${branch.id}`}
+      backLabel={t("branches.tab")}
+      /* Which shop's menu is being overridden, said the way the shop page says
+         it — see `store-identity`. The title names the branch, and a branch
+         name repeats across shops. The picture follows the branch's own when it
+         has one, which is what a customer would see. */
+      media={
+        store.data ? (
+          <StoreThumb
+            store={
+              branch.imageUrl
+                ? { ...store.data, imageUrl: branch.imageUrl }
+                : store.data
+            }
+            className="size-[46px] rounded-md"
+          />
+        ) : undefined
+      }
+      meta={store.data ? <ShopLine store={store.data} /> : undefined}
+      aside={store.data ? <StoreFacts store={store.data} /> : undefined}
+      /* A list of every dish with a price beside it — the width is the point
+         here, not a second column. */
+      width="wide"
+    >
+      <BranchMenuPanel branch={branch} storeId={storeId} />
+    </EditorPage>
+  );
+}
+
+function BranchMenuPanel({
   branch,
   storeId,
 }: {
@@ -105,7 +177,7 @@ export function BranchMenuPanel({
 
   if (menu.isPending || overrides.isPending) {
     return (
-      <div aria-hidden className="flex flex-col gap-sm p-xxl">
+      <div aria-hidden className="flex flex-col gap-sm">
         {[0, 1, 2].map((row) => (
           <div key={row} className="h-[52px] rounded-md bg-neutral-fill" />
         ))}
@@ -115,14 +187,12 @@ export function BranchMenuPanel({
 
   if (sections.length === 0) {
     return (
-      <p className="p-xxl text-[14px] text-text-faint">
-        {t("branchMenu.noMenu")}
-      </p>
+      <p className="text-[14px] text-text-faint">{t("branchMenu.noMenu")}</p>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-lg overflow-y-auto p-xxl">
+    <div className="flex flex-col gap-lg">
       <p className="ps-md text-[13px] text-text-faint">
         {t("branchMenu.intro")}
       </p>

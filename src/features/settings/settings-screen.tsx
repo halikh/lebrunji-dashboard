@@ -8,16 +8,13 @@ import { Button, cx } from "@/components/ui";
 import { SearchInput } from "@/components/ui/search-input";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
-import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
-import { Panel } from "@/components/ui/panel";
-import { PanelHeader } from "@/components/ui/panel-header";
+import { useRowFocus } from "@/components/ui/row-focus";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { ROW } from "@/components/ui/row";
 import { Select } from "@/components/ui/select";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 
-import { Toggle } from "@/components/ui/toggle";
 import { useConfirmLeave } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
@@ -34,8 +31,6 @@ import {
   type PolicySection,
 } from "./api/content";
 import {
-  useCreateHelpTopic,
-  useCreatePolicySection,
   useDeleteHelpTopic,
   useDeletePolicySection,
   useHelpTopics,
@@ -47,7 +42,6 @@ import {
   useUpdateHelpTopic,
   useUpdateOrderStatusContent,
   useUpdatePaymentMethod,
-  useUpdatePolicySection,
 } from "./use-content";
 
 /**
@@ -163,6 +157,7 @@ export function SettingsScreen() {
  * that looks like a caching problem. The form edits the group as a group.
  */
 function HelpTab() {
+  const router = useRouter();
   /**
    * The term, and the mode it puts the list in.
    *
@@ -175,15 +170,14 @@ function HelpTab() {
   const searching = search.trim().length >= SEARCH.minTerm;
 
   const topics = useHelpTopics(searching ? search : "");
-  const create = useCreateHelpTopic();
   const update = useUpdateHelpTopic();
   const remove = useDeleteHelpTopic();
   const reorder = useReorderHelpTopics();
 
-  const [open, setOpen] = useState<string | null>(null);
+  /** Which row to bring back into view — see `useRowFocus`. */
+  const focus = useRowFocus();
 
   const rows = topics.data ?? [];
-  const editing = rows.find((row) => row.id === open) ?? null;
 
   const order = useReorder({
     ids: rows.map((row) => row.id),
@@ -223,7 +217,7 @@ function HelpTab() {
               </span>
             ) : null}
           </div>
-          <Button onClick={() => setOpen("new")}>
+          <Button onClick={() => router.push("/settings/help/new")}>
             {t("content.addTopic")}
           </Button>
         </div>
@@ -266,19 +260,18 @@ function HelpTab() {
               <HelpRow
                 key={row.id}
                 topic={row}
-                open={open === row.id}
+                open={focus.isFocused(row.id)}
+                anchor={focus.attach(row.id)}
                 rowProps={order.rowProps}
                 handleProps={order.handleProps}
-                onEdit={() => setOpen(row.id)}
+                onEdit={() => router.push(`/settings/help/${row.id}`)}
                 onToggle={() => {
-                  setOpen(null);
                   update.mutate({
                     id: row.id,
                     patch: { isActive: !row.isActive },
                   });
                 }}
                 onRemove={async () => {
-                  setOpen(null);
                   await remove.mutateAsync({
                     id: row.id,
                     name: pickLocalized(row.question),
@@ -288,47 +281,6 @@ function HelpTab() {
             ))}
         </div>
       </div>
-
-      <Panel
-        open={open !== null}
-        onClose={() => setOpen(null)}
-        label={t("content.topicForm")}
-      >
-        {open && (
-          <>
-            <PanelHeader
-              title={
-                editing
-                  ? pickLocalized(editing.question)
-                  : t("content.addTopic")
-              }
-              onClose={() => setOpen(null)}
-            />
-
-            <HelpEditor
-              key={open}
-              initial={editing ?? undefined}
-              groups={rows}
-              pending={create.isPending || update.isPending}
-              onSave={(draft) => {
-                const name = pickLocalized(draft.question);
-                if (editing) {
-                  update.mutate(
-                    { id: editing.id, patch: draft, name },
-                    { onSuccess: () => setOpen(null) },
-                  );
-                } else {
-                  create.mutate(
-                    { draft, sortOrder: rows.length, name },
-                    { onSuccess: () => setOpen(null) },
-                  );
-                }
-              }}
-              onCancel={() => setOpen(null)}
-            />
-          </>
-        )}
-      </Panel>
     </div>
   );
 }
@@ -344,6 +296,7 @@ type ReorderProps = {
 function HelpRow({
   topic,
   open,
+  anchor,
   rowProps,
   handleProps,
   onEdit,
@@ -351,7 +304,10 @@ function HelpRow({
   onRemove,
 }: {
   topic: HelpTopic;
+  /** Whether this is the row just returned from. Draws the ring. */
   open: boolean;
+  /** Scrolls this row back into view when it is the one returned to. */
+  anchor: (node: HTMLElement | null) => void;
   onEdit: () => void;
   onToggle: () => void;
   onRemove: () => Promise<void>;
@@ -371,7 +327,7 @@ function HelpRow({
   );
 
   return (
-    <div {...row}>
+    <div {...row} ref={anchor}>
       <button {...handleProps(topic.id)}>
         <GripIcon />
       </button>
@@ -424,145 +380,6 @@ function HelpRow({
   );
 }
 
-function HelpEditor({
-  initial,
-  groups,
-  pending,
-  onSave,
-  onCancel,
-}: {
-  initial?: HelpTopic;
-  groups: HelpTopic[];
-  pending: boolean;
-  onSave: (draft: {
-    groupSlug: string;
-    groupName: Localized;
-    question: Localized;
-    answer: Localized;
-    isActive: boolean;
-  }) => void;
-  onCancel: () => void;
-}) {
-  const languages = useLanguages();
-  const codes = languages.data?.map((language) => language.code) ?? [];
-
-  // One entry per group that exists, so a new topic joins an existing heading
-  // rather than inventing a near-duplicate of it.
-  const known = [
-    ...new Map(
-      groups.map((one) => [one.groupSlug, one.groupName] as const),
-    ).entries(),
-  ];
-
-  const [groupSlug, setGroupSlug] = useState(
-    initial?.groupSlug ?? known[0]?.[0] ?? "",
-  );
-  const [question, setQuestion] = useState<Localized>(initial?.question ?? {});
-  const [answer, setAnswer] = useState<Localized>(initial?.answer ?? {});
-  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
-
-  const [errors, setErrors] = useState<{
-    question?: string;
-    answer?: string;
-    group?: string;
-  }>({});
-
-  const groupName =
-    known.find(([slug]) => slug === groupSlug)?.[1] ?? ({} as Localized);
-
-  function submit() {
-    const questionCheck = validateLocalizedText(
-      question,
-      codes,
-      TEXT.helpQuestion,
-    );
-    const answerCheck = validateLocalizedText(answer, codes, TEXT.helpAnswer);
-
-    const found = {
-      question: questionCheck.ok
-        ? undefined
-        : t(questionCheck.key, questionCheck.params),
-      answer: answerCheck.ok
-        ? undefined
-        : t(answerCheck.key, answerCheck.params),
-      group: groupSlug ? undefined : t("content.groupRequired"),
-    };
-
-    setErrors(found);
-    if (found.question || found.answer || found.group) return;
-
-    onSave({ groupSlug, groupName, question, answer, isActive });
-  }
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
-        <Field
-          label={t("content.group")}
-          hint={t("content.groupHint")}
-          error={errors.group}
-        >
-          <Select
-            value={groupSlug}
-            onChange={setGroupSlug}
-            placeholder={t("content.pickGroup")}
-            options={known.map(([slug, name]) => ({
-              value: slug,
-              label: pickLocalized(name) || slug,
-            }))}
-          />
-        </Field>
-
-        <LocalizedField
-          label={t("content.question")}
-          value={question}
-          onChange={setQuestion}
-          maxLength={TEXT.helpQuestion}
-          error={errors.question}
-          placeholder={{
-            en: "How do I track my order?",
-            ar: "كيف أتتبع طلبي؟",
-          }}
-        />
-
-        <LocalizedField
-          label={t("content.answer")}
-          value={answer}
-          onChange={setAnswer}
-          maxLength={TEXT.helpAnswer}
-          multiline
-          error={errors.answer}
-          placeholder={{
-            en: "Open the order from the Orders tab.",
-            ar: "افتح الطلب من تبويب الطلبات.",
-          }}
-        />
-
-        <Field
-          label={t("content.visibility")}
-          hint={isActive ? t("content.liveHint") : t("content.hiddenHint")}
-        >
-          <Toggle
-            on={isActive}
-            onChange={() => setIsActive((current) => !current)}
-            labelOn={t("content.live")}
-            labelOff={t("content.hidden")}
-          />
-        </Field>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
-        <Button variant="secondary" onClick={onCancel} disabled={pending}>
-          {t("common.cancel")}
-        </Button>
-        <Button onClick={submit} pending={pending}>
-          {t("content.save")}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Legal
 // ---------------------------------------------------------------------------
@@ -576,21 +393,32 @@ function HelpEditor({
  * on the tab.
  */
 function LegalTab() {
-  const [document, setDocument] = useState<PolicyDocument>("privacy");
+  const router = useRouter();
+  const params = useSearchParams();
+
+  /**
+   * Which policy is on screen, seeded from the URL.
+   *
+   * The editor is a page now, and it comes back here by href — so it has to be
+   * able to say *which* document it was editing, or returning from a terms
+   * section would land on privacy and the row it asked to focus would not be in
+   * the list. See `?doc=` in `policy-section-editor.tsx`.
+   */
+  const [document, setDocument] = useState<PolicyDocument>(
+    params.get("doc") === "terms" ? "terms" : "privacy",
+  );
 
   const [search, setSearch] = useState("");
   const searching = search.trim().length >= SEARCH.minTerm;
 
   const sections = usePolicySections(document, searching ? search : "");
-  const create = useCreatePolicySection(document);
-  const update = useUpdatePolicySection(document);
   const remove = useDeletePolicySection(document);
   const reorder = useReorderPolicySections(document);
 
-  const [open, setOpen] = useState<string | null>(null);
+  /** Which row to bring back into view — see `useRowFocus`. */
+  const focus = useRowFocus();
 
   const rows = sections.data ?? [];
-  const editing = rows.find((row) => row.id === open) ?? null;
 
   const order = useReorder({
     ids: rows.map((row) => row.id),
@@ -615,7 +443,6 @@ function LegalTab() {
                 // The open section belongs to the document being left, and so
                 // does the search — a term that matched in privacy has no
                 // standing in terms.
-                setOpen(null);
                 setSearch("");
               }}
               options={POLICY_DOCUMENTS.map((one) => ({
@@ -641,7 +468,9 @@ function LegalTab() {
             ) : null}
           </div>
 
-          <Button onClick={() => setOpen("new")}>
+          <Button
+            onClick={() => router.push(`/settings/legal/new?doc=${document}`)}
+          >
             {t("content.addSection")}
           </Button>
         </div>
@@ -674,12 +503,14 @@ function LegalTab() {
                 key={row.id}
                 section={row}
                 index={index}
-                open={open === row.id}
+                open={focus.isFocused(row.id)}
+                anchor={focus.attach(row.id)}
                 rowProps={order.rowProps}
                 handleProps={order.handleProps}
-                onEdit={() => setOpen(row.id)}
+                onEdit={() =>
+                  router.push(`/settings/legal/${row.id}?doc=${document}`)
+                }
                 onRemove={async () => {
-                  setOpen(null);
                   await remove.mutateAsync({
                     id: row.id,
                     name: pickLocalized(row.title),
@@ -689,48 +520,6 @@ function LegalTab() {
             ))}
         </div>
       </div>
-
-      <Panel
-        open={open !== null}
-        onClose={() => setOpen(null)}
-        label={t("content.sectionForm")}
-      >
-        {open && (
-          <>
-            <PanelHeader
-              title={
-                editing ? pickLocalized(editing.title) : t("content.addSection")
-              }
-              onClose={() => setOpen(null)}
-            />
-
-            <PolicyEditor
-              key={`${document}-${open}`}
-              initial={editing ?? undefined}
-              pending={create.isPending || update.isPending}
-              onSave={(draft) => {
-                const name = pickLocalized(draft.title);
-                if (editing) {
-                  update.mutate(
-                    { id: editing.id, patch: draft, name },
-                    { onSuccess: () => setOpen(null) },
-                  );
-                } else {
-                  create.mutate(
-                    {
-                      draft: { ...draft, document },
-                      sortOrder: rows.length,
-                      name,
-                    },
-                    { onSuccess: () => setOpen(null) },
-                  );
-                }
-              }}
-              onCancel={() => setOpen(null)}
-            />
-          </>
-        )}
-      </Panel>
     </div>
   );
 }
@@ -739,6 +528,7 @@ function PolicyRow({
   section,
   index,
   open,
+  anchor,
   rowProps,
   handleProps,
   onEdit,
@@ -746,7 +536,10 @@ function PolicyRow({
 }: {
   section: PolicySection;
   index: number;
+  /** Whether this is the row just returned from. Draws the ring. */
   open: boolean;
+  /** Scrolls this row back into view when it is the one returned to. */
+  anchor: (node: HTMLElement | null) => void;
   onEdit: () => void;
   onRemove: () => Promise<void>;
 } & ReorderProps) {
@@ -763,7 +556,7 @@ function PolicyRow({
   );
 
   return (
-    <div {...row}>
+    <div {...row} ref={anchor}>
       <button {...handleProps(section.id)}>
         <GripIcon />
       </button>
@@ -803,77 +596,6 @@ function PolicyRow({
       >
         {t("content.remove")}
       </ConfirmButton>
-    </div>
-  );
-}
-
-function PolicyEditor({
-  initial,
-  pending,
-  onSave,
-  onCancel,
-}: {
-  initial?: PolicySection;
-  pending: boolean;
-  onSave: (draft: { title: Localized; body: Localized }) => void;
-  onCancel: () => void;
-}) {
-  const languages = useLanguages();
-  const codes = languages.data?.map((language) => language.code) ?? [];
-
-  const [title, setTitle] = useState<Localized>(initial?.title ?? {});
-  const [body, setBody] = useState<Localized>(initial?.body ?? {});
-  const [errors, setErrors] = useState<{ title?: string; body?: string }>({});
-
-  function submit() {
-    const titleCheck = validateLocalizedText(title, codes, TEXT.policyTitle);
-    const bodyCheck = validateLocalizedText(body, codes, TEXT.policyBody);
-
-    const found = {
-      title: titleCheck.ok ? undefined : t(titleCheck.key, titleCheck.params),
-      body: bodyCheck.ok ? undefined : t(bodyCheck.key, bodyCheck.params),
-    };
-
-    setErrors(found);
-    if (found.title || found.body) return;
-
-    onSave({ title, body });
-  }
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
-        <LocalizedField
-          label={t("content.sectionTitle")}
-          value={title}
-          onChange={setTitle}
-          maxLength={TEXT.policyTitle}
-          error={errors.title}
-          placeholder={{ en: "What we collect", ar: "ما الذي نجمعه" }}
-        />
-
-        <LocalizedField
-          label={t("content.sectionBody")}
-          value={body}
-          onChange={setBody}
-          maxLength={TEXT.policyBody}
-          multiline
-          error={errors.body}
-          placeholder={{
-            en: "We keep your name, phone number and delivery addresses.",
-            ar: "نحتفظ باسمك ورقم هاتفك وعناوين التوصيل.",
-          }}
-        />
-      </div>
-
-      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
-        <Button variant="secondary" onClick={onCancel} disabled={pending}>
-          {t("common.cancel")}
-        </Button>
-        <Button onClick={submit} pending={pending}>
-          {t("content.save")}
-        </Button>
-      </div>
     </div>
   );
 }
@@ -1009,11 +731,21 @@ function StepsTab() {
         <>
           {/* The path, drawn as one. Horizontal because that is the shape of a
               sequence, and because five names across is far less to read than
-              five cards down. */}
+              five cards down.
+
+              It spans the width rather than hugging its words: the strip is a
+              *path*, and a path that stops a third of the way across reads as
+              five buttons that happen to be in a row. Each chip takes an equal
+              share (see `flex-1` on the button), so the steps are evenly spaced
+              whatever they are called — which is also what keeps a long Arabic
+              name from making one step twice the width of its neighbour.
+
+              `flex-nowrap`, because a sequence that wraps to a second line is
+              not a sequence any more; the chips give up width instead. */}
           <div
             role="tablist"
             aria-label={t("content.tabSteps")}
-            className="flex flex-wrap items-stretch gap-xs"
+            className="flex items-stretch gap-xs"
           >
             {path.map((status, index) => (
               <StepChip
@@ -1133,7 +865,10 @@ function StepChip({
   const tone = statusTone(slug);
 
   return (
-    <div className="flex items-center">
+    // `flex-1` here as well as on the button: the chip's wrapper is what the
+    // strip lays out, so a share given only to the button would be a share of
+    // a box that is still only as wide as its label.
+    <div className="flex flex-1 items-center">
       {joined && (
         <span aria-hidden className="h-px w-[14px] shrink-0 bg-border" />
       )}
@@ -1146,7 +881,11 @@ function StepChip({
           active ? { borderColor: tone.dot, background: tone.wash } : undefined
         }
         className={cx(
-          "flex min-w-[128px] flex-col gap-xxs rounded-md border px-lg py-md text-left",
+          // `flex-1` with a `min-w-0`, not a fixed width: every step takes the
+          // same share of the strip, and the floor is zero so a long name
+          // truncates inside its own chip rather than pushing the row wider
+          // than the page.
+          "flex min-w-0 flex-1 flex-col gap-xxs rounded-md border px-lg py-md text-left",
           active
             ? "shadow-card"
             : "border-border bg-surface hover:border-active",

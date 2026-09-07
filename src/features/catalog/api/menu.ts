@@ -1,3 +1,4 @@
+import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { formatLocalized } from "@/lib/text-format";
 import { pickLocalized } from "@/i18n/db-text";
@@ -46,6 +47,15 @@ export type MenuItem = {
   priceUnit: PriceUnit | null;
   unitQuantity: number | null;
   /**
+   * How far one press of the customer's `+` or `−` moves, in `priceUnit`.
+   *
+   * Null for the plain whole-item stepper, which is most of the menu — and
+   * which is what every item written before `0119` keeps. Set, it makes
+   * `unitQuantity` a *floor* as well as a size: `(kg, 5, 5)` is a shop that
+   * sells from five kilos, five at a time.
+   */
+  unitStep: number | null;
+  /**
    * The tags on this dish, as ids into the vocabulary.
    *
    * Ids rather than rows: a tag's name, colour and position are properties of
@@ -79,12 +89,18 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
       `id, slug, title, sort_order,
        menu_items ( id, menu_section_id, slug, name, description, price,
                     image_url, is_active, sort_order, deleted_at,
-                    price_unit, unit_quantity,
+                    price_unit, unit_quantity, unit_step,
                     menu_item_tag_links ( menu_item_tag_id ) )`,
     )
     .eq("store_id", storeId)
     .is("deleted_at", null)
-    .order("sort_order", { ascending: true });
+    .order("sort_order", { ascending: true })
+    // Capped, not paged. The note above says why a menu is not paginated — it
+    // is dragged into order, and a position within a page is not a position in
+    // a menu. This is that reasoning's other half: the assumption made
+    // checkable, so a shop with two thousand items is a shop somebody is told
+    // about rather than one quietly shown half its menu.
+    .limit(PAGE.cap);
 
   if (error) throw new Error(`Could not read the menu: ${error.message}`);
 
@@ -198,8 +214,6 @@ async function searchMenuSections(
   storeId: string,
   term: string,
 ): Promise<MenuMatches["sections"]> {
-  const like = `%${term.trim()}%`;
-
   const { data, error } = await getClient()
     .from("menu_sections")
     // The count comes back with the row, because a heading on its own says
@@ -208,13 +222,10 @@ async function searchMenuSections(
     .select("id, title, menu_items(count)")
     .eq("store_id", storeId)
     .is("deleted_at", null)
-    .or(
-      [
-        `title->>en.ilike.${like}`,
-        `title->>ar.ilike.${like}`,
-        `slug.ilike.${like}`,
-      ].join(","),
-    )
+    // Quoted — a section called "Mezze, cold" would otherwise end the
+    // condition at its comma and the whole filter would be refused. See
+    // `lib/search.ts`.
+    .or(likeAny(["title->>en", "title->>ar", "slug"], term))
     .order("sort_order", { ascending: true })
     .limit(PAGE.size);
 
@@ -238,7 +249,6 @@ async function searchMenuItems(
   storeId: string,
   term: string,
 ): Promise<MenuItem[]> {
-  const like = `%${term.trim()}%`;
 
   const { data, error } = await getClient()
     .from("menu_items")
@@ -250,12 +260,10 @@ async function searchMenuItems(
     .eq("store_id", storeId)
     .is("deleted_at", null)
     .or(
-      [
-        `name->>en.ilike.${like}`,
-        `name->>ar.ilike.${like}`,
-        `description->>en.ilike.${like}`,
-        `slug.ilike.${like}`,
-      ].join(","),
+      likeAny(
+        ["name->>en", "name->>ar", "description->>en", "slug"],
+        term,
+      ),
     )
     .order("sort_order", { ascending: true })
     .limit(PAGE.size);
@@ -289,6 +297,8 @@ export type MenuItemDraft = {
   /** Null together — see `MenuItem`. */
   priceUnit: PriceUnit | null;
   unitQuantity: number | null;
+  /** Null unless the item is stepped — see `MenuItem`. */
+  unitStep: number | null;
   /** Ids from the tag vocabulary. Empty is a valid answer, not a missing one. */
   tagIds: string[];
 };
@@ -328,6 +338,7 @@ export async function createMenuItem(
       image_url: draft.imageUrl,
       price_unit: draft.priceUnit,
       unit_quantity: draft.unitQuantity,
+      unit_step: draft.unitStep,
       sort_order: sortOrder,
     })
     // The id comes back because the links need something to point at. It is
@@ -407,7 +418,8 @@ export async function updateMenuItem(
   patch: MenuItemPatch,
 ): Promise<void> {
   const row: Record<string, unknown> = {};
-  if (patch.name !== undefined) row.name = formatLocalized(patch.name, NAME_FORMAT);
+  if (patch.name !== undefined)
+    row.name = formatLocalized(patch.name, NAME_FORMAT);
   if (patch.description !== undefined) {
     row.description = formatLocalized(
       localizedOrNull(patch.description),
@@ -425,6 +437,9 @@ export async function updateMenuItem(
   if (patch.unitQuantity !== undefined) {
     row.unit_quantity = patch.unitQuantity;
   }
+  // And here — clearing the unit clears this too, so null is the value that
+  // turns a stepped item back into a counted one.
+  if (patch.unitStep !== undefined) row.unit_step = patch.unitStep;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 
   // A patch may be tags only — a reorder is not, and neither is a switch — so
@@ -475,11 +490,13 @@ export async function createMenuSection(
   draft: MenuSectionDraft,
   sortOrder: number,
 ): Promise<void> {
-  const { error } = await getClient().from("menu_sections").insert({
-    store_id: draft.storeId,
-    title: formatLocalized(draft.title, NAME_FORMAT),
-    sort_order: sortOrder,
-  });
+  const { error } = await getClient()
+    .from("menu_sections")
+    .insert({
+      store_id: draft.storeId,
+      title: formatLocalized(draft.title, NAME_FORMAT),
+      sort_order: sortOrder,
+    });
 
   if (error) throw new Error(friendly(error.message));
 }
@@ -711,6 +728,9 @@ function toItem(row: Record<string, unknown>): MenuItem {
     // and JSON has no type for that. Parsed once here rather than in each
     // screen, where the first one to forget would compare "500" to 500.
     unitQuantity: row.unit_quantity == null ? null : Number(row.unit_quantity),
+    // `numeric` again — same string, same parse. A build reading a database
+    // that predates `0119` sees the key missing, which is the plain stepper.
+    unitStep: row.unit_step == null ? null : Number(row.unit_step),
     sortOrder: row.sort_order as number,
     // An embed with nothing in it comes back as `[]`, so an untagged dish and
     // a dish whose links were not asked for look identical here. Every read
@@ -819,54 +839,93 @@ export type Archive = {
  * they can come back: restoring a dish into an archived section is the mislaid
  * state `archiveMenuSection` exists to prevent, and the screen has to be able
  * to say so before the operator presses the button rather than after.
+ *
+ * ## The search asks the database, all five times
+ *
+ * An archive is the one list here that only grows — nothing in this product is
+ * deleted — so it is where "scroll until you see it" stops working first, and
+ * the thing being hunted for is by definition old. Filtering the fetched rows
+ * would search what was *read*, which is the wrong half of that on five reads
+ * that are capped.
+ *
+ * Each kind is searched by its own name, in both languages. A withdrawn choice
+ * is matched on its own name rather than on its question's: somebody hunting
+ * for "Extra garlic" types that, and the question it answers is what the row
+ * then tells them.
  */
-export async function fetchArchive(storeId: string): Promise<Archive> {
+export async function fetchArchive(
+  storeId: string,
+  search?: string | null,
+): Promise<Archive> {
   const client = getClient();
+  const term = searchTerm(search);
 
   // Alongside the four below rather than after them: it is one more independent
   // question about the same shop, and awaiting it separately would add a round
   // trip's wait to a screen that already pays for one.
-  const branches = fetchArchivedBranches(storeId);
+  const branches = fetchArchivedBranches(storeId, term);
+
+  // Built rather than inlined, so the term can be applied to each: a filter
+  // added to a query literal inside `Promise.all` would have to be repeated in
+  // five branches, which is five places to forget one.
+  let sectionQuery = client
+    .from("menu_sections")
+    .select("id, title, deleted_at")
+    .eq("store_id", storeId)
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false })
+    .limit(PAGE.cap);
+  if (term) {
+    sectionQuery = sectionQuery.or(
+      likeAny(["title->>en", "title->>ar", "slug"], term),
+    );
+  }
+
+  let itemQuery = client
+    .from("menu_items")
+    .select(
+      "id, name, price, image_url, deleted_at, menu_sections!inner ( title, deleted_at )",
+    )
+    .eq("store_id", storeId)
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false })
+    .limit(PAGE.cap);
+  if (term) {
+    itemQuery = itemQuery.or(likeAny(["name->>en", "name->>ar", "slug"], term));
+  }
+
+  let groupQuery = client
+    .from("option_groups")
+    .select(
+      `id, title, is_active,
+       menu_item_option_group_links ( menu_items ( name ) )`,
+    )
+    .eq("store_id", storeId)
+    .eq("is_active", false)
+    .limit(PAGE.cap);
+  if (term) {
+    groupQuery = groupQuery.or(likeAny(["title->>en", "title->>ar"], term));
+  }
+
+  let optionQuery = client
+    .from("item_options")
+    .select(
+      `id, name, price, is_active,
+       option_groups!inner ( title, store_id,
+         menu_item_option_group_links ( menu_items ( name ) ) )`,
+    )
+    .eq("option_groups.store_id", storeId)
+    .eq("is_active", false)
+    .limit(PAGE.cap);
+  if (term) {
+    optionQuery = optionQuery.or(likeAny(["name->>en", "name->>ar"], term));
+  }
 
   const [sections, items, groups, options] = await Promise.all([
-    client
-      .from("menu_sections")
-      .select("id, title, deleted_at")
-      .eq("store_id", storeId)
-      .not("deleted_at", "is", null)
-      .order("deleted_at", { ascending: false }),
-
-    client
-      .from("menu_items")
-      .select(
-        "id, name, price, image_url, deleted_at, menu_sections!inner ( title, deleted_at )",
-      )
-      .eq("store_id", storeId)
-      .not("deleted_at", "is", null)
-      .order("deleted_at", { ascending: false }),
-
-    // Scoped by the group's own `store_id` rather than through an item, since
-    // `0094` there is no owning item to join to — and a withdrawn question that
-    // is asked on nothing would drop out of an inner join to the links, which
-    // is exactly the row most in need of being listed here.
-    client
-      .from("option_groups")
-      .select(
-        `id, title, is_active,
-         menu_item_option_group_links ( menu_items ( name ) )`,
-      )
-      .eq("store_id", storeId)
-      .eq("is_active", false),
-
-    client
-      .from("item_options")
-      .select(
-        `id, name, price, is_active,
-         option_groups!inner ( title, store_id,
-           menu_item_option_group_links ( menu_items ( name ) ) )`,
-      )
-      .eq("option_groups.store_id", storeId)
-      .eq("is_active", false),
+    sectionQuery,
+    itemQuery,
+    groupQuery,
+    optionQuery,
   ]);
 
   for (const result of [sections, items, groups, options]) {

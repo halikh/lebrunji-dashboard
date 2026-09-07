@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToasts } from "@/components/ui/toast";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { searchTerm } from "@/lib/search";
 
 import {
   archiveBranch,
@@ -18,13 +19,29 @@ import {
 
 export const branchKeys = {
   all: ["branches"] as const,
-  list: (storeId: string) => ["branches", "list", storeId] as const,
+  list: (storeId: string, search = "") =>
+    ["branches", "list", storeId, search] as const,
 };
 
-export function useBranches(storeId: string) {
+/**
+ * One shop's branches, or the ones matching a term.
+ *
+ * The term is part of the key, so a search is a **different list** rather than
+ * the same one re-filtered — which is what makes it a query the database
+ * answers instead of a filter over whatever happened to be downloaded. The
+ * previous rows stay under it while the new ones are in flight, because a list
+ * that blanks on every keystroke cannot be typed into.
+ *
+ * The default is the empty term, so every caller that only wants "this shop's
+ * branches" — the editor's picker, the archive — keeps the key it had.
+ */
+export function useBranches(storeId: string, search = "") {
+  const term = searchTerm(search);
+
   return useQuery({
-    queryKey: branchKeys.list(storeId),
-    queryFn: () => fetchBranches(storeId),
+    queryKey: branchKeys.list(storeId, term ?? ""),
+    queryFn: () => fetchBranches(storeId, term),
+    placeholderData: (previous) => previous,
   });
 }
 

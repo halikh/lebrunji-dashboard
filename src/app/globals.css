@@ -15,6 +15,27 @@ body {
   height: 100%;
 }
 
+/**
+ * The dashboard is an app frame, not a document.
+ *
+ * Its shell is exactly the viewport's height and every screen inside it scrolls
+ * its own pane. What was left over was the *window*: the body is `min-h-full`,
+ * so the smallest disagreement between that and the shell's `100dvh` gave the
+ * page a scrollbar of its own — a second one, beside the pane's, scrolling the
+ * header the pane keeps still.
+ *
+ * Matched on the shell rather than set on `<body>` directly, because the body
+ * is the root layout's and the login pages share it. They are ordinary
+ * documents and go on scrolling.
+ *
+ * A descendant match rather than a child one: the shell is a direct child of
+ * the body today, and a provider growing a wrapper element around it is not the
+ * sort of change anybody would think to check this rule against.
+ */
+body:has([data-app-shell]) {
+  overflow: hidden;
+}
+
 body {
   background: var(--color-background);
   color: var(--color-text);
@@ -478,8 +499,12 @@ dialog[open]::backdrop {
  * `both`, so it holds at zero opacity for the delay rather than showing first.
  */
 @keyframes loader-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .animate-fade-in {
@@ -583,4 +608,41 @@ dialog[open]::backdrop {
  * radius; the library's default one is a different white on a different grey. */
 .react-datepicker__triangle {
   display: none;
+}
+
+/* ===========================================================================
+ * Scrolling, eased
+ * ===========================================================================
+ *
+ * Every jump this app makes is to somewhere the operator already knows about:
+ * the row they were editing, coming back from its page (`useRowFocus`), the
+ * first field with an error after a failed save, a section a tab points at.
+ * Landing there instantly is what makes those feel like the page *changed*
+ * rather than moved — the eye has no way to tell it is the same list.
+ *
+ * `scroll-behavior` on the document is not enough here: almost nothing in this
+ * app scrolls the document. Each screen is a column with its own
+ * `overflow-y-auto`, so the rule has to reach the scrollers themselves.
+ *
+ * ## And it is off for anybody who asked for that
+ *
+ * `prefers-reduced-motion` is a medical setting before it is a taste — smooth
+ * scrolling is one of the specific things that triggers vestibular symptoms —
+ * so the whole block sits behind it. `scrollIntoView({ behavior: "smooth" })`
+ * in `useRowFocus` also honours the same preference in every browser that
+ * implements it, which is why nothing there has to be conditional either.
+ * ======================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* The scrollers themselves — see above. Tailwind's utilities are the only
+   * way any element in this app becomes one, so these three are the whole set;
+   * a bare `*` would apply it to the many elements that never scroll. */
+  .overflow-y-auto,
+  .overflow-auto,
+  .overflow-x-auto {
+    scroll-behavior: smooth;
+  }
 }

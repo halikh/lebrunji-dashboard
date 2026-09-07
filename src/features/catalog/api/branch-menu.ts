@@ -1,3 +1,4 @@
+import { PAGE } from "@/lib/limits";
 import { getClient } from "@/lib/supabase/client";
 
 /**
@@ -43,18 +44,28 @@ export async function fetchBranchOverrides(
   const client = getClient();
 
   const [hidden, items, options] = await Promise.all([
+    // Bounded by the shop's own menu rather than by anything here, and sparse
+    // in practice — a branch writes a row only where it differs. The limits are
+    // for the case that stops being true: a branch that hid every item of a
+    // large menu would otherwise read the lot into three maps on every visit.
+    // `maxRows` rather than `cap`, because these are not a list anybody reads:
+    // a truncated one would silently un-hide items, so the number is set where
+    // it will not be reached.
     client
       .from("branch_menu_hidden")
       .select("menu_section_id, menu_item_id, option_group_id, item_option_id")
-      .eq("branch_id", branchId),
+      .eq("branch_id", branchId)
+      .limit(PAGE.maxRows),
     client
       .from("branch_item_prices")
       .select("menu_item_id, price")
-      .eq("branch_id", branchId),
+      .eq("branch_id", branchId)
+      .limit(PAGE.maxRows),
     client
       .from("branch_option_prices")
       .select("item_option_id, price")
-      .eq("branch_id", branchId),
+      .eq("branch_id", branchId)
+      .limit(PAGE.maxRows),
   ]);
 
   const failure = [hidden, items, options].find((one) => one.error);

@@ -1,26 +1,31 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
+import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Button } from "@/components/ui";
 import { pickLocalized } from "@/i18n/db-text";
-import { Panel } from "@/components/ui/panel";
-import { useGuardedAction } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 
 import { NoPinWarning } from "./no-pin-warning";
-import { StoreWizard } from "./store-wizard";
 
+import { applyOrder } from "./api/menu";
 import type { Store } from "./api/stores";
-import { useArchiveStore, useStores, useUpdateStore } from "./use-stores";
+import {
+  useArchiveStore,
+  useReorderStores,
+  useStores,
+  useUpdateStore,
+} from "./use-stores";
 
 /**
  * The shops.
@@ -35,168 +40,165 @@ import { useArchiveStore, useStores, useUpdateStore } from "./use-stores";
  * nothing else on the screen would ever say so.
  */
 export function StoresList() {
+  const router = useRouter();
+  /**
+   * The term, and the mode it puts the list in.
+   *
+   * Searching and reordering are different jobs on one list and cannot both be
+   * on — the same rule the categories list follows. A position among *matches*
+   * is not a position in the list, so a drag while filtered would write an
+   * order nobody chose. The handles go away and the hint with them.
+   */
   const [search, setSearch] = useState("");
+  const searching = search.trim().length > 0;
 
   const stores = useStores(search);
   const update = useUpdateStore();
   const archive = useArchiveStore();
+  const reorder = useReorderStores();
 
   const rows = stores.data?.stores ?? [];
 
   /**
-   * Whether the add-a-shop wizard is open.
+   * Dragging, on the dashboard's own column.
    *
-   * Local state rather than the URL, unlike every filter here: a half-filled
-   * wizard is not a view somebody should be able to link to or land back on
-   * after a reload, because the state that made it meaningful is gone.
+   * `applyOrder` numbers by `sortOrder`, so the rows are handed to it with
+   * `adminSortOrder` in that slot and the result is put back the same way —
+   * which keeps one numbering function for six lists rather than a second copy
+   * differing by a field name.
+   *
+   * What it writes is `admin_sort_order`, which nothing else reads: the
+   * customer’s own order is `sort_order` and is not touched here. See `0118`.
    */
-  const [adding, setAdding] = useState(false);
-  const guarded = useGuardedAction();
+  const order = useReorder({
+    ids: rows.map((row) => row.id),
+    onReorder: (ids) => {
+      const { next, updates } = applyOrder(
+        rows.map((row) => ({ ...row, sortOrder: row.adminSortOrder })),
+        ids,
+      );
+      reorder.mutate({
+        updates,
+        next: {
+          truncated: stores.data?.truncated ?? false,
+          stores: next.map((row) => ({
+            ...row,
+            adminSortOrder: row.sortOrder,
+            sortOrder: row.adminSortOrder,
+          })),
+        },
+      });
+    },
+    labelOf: (id) =>
+      pickLocalized(rows.find((row) => row.id === id)?.name ?? {}),
+    disabled: searching,
+  });
 
   return (
-    // A row, not a column: the panel is a *sibling* of the list, which is what
-    // makes it open beside it. Nested inside the column it becomes another
-    // block in the stack and lands under the rows — the same shape the
-    // categories, tags and promotions lists already use.
-    <div className="relative flex h-full">
-      <div className="flex min-w-0 flex-grow flex-col">
-        <ListHeader
-          title={t("catalogue.stores")}
-          search={{
-            value: search,
-            onChange: setSearch,
-            placeholder: t("catalogue.searchPlaceholder"),
-          }}
-          action={
-            <Button onClick={() => setAdding(true)}>{t("store.add")}</Button>
-          }
-        />
+    <div className="flex h-full flex-col">
+      <ListHeader
+        title={t("catalogue.stores")}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: t("catalogue.searchPlaceholder"),
+        }}
+        // Gone when there is nothing to sort — one shop, or a filtered
+        // list. See `sortable` on `useReorder`.
+        hint={order.sortable ? t("catalogue.reorderHint") : undefined}
+        action={
+          <Button onClick={() => router.push("/catalogue/new")}>
+            {t("store.add")}
+          </Button>
+        }
+      />
 
-        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-          {stores.isPending && (
-            <div aria-hidden className="flex flex-col gap-sm">
-              {[0, 1, 2, 3].map((row) => (
-                <div
-                  key={row}
-                  className="h-[74px] rounded-md border border-border bg-surface opacity-60"
-                />
-              ))}
+      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        {stores.isPending && (
+          <div aria-hidden className="flex flex-col gap-sm">
+            {[0, 1, 2, 3].map((row) => (
+              <div
+                key={row}
+                className="h-[74px] rounded-md border border-border bg-surface opacity-60"
+              />
+            ))}
+          </div>
+        )}
+
+        {stores.isError && (
+          <div className="flex flex-col items-center gap-lg py-huge text-center">
+            <div className="flex flex-col gap-xs">
+              <h2 className="text-[18px]">{t("catalogue.failedTitle")}</h2>
+              <p className="text-[14px] text-text-soft">
+                {t("catalogue.failedBody")}
+              </p>
             </div>
-          )}
+            <Button variant="secondary" onClick={() => void stores.refetch()}>
+              {t("common.retry")}
+            </Button>
+          </div>
+        )}
 
-          {stores.isError && (
-            <div className="flex flex-col items-center gap-lg py-huge text-center">
-              <div className="flex flex-col gap-xs">
-                <h2 className="text-[18px]">{t("catalogue.failedTitle")}</h2>
-                <p className="text-[14px] text-text-soft">
-                  {t("catalogue.failedBody")}
-                </p>
-              </div>
-              <Button variant="secondary" onClick={() => void stores.refetch()}>
-                {t("common.retry")}
-              </Button>
-            </div>
-          )}
+        {stores.isSuccess && rows.length === 0 && (
+          <EmptyState
+            titleKey={
+              search ? "catalogue.noMatchTitle" : "catalogue.emptyTitle"
+            }
+            bodyKey={search ? "catalogue.noMatchBody" : "catalogue.emptyBody"}
+          />
+        )}
 
-          {stores.isSuccess && rows.length === 0 && (
-            <EmptyState
-              titleKey={
-                search ? "catalogue.noMatchTitle" : "catalogue.emptyTitle"
-              }
-              bodyKey={search ? "catalogue.noMatchBody" : "catalogue.emptyBody"}
-            />
-          )}
+        {order.ordered(rows, (row) => row.id).map((store) => (
+          <StoreRow
+            key={store.id}
+            store={store}
+            rowProps={order.rowProps(store.id)}
+            handleProps={order.handleProps(store.id)}
+            onToggleActive={() =>
+              update.mutate({
+                id: store.id,
+                patch: { isActive: !store.isActive },
+              })
+            }
+            onToggleFeatured={() =>
+              update.mutate({
+                id: store.id,
+                patch: { isFeatured: !store.isFeatured },
+              })
+            }
+            // Awaited and discarded: `ConfirmButton` keeps its dialog open
+            // until this settles, and catches a rejection to report inside it.
+            onArchive={async () => {
+              await archive.mutateAsync({ id: store.id, name: store.name });
+            }}
+          />
+        ))}
 
-          {rows.map((store) => (
-            <StoreRow
-              key={store.id}
-              store={store}
-              onToggleActive={() =>
-                update.mutate({
-                  id: store.id,
-                  patch: { isActive: !store.isActive },
-                })
-              }
-              onToggleFeatured={() =>
-                update.mutate({
-                  id: store.id,
-                  patch: { isFeatured: !store.isFeatured },
-                })
-              }
-              // Awaited and discarded: `ConfirmButton` keeps its dialog open
-              // until this settles, and catches a rejection to report inside it.
-              onArchive={async () => {
-                await archive.mutateAsync({ id: store.id, name: store.name });
-              }}
-            />
-          ))}
-
-          {/* Said out loud rather than silently truncating. A catalogue that is
+        {/* Said out loud rather than silently truncating. A catalogue that is
             quietly missing shops is the kind of wrong nobody notices until a
             customer asks why they cannot find one. */}
-          {stores.data?.truncated && (
-            <p
-              role="status"
-              className="px-md py-lg text-[13px] text-text-faint"
-            >
-              {t("catalogue.truncated")}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <Panel
-        open={adding}
-        onClose={guarded(() => setAdding(false))}
-        label={t("store.add")}
-      >
-        {adding && (
-          <>
-            <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
-              <h2 className="flex-grow text-[20px]">{t("store.add")}</h2>
-              <button
-                type="button"
-                onClick={guarded(() => setAdding(false))}
-                aria-label={t("common.close")}
-                className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft hover:bg-neutral-fill lg:flex"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  aria-hidden
-                >
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-
-            <StoreWizard
-              // Keyed on being opened, so cancelling and reopening starts a
-              // fresh shop rather than resuming a half-filled one nobody
-              // expected to come back.
-              key={String(adding)}
-              sortOrder={stores.data?.stores.length ?? 0}
-              onClose={() => setAdding(false)}
-            />
-          </>
+        {stores.data?.truncated && (
+          <p role="status" className="px-md py-lg text-[13px] text-text-faint">
+            {t("catalogue.truncated")}
+          </p>
         )}
-      </Panel>
+      </div>
     </div>
   );
 }
 
 function StoreRow({
   store,
+  rowProps,
+  handleProps,
   onToggleActive,
   onToggleFeatured,
   onArchive,
 }: {
   store: Store;
+  /** From `useReorder` — the row’s id, its transform, its measured box. */
+  rowProps: ReturnType<ReturnType<typeof useReorder>["rowProps"]>;
+  handleProps: ReturnType<ReturnType<typeof useReorder>["handleProps"]>;
   onToggleActive: () => void;
   onToggleFeatured: () => void;
   onArchive: () => Promise<void>;
@@ -205,7 +207,9 @@ function StoreRow({
 
   return (
     <div
+      {...rowProps}
       className={cx(
+        rowProps.className,
         // `relative`, so the name's stretched hit area is bounded by the row.
         ROW,
         // A hidden shop is marked, not dimmed.
@@ -223,6 +227,18 @@ function StoreRow({
           : "border-danger-wash bg-danger-wash/30",
       )}
     >
+      {/* First in the row, and above the name's stretched overlay — `z-10`
+          for the same reason every other control here carries it. The handle
+          hides itself on a list of one and while searching; `useReorder` owns
+          that rule so six lists cannot each forget it. */}
+      <button
+        {...handleProps}
+        type="button"
+        className={cx(handleProps.className, "relative z-10")}
+      >
+        <GripIcon />
+      </button>
+
       {store.imageUrl ? (
         // `relative z-10`, for the same reason the controls below carry it:
         // the shop's name is an anchor stretched over the whole row, and

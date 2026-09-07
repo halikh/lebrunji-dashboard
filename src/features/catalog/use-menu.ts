@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToasts } from "@/components/ui/toast";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { searchTerm } from "@/lib/search";
 import { SEARCH } from "@/lib/limits";
 import type { Localized } from "@/lib/validation";
 
@@ -346,10 +347,15 @@ export function useReorderMenu(storeId: string) {
  * invalidates it — a dish archived on the menu tab appears here without the
  * mutation having to know this screen exists.
  */
-export function useArchive(storeId: string) {
+export function useArchive(storeId: string, search = "") {
+  const term = searchTerm(search);
+
   return useQuery({
-    queryKey: [...menuKeys.store(storeId), "archive"],
-    queryFn: () => fetchArchive(storeId),
+    queryKey: [...menuKeys.store(storeId), "archive", term ?? ""],
+    queryFn: () => fetchArchive(storeId, term),
+    // The rows already found stay under the new query. A list that blanks
+    // between keystrokes cannot be typed into.
+    placeholderData: (previous) => previous,
   });
 }
 

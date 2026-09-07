@@ -1,3 +1,4 @@
+import { matchesLike } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
@@ -129,10 +130,13 @@ export async function fetchCustomers(options: {
   const term = search?.trim();
   if (term) {
     const digits = term.replace(/\D/g, "");
-    const matches = [`name.ilike.%${term}%`];
+    // Quoted — a customer called "Ali, Beirut" would otherwise end the
+    // condition at the comma and the whole filter would be refused. See
+    // `lib/search.ts`.
+    const matches = [matchesLike("name", term)];
     // Only when there are digits to match. A bare `%%` on the phone would
     // return every row and quietly turn a name search into no search at all.
-    if (digits) matches.push(`phone.ilike.%${digits}%`);
+    if (digits) matches.push(matchesLike("phone", digits));
     query = query.or(matches.join(","));
   }
 

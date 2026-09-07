@@ -185,6 +185,19 @@ function Rate() {
           </p>
         </div>
 
+        {/* What the base currency is for, above the rate rather than beside it.
+          The screen is the only place `is_base` surfaces on its own, and an
+          operator who has just given one shop its own currency has no other
+          way to find out what the rest of them fall back to. */}
+        <div className="flex flex-col gap-xxs rounded-md border border-border bg-surface p-lg">
+          <span className="text-[14px] font-semibold">
+            {t("pricing.baseTitle", { code: base.code })}
+          </span>
+          <span className="text-[13px] text-text-soft">
+            {t("pricing.baseBody")}
+          </span>
+        </div>
+
         <div className="flex flex-col gap-xs rounded-md border border-border bg-surface p-lg">
           <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
             {t("pricing.rateNow")}

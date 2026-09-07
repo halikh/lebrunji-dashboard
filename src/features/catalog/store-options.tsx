@@ -11,6 +11,7 @@ import { LocalizedField } from "@/components/ui/localized-field";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { useRevealOnMount } from "@/components/ui/reveal";
+import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Toggle } from "@/components/ui/toggle";
@@ -73,6 +74,14 @@ export function StoreOptions({ storeId }: { storeId: string }) {
    * form; it just no longer owns the switch.
    */
   const [adding, setAdding] = useState(false);
+  /**
+   * What the operator typed.
+   *
+   * State rather than the URL, unlike the two selects beside it. Those name a
+   * section and a dish, which are things worth linking to — a half-typed word
+   * is not.
+   */
+  const [search, setSearch] = useState("");
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -139,66 +148,83 @@ export function StoreOptions({ storeId }: { storeId: string }) {
         are gone, which is about a hundred points, or two more questions on
         screen.
       */}
-      <div className="flex shrink-0 flex-col gap-lg px-xxl py-lg">
-        {/* Side by side, and each capped rather than sharing the width
-            equally: a section name and a dish name are short, and two selects
-            stretched across a wide monitor would be a filter bar that reads as
-            the page's main content. They wrap on a narrow one. */}
-        <div className="flex flex-wrap items-end gap-lg">
-          {/* `items-end`, so the button's baseline sits with the selects'
-              rather than with their labels. The selects keep a fixed width and
-              the button takes what it needs — a "New question" stretched to
-              320px would read as a third filter. */}
-          {/* No `Field` label: "Section" over a box that already reads "Choose
-              a section" is the same word twice, and the second one costs a line
-              of a screen with none to spare. `aria-label` keeps it named for a
-              screen reader, which is what the label was really doing. */}
+      {/* One line: the box, the two selects, the action.
+
+          They are all the same kind of thing — ways to decide what is on the
+          list — and stacking the search above the selects made it read as a
+          heading over them, on the tab with the least room to spend. The
+          selects are capped rather than sharing the width equally: a section
+          name and a dish name are short, and the box is the one control whose
+          useful width is not decided by its own content, so it takes the slack.
+          They wrap on a narrow screen.
+
+          `items-end`, so the button's baseline sits with the controls' rather
+          than with the top of them — a "New question" stretched to 320px would
+          read as a third filter.
+
+          The box searches the choices as well as the titles: a question is
+          called "Size", which repeats across a shop, and what anybody remembers
+          is "Half kilo". */}
+      <div className="flex shrink-0 flex-wrap items-end gap-lg px-xxl py-lg">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder={t("options.searchPlaceholder")}
+          // A floor under the flex-grow, so on a middling width it shrinks to a
+          // box words still fit in rather than to a stub between two selects
+          // that will not give any ground.
+          className="min-w-[220px]"
+        />
+
+        {/* No `Field` label: "Section" over a box that already reads "Choose a
+            section" is the same word twice, and the second one costs a line of
+            a screen with none to spare. `aria-label` keeps it named for a
+            screen reader, which is what the label was really doing. */}
+        <span className="w-[320px] max-w-full">
+          <Select
+            aria-label={t("options.section")}
+            value={sectionId ?? ""}
+            onChange={(value) => choose({ section: value || null })}
+            placeholder={t("options.pickSection")}
+            isClearable
+            options={sections.map((one) => ({
+              value: one.id,
+              label: pickLocalized(one.title),
+            }))}
+          />
+        </span>
+
+        {section && (
           <span className="w-[320px] max-w-full">
             <Select
-              aria-label={t("options.section")}
-              value={sectionId ?? ""}
-              onChange={(value) => choose({ section: value || null })}
-              placeholder={t("options.pickSection")}
+              aria-label={t("options.item")}
+              value={itemId ?? ""}
+              onChange={(value) => choose({ item: value || null })}
+              placeholder={t("options.pickItem")}
               isClearable
-              options={sections.map((one) => ({
+              options={section.items.map((one) => ({
                 value: one.id,
-                label: pickLocalized(one.title),
+                label: pickLocalized(one.name),
+                // The marker. A dish with no questions looks complete
+                // everywhere else in the dashboard; this is the only place it
+                // can be seen at a glance.
+                note:
+                  (counts.data?.get(one.id) ?? 0) === 0
+                    ? t("options.noneSet")
+                    : undefined,
               }))}
             />
           </span>
+        )}
 
-          {section && (
-            <span className="w-[320px] max-w-full">
-              <Select
-                aria-label={t("options.item")}
-                value={itemId ?? ""}
-                onChange={(value) => choose({ item: value || null })}
-                placeholder={t("options.pickItem")}
-                isClearable
-                options={section.items.map((one) => ({
-                  value: one.id,
-                  label: pickLocalized(one.name),
-                  // The marker. A dish with no questions looks complete
-                  // everywhere else in the dashboard; this is the only place it
-                  // can be seen at a glance.
-                  note:
-                    (counts.data?.get(one.id) ?? 0) === 0
-                      ? t("options.noneSet")
-                      : undefined,
-                }))}
-              />
-            </span>
-          )}
-
-          {/* The action beside the filters rather than pinned to the foot.
+        {/* The action beside the filters rather than pinned to the foot.
               A sticky bar is right for a *form* — it keeps Save reachable down
               a long page — and this is a list with one thing you can add to it.
               Down there it was a full-width coral band under a list of two
               rows, which read as the most important thing on the screen. */}
-          <Button onClick={() => setAdding(true)} disabled={adding}>
-            {t("options.addGroup")}
-          </Button>
-        </div>
+        <Button onClick={() => setAdding(true)} disabled={adding}>
+          {t("options.addGroup")}
+        </Button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
@@ -211,6 +237,7 @@ export function StoreOptions({ storeId }: { storeId: string }) {
           adding={adding}
           onAddingChange={setAdding}
           storeId={storeId}
+          search={search}
           itemId={item?.id ?? null}
           itemName={
             item
@@ -247,6 +274,7 @@ function ItemQuestions({
   storeId,
   itemId,
   itemName,
+  search,
 }: {
   /** Whether the new-question form is showing. Owned by the screen above. */
   adding: boolean;
@@ -256,8 +284,10 @@ function ItemQuestions({
   itemId: string | null;
   /** The heading — the item's name, or the shop's own. */
   itemName: string;
+  /** What was typed in the box above. Empty for the whole list. */
+  search: string;
 }) {
-  const groups = useStoreQuestions(storeId);
+  const groups = useStoreQuestions(storeId, search);
   const menu = useMenu(storeId);
   const setItems = useSetQuestionItems();
   // Lifted to the screen, because the button that turns it on now lives up
@@ -329,8 +359,16 @@ function ItemQuestions({
           </p>
         )}
 
+        {/* A term that found nothing is its own state, and a different one:
+            "Nothing here yet" invites the operator to add a question, which is
+            the wrong next step when the right one is a different word. */}
         {groups.isSuccess && offered.length === 0 && !adding && (
-          <EmptyState titleKey="options.noQuestions" mood="waiting" />
+          <EmptyState
+            titleKey={
+              search.trim() ? "options.noMatches" : "options.noQuestions"
+            }
+            mood="waiting"
+          />
         )}
 
         {/* Said only when something is actually missing from the list, so it is

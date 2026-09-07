@@ -51,7 +51,7 @@ import { getObject } from "@/lib/storage/bucket";
  * looks perfectly correct.
  */
 const KEY =
-  /^(menu-items|stores|promotions|categories|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
+  /^(menu-items|stores|promotions|categories|category-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
 
 const TYPES: Record<string, string> = {
   jpg: "image/jpeg",

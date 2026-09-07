@@ -45,7 +45,20 @@ export function ItemOptions({
   return (
     <Link
       href={`/catalogue/${storeId}?tab=options&section=${sectionId}&item=${itemId}`}
-      className="flex w-fit items-center gap-sm rounded-md border border-border bg-surface px-lg py-md text-[14px] font-semibold text-primary hover:border-primary"
+      /*
+        Full width, like every other control in this column.
+
+        Shrink-wrapped it was a small pill floating in a field's worth of space,
+        which read as a chip — something that labels the thing above it — rather
+        than as the row that takes you somewhere. It sits among fields that all
+        span the column, and a control that does not span it is one the eye
+        files as decoration.
+
+        `justify-between` with the chevron on the trailing edge, so it reads as
+        a navigation row and not as a stretched button: the arrow marks where the
+        row ends, which is what says it leads off this page.
+      */
+      className="flex w-full items-center justify-between gap-sm rounded-md border border-border bg-surface px-lg py-md text-[14px] font-semibold text-primary hover:border-primary"
     >
       {t("options.openFor")}
       <svg

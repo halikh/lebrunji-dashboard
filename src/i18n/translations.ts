@@ -641,6 +641,11 @@ const en = {
     archive: "Archive",
     truncated:
       "Showing the first 200 shops. Reordering and search still work, but the list is not complete.",
+    // Said once, above the list. `0118` gave the dashboard its own order so
+    // this drag cannot move a shop on the customer's home screen, and the
+    // second sentence is the whole of why the column exists.
+    reorderHint:
+      "Drag to arrange this list. It is the dashboard's own order — what customers see is unaffected.",
     openMenu: "Menu",
   },
 
@@ -693,36 +698,10 @@ const en = {
    * A shop's own settings, as opposed to what it sells.
    */
   store: {
-    // ---- adding one (the wizard) ------------------------------------------
+    // ---- adding one -------------------------------------------------------
     add: "New store",
     create: "Create the store",
-    back: "Back",
-    next: "Next",
-    stepOf: "Step {step} of {total}",
-    // Two or three words each: the strip is a map of what is coming, not a
-    // second set of headings competing with the one on screen.
-    shortName: "Name",
-    shortPlacement: "Placement",
-    shortLocation: "Location",
-    shortOrders: "Orders",
     created: "{name} added — set up its menu next",
-
-    stepName: "What is it called?",
-    stepNameBlurb:
-      "The name customers see, in each language, and the picture on its card.",
-    stepPlacement: "Where does it belong, and what does it price in?",
-    stepPlacementBlurb:
-      "The category decides which tile customers find it under. The currency is what every price on its menu means.",
-    stepLocation: "Where is it?",
-    stepLocationBlurb:
-      "Paste a Google Maps link or a pair of coordinates. This is what delivery is charged from.",
-    stepOrders: "How does it take orders, and is it open for business?",
-    // Says what each of the three answers is *for*. The step used to be the
-    // prep window alone and was called Timing; the number moved here because
-    // both halves are the same question — how an order reaches this kitchen,
-    // and how long it takes once it has.
-    stepOrdersBlurb:
-      "The preparation window drives the delivery estimate a customer is shown, and the number is where an order is sent so the kitchen can start.",
 
     category: "Category",
     categoryHint: "The tile customers find it under on the home screen.",
@@ -796,6 +775,17 @@ const en = {
     liveHint: "Customers can find and order from it straight away.",
     // Off by default on a new shop, and the hint says why rather than leaving
     // it to be discovered.
+    // Featuring, asked on the form rather than only on the list — see
+    // `StoreDraft.isFeatured`.
+    featured: "Featured",
+    // The plain negation, not a euphemism for it. "Normal" described the shop
+    // rather than the switch, so the off state read as a category the shop was
+    // in rather than as the thing the toggle does.
+    notFeatured: "Not featured",
+    featuredHint:
+      "It leads the home screen, above the shops that are not featured.",
+    featuredHintOff:
+      "It appears in its category like any other shop. You can promote it later from the shops list.",
     hiddenHintNew:
       "Recommended for now — it has no menu or opening hours yet. Turn it on from the shops list when it is ready.",
 
@@ -911,6 +901,18 @@ const en = {
    * short, seen by everyone, and ordered by hand — which is why the order is
    * the thing this screen is really about.
    */
+  /**
+   * The colour picker's own words, shared by every form that has one.
+   *
+   * `ColorPicker` is one component now — the tag editor's, lifted — so the two
+   * strings it needs are here rather than under whichever feature happened to
+   * grow it first.
+   */
+  color: {
+    custom: "Pick a colour",
+    hex: "Colour, as a hex code",
+  },
+
   categories: {
     tab: "Categories",
     add: "New category",
@@ -919,6 +921,32 @@ const en = {
     kindHint: "Groups categories in the app. Set by migration, not here.",
     pickKind: "Choose a kind",
     kindRequired: "Every category belongs to a kind.",
+
+    // ---- the artwork (0117) -------------------------------------------------
+    //
+    // Three overrides on what the app draws a category as. Each says what it is
+    // *for* rather than naming a column, and each says what leaving it empty
+    // does — because empty is a real answer here and the common one.
+    artworkSection: "Artwork",
+    artworkSectionHint:
+      "How this category looks in the app when a shop has sent no photograph of its own. Leave any of them empty and the app's own answer is used.",
+    emptyIcon: "Empty-state icon",
+    emptyIconHint:
+      "Shown in a shop's empty picture well. Empty for the app's own glyph for this category.",
+    emptyBackground: "Empty-state background",
+    emptyBackgroundHint: "The colour behind that icon.",
+    storeText: "Text on a shop's page",
+    storeTextHint:
+      "The category's name above a shop's own, on its page. It sits on the background above, so the two are read together.",
+    // Said with the numbers in front of the operator rather than refused: the
+    // pair is theirs to choose and this is what it measures.
+    contrast: "{ratio}:1 against the background",
+    contrastPoor: "Hard to read — 4.5:1 is the readable minimum.",
+    artworkPreview: "How it reads",
+    // Reached by a link to a category that has since been archived, or a
+    // mistyped id. Says what happened rather than showing an empty form that
+    // would create a *new* one on save.
+    notFound: "That category is not here any more.",
     visibility: "Visibility",
     live: "Live",
     hidden: "Hidden",
@@ -1051,6 +1079,8 @@ const en = {
     // A value the check constraint refuses. Reached only by a stale tab or a
     // hand-made request, and it says which column rather than echoing Postgres.
     unknownInk: "That is not a colour a tag's words can be.",
+    // A link to a tag that has since been retired, or a mistyped id.
+    notFound: "That tag is not here any more.",
 
     // The emoji rule. Said as what a tag *is* rather than as a refusal — the
     // hint carries it before the error has to.
@@ -1115,6 +1145,22 @@ const en = {
     // mascot.
     noneOfThese: "Nothing archived of this kind",
     noneOfTheseBody: "Try another filter, or All.",
+
+    // The search. An archive only grows — nothing here is ever deleted — so
+    // it is the one catalogue list where "scroll until you see it" stops
+    // working first, and the thing being looked for is by definition old.
+    searchPlaceholder: "Search the archive",
+    // The shop's own archive names what is in it, because "the archive" on a
+    // shop page could be read as the catalogue's.
+    searchStorePlaceholder: "Search sections, dishes, questions and choices",
+    noMatches: "Nothing matches that",
+    // Aimed at the term rather than at the filter: a search that finds nothing
+    // is corrected by typing something else, not by pressing another tab.
+    noMatchesBody: "Try a different word, or part of a slug.",
+    // The heading over one kind, carrying the server's count — "SHOPS · 40"
+    // over the ten that have been paged in. A bare heading would say less than
+    // the number does.
+    groupHeading: "{title} · {count}",
     // Says where it would return to, which is the fact that decides whether
     // pressing the button is safe.
     inSection: "in {name}",
@@ -1309,6 +1355,22 @@ const en = {
     quantityHint: "How much of that unit one of these is — 1 kg, or 500 g.",
     quantityRequired: "Say how much, or clear the unit.",
     quantityPositive: "The amount must be more than zero.",
+
+    // The step — `0119`. How far the customer's + and − move, which is a
+    // different question from how much one of these *is*, and the reason a
+    // butcher can say "from five kilos, five at a time".
+    step: "Steps by",
+    stepHint: "Leave empty and the customer counts whole items.",
+    stepPositive: "The step must be more than zero.",
+    // What the buttons will actually do, spelled out. A shop setting this is
+    // describing a range, and a range is far easier to check by reading it
+    // than by reasoning about two numbers.
+    stepPreview: "In the app: {chain}",
+    stepPreviewNone: "In the app: 1, 2, 3 × {size}",
+    // The one thing a step can get wrong. `0119` explains why the database
+    // does not decide it: each press adds one line, and a line is one price.
+    stepUneven:
+      "Each press adds one more price, so this only adds up when the step matches the amount.",
   },
 
   options: {
@@ -1323,6 +1385,11 @@ const en = {
     noQuestions: "Nothing here yet.",
     saveFirst: "Save this item first, then set up its options.",
     openFor: "Set up this item's options",
+    // Both axes of the filter bar named: the selects say *where* a question is
+    // asked, this says what it says. Choices are matched too — see
+    // `questionIdsMatching`.
+    searchPlaceholder: "Search questions and choices",
+    noMatches: "No question matches that.",
     chooseOne: "Choose one",
     chooseAny: "Choose any",
     required: "Required",
@@ -1454,6 +1521,17 @@ const en = {
     // `0028` stores `rate_updated_at` precisely so this can be said: a rate
     // with no date is a rumour.
     rateAsOf: "Set {when}",
+    // What the base currency *is*, said on the screen that owns it.
+    //
+    // It reads as "the platform's currency" and it is not: since `0110` a shop
+    // and even a single branch may price in another, and the operator who sets
+    // one needs to know this is the fallback rather than the law. Named on the
+    // rate card because that is the only screen the base currency appears on
+    // by itself.
+    baseTitle: "{code} is the default for all shops",
+    baseBody:
+      "Every shop prices in it unless it is given one of its own — on the shop's own form, or on a single branch's.",
+
     rateLabel: "{code} per unit",
     rateHint: "How many {other} one {base} is worth.",
     rateSave: "Change the rate",
@@ -1547,9 +1625,12 @@ const en = {
     nameRequired: "Give it a name so you can find it again.",
     // One card per language, because the wording is inside the picture — `0013`
     // dropped a discount's text columns on exactly that reasoning.
-    imageHint: "The card as customers see it. Wide, not square — one per language.",
+    imageHint:
+      "The card as customers see it. Wide, not square — one per language.",
     imageBothLanguages:
       "A card is needed in every language, or none at all — the words are inside the picture.",
+    // A link to a promotion that has since been archived, or a mistyped id.
+    notFound: "That promotion is not here any more.",
 
     /**
      * Where the card is shown.
@@ -1572,7 +1653,8 @@ const en = {
     },
     placementsHint: {
       home: "The rail near the top, to everyone.",
-      store: "On the page of a shop this promotion covers — where somebody is already looking.",
+      store:
+        "On the page of a shop this promotion covers — where somebody is already looking.",
       cart: "Above the basket, where a minimum spend is a number the customer can act on.",
     },
 
@@ -1886,6 +1968,8 @@ const en = {
     groupHint:
       "The heading it sits under. Pick an existing one — a new heading is a migration, so groups stay a short, deliberate list.",
     pickGroup: "Choose a group",
+    // A link to a topic or a section that has since been archived.
+    notFound: "That is not here any more.",
     groupRequired: "Every question sits under a heading.",
     question: "Question",
     answer: "Answer",
@@ -1961,6 +2045,8 @@ const en = {
   menu: {
     title: "Menu",
     back: "All shops",
+    itemNotFound: "That item is not here any more.",
+    sectionNotFound: "That section is not here any more.",
     addItem: "Add an item to {section}",
     name: "Name",
     description: "Description",
@@ -2099,6 +2185,7 @@ const en = {
    * place.
    */
   branches: {
+    notFound: "That branch is not here any more.",
     tab: "Branches",
     // The two headings inside the panel. Opening a branch opens everything
     // about the shop at that branch, read from the brand downward — so each
@@ -2124,6 +2211,10 @@ const en = {
     // one branch" is the first question this screen gets.
     intro:
       "Where this shop trades from. The menu is shared by all of them — each branch can hide what it does not serve and charge its own prices.",
+    searchPlaceholder: "Search branches",
+    // A term that matched nothing, said as its own state — the list simply
+    // emptying reads as a shop that has lost its branches.
+    noMatches: "No branch matches that.",
     add: "New branch",
     edit: "Edit branch",
     name: "Branch name",
@@ -2147,12 +2238,31 @@ const en = {
     // quotes the top distance band on every order.
     pinRequired:
       "A branch needs a pin — without one every delivery from it is charged at the top distance band.",
-    visibility: "Taking orders",
-    live: "Open",
-    hidden: "Closed",
-    liveHint: "Customers can order from this branch.",
+    /*
+      Not the opening hours, and it used to read as though it were.
+   
+      This switch said "Taking orders — Open / Closed", which is the exact
+      question the weekly timetable on the Hours tab answers, so a branch
+      appeared to have two competing switches for one thing. It does not. Since
+      `0116` `branch_is_open` reads the timetable and `place_order` enforces it,
+      and that is what decides whether a customer can order *right now*.
+   
+      What this decides is whether the branch trades at all — a refit, a
+      seasonal shut, a place that is not opening again this year. A branch
+      turned off here is gone from the app whatever its hours say, which is why
+      it is worded as a state the operator has to come back and undo.
+    */
+    visibility: "Branch status",
+    live: "Trading",
+    hidden: "Closed indefinitely",
+    // The badge on the row, where the switch's own words are too long — and
+    // where "Closed" alone would be read as the shop being shut for the
+    // evening, which is the confusion this whole block exists to end.
+    notTrading: "Not trading",
+    liveHint:
+      "Open on the hours set for it. Those are what decide whether it is taking orders right now — this switch is for shutting the branch altogether.",
     hiddenHint:
-      "Hidden from the app. The shop's other branches are unaffected.",
+      "Shut until this is turned back on, whatever its opening hours say. Gone from the app; the shop’s other branches are unaffected.",
     hoursTitle: "Opening hours",
     added: "{name} added",
     saved: "{name} saved",

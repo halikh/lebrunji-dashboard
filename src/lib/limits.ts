@@ -146,6 +146,21 @@ export const PAGE = {
   size: 50,
   /** A hand-edited `?page=` beyond this is refused rather than scanned. */
   maxRows: 50 * 40,
+  /**
+   * The most rows an *unpaged* list will read.
+   *
+   * Some lists here cannot be paged, and it is not an omission: their order is
+   * `sort_order`, which an operator sets by dragging, and a position within a
+   * page is not a position in the list — so paging would break the feature the
+   * ordering exists for. `fetchStores` wrote that argument down first and the
+   * categories, tags, branches and menu reads follow it.
+   *
+   * What replaces paging is this: a limit, and a line on screen when it is hit.
+   * The number is the assumption "a catalogue has tens of these, not thousands"
+   * made checkable — so the day it stops being true, somebody is told rather
+   * than shown a list that is quietly missing rows.
+   */
+  cap: 200,
 } as const;
 
 export const SEARCH = { minTerm: 2, maxTerm: 64 } as const;

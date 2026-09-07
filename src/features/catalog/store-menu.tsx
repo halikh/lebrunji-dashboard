@@ -1,18 +1,18 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useGuardedAction } from "@/components/unsaved-changes";
-import { createPortal } from "react-dom";
 
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, cx } from "@/components/ui";
 import { SearchInput } from "@/components/ui/search-input";
+import { useRowFocus } from "@/components/ui/row-focus";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedField } from "@/components/ui/localized-field";
-import { Panel } from "@/components/ui/panel";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { useRevealOnMount } from "@/components/ui/reveal";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
@@ -25,13 +25,12 @@ import { itemUnit, pricePerUnit, unitKey } from "@/lib/units";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
-import { MenuItemEditor } from "./menu-item-editor";
 import { BulkForm } from "./bulk-form";
 import { ItemTags } from "./tag-chip";
 import {
   useArchiveMenuItem,
   useArchiveMenuSection,
-  useCreateMenuItem,
+  useUpdateMenuSection,
   useCreateMenuItems,
   useCreateMenuSection,
   useCreateMenuSections,
@@ -39,7 +38,6 @@ import {
   useMenuSearch,
   useReorderMenu,
   useUpdateMenuItem,
-  useUpdateMenuSection,
 } from "./use-menu";
 import { useLanguages } from "@/features/reference/use-languages";
 import { useStore } from "./use-stores";
@@ -65,40 +63,16 @@ import { useStore } from "./use-stores";
  * It also means one shell pattern: detail opens beside the list here exactly as
  * an order's receipt does.
  */
-/**
- * What the side panel is editing.
- *
- * A null id means adding rather than editing, in both cases.
- */
-type PanelTarget =
-  | { kind: "item"; sectionId: string; itemId: string | null }
-  /** Renaming only. Adding one is inline at the bottom of the list. */
-  | { kind: "section"; sectionId: string };
-
-export function StoreMenu({
-  storeId,
-  panelSlot,
-}: {
-  storeId: string;
-  /**
-   * Where the detail panel is drawn, from `StoreScreen`.
-   *
-   * The panel is a sibling of the *page* rather than of this list, so that it
-   * runs the full height beside the shop's header rather than starting under
-   * it. Null on the first render, before the slot's node exists — the panel is
-   * shut then, so it renders in place and nothing is seen to move.
-   */
-  panelSlot: HTMLElement | null;
-}) {
+export function StoreMenu({ storeId }: { storeId: string }) {
+  const router = useRouter();
   const store = useStore(storeId);
   const menu = useMenu(storeId);
-  const create = useCreateMenuItem(storeId);
   const update = useUpdateMenuItem(storeId);
   const archive = useArchiveMenuItem(storeId);
 
   const createSection = useCreateMenuSection(storeId);
-  const renameSection = useUpdateMenuSection(storeId);
   const archiveSection = useArchiveMenuSection(storeId);
+  const renameSection = useUpdateMenuSection(storeId);
   const reorder = useReorderMenu(storeId);
 
   const sections = menu.data ?? [];
@@ -140,28 +114,23 @@ export function StoreMenu({
     // renamed.
   });
 
-  /**
-   * What the panel is showing, if anything.
-   *
-   * **One piece of state for both kinds of edit**, and one panel. A section's
-   * name and an item's details are different forms, but "something is being
-   * edited beside the list" is one condition — two states for it would allow
-   * two open at once, and two half-filled forms on one screen is a way to lose
-   * work.
-   *
-   * A null id means adding rather than editing, in both cases.
-   */
-  const [open, setOpen] = useState<PanelTarget | null>(null);
-  const guarded = useGuardedAction();
+  /** Which row to bring back into view — see `useRowFocus`. */
+  const focus = useRowFocus();
 
   /**
-   * How many dishes have been added through this panel.
+   * The section being renamed, if any.
    *
-   * The editor's `key` on a new item, so "save and add another" gets a blank
-   * form — and a *failed* save does not. Counting saves rather than
-   * submissions is the whole distinction.
+   * Inline, in the section's own heading — the twin of adding one, which
+   * happens inline at the bottom of the list. A name is one field, and sending
+   * somebody to a page of their own for it would cost them their place in a
+   * menu that runs to several screens, to type eight characters.
+   *
+   * Here rather than inside `Section` so that a *search result* can open it
+   * too: renaming from there clears the search and the form opens on the row in
+   * the list, which is where the section actually is.
    */
-  const [added, setAdded] = useState(0);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const guarded = useGuardedAction();
 
   /**
    * Adding a section, which stays inline while renaming one does not.
@@ -208,178 +177,18 @@ export function StoreMenu({
    */
   const matches = useMenuSearch(storeId, search);
 
-  const openSection =
-    open?.kind === "item" || open?.sectionId
-      ? menu.data?.find((section) => section.id === open.sectionId)
-      : undefined;
-
-  const editingItem =
-    open?.kind === "item" && open.itemId !== null
-      ? menu.data
-          ?.flatMap((section) => section.items)
-          .find((item) => item.id === open.itemId)
-      : undefined;
-
-  const pending = create.isPending || update.isPending;
-  const error =
-    create.error instanceof Error
-      ? create.error.message
-      : update.error instanceof Error
-        ? update.error.message
-        : null;
-
-  /**
-   * The detail panel, drawn into `StoreScreen`'s slot when there is one.
-   *
-   * `createPortal` moves the DOM node and leaves the React tree exactly
-   * where it is — so `open`, the section being renamed, the save mutations
-   * and the counter behind "add another" all stay here, and none of them
-   * has to be threaded up to a parent to move a box by the height of a
-   * header.
-   */
-  const panel = (
-    <Panel
-      open={open !== null}
-      onClose={guarded(() => setOpen(null))}
-      label={t("menu.formLabel")}
-    >
-      {open && (
-        <>
-          <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
-            <div className="flex flex-grow flex-col gap-xxs">
-              {/* The overline says where in the menu this lands. On a section
-                      it says what is being edited *is* a section, which the title
-                      below cannot — "Cold mezze" alone reads as an item. */}
-              <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
-                {open.kind === "section"
-                  ? t("menu.sections")
-                  : pickLocalized(openSection?.title ?? {})}
-              </span>
-              <h2 className="text-[20px]">
-                {open.kind === "section"
-                  ? openSection
-                    ? pickLocalized(openSection.title)
-                    : t("menu.addSection")
-                  : editingItem
-                    ? pickLocalized(editingItem.name)
-                    : t("menu.newItem")}
-              </h2>
-            </div>
-            {/* The same close the receipt has. Escape and Cancel both work,
-                    but a visible affordance is what people look for first. */}
-            <button
-              type="button"
-              onClick={guarded(() => setOpen(null))}
-              aria-label={t("common.close")}
-              className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft hover:bg-neutral-fill lg:flex"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                aria-hidden
-              >
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-          </div>
-
-          {open.kind === "section" ? (
-            <SectionForm
-              // Keyed on the section, so opening a different one rebuilds
-              // the form rather than leaving the previous name in the field.
-              key={open.sectionId}
-              variant="panel"
-              initial={openSection?.title}
-              pending={renameSection.isPending}
-              onSave={(title) =>
-                renameSection.mutate(
-                  { id: open.sectionId, title },
-                  { onSuccess: () => setOpen(null) },
-                )
-              }
-              onCancel={guarded(() => setOpen(null))}
-            />
-          ) : (
-            <MenuItemEditor
-              /*
-                    Keyed, so switching from one item to another rebuilds the form
-                    rather than leaving the previous item's text in the fields —
-                    the state lives inside the editor, and React would otherwise
-                    reuse it. The counter on a new item is what makes "add
-                    another" clear the form.
-
-                    It counts **saves**, not submissions. It used to be
-                    `create.submittedAt`, which changes on every attempt — so a
-                    refused insert remounted the editor and threw away everything
-                    the operator had typed, at the exact moment they needed to
-                    read the error and correct one field. Losing a form to its own
-                    error message is the worst version of a validation failure.
-                  */
-              key={open.itemId ?? `new-${open.sectionId}-${added}`}
-              storeId={storeId}
-              itemId={open.itemId}
-              sectionId={open.sectionId}
-              initial={editingItem}
-              pending={pending}
-              error={error}
-              onSave={(draft) => {
-                if (open.itemId) {
-                  update.mutate(
-                    { id: open.itemId, patch: draft },
-                    { onSuccess: () => setOpen(null) },
-                  );
-                } else {
-                  create.mutate(
-                    {
-                      draft: { ...draft, storeId, sectionId: open.sectionId },
-                      sortOrder: nextSortOrder(openSection),
-                    },
-                    { onSuccess: () => setOpen(null) },
-                  );
-                }
-              }}
-              onSaveAndAnother={
-                // Only while adding. "Add another" means nothing when editing
-                // something that already exists.
-                open.itemId
-                  ? undefined
-                  : (draft) =>
-                      create.mutate(
-                        {
-                          draft: {
-                            ...draft,
-                            storeId,
-                            sectionId: open.sectionId,
-                          },
-                          // At the end of the section it was added to. The column
-                          // has no default, and "where does it go" is a question
-                          // the caller can answer and the database cannot.
-                          sortOrder: nextSortOrder(openSection),
-                        },
-                        // The blank form is the reward for a save that landed.
-                        { onSuccess: () => setAdded((count) => count + 1) },
-                      )
-              }
-              onCancel={guarded(() => setOpen(null))}
-            />
-          )}
-        </>
-      )}
-    </Panel>
-  );
-
   return (
     // The shop's name and its tabs belong to `StoreScreen`, which draws them
-    // once for both panes. This is the menu itself and the panel beside it.
-    <div className="relative flex h-full">
+    // once for every tab. This is the menu itself.
+    <div className="flex h-full flex-col">
       {/* `relative`, so the pinned add-a-section bar can lie over the bottom of
-          the list rather than taking height from it. */}
-      <div className="relative flex min-w-0 flex-grow flex-col">
+          the list rather than taking height from it.
+
+          `min-h-0` because this is now a *column* child rather than a row one:
+          a flex item's min-height defaults to its content, so without it this
+          grows to the height of the whole menu, the scroller inside never
+          bounds, and the page picks up a second scrollbar. */}
+      <div className="relative flex min-h-0 min-w-0 flex-grow flex-col">
         {/* The hint sits under the box, not beside it — where a field's helper
             always goes, so it reads as belonging to the input rather than as a
             note that happens to be next to it.
@@ -511,7 +320,9 @@ export function StoreMenu({
                       variant="primary-quiet"
                       size="sm"
                       onClick={guarded(() =>
-                        setOpen({ kind: "section", sectionId: section.id }),
+                        router.push(
+                          `/catalogue/${storeId}/sections/${section.id}`,
+                        ),
                       )}
                     >
                       {t("menu.renameSection")}
@@ -546,13 +357,8 @@ export function StoreMenu({
                     sections.find((one) => one.id === item.sectionId)?.title ??
                       {},
                   )}
-                  open={open?.kind === "item" && open.itemId === item.id}
                   onEdit={guarded(() =>
-                    setOpen({
-                      kind: "item",
-                      sectionId: item.sectionId,
-                      itemId: item.id,
-                    }),
+                    router.push(`/catalogue/${storeId}/items/${item.id}`),
                   )}
                   onToggle={() =>
                     update.mutate({
@@ -578,18 +384,21 @@ export function StoreMenu({
                   key={section.id}
                   section={section}
                   currencyCode={store.data?.currencyCode ?? ""}
-                  openItemId={open?.kind === "item" ? open.itemId : null}
-                  renaming={
-                    open?.kind === "section" && open.sectionId === section.id
-                  }
+                  focus={focus}
                   carried={sectionOrder.movingId === section.id}
                   rowProps={sectionOrder.rowProps}
                   handleProps={sectionOrder.handleProps}
-                  onRename={guarded(() =>
-                    setOpen({ kind: "section", sectionId: section.id }),
-                  )}
+                  renaming={renamingId === section.id}
+                  renamePending={renameSection.isPending}
+                  onRename={guarded(() => setRenamingId(section.id))}
+                  onRenameSave={(title) =>
+                    renameSection.mutate(
+                      { id: section.id, title },
+                      { onSuccess: () => setRenamingId(null) },
+                    )
+                  }
+                  onRenameCancel={guarded(() => setRenamingId(null))}
                   onArchiveSection={async () => {
-                    setOpen(null);
                     await archiveSection.mutateAsync({
                       id: section.id,
                       name: section.title,
@@ -598,15 +407,15 @@ export function StoreMenu({
                   onReorderItems={(ids) => reorderItems(section.id, ids)}
                   onEdit={(itemId: string) =>
                     guarded(() =>
-                      setOpen({ kind: "item", sectionId: section.id, itemId }),
+                      router.push(`/catalogue/${storeId}/items/${itemId}`),
                     )()
                   }
                   onAdd={guarded(() =>
-                    setOpen({
-                      kind: "item",
-                      sectionId: section.id,
-                      itemId: null,
-                    }),
+                    // Which section it joins, so a reload or a pasted link
+                    // still lands in the right part of the menu.
+                    router.push(
+                      `/catalogue/${storeId}/items/new?section=${section.id}`,
+                    ),
                   )}
                   decimals={decimalsOf(store.data?.currencyCode ?? "")}
                   bulk={{
@@ -683,8 +492,6 @@ export function StoreMenu({
             Hidden while searching, because there is no menu on screen for a new
             section to join. */}{" "}
       </div>
-
-      {panelSlot ? createPortal(panel, panelSlot) : panel}
     </div>
   );
 }
@@ -703,12 +510,15 @@ type ReorderProps = {
 function Section({
   section,
   currencyCode,
-  openItemId,
+  focus,
   rowProps,
   handleProps,
-  renaming,
   carried,
+  renaming,
+  renamePending,
   onRename,
+  onRenameSave,
+  onRenameCancel,
   onArchiveSection,
   onReorderItems,
   onEdit,
@@ -720,10 +530,13 @@ function Section({
 }: {
   section: MenuSection;
   currencyCode: string;
-  openItemId: string | null;
-  /** The panel is showing this section's name — the heading is marked, not
-   *  replaced. */
+  /** Which row was just returned from, and how to scroll it back into view. */
+  focus: ReturnType<typeof useRowFocus>;
+  /** This section's name is being edited, in place of its heading. */
   renaming: boolean;
+  renamePending: boolean;
+  onRenameSave: (title: Localized) => void;
+  onRenameCancel: () => void;
   /** Being dragged, so it shows as its heading alone. */
   carried: boolean;
   onRename: () => void;
@@ -770,54 +583,73 @@ function Section({
 
   return (
     <section {...row}>
-      <div className="flex items-center gap-md">
-        <button {...handleProps(section.id)}>
-          <GripIcon />
-        </button>
+      {/* In place of the heading, not under it: the field *is* the name, and a
+          form below the thing it edits would leave two of them on screen. The
+          items stay where they are — the section is not going anywhere. */}
+      {renaming ? (
+        <SectionForm
+          initial={section.title}
+          pending={renamePending}
+          onSave={onRenameSave}
+          onCancel={onRenameCancel}
+        />
+      ) : (
+        <div className="flex items-center gap-md">
+          <button {...handleProps(section.id)}>
+            <GripIcon />
+          </button>
 
-        {/* Marked while the panel is renaming it, so the form and the list
-            agree about what is being edited — the same mark an item row gets. */}
-        <h2 className={cx("text-[18px]", renaming && "text-active")}>
-          {title}
-        </h2>
-        <span className="text-[13px] text-text-faint">
-          {t("menu.itemCount", { count: section.items.length })}
-        </span>
+          {/* Marked and scrolled to on the way back from renaming it — the same
+            signal an item row gets, for the same "this is the one you were
+            working on". */}
+          <h2
+            ref={focus.attach(section.id)}
+            className={cx(
+              "text-[18px]",
+              focus.isFocused(section.id) && "text-active",
+            )}
+          >
+            {title}
+          </h2>
+          <span className="text-[13px] text-text-faint">
+            {t("menu.itemCount", { count: section.items.length })}
+          </span>
 
-        {/* Pushed to the far end. These are the section's own controls and
+          {/* Pushed to the far end. These are the section's own controls and
             should not compete with the items under it, which is what the
             operator is actually reading.
 
             Hidden while the section is being carried: they are things to press,
             and nothing in a block travelling under the cursor is pressable. */}
-        <div
-          className={cx(
-            "ms-auto flex items-center gap-sm",
-            carried && "hidden",
-          )}
-        >
-          {/* Blue on a blue tint, beside a filled red Archive.
+          <div
+            className={cx(
+              "ms-auto flex items-center gap-sm",
+              carried && "hidden",
+            )}
+          >
+            {/* Blue on a blue tint, beside a filled red Archive.
               It needs a ground of its own — two controls together where only
               one has a surface read as one button and one label — and the
               palette says which ground: **blue is what you act on**. A neutral
               fill made it look like a label with a box round it, and coral is
               reserved for the one primary move on a screen. */}
-          <Button variant="primary-quiet" size="sm" onClick={onRename}>
-            {t("menu.renameSection")}
-          </Button>
-          <ConfirmButton
-            onConfirm={onArchiveSection}
-            titleKey="menu.sectionArchiveTitle"
-            bodyKey="menu.sectionArchiveBody"
-            confirmKey="menu.archiveConfirm"
-            variant="danger"
-            triggerVariant="danger"
-            size="sm"
-          >
-            {t("menu.archive")}
-          </ConfirmButton>
+            <Button variant="primary-quiet" size="sm" onClick={onRename}>
+              {t("menu.renameSection")}
+            </Button>
+            <ConfirmButton
+              onConfirm={onArchiveSection}
+              titleKey="menu.sectionArchiveTitle"
+              bodyKey="menu.sectionArchiveBody"
+              confirmKey="menu.archiveConfirm"
+              variant="danger"
+              triggerVariant="danger"
+              size="sm"
+            >
+              {t("menu.archive")}
+            </ConfirmButton>
+          </div>
         </div>
-      </div>
+      )}
 
       {itemOrder.instructions}
 
@@ -854,9 +686,8 @@ function Section({
               handleProps={itemOrder.handleProps}
               rowProps={itemOrder.rowProps}
               carried={itemOrder.movingId === item.id}
-              // The row the panel is showing is marked, so the form and the list
-              // agree about what is being edited.
-              open={openItemId === item.id}
+              // Marked and scrolled to on the way back from its own page.
+              anchor={focus.attach(item.id)}
               onEdit={() => onEdit(item.id)}
               onToggle={() => onToggle(item)}
               onArchive={() => onArchive(item)}
@@ -918,7 +749,7 @@ function Section({
 function ItemRow({
   item,
   currencyCode,
-  open,
+  anchor,
   carried,
   rowProps,
   handleProps,
@@ -928,7 +759,7 @@ function ItemRow({
 }: {
   item: MenuItem;
   currencyCode: string;
-  open: boolean;
+  anchor: (node: HTMLElement | null) => void;
   /** Being dragged, so it sheds everything that is not identity. */
   carried: boolean;
   onEdit: () => void;
@@ -942,15 +773,12 @@ function ItemRow({
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
       !item.isActive && "border-danger-wash bg-danger-wash/30",
-      open &&
-        "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
-      item.isActive && !open && "border-border",
-      item.isActive && open && "border-active",
+      item.isActive && "border-border",
     ),
   );
 
   return (
-    <div {...row}>
+    <div {...row} ref={anchor}>
       <button {...handleProps(item.id)}>
         <GripIcon />
       </button>
@@ -1077,17 +905,13 @@ function ItemRow({
 /**
  * Naming a section.
  *
- * Two placements, one form:
+ * Two placements, one form, and both of them inline:
  *
- * - **In the panel**, when renaming — beside the section it is renaming, the
- *   same way an item's details open beside the list. It wears the panel's own
- *   layout there: no card of its own, and the buttons in a footer at the
- *   bottom, because a bordered box inside a bordered panel is a frame around a
- *   frame.
- * - **Inline at the bottom**, when adding — in the place the new section will
- *   appear, where the button was, so nothing has to move to make room. There it
- *   needs its own edges, because it is sitting among the sections rather than
- *   in a space of its own.
+ * - **In the section's heading**, when renaming — in place of the name, because
+ *   the field *is* the name. The items stay under it, so the section never
+ *   leaves the screen to be renamed.
+ * - **At the bottom of the list**, when adding — in the place the new section
+ *   will appear, where the button was, so nothing has to move to make room.
  *
  * One component either way. Two would drift, and the way they would drift is
  * that one grows a field the other does not.
@@ -1098,13 +922,11 @@ function ItemRow({
 function SectionForm({
   initial,
   pending,
-  variant = "inline",
   onSave,
   onCancel,
 }: {
   initial?: Localized;
   pending: boolean;
-  variant?: "inline" | "panel";
   onSave: (title: Localized) => void;
   onCancel: () => void;
 }) {
@@ -1159,23 +981,6 @@ function SectionForm({
     </>
   );
 
-  if (variant === "panel") {
-    return (
-      // `flex-1 min-h-0` rather than `h-full`, for the reason the item editor
-      // records: there is a header above this in the same column, and `h-full`
-      // asks for the panel's whole height in addition to it — which pushes the
-      // buttons out of the bottom.
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
-          {field}
-        </div>
-        <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
-          {buttons}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       ref={form}
@@ -1213,7 +1018,6 @@ function SearchResult({
   item,
   currencyCode,
   sectionTitle,
-  open,
   onEdit,
   onToggle,
   onArchive,
@@ -1221,7 +1025,6 @@ function SearchResult({
   item: MenuItem;
   currencyCode: string;
   sectionTitle: string;
-  open: boolean;
   onEdit: () => void;
   onToggle: () => void;
   onArchive: () => Promise<void>;
@@ -1231,10 +1034,7 @@ function SearchResult({
       className={cx(
         ROW,
         !item.isActive && "border-danger-wash bg-danger-wash/30",
-        open &&
-          "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
-        item.isActive && !open && "border-border",
-        item.isActive && open && "border-active",
+        item.isActive && "border-border",
       )}
     >
       <Thumbnail

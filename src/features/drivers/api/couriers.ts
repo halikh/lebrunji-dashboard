@@ -2,6 +2,7 @@ import type { DayHours } from "@/features/catalog/api/hours";
 import { SEARCH } from "@/lib/limits";
 import { digitsOf } from "@/lib/phone";
 import { isOpenNow } from "@/lib/week";
+import { matchesLike } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 
 /**
@@ -113,11 +114,11 @@ export async function fetchCouriers(search = ""): Promise<Courier[]> {
     const digits = digitsOf(term);
     query = query.or(
       [
-        `name.ilike.%${term}%`,
+        matchesLike("name", term),
         // Only when the term contains digits at all: a bare `%%` matches every
         // row, so a name search would quietly return the whole table and look
         // like the filter had failed.
-        ...(digits ? [`phone.ilike.%${digits}%`] : []),
+        ...(digits ? [matchesLike("phone", digits)] : []),
       ].join(","),
     );
   }

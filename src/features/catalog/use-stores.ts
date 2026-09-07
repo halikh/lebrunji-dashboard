@@ -13,9 +13,11 @@ import {
   createStore,
   fetchStores,
   setStoreCurrency,
+  setStoreOrder,
   updateStore,
   type CurrencyChangeMode,
   type Store,
+  type StorePage,
   type StorePatch,
   type StoreDraft,
 } from "./api/stores";
@@ -30,6 +32,57 @@ export function useStore(id: string) {
   return useQuery({
     queryKey: storeKeys.detail(id),
     queryFn: () => fetchStore(id),
+  });
+}
+
+/**
+ * Reordering the shops, in the dashboard's own order.
+ *
+ * The mirror of `useReorderCategories`, and it writes `admin_sort_order` rather
+ * than `sort_order` — `0118` for why the two are separate columns.
+ *
+ * Optimistic, because the list moves under the operator's hand and a row that
+ * snapped back for the length of a round trip would read as a drag that did not
+ * take. The snapshot is every `stores` query, so a failure restores the list
+ * the operator was actually looking at rather than one canonical copy of it.
+ */
+export function useReorderStores() {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  return useMutation({
+    mutationFn: (input: {
+      updates: { id: string; sortOrder: number }[];
+      next: StorePage;
+    }) => setStoreOrder(input.updates),
+
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: storeKeys.all });
+      const snapshot = queryClient.getQueriesData<StorePage>({
+        queryKey: storeKeys.all,
+      });
+      // The unsearched list only. Dragging is off while searching — a
+      // position among matches is not a position in the list — so that is
+      // the one key whose order this can be about.
+      queryClient.setQueriesData<StorePage>(
+        { queryKey: storeKeys.list("") },
+        input.next,
+      );
+      return { snapshot };
+    },
+
+    onError: (error, _input, context) => {
+      for (const [key, page] of context?.snapshot ?? []) {
+        queryClient.setQueryData(key, page);
+      }
+      toast.danger(
+        error instanceof Error ? error.message : t("reorder.failed"),
+      );
+    },
+
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: storeKeys.all });
+    },
   });
 }
 

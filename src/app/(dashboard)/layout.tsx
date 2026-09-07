@@ -34,8 +34,29 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         The dynamic unit also handles a phone's address bar sliding away, which
         `100vh` famously does not.
+
+        ## `data-app-shell` is what stops the *document* scrolling
+
+        All of the above bounds this element and still leaves the window free to
+        scroll whatever it thinks the document's height is — and any pixel of
+        disagreement there is the second scrollbar, sitting beside the pane's
+        and moving the chrome the pane exists to keep still.
+
+        `globals.css` matches this attribute and turns off overflow on the body,
+        so on a dashboard route the document cannot scroll at all. It is done
+        from the stylesheet rather than by putting the class on `<body>` because
+        the body belongs to the root layout, which the login pages share — and
+        they are ordinary documents that should scroll.
+
+        It was briefly `fixed inset-0`, which also works and costs more than it
+        should: out of flow, the shell no longer reserves the window's scrollbar
+        gutter, so the document went a scrollbar's width wider than the viewport
+        and picked up a *horizontal* scroll that slid the rail off the left.
       */}
-      <div className="flex h-dvh flex-col overflow-hidden md:flex-row">
+      <div
+        data-app-shell
+        className="flex h-dvh flex-col overflow-hidden md:flex-row"
+      >
         {/*
         First in the DOM and visually hidden until focused. Without it, reaching
         the content from the keyboard means tabbing through every section link

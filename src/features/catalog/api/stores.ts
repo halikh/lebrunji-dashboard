@@ -1,3 +1,4 @@
+import { PAGE } from "@/lib/limits";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { digitsOf } from "@/lib/phone";
@@ -21,7 +22,24 @@ export type Store = {
   currencyCode: string;
   isActive: boolean;
   isFeatured: boolean;
+  /**
+   * Where the shop sits on the **customer's** home screen.
+   *
+   * The app reads it — `fetchStores` there ends `.order('sort_order')` — so
+   * it is a merchandising decision, and nothing in this dashboard writes it.
+   */
   sortOrder: number;
+  /**
+   * Where the shop sits in **this list**, and nowhere else — `0118`.
+   *
+   * A second order, because the two wants are genuinely different and one
+   * column cannot hold both: dragging a shop to the top of the dashboard to
+   * work on it would move it to the top of every customer's home screen.
+   *
+   * Zero on every row until the first drag, which is a tie broken by the
+   * secondary key below.
+   */
+  adminSortOrder: number;
   /**
    * Where the shop is.
    *
@@ -42,6 +60,27 @@ export type Store = {
    * shop rather than offering one that opens an empty chat.
    */
   whatsappPhone: string | null;
+  /**
+   * The number an order actually reaches — the branch's, falling back to this
+   * row's own.
+   *
+   * ## Why it is resolved in the query
+   *
+   * `0101` moved the number to `branches`, and the branch editor is the only
+   * screen that writes one, so `whatsappPhone` above is null on every shop
+   * created since. A header reading it said "No WhatsApp number" about a shop
+   * whose number was on screen two tabs away.
+   *
+   * The first fix read the Branches tab from the shop's header — which made
+   * every tab pay for a query only one of them is about, the exact shape this
+   * catalogue is being moved away from. So it is an embed instead: one round
+   * trip, on the query the header was already making.
+   *
+   * The *first* branch with a number, in the Branches tab's own order, so the
+   * header and that tab name the same place. Null when no branch has one and
+   * neither has the shop — which is a real state, and the one the list flags.
+   */
+  orderPhone: string | null;
 };
 
 /**
@@ -58,25 +97,40 @@ export type Store = {
  *    needs a virtualised list and a different reordering gesture — and the
  *    caller is told rather than silently shown a truncated catalogue.
  */
-export async function fetchStores(
-  options: { search?: string | null } = {},
-): Promise<{
+/** The shops, and whether the cap above cut them short. */
+export type StorePage = {
   stores: Store[];
   /** True when the cap was reached — see above. The UI says so. */
   truncated: boolean;
-}> {
-  const limit = 200;
+};
+
+export async function fetchStores(
+  options: { search?: string | null } = {},
+): Promise<StorePage> {
+  // `PAGE.cap` — the shared number, and the shared argument. This function is
+  // where it was first written down; the categories, tags, branches and menu
+  // reads all point back here.
+  const limit = PAGE.cap;
 
   let query = getClient()
     .from("stores")
     .select(
       `id, slug, name, image_url, category_id, currency_code, is_active, is_featured,
-       sort_order, latitude, longitude, prep_min_minutes, prep_max_minutes,
+       sort_order, admin_sort_order, latitude, longitude, prep_min_minutes, prep_max_minutes,
        whatsapp_phone,
-       categories ( name )`,
+       categories ( name ),
+       branches ( whatsapp_phone, sort_order, created_at, deleted_at )`,
     )
     .is("deleted_at", null)
-    .order("sort_order", { ascending: true })
+    // `0118`'s column, not the app's. An operator dragging a row here is
+    // putting the shop they are working on where they can find it; the
+    // customer's order is a different decision and stays where it was.
+    .order("admin_sort_order", { ascending: true })
+    // The tiebreak, and it does real work: every row is zero until the first
+    // drag, so without it the whole catalogue would come back in whatever
+    // order the planner chose — and a list that reshuffles between visits is
+    // one nobody can find anything in twice.
+    .order("id", { ascending: true })
     .limit(limit + 1);
 
   if (options.search) {
@@ -104,9 +158,10 @@ export async function fetchStore(id: string): Promise<Store> {
     .from("stores")
     .select(
       `id, slug, name, image_url, category_id, currency_code, is_active, is_featured,
-       sort_order, latitude, longitude, prep_min_minutes, prep_max_minutes,
+       sort_order, admin_sort_order, latitude, longitude, prep_min_minutes, prep_max_minutes,
        whatsapp_phone,
-       categories ( name )`,
+       categories ( name ),
+       branches ( whatsapp_phone, sort_order, created_at, deleted_at )`,
     )
     .eq("id", id)
     .single();
@@ -143,7 +198,10 @@ function requireTradeable(draft: {
   latitude?: number | null;
   longitude?: number | null;
 }): void {
-  if (draft.whatsappPhone !== undefined && !digitsOf(draft.whatsappPhone ?? "")) {
+  if (
+    draft.whatsappPhone !== undefined &&
+    !digitsOf(draft.whatsappPhone ?? "")
+  ) {
     throw new Error(t("branches.whatsappRequired"));
   }
   if (
@@ -164,6 +222,21 @@ export type StoreDraft = {
   prepMinMinutes: number;
   prepMaxMinutes: number;
   isActive: boolean;
+  /**
+   * Whether the shop leads the home screen.
+   *
+   * The form asks now. It used to be hard-coded false here on the argument that
+   * featuring is a claim made to every customer and belongs to the confirmed
+   * switch on the shops list — which is a good argument about the *default* and
+   * a bad one about the field existing at all. An operator adding a shop they
+   * have just agreed a promotion for should not have to add it, leave, find it
+   * in the list and flick a second switch.
+   *
+   * It still defaults to off, and it is still beside Visibility, which also
+   * defaults to off: a shop with no menu, no hours and no pin is not one to put
+   * at the top of the home screen.
+   */
+  isFeatured: boolean;
   /**
    * Where an order is sent to the kitchen. Digits, no `+`, as `wa.me` takes it.
    *
@@ -223,12 +296,10 @@ export async function fetchDefaultCountry(): Promise<{ id: string }> {
  * - **`sort_order`** — the end of the list. Where a shop goes is a question the
  *   caller can answer and the database cannot, and "last" is the only answer
  *   that does not silently reorder somebody else's catalogue.
- * - **`is_featured`** — always false. Featuring is a claim made to every
- *   customer on the home screen, and it belongs to the deliberate, confirmed
- *   switch on the list rather than to a checkbox on a creation form somebody is
- *   filling in for the first time.
+ * `is_featured` is no longer among them: the form asks, and defaults it off.
+ * See `StoreDraft.isFeatured` for why it stopped being hard-coded.
  *
- * ## It is created hidden by default
+ * ## It is created hidden, and unfeatured, by default
  *
  * A shop with no menu, no hours and no pin is not a shop a customer should be
  * able to find. The wizard offers the switch and defaults it off, so going live
@@ -261,7 +332,7 @@ export async function createStore(
       prep_min_minutes: draft.prepMinMinutes,
       prep_max_minutes: draft.prepMaxMinutes,
       is_active: draft.isActive,
-      is_featured: false,
+      is_featured: draft.isFeatured,
       sort_order: sortOrder,
     })
     .select("id")
@@ -273,6 +344,16 @@ export async function createStore(
 
 export type StorePatch = {
   name?: Localized;
+  /**
+   * What kind of shop this is — `categories.id`.
+   *
+   * Editable, unlike the currency below. It was settable only in the wizard,
+   * which meant a shop filed under the wrong category on the day it was created
+   * stayed there: the only fix was to delete it and add it again, losing the
+   * menu with it. Nothing is denominated in a category, so moving one is a
+   * column write like the name.
+   */
+  categoryId?: string;
   /*
    * No `currencyCode`, and that is the point.
    *
@@ -322,7 +403,9 @@ export async function updateStore(
   requireTradeable(patch);
 
   const row: Record<string, unknown> = {};
-  if (patch.name !== undefined) row.name = formatLocalized(patch.name, NAME_FORMAT);
+  if (patch.name !== undefined)
+    row.name = formatLocalized(patch.name, NAME_FORMAT);
+  if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
@@ -432,12 +515,57 @@ function toStore(row: Record<string, unknown>): Store {
     isActive: row.is_active as boolean,
     isFeatured: row.is_featured as boolean,
     sortOrder: row.sort_order as number,
+    adminSortOrder: (row.admin_sort_order as number | null) ?? 0,
     latitude: (row.latitude as number | null) ?? null,
     longitude: (row.longitude as number | null) ?? null,
     whatsappPhone: (row.whatsapp_phone as string | null) ?? null,
+    orderPhone: orderPhone(row),
     prepMinMinutes: row.prep_min_minutes as number,
     prepMaxMinutes: row.prep_max_minutes as number,
   };
+}
+
+/**
+ * The number orders reach — see `Store.orderPhone`.
+ *
+ * ## The ordering is the Branches tab's, restated
+ *
+ * `sort_order` then `created_at`, because an embed comes back in whatever order
+ * PostgREST felt like and "the first branch" has to mean the same thing on both
+ * screens. A header naming a different place from the tab below it is worse
+ * than one naming none.
+ *
+ * ## The archived are skipped, not filtered in the query
+ *
+ * A `deleted_at` filter on an *embedded* table removes the child rather than
+ * the parent, so a shop whose only branch was archived would come back looking
+ * like a shop with no branches at all — the same trap `fetchMenu` documents.
+ * Asked for and dropped here instead.
+ */
+function orderPhone(row: Record<string, unknown>): string | null {
+  const branches = Array.isArray(row.branches)
+    ? (row.branches as Record<string, unknown>[])
+    : row.branches
+      ? [row.branches as Record<string, unknown>]
+      : [];
+
+  const live = branches
+    .filter((one) => one.deleted_at == null)
+    .sort((a, b) => {
+      const order = Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0);
+      if (order !== 0) return order;
+      return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+    });
+
+  const fromBranch = live.find(
+    (one) => typeof one.whatsapp_phone === "string" && one.whatsapp_phone,
+  );
+
+  return (
+    (fromBranch?.whatsapp_phone as string | undefined) ??
+    (row.whatsapp_phone as string | null) ??
+    null
+  );
 }
 
 /** One readable string out of a translated column, for a label. */
@@ -459,6 +587,53 @@ function pick(value: unknown): string {
  */
 function normalise(input: string): string {
   return input.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Writes a new position to each shop that moved.
+ *
+ * ## Why `admin_sort_order` and not `sort_order`
+ *
+ * Because they answer different questions. `sort_order` decides what a customer
+ * sees first on the home screen — a merchandising decision the app reads and
+ * nothing here writes. This one decides where a row sits in *this* list, which
+ * is an operator putting the shop they are working on where they can find it.
+ *
+ * Migration `0118` added the second column for exactly this: one column would
+ * mean dragging a row up here to work on it also moved it to the top of every
+ * customer's home screen.
+ *
+ * ## Several requests rather than one
+ *
+ * The same trade `setMenuOrder` documents. There is no bulk update in
+ * PostgREST that sets a *different* value per row, and the alternatives are a
+ * stored procedure or an upsert that would have to carry every other column of
+ * every row — which is how a reorder silently reverts a name somebody changed
+ * in another tab. Only the rows whose position actually changed are sent, so a
+ * drag of one row into the row above it is two requests, not forty.
+ *
+ * They are not atomic, and that is survivable here in a way it would not be for
+ * money: a half-applied reorder is a list in a slightly odd order, which the
+ * next drag fixes. The optimistic update is rolled back on the first failure so
+ * the screen does not claim an order the database refused.
+ */
+export async function setStoreOrder(
+  updates: { id: string; sortOrder: number }[],
+): Promise<void> {
+  if (updates.length === 0) return;
+
+  const client = getClient();
+  const results = await Promise.all(
+    updates.map(({ id, sortOrder }) =>
+      client
+        .from("stores")
+        .update({ admin_sort_order: sortOrder })
+        .eq("id", id),
+    ),
+  );
+
+  const failure = results.find((result) => result.error);
+  if (failure?.error) throw new Error(friendly(failure.error.message));
 }
 
 /** Turns a constraint violation into a sentence the operator can act on. */

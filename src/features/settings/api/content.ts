@@ -1,3 +1,4 @@
+import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import type { Localized } from "@/lib/validation";
@@ -73,17 +74,27 @@ export async function fetchHelpTopics(
     .order("sort_order", { ascending: true })
     .limit(CAP);
 
-  const term = search?.trim();
+  // Quoted — a term with a comma in it would otherwise be read as two
+  // conditions and the filter refused. See `lib/search.ts`.
+  //
+  // `group_name->>ar` is here now too. It was the one column of the three
+  // whose Arabic was not searched, so a group named only in Arabic could be
+  // found by its question and not by the heading it sits under — and the app's
+  // own read searches all six, which is the list a customer types into.
+  const term = searchTerm(search);
   if (term) {
-    const like = `%${term}%`;
     query = query.or(
-      [
-        `question->>en.ilike.${like}`,
-        `question->>ar.ilike.${like}`,
-        `answer->>en.ilike.${like}`,
-        `answer->>ar.ilike.${like}`,
-        `group_name->>en.ilike.${like}`,
-      ].join(","),
+      likeAny(
+        [
+          "question->>en",
+          "question->>ar",
+          "answer->>en",
+          "answer->>ar",
+          "group_name->>en",
+          "group_name->>ar",
+        ],
+        term,
+      ),
     );
   }
 
@@ -222,16 +233,11 @@ export async function fetchPolicySections(
     .order("sort_order", { ascending: true })
     .limit(CAP);
 
-  const term = search?.trim();
+  // Quoted, and the same four columns the app's own read searches.
+  const term = searchTerm(search);
   if (term) {
-    const like = `%${term}%`;
     query = query.or(
-      [
-        `title->>en.ilike.${like}`,
-        `title->>ar.ilike.${like}`,
-        `body->>en.ilike.${like}`,
-        `body->>ar.ilike.${like}`,
-      ].join(","),
+      likeAny(["title->>en", "title->>ar", "body->>en", "body->>ar"], term),
     );
   }
 

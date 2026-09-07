@@ -5,14 +5,23 @@ import { useState, type ReactNode } from "react";
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
 import { ROW_STATIC } from "@/components/ui/row";
+import { SearchInput } from "@/components/ui/search-input";
 import { FilterTab, tabArrowHandler } from "@/components/ui/tab";
 import { pickLocalized } from "@/i18n/db-text";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { formatDate } from "@/lib/time";
 
 import { TagChip } from "./tag-chip";
-import { useCatalogueArchive, useCatalogueRestore } from "./use-archive";
+import {
+  useArchiveCounts,
+  useArchivedCategories,
+  useArchivedPromotions,
+  useArchivedStores,
+  useArchivedTags,
+  useCatalogueRestore,
+} from "./use-archive";
 
 /**
  * What the catalogue has put away, and the way back.
@@ -44,6 +53,21 @@ import { useCatalogueArchive, useCatalogueRestore } from "./use-archive";
  * an archived category lands on a shelf neither the dashboard nor the app
  * draws. `restoreStore` refuses it, and the row says so in place of the button
  * rather than after it is pressed.
+ *
+ * ## The search, and why an archive of all things needs one
+ *
+ * This is the one list in the catalogue that only grows — nothing is ever
+ * deleted — so it is the one where "scroll until you see it" stops working
+ * first. The search is a **query**, not a filter over the rows on screen: the
+ * thing being looked for is by definition old, which means it is exactly the
+ * thing that has not been paged in yet.
+ *
+ * ## Nothing is drawn until the first answer arrives
+ *
+ * The strip used to render while the query was still in flight, with every
+ * count reading zero, and then vanish when an empty archive resolved into its
+ * empty state. A control that appears and is taken away reads as a glitch even
+ * when both frames are correct. So the pending case is its own, above both.
  */
 
 type Kind = "all" | "stores" | "categories" | "tags" | "promotions";
@@ -57,9 +81,6 @@ const TABS: { key: Kind; labelKey: TranslationKey }[] = [
 ];
 
 export function CatalogueArchive() {
-  const archive = useCatalogueArchive();
-  const restore = useCatalogueRestore();
-
   /**
    * Component state, not the URL.
    *
@@ -68,24 +89,25 @@ export function CatalogueArchive() {
    * nobody pastes is state.
    */
   const [kind, setKind] = useState<Kind>("all");
+  const [search, setSearch] = useState("");
 
-  const data = archive.data;
+  const restore = useCatalogueRestore();
+  const counts = useArchiveCounts(search);
 
-  const counts: Record<Kind, number> = {
-    all:
-      (data?.stores.length ?? 0) +
-      (data?.categories.length ?? 0) +
-      (data?.tags.length ?? 0) +
-      (data?.promotions.length ?? 0),
-    stores: data?.stores.length ?? 0,
-    categories: data?.categories.length ?? 0,
-    tags: data?.tags.length ?? 0,
-    promotions: data?.promotions.length ?? 0,
-  };
-
+  /** Whether a list is drawn at all — "All", or the one that was picked. */
   const showing = (which: Kind) => kind === "all" || kind === which;
 
-  if (archive.isError) {
+  // Each list runs only while it is being shown. On a specific filter that is
+  // one query; on "All" — which is a request for all four — it is four, each
+  // paged rather than whole.
+  const stores = useArchivedStores(search, showing("stores"));
+  const categories = useArchivedCategories(search, showing("categories"));
+  const tags = useArchivedTags(search, showing("tags"));
+  const promotions = useArchivedPromotions(search, showing("promotions"));
+
+  const searching = search.trim().length > 0;
+
+  if (counts.isError) {
     return (
       <EmptyState
         mood="lost"
@@ -95,7 +117,21 @@ export function CatalogueArchive() {
     );
   }
 
-  if (archive.isSuccess && counts.all === 0) {
+  // Before the first answer. Above the empty state and above the strip, so
+  // neither is drawn on numbers nobody has yet — see the note in the header.
+  if (counts.isPending || counts.data === undefined) {
+    return (
+      <div aria-hidden className="flex flex-col gap-sm p-xxl">
+        <div className="h-[36px] w-[320px] rounded-md bg-neutral-fill" />
+        <div className="h-[64px] rounded-md bg-neutral-fill" />
+        <div className="h-[64px] rounded-md bg-neutral-fill" />
+      </div>
+    );
+  }
+
+  // An archive with nothing in it and nothing typed. Not the same as a search
+  // that found nothing, which keeps the box so the term can be corrected.
+  if (counts.data.all === 0 && !searching) {
     return (
       <EmptyState
         mood="done"
@@ -105,30 +141,46 @@ export function CatalogueArchive() {
     );
   }
 
+  const tally: Record<Kind, number> = {
+    all: counts.data.all,
+    stores: counts.data.stores,
+    categories: counts.data.categories,
+    tags: counts.data.tags,
+    promotions: counts.data.promotions,
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Above the scroller. A filter strip that scrolls away leaves the
           operator looking at a filtered list with no visible sign that a filter
-          is on. */}
-      <div
-        role="tablist"
-        aria-label={t("archive.catalogueTitle")}
-        className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
-      >
-        {TABS.map(({ key, labelKey }) => (
-          <FilterTab
-            key={key}
-            label={t(labelKey)}
-            count={counts[key]}
-            active={kind === key}
-            onClick={() => setKind(key)}
-            onKeyDown={tabArrowHandler(
-              TABS.map((one) => one.key),
-              kind,
-              setKind,
-            )}
-          />
-        ))}
+          is on — and the same is true of the search box beside it. */}
+      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-sm">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder={t("archive.searchPlaceholder")}
+        />
+
+        <div
+          role="tablist"
+          aria-label={t("archive.catalogueTitle")}
+          className="flex gap-xxs overflow-x-auto"
+        >
+          {TABS.map(({ key, labelKey }) => (
+            <FilterTab
+              key={key}
+              label={t(labelKey)}
+              count={tally[key]}
+              active={kind === key}
+              onClick={() => setKind(key)}
+              onKeyDown={tabArrowHandler(
+                TABS.map((one) => one.key),
+                kind,
+                setKind,
+              )}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
@@ -138,12 +190,15 @@ export function CatalogueArchive() {
 
         {/* A filter with nothing behind it is its own state. Without this the
             screen would go blank under a strip whose count says zero, which
-            reads as broken rather than as empty. */}
-        {counts[kind] === 0 && (
+            reads as broken rather than as empty. Searching says so differently:
+            the fix for "no matches" is a different term, not a different tab. */}
+        {tally[kind] === 0 && (
           <EmptyState
             mood="waiting"
-            titleKey="archive.noneOfThese"
-            bodyKey="archive.noneOfTheseBody"
+            titleKey={searching ? "archive.noMatches" : "archive.noneOfThese"}
+            bodyKey={
+              searching ? "archive.noMatchesBody" : "archive.noneOfTheseBody"
+            }
           />
         )}
 
@@ -151,138 +206,154 @@ export function CatalogueArchive() {
             the list that unblocks the others leads. */}
         <Group
           title={t("archive.categories")}
-          rows={showing("categories") ? counts.categories : 0}
+          shown={showing("categories")}
+          count={tally.categories}
+          query={categories}
         >
-          {data?.categories.map((category) => (
-            <div key={category.id} className={ROW_STATIC}>
-              <Identity
-                name={pickLocalized(category.name)}
-                detail={t("archive.archivedOn", {
-                  when: formatDate(category.archivedAt),
-                })}
-              />
-              <Restore
-                name={pickLocalized(category.name)}
-                body="archive.restoreCategory"
-                onConfirm={() =>
-                  restore.category.mutateAsync({
-                    id: category.id,
-                    name: pickLocalized(category.name),
-                  })
-                }
-              />
-            </div>
-          ))}
+          {categories.data?.pages
+            .flatMap((page) => page.rows)
+            .map((category) => (
+              <div key={category.id} className={ROW_STATIC}>
+                <Identity
+                  name={pickLocalized(category.name)}
+                  detail={t("archive.archivedOn", {
+                    when: formatDate(category.archivedAt),
+                  })}
+                />
+                <Restore
+                  name={pickLocalized(category.name)}
+                  body="archive.restoreCategory"
+                  onConfirm={() =>
+                    restore.category.mutateAsync({
+                      id: category.id,
+                      name: pickLocalized(category.name),
+                    })
+                  }
+                />
+              </div>
+            ))}
         </Group>
 
         <Group
           title={t("archive.stores")}
-          rows={showing("stores") ? counts.stores : 0}
+          shown={showing("stores")}
+          count={tally.stores}
+          query={stores}
         >
-          {data?.stores.map((store) => (
-            <div key={store.id} className={ROW_STATIC}>
-              <Thumbnail
-                url={store.imageUrl}
-                name={pickLocalized(store.name)}
-              />
-              <Identity
-                name={pickLocalized(store.name)}
-                detail={[
-                  t("archive.inCategory", {
-                    name: pickLocalized(store.categoryName),
-                  }),
-                  t("archive.archivedOn", {
-                    when: formatDate(store.archivedAt),
-                  }),
-                ].join(" · ")}
-              />
-              {store.categoryArchived ? (
-                <Blocked>
-                  {t("archive.categoryGoneFirst", {
-                    name: pickLocalized(store.categoryName),
-                  })}
-                </Blocked>
-              ) : (
-                <Restore
+          {stores.data?.pages
+            .flatMap((page) => page.rows)
+            .map((store) => (
+              <div key={store.id} className={ROW_STATIC}>
+                <Thumbnail
+                  url={store.imageUrl}
                   name={pickLocalized(store.name)}
-                  body="archive.restoreStore"
-                  onConfirm={() =>
-                    restore.store.mutateAsync({
-                      id: store.id,
-                      name: pickLocalized(store.name),
-                    })
-                  }
                 />
-              )}
-            </div>
-          ))}
+                <Identity
+                  name={pickLocalized(store.name)}
+                  detail={[
+                    t("archive.inCategory", {
+                      name: pickLocalized(store.categoryName),
+                    }),
+                    t("archive.archivedOn", {
+                      when: formatDate(store.archivedAt),
+                    }),
+                  ].join(" · ")}
+                />
+                {store.categoryArchived ? (
+                  <Blocked>
+                    {t("archive.categoryGoneFirst", {
+                      name: pickLocalized(store.categoryName),
+                    })}
+                  </Blocked>
+                ) : (
+                  <Restore
+                    name={pickLocalized(store.name)}
+                    body="archive.restoreStore"
+                    onConfirm={() =>
+                      restore.store.mutateAsync({
+                        id: store.id,
+                        name: pickLocalized(store.name),
+                      })
+                    }
+                  />
+                )}
+              </div>
+            ))}
         </Group>
 
         <Group
           title={t("archive.tags")}
-          rows={showing("tags") ? counts.tags : 0}
+          shown={showing("tags")}
+          count={tally.tags}
+          query={tags}
         >
-          {data?.tags.map((tag) => (
-            <div key={tag.id} className={ROW_STATIC}>
-              {/* The chip, not the bare name. A tag *is* its colour on a dish,
-                  and an archived one should be recognisable as the thing that
-                  was taken off forty menu rows. */}
-              <span className="shrink-0">
-                <TagChip
-                  tone={tag.tone}
-                  ink={tag.ink}
-                  color={tag.color}
-                  label={pickLocalized(tag.name)}
+          {tags.data?.pages
+            .flatMap((page) => page.rows)
+            .map((tag) => (
+              <div key={tag.id} className={ROW_STATIC}>
+                {/* The chip, not the bare name. A tag *is* its colour on a
+                    dish, and an archived one should be recognisable as the
+                    thing that was taken off forty menu rows. */}
+                <span className="shrink-0">
+                  <TagChip
+                    tone={tag.tone}
+                    ink={tag.ink}
+                    color={tag.color}
+                    label={pickLocalized(tag.name)}
+                  />
+                </span>
+                <Identity
+                  name={pickLocalized(tag.name)}
+                  detail={t("archive.archivedOn", {
+                    when: formatDate(tag.archivedAt),
+                  })}
                 />
-              </span>
-              <Identity
-                name={pickLocalized(tag.name)}
-                detail={t("archive.archivedOn", {
-                  when: formatDate(tag.archivedAt),
-                })}
-              />
-              <Restore
-                name={pickLocalized(tag.name)}
-                body="archive.restoreTag"
-                onConfirm={() =>
-                  restore.tag.mutateAsync({
-                    id: tag.id,
-                    name: pickLocalized(tag.name),
-                  })
-                }
-              />
-            </div>
-          ))}
+                <Restore
+                  name={pickLocalized(tag.name)}
+                  body="archive.restoreTag"
+                  onConfirm={() =>
+                    restore.tag.mutateAsync({
+                      id: tag.id,
+                      name: pickLocalized(tag.name),
+                    })
+                  }
+                />
+              </div>
+            ))}
         </Group>
 
         <Group
           title={t("archive.promotions")}
-          rows={showing("promotions") ? counts.promotions : 0}
+          shown={showing("promotions")}
+          count={tally.promotions}
+          query={promotions}
         >
-          {data?.promotions.map((promotion) => (
-            <div key={promotion.id} className={ROW_STATIC}>
-              <Thumbnail url={promotion.imageUrl} name={promotion.slug} />
-              {/* The slug is the name. `0013` dropped every text column a
-                  customer would have read — the card is artwork — so the slug is
-                  the only handle an operator has on a picture in a list. */}
-              <Identity
-                name={promotion.slug}
-                detail={t("archive.archivedOn", {
-                  when: formatDate(promotion.archivedAt),
-                })}
-              />
-              <Restore
-                name={promotion.slug}
-                body="archive.restorePromotion"
-                onConfirm={() =>
-                  restore.promotion.mutateAsync({
-                    id: promotion.id,
-                    name: promotion.slug,
-                  })
-                }
-              />
-            </div>
-          ))}
+          {promotions.data?.pages
+            .flatMap((page) => page.rows)
+            .map((promotion) => (
+              <div key={promotion.id} className={ROW_STATIC}>
+                <Thumbnail url={promotion.imageUrl} name={promotion.slug} />
+                {/* The slug is the name. `0013` dropped every text column a
+                    customer would have read — the card is artwork — so the slug
+                    is the only handle an operator has on a picture in a list. */}
+                <Identity
+                  name={promotion.slug}
+                  detail={t("archive.archivedOn", {
+                    when: formatDate(promotion.archivedAt),
+                  })}
+                />
+                <Restore
+                  name={promotion.slug}
+                  body="archive.restorePromotion"
+                  onConfirm={() =>
+                    restore.promotion.mutateAsync({
+                      id: promotion.id,
+                      name: promotion.slug,
+                    })
+                  }
+                />
+              </div>
+            ))}
         </Group>
       </div>
     </div>
@@ -330,29 +401,54 @@ function Blocked({ children }: { children: ReactNode }) {
 }
 
 /**
- * One kind of put-away thing.
+ * One kind of put-away thing, with its own way to the next page.
  *
  * Empty groups are dropped rather than shown with a "none" line — four headings
  * over a single archived tag is a page about its own structure, and the
  * operator came here to find one thing.
+ *
+ * ## The sentinel belongs to the group, not to the screen
+ *
+ * Each list pages separately, so "load more" has to mean *this* list. One
+ * sentinel at the bottom of the page would be ambiguous on the All tab, where
+ * four lists are on screen and three of them may have more to give.
+ *
+ * The count is the server's, and it is what decides whether the heading is
+ * drawn at all — the rows in hand are a page of it. Both are shown: a heading
+ * reading "Shops" over ten of forty says less than the number does.
  */
 function Group({
   title,
-  rows,
+  shown,
+  count,
+  query,
   children,
 }: {
   title: string;
-  rows: number;
+  /** Whether this kind is the filter, or the filter is "All". */
+  shown: boolean;
+  /** How many there are in total — not how many have been fetched. */
+  count: number;
+  query: {
+    hasNextPage: boolean;
+    isFetchingNextPage: boolean;
+    fetchNextPage: () => unknown;
+  };
   children: ReactNode;
 }) {
-  if (rows === 0) return null;
+  if (!shown || count === 0) return null;
 
   return (
     <section className="flex flex-col gap-sm">
       <h2 className="ps-md text-[13px] font-semibold uppercase tracking-wide text-text-faint">
-        {title}
+        {t("archive.groupHeading", { title, count })}
       </h2>
       {children}
+      <InfiniteSentinel
+        hasMore={query.hasNextPage}
+        loading={query.isFetchingNextPage}
+        onLoadMore={() => void query.fetchNextPage()}
+      />
     </section>
   );
 }

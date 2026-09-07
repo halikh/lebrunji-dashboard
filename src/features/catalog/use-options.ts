@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToasts } from "@/components/ui/toast";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { searchTerm } from "@/lib/search";
 import type { Localized } from "@/lib/validation";
 
 import {
@@ -210,11 +211,22 @@ export function useItemOptions() {
 
 export type { OptionGroup };
 
-/** Every question in a shop, with the items each is asked on. */
-export function useStoreQuestions(storeId: string) {
+/**
+ * Every question in a shop, with the items each is asked on — or the ones a
+ * term matches.
+ *
+ * The term is in the key, so a search is a different list rather than the same
+ * one re-filtered, which is what puts the matching on the server. It matches a
+ * question's title *and* its choices' names, because what an operator
+ * remembers about "Size" is "Half kilo"; see `questionIdsMatching`.
+ */
+export function useStoreQuestions(storeId: string, search = "") {
+  const term = searchTerm(search);
+
   return useQuery({
-    queryKey: [...optionKeys.counts(storeId), "questions"],
-    queryFn: () => fetchStoreQuestions(storeId),
+    queryKey: [...optionKeys.counts(storeId), "questions", term ?? ""],
+    queryFn: () => fetchStoreQuestions(storeId, term),
+    placeholderData: (previous) => previous,
   });
 }
 

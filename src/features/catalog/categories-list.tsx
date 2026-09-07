@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
@@ -8,26 +9,17 @@ import { ListHeader } from "@/components/ui/list-header";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
-import { Field } from "@/components/ui/field";
-import { LocalizedField } from "@/components/ui/localized-field";
-import { Panel } from "@/components/ui/panel";
-import { PanelHeader } from "@/components/ui/panel-header";
+import { useRowFocus } from "@/components/ui/row-focus";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
-import { Select } from "@/components/ui/select";
-import { Toggle } from "@/components/ui/toggle";
-import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
-import { SEARCH, TEXT } from "@/lib/limits";
-import { validateLocalizedText, type Localized } from "@/lib/validation";
+import { SEARCH } from "@/lib/limits";
 
 import { applyOrder } from "./api/menu";
-import type { Category, CategoryDraft } from "./api/categories";
+import type { Category } from "./api/categories";
 import {
   useArchiveCategory,
   useCategories,
-  useCategoryKinds,
-  useCreateCategory,
   useReorderCategories,
   useUpdateCategory,
 } from "./use-categories";
@@ -45,16 +37,21 @@ import {
  * That is why the list is the screen and the form is a panel beside it, rather
  * than the other way round.
  *
- * ## The form opens beside the list, as it does for a menu item
+ * ## The form is a page, and used to be a panel
  *
  * The flow study called for editing inline, in the row. A category carries two
  * languages of name, a kind and three switches, and growing a row to fit that
- * reflows every row beneath it — the same reason the
- * menu item editor moved out of the row. The panel keeps what mattered about
- * the inline idea, which was never editing *within* the row: it was not losing
- * your place in the list.
+ * reflows every row beneath it — so it moved out, first into a panel beside the
+ * list and now onto a route of its own.
+ *
+ * What the panel was protecting was never editing *within* the row: it was not
+ * losing your place. That is kept without it — the editor hands back the id it
+ * was working on and `useRowFocus` brings the row into view. What is gained is
+ * a URL: a link that can be sent, a refresh that lands where it left off, and a
+ * back button that means what it says.
  */
 export function CategoriesList() {
+  const router = useRouter();
   /**
    * The term, and the mode it puts the list in.
    *
@@ -67,26 +64,19 @@ export function CategoriesList() {
   const searching = search.trim().length >= SEARCH.minTerm;
 
   const categories = useCategories(searching ? search : "");
-  const create = useCreateCategory();
   const update = useUpdateCategory();
   const archive = useArchiveCategory();
   const reorder = useReorderCategories();
 
-  /**
-   * The row the panel is editing, or `"new"` while one is being added.
-   *
-   * **Any action on a row closes it.** A form open beside the list holds a copy
-   * of a row as it was when it opened; flipping a switch or archiving something
-   * changes the list underneath it, and a form that stays open then is either
-   * showing a row that no longer exists or is about to save values from before
-   * the change. Closing is the honest answer: the operator has moved on to the
-   * list, and nothing they typed is lost that they had not already abandoned by
-   * reaching past the form to act on a row.
-   */
-  const [open, setOpen] = useState<string | null>(null);
-
   const rows = categories.data ?? [];
-  const editing = rows.find((row) => row.id === open) ?? null;
+
+  /**
+   * Which row to bring back into view.
+   *
+   * Set by the editor on its way out — see `useRowFocus`. It is what replaces
+   * the one thing the side panel was genuinely good at: not losing your place.
+   */
+  const focus = useRowFocus();
 
   const order = useReorder({
     ids: rows.map((row) => row.id),
@@ -116,7 +106,7 @@ export function CategoriesList() {
           // list. See `sortable` on `useReorder`.
           hint={order.sortable ? t("categories.reorderHint") : undefined}
           action={
-            <Button onClick={() => setOpen("new")}>
+            <Button onClick={() => router.push("/catalogue/categories/new")}>
               {t("categories.add")}
             </Button>
           }
@@ -154,21 +144,18 @@ export function CategoriesList() {
               <Row
                 key={row.id}
                 category={row}
-                open={open === row.id}
+                open={focus.isFocused(row.id)}
+                anchor={focus.attach(row.id)}
                 rowProps={order.rowProps}
                 handleProps={order.handleProps}
-                onEdit={() => setOpen(row.id)}
-                onToggleActive={() => {
-                  // The panel closes on any row action — see the note on
-                  // `setOpen` above.
-                  setOpen(null);
+                onEdit={() => router.push(`/catalogue/categories/${row.id}`)}
+                onToggleActive={() =>
                   update.mutate({
                     id: row.id,
                     patch: { isActive: !row.isActive },
-                  });
-                }}
+                  })
+                }
                 onArchive={async () => {
-                  setOpen(null);
                   await archive.mutateAsync({ id: row.id, name: row.name });
                 }}
               />
@@ -183,43 +170,6 @@ export function CategoriesList() {
           )}
         </div>
       </div>
-
-      <Panel
-        open={open !== null}
-        onClose={() => setOpen(null)}
-        label={t("categories.formLabel")}
-      >
-        {open && (
-          <>
-            <PanelHeader
-              title={
-                editing ? pickLocalized(editing.name) : t("categories.add")
-              }
-              onClose={() => setOpen(null)}
-            />
-
-            <Editor
-              key={open}
-              initial={editing ?? undefined}
-              pending={create.isPending || update.isPending}
-              onSave={(draft) => {
-                if (editing) {
-                  update.mutate(
-                    { id: editing.id, patch: draft, name: draft.name },
-                    { onSuccess: () => setOpen(null) },
-                  );
-                } else {
-                  create.mutate(
-                    { draft, sortOrder: rows.length },
-                    { onSuccess: () => setOpen(null) },
-                  );
-                }
-              }}
-              onCancel={() => setOpen(null)}
-            />
-          </>
-        )}
-      </Panel>
     </div>
   );
 }
@@ -235,6 +185,7 @@ type ReorderProps = {
 function Row({
   category,
   open,
+  anchor,
   rowProps,
   handleProps,
   onEdit,
@@ -242,7 +193,10 @@ function Row({
   onArchive,
 }: {
   category: Category;
+  /** Whether this is the row just returned from. Draws the ring. */
   open: boolean;
+  /** Scrolls this row back into view when it is the one returned to. */
+  anchor: (node: HTMLElement | null) => void;
   onEdit: () => void;
   onToggleActive: () => void;
   onArchive: () => Promise<void>;
@@ -254,15 +208,13 @@ function Row({
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
       !category.isActive && "border-danger-wash bg-danger-wash/30",
-      open &&
-        "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
-      category.isActive && !open && "border-border",
+      category.isActive && "border-border",
       category.isActive && open && "border-active",
     ),
   );
 
   return (
-    <div {...row}>
+    <div {...row} ref={anchor}>
       <button {...handleProps(category.id)}>
         <GripIcon />
       </button>
@@ -322,117 +274,6 @@ function Row({
       >
         {t("categories.archive")}
       </ConfirmButton>
-    </div>
-  );
-}
-
-function Editor({
-  initial,
-  pending,
-  onSave,
-  onCancel,
-}: {
-  initial?: Category;
-  pending: boolean;
-  onSave: (draft: CategoryDraft) => void;
-  onCancel: () => void;
-}) {
-  const languages = useLanguages();
-  const kinds = useCategoryKinds();
-  const codes = languages.data?.map((language) => language.code) ?? [];
-
-  const [name, setName] = useState<Localized>(initial?.name ?? {});
-  const [kindId, setKindId] = useState(initial?.kindId ?? "");
-  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
-  const [hasMenuNav, setHasMenuNav] = useState(initial?.hasMenuNav ?? true);
-
-  const [errors, setErrors] = useState<{ name?: string; kind?: string }>({});
-
-  function submit() {
-    const nameCheck = validateLocalizedText(name, codes, TEXT.name);
-    const found = {
-      name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
-      // `category_kind_id` is `not null` with no default, so an empty one is a
-      // refusal from Postgres rather than a message about the field it came
-      // from. Caught here so it reads as a form.
-      kind: kindId ? undefined : t("categories.kindRequired"),
-    };
-
-    setErrors(found);
-    if (found.name || found.kind) return;
-
-    onSave({
-      name,
-      kindId,
-      isActive,
-      hasMenuNav,
-    });
-  }
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
-        <LocalizedField
-          label={t("categories.name")}
-          value={name}
-          onChange={setName}
-          maxLength={TEXT.name}
-          error={errors.name}
-          format="sentence"
-          placeholder={{ en: "Restaurants", ar: "مطاعم" }}
-        />
-
-        <Field
-          label={t("categories.kind")}
-          hint={t("categories.kindHint")}
-          error={errors.kind}
-        >
-          <Select
-            value={kindId}
-            onChange={setKindId}
-            placeholder={t("categories.pickKind")}
-            options={(kinds.data ?? []).map((kind) => ({
-              value: kind.id,
-              label: pickLocalized(kind.name),
-            }))}
-          />
-        </Field>
-
-        <Field
-          label={t("categories.visibility")}
-          hint={
-            isActive ? t("categories.liveHint") : t("categories.hiddenHint")
-          }
-        >
-          <Toggle
-            on={isActive}
-            onChange={() => setIsActive((current) => !current)}
-            labelOn={t("categories.live")}
-            labelOff={t("categories.hidden")}
-          />
-        </Field>
-
-        <Field
-          label={t("categories.menuNav")}
-          hint={t("categories.menuNavHint")}
-        >
-          <Toggle
-            on={hasMenuNav}
-            onChange={() => setHasMenuNav((current) => !current)}
-            labelOn={t("categories.menuNavOn")}
-            labelOff={t("categories.menuNavOff")}
-          />
-        </Field>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
-        <Button variant="secondary" onClick={onCancel} disabled={pending}>
-          {t("common.cancel")}
-        </Button>
-        <Button onClick={submit} pending={pending}>
-          {t("categories.save")}
-        </Button>
-      </div>
     </div>
   );
 }

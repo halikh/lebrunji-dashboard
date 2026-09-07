@@ -3,6 +3,7 @@
 import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Select } from "@/components/ui/select";
+import { Toggle } from "@/components/ui/toggle";
 import { useMoney } from "@/features/reference/use-currencies";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
@@ -10,6 +11,8 @@ import { restatePrice } from "@/lib/money";
 import type { Localized } from "@/lib/validation";
 
 import type { CurrencyChangeMode, Store } from "./api/stores";
+import { pickLocalized } from "@/i18n/db-text";
+import { useCategories } from "./use-categories";
 import { useMenu } from "./use-menu";
 import { useSetStoreCurrency, useUpdateStore } from "./use-stores";
 
@@ -45,8 +48,12 @@ export function ShopFields({
   name,
   onName,
   nameError,
+  categoryId,
+  onCategoryId,
   currencyCode,
   onCurrencyCode,
+  isFeatured,
+  onIsFeatured,
   mode,
   onMode,
 }: {
@@ -54,12 +61,19 @@ export function ShopFields({
   name: Localized;
   onName: (value: Localized) => void;
   nameError?: string;
+  categoryId: string;
+  onCategoryId: (id: string) => void;
   currencyCode: string;
   onCurrencyCode: (code: string) => void;
+  isFeatured: boolean;
+  onIsFeatured: (on: boolean) => void;
   mode: CurrencyChangeMode;
   onMode: (mode: CurrencyChangeMode) => void;
 }) {
   const { format, currencies } = useMoney();
+  // Every category, unfiltered — the same list the shop was filed from when it
+  // was created.
+  const categories = useCategories("");
   // Only for the worked example below. Cached — the Menu tab has usually
   // already loaded it — and its absence costs nothing: no sample, no warning,
   // which is the right answer for a shop with no menu anyway.
@@ -122,6 +136,29 @@ export function ShopFields({
         placeholder={{ en: "NARA KITCHEN", ar: "مطبخ نارة" }}
       />
 
+      {/*
+        Which kind of shop this is — and it can be changed now.
+
+        It used to be a wizard-only answer, which made a mis-filing permanent:
+        the category decides where the shop appears on Home and what artwork it
+        wears, and the only way to correct it was to delete the shop and lose
+        the menu with it.
+
+        Nothing is denominated in a category the way prices are in a currency,
+        so this is a plain write and needs none of the machinery below it.
+      */}
+      <Field label={t("store.category")} hint={t("store.categoryHint")}>
+        <Select
+          value={categoryId}
+          onChange={onCategoryId}
+          placeholder={t("store.pickCategory")}
+          options={(categories.data ?? []).map((category) => ({
+            value: category.id,
+            label: pickLocalized(category.name),
+          }))}
+        />
+      </Field>
+
       <Field label={t("store.currency")} hint={t("store.currencyEditHint")}>
         <Select
           value={currencyCode}
@@ -131,6 +168,37 @@ export function ShopFields({
             value: one.code,
             label: one.code,
           }))}
+        />
+      </Field>
+
+      {/*
+        Featuring, edited where the shop is edited.
+
+        It was the shops list and nowhere else. That is the right place for it
+        — the list is where you compare shops and decide which one leads — but
+        being *only* there meant an operator who had opened a shop to change
+        three things about it had to save, go back and find the row to change a
+        fourth.
+
+        No confirmation dialog here, unlike the list. There the switch acts the
+        instant it is flicked, on a live shop, from a column of identical rows,
+        which is exactly what the dialog guards. Here nothing happens until
+        Save, and the row it belongs to is the panel that is open.
+
+        It is in the shop section rather than the branch one because it is a
+        claim about the shop: the app's home screen lists shops, and a card
+        resolves the nearest branch afterwards — there is no per-branch home
+        screen for a featured branch to lead.
+      */}
+      <Field
+        label={t("store.featured")}
+        hint={isFeatured ? t("store.featuredHint") : t("store.featuredHintOff")}
+      >
+        <Toggle
+          on={isFeatured}
+          onChange={() => onIsFeatured(!isFeatured)}
+          labelOn={t("catalogue.featured")}
+          labelOff={t("store.notFeatured")}
         />
       </Field>
 
@@ -234,7 +302,13 @@ export function useSaveShop() {
 
   async function saveShop(
     store: Store,
-    next: { name: Localized; currencyCode: string; mode: CurrencyChangeMode },
+    next: {
+      name: Localized;
+      categoryId: string;
+      currencyCode: string;
+      isFeatured: boolean;
+      mode: CurrencyChangeMode;
+    },
   ): Promise<boolean> {
     const currencyMoved =
       next.currencyCode !== "" && next.currencyCode !== store.currencyCode;
@@ -242,6 +316,9 @@ export function useSaveShop() {
     // values is always false, which would mark the shop changed on every save.
     // The same reasoning `changed()` in `unsaved-changes` records.
     const nameMoved = JSON.stringify(next.name) !== JSON.stringify(store.name);
+    const categoryMoved =
+      next.categoryId !== "" && next.categoryId !== store.categoryId;
+    const featureMoved = next.isFeatured !== store.isFeatured;
 
     if (currencyMoved) {
       try {
@@ -259,11 +336,18 @@ export function useSaveShop() {
       }
     }
 
-    if (nameMoved) {
+    // One write for all three, because they are three columns on the same row:
+    // separate requests would mean a shop that got renamed and stayed mis-filed
+    // when the second failed.
+    if (nameMoved || categoryMoved || featureMoved) {
       try {
         await update.mutateAsync({
           id: store.id,
-          patch: { name: next.name },
+          patch: {
+            ...(nameMoved && { name: next.name }),
+            ...(categoryMoved && { categoryId: next.categoryId }),
+            ...(featureMoved && { isFeatured: next.isFeatured }),
+          },
           name: store.name,
         });
       } catch {

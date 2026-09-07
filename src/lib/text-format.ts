@@ -128,7 +128,10 @@ export function formatLocalized<T extends Record<string, string> | null>(
 ): T {
   if (!value) return value;
   return Object.fromEntries(
-    Object.entries(value).map(([code, text]) => [code, formatText(text, format)]),
+    Object.entries(value).map(([code, text]) => [
+      code,
+      formatText(text, format),
+    ]),
   ) as T;
 }
 

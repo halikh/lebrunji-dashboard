@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { asPriceUnit, itemUnit, pricePerUnit } from "./units";
+import { asPriceUnit, itemUnit, pricePerUnit, unitAmount } from "./units";
 
 describe("itemUnit", () => {
   it("is null unless both columns are there", () => {
@@ -22,7 +22,60 @@ describe("itemUnit", () => {
     expect(itemUnit({ priceUnit: "g", unitQuantity: 500 })).toEqual({
       unit: "g",
       quantity: 500,
+      // Absent on the row, and absent is the plain whole-item stepper.
+      step: null,
     });
+  });
+
+  it("carries a step through when there is one", () => {
+    expect(
+      itemUnit({ priceUnit: "kg", unitQuantity: 5, unitStep: 5 }),
+    ).toEqual({ unit: "kg", quantity: 5, step: 5 });
+  });
+
+  it("drops a step that cannot move", () => {
+    // `0119`'s CHECK refuses these, so this is about an item built by hand —
+    // a `+` that does nothing is worse than no `+` at all.
+    expect(itemUnit({ priceUnit: "kg", unitQuantity: 5, unitStep: 0 })?.step)
+      .toBeNull();
+    expect(itemUnit({ priceUnit: "kg", unitQuantity: 5, unitStep: -1 })?.step)
+      .toBeNull();
+  });
+});
+
+describe("unitAmount", () => {
+  it("walks from the starting amount, by the step", () => {
+    // The case this was built for: five kilos minimum, five at a time.
+    const unit = { unit: "kg", quantity: 5, step: 5 } as const;
+    expect(unitAmount(unit, 1)).toBe(5);
+    expect(unitAmount(unit, 2)).toBe(10);
+    expect(unitAmount(unit, 3)).toBe(15);
+  });
+
+  it("starts at the starting amount and will not go below it", () => {
+    const unit = { unit: "kg", quantity: 5, step: 5 } as const;
+    expect(unitAmount(unit, 0)).toBe(5);
+    expect(unitAmount(unit, -3)).toBe(5);
+  });
+
+  it("steps by something other than the starting amount", () => {
+    // From 5 kg, two at a time: 5, 7, 9.
+    const unit = { unit: "kg", quantity: 5, step: 2 } as const;
+    expect(unitAmount(unit, 3)).toBe(9);
+  });
+
+  it("multiplies packs when there is no step", () => {
+    // Falls out of the same expression rather than being a second branch:
+    // three 500 g packs are 1500 g.
+    const unit = { unit: "g", quantity: 500, step: null } as const;
+    expect(unitAmount(unit, 3)).toBe(1500);
+  });
+
+  it("does not accumulate binary noise", () => {
+    // 0.1 + 0.1 + 0.1 is 0.30000000000000004 in IEEE 754, and "0.3 kg" is
+    // what a person weighing something out expects to read.
+    const unit = { unit: "kg", quantity: 0.1, step: 0.1 } as const;
+    expect(unitAmount(unit, 3)).toBe(0.3);
   });
 });
 

@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ROW_STATIC } from "@/components/ui/row";
+import { SearchInput } from "@/components/ui/search-input";
 import { FilterTab, tabArrowHandler } from "@/components/ui/tab";
 import { pickLocalized } from "@/i18n/db-text";
 import { t, type TranslationKey } from "@/i18n/translations";
@@ -83,13 +84,24 @@ export function StoreArchive({ storeId }: { storeId: string }) {
    * survives a reload but nobody ever pastes is state.
    */
   const [kind, setKind] = useState<Kind>("all");
-  const archive = useArchive(storeId);
+  /**
+   * What was typed.
+   *
+   * It reaches the database — all five reads — rather than filtering the rows
+   * on screen. An archive only grows, so the thing being hunted for is by
+   * definition old, and the five reads are capped: a client-side filter would
+   * search what was fetched, which is the half the operator has already
+   * scrolled past. See `fetchArchive`.
+   */
+  const [search, setSearch] = useState("");
+  const archive = useArchive(storeId, search);
   const restore = useRestore(storeId);
   const store = useStore(storeId);
   const { format } = useMoney();
 
   const currencyCode = store.data?.currencyCode ?? "";
   const data = archive.data;
+  const searching = search.trim().length > 0;
 
   const empty =
     data !== undefined &&
@@ -109,7 +121,29 @@ export function StoreArchive({ storeId }: { storeId: string }) {
     );
   }
 
-  if (empty) {
+  /**
+   * Before the first answer.
+   *
+   * Above the empty state *and* above the strip, which is the whole fix: the
+   * strip used to render while the query was in flight with every count
+   * reading zero, and then be taken away when an empty archive resolved into
+   * its empty state. A control that appears and is removed reads as a glitch
+   * even when both frames are correct.
+   */
+  if (archive.isPending || data === undefined) {
+    return (
+      <div aria-hidden className="flex flex-col gap-sm p-xxl">
+        <div className="h-[36px] w-[320px] rounded-md bg-neutral-fill" />
+        <div className="h-[64px] rounded-md bg-neutral-fill" />
+        <div className="h-[64px] rounded-md bg-neutral-fill" />
+      </div>
+    );
+  }
+
+  // Empty *and* nothing typed. A search that found nothing keeps the box, so
+  // the term can be corrected — taking it away would strand the operator on a
+  // screen with no way back to the list.
+  if (empty && !searching) {
     return (
       <EmptyState
         mood="done"
@@ -141,25 +175,33 @@ export function StoreArchive({ storeId }: { storeId: string }) {
       {/* Above the scroller, not inside it. A filter strip that scrolls away
           leaves the operator looking at a filtered list with no visible sign
           that a filter is on. */}
-      <div
-        role="tablist"
-        aria-label={t("archive.title")}
-        className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
-      >
-        {TABS.map(({ key, labelKey }) => (
-          <FilterTab
-            key={key}
-            label={t(labelKey)}
-            count={counts[key]}
-            active={kind === key}
-            onClick={() => setKind(key)}
-            onKeyDown={tabArrowHandler(
-              TABS.map((one) => one.key),
-              kind,
-              setKind,
-            )}
-          />
-        ))}
+      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-sm">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder={t("archive.searchStorePlaceholder")}
+        />
+
+        <div
+          role="tablist"
+          aria-label={t("archive.title")}
+          className="flex gap-xxs overflow-x-auto"
+        >
+          {TABS.map(({ key, labelKey }) => (
+            <FilterTab
+              key={key}
+              label={t(labelKey)}
+              count={counts[key]}
+              active={kind === key}
+              onClick={() => setKind(key)}
+              onKeyDown={tabArrowHandler(
+                TABS.map((one) => one.key),
+                kind,
+                setKind,
+              )}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
@@ -173,8 +215,10 @@ export function StoreArchive({ storeId }: { storeId: string }) {
         {counts[kind] === 0 && (
           <EmptyState
             mood="waiting"
-            titleKey="archive.noneOfThese"
-            bodyKey="archive.noneOfTheseBody"
+            titleKey={searching ? "archive.noMatches" : "archive.noneOfThese"}
+            bodyKey={
+              searching ? "archive.noMatchesBody" : "archive.noneOfTheseBody"
+            }
           />
         )}
 

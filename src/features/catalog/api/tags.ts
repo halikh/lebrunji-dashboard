@@ -1,3 +1,5 @@
+import { PAGE } from "@/lib/limits";
+import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { formatLocalized, hasEmoji } from "@/lib/text-format";
@@ -131,19 +133,17 @@ export async function fetchTags(search?: string | null): Promise<Tag[]> {
     .select(COLUMNS)
     .is("deleted_at", null);
 
-  const term = search?.trim();
-  if (term) {
-    const like = `%${term}%`;
-    query = query.or(
-      [
-        `name->>en.ilike.${like}`,
-        `name->>ar.ilike.${like}`,
-        `slug.ilike.${like}`,
-      ].join(","),
-    );
-  }
+  // Quoted — see `lib/search.ts`. A tag named "Hot, spicy" would otherwise
+  // break the filter it is interpolated into.
+  const term = searchTerm(search);
+  if (term) query = query.or(likeAny(["name->>en", "name->>ar", "slug"], term));
 
-  const { data, error } = await query.order("created_at", { ascending: false });
+  const { data, error } = await query
+    .order("created_at", { ascending: false })
+    // A vocabulary is bounded by what fits on a chip row, and the note above
+    // says why paging would not help a shop that has outgrown that. The cap is
+    // that assumption made checkable rather than assumed.
+    .limit(PAGE.cap);
 
   if (error) throw new Error(`Could not read the tags: ${error.message}`);
 

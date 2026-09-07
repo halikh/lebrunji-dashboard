@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { BackLink } from "@/components/ui/back-link";
 import { Button, cx } from "@/components/ui";
 import { Avatar } from "@/components/ui/avatar";
 import { Copyable } from "@/components/ui/copyable";
-import { Panel } from "@/components/ui/panel";
-import { PanelHeader } from "@/components/ui/panel-header";
 import { ROW } from "@/components/ui/row";
 import { Toggle } from "@/components/ui/toggle";
 import { t } from "@/i18n/translations";
@@ -19,7 +17,6 @@ import { useClock } from "@/features/settings/use-clock";
 import { startOfBusinessDay, startOfBusinessDayPlus } from "@/lib/time";
 
 import { isOverridden, isTakingOrders, type Courier } from "./api/couriers";
-import { DriverEditor } from "./drivers-screen";
 import { useCourier, useDispatches, useSaveCourier } from "./use-couriers";
 
 /**
@@ -34,8 +31,8 @@ import { useCourier, useDispatches, useSaveCourier } from "./use-couriers";
  *
  ## One page, and the rota is not on it
  *
- * The week briefly had a tab here. It is edited in the same side form as the
- * name and the number — one week editor rather than two that drift — and a tab
+ * The week briefly had a tab here. It is edited on the same page as the name
+ * and the number — one week editor rather than two that drift — and a tab
  * carrying a second copy was a second place for a rota to be half-saved.
  *
  * What stays is the state the rota *produces*: the switch under the name says
@@ -52,12 +49,11 @@ import { useCourier, useDispatches, useSaveCourier } from "./use-couriers";
  */
 
 export function DriverProfile({ id }: { id: string }) {
+  const router = useRouter();
   const clock = useClock();
   const courier = useCourier(id);
   const dispatches = useDispatches(id);
   const save = useSaveCourier();
-
-  const [editing, setEditing] = useState(false);
 
   const rows = dispatches.data ?? [];
 
@@ -167,7 +163,7 @@ export function DriverProfile({ id }: { id: string }) {
                   controls on a row and should not shout; here it is the only
                   thing on the page you can *do*, and a secondary button beside
                   nothing else reads as disabled. */}
-              <Button onClick={() => setEditing(true)}>
+              <Button onClick={() => router.push(`/drivers/${driver.id}/edit`)}>
                 {t("drivers.edit")}
               </Button>
             </div>
@@ -253,33 +249,6 @@ export function DriverProfile({ id }: { id: string }) {
           )}
         </div>
       </div>
-
-      <Panel
-        open={editing}
-        onClose={() => setEditing(false)}
-        label={t("drivers.edit")}
-      >
-        {editing && driver && (
-          <>
-            <PanelHeader
-              title={driver.name}
-              onClose={() => setEditing(false)}
-            />
-            <DriverEditor
-              key={driver.id}
-              initial={driver}
-              pending={save.isPending}
-              onCancel={() => setEditing(false)}
-              onSave={(patch) =>
-                save.mutate(
-                  { id: driver.id, draft: patch, name: patch.name },
-                  { onSuccess: () => setEditing(false) },
-                )
-              }
-            />
-          </>
-        )}
-      </Panel>
     </div>
   );
 }

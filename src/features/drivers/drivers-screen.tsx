@@ -4,35 +4,20 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { Button, Field, Input, cx } from "@/components/ui";
+import { Button, cx } from "@/components/ui";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmButton } from "@/components/ui/confirm-button";
-import {
-  changed,
-  useGuardedAction,
-  useUnsavedChanges,
-} from "@/components/unsaved-changes";
+import { FOCUS_RING, useRowFocus } from "@/components/ui/row-focus";
 import { ROW } from "@/components/ui/row";
-import { Panel } from "@/components/ui/panel";
-import { PhoneInput } from "@/components/ui/phone-input";
-import { PanelHeader } from "@/components/ui/panel-header";
 import { Toggle } from "@/components/ui/toggle";
 import { ListHeader } from "@/components/ui/list-header";
 import { FilterTab, tabArrowHandler, type TabTone } from "@/components/ui/tab";
 import { t, type TranslationKey } from "@/i18n/translations";
-import { SEARCH, TEXT } from "@/lib/limits";
-import { digitsOf, formatPhone } from "@/lib/phone";
-import { validatePhone } from "@/lib/validation";
+import { SEARCH } from "@/lib/limits";
+import { formatPhone } from "@/lib/phone";
 
-import {
-  isOverridden,
-  isTakingOrders,
-  type Courier,
-  type CourierDraft,
-} from "./api/couriers";
-import type { DayHours } from "@/features/catalog/api/hours";
+import { isOverridden, isTakingOrders, type Courier } from "./api/couriers";
 
-import { HoursGrid } from "./hours-grid";
 import {
   useCouriers,
   useSaveCourier,
@@ -122,9 +107,8 @@ export function DriversScreen() {
   const save = useSaveCourier();
   const setActive = useSetCourierActive();
 
-  /** The row being edited, `"new"` for the one being added, or nothing. */
-  const [open, setOpen] = useState<string | null>(null);
-  const guarded = useGuardedAction();
+  /** Which row to bring back into view — see `useRowFocus`. */
+  const focus = useRowFocus();
 
   const searching = search.trim().length >= SEARCH.minTerm;
   const matching = couriers.data ?? [];
@@ -165,145 +149,110 @@ export function DriversScreen() {
             scope === "active" ? isTakingOrders(one) : !isTakingOrders(one),
           );
 
-  /** The driver the panel is editing, or nothing when it is adding one. */
-  const editing =
-    open === "new" ? null : (matching.find((one) => one.id === open) ?? null);
-
   return (
-    // A row, not a column: the panel is a *sibling* of the list, which is what
-    // makes it open beside it — the same shape the shops list uses.
-    <div className="relative flex h-full">
-      <div className="flex min-w-0 flex-grow flex-col">
-        <ListHeader
-          title={t("drivers.title")}
-          search={{
-            value: search,
-            onChange: setSearch,
-            placeholder: t("drivers.search"),
-          }}
-          action={
-            <Button onClick={guarded(() => setOpen("new"))}>
-              {t("drivers.add")}
-            </Button>
-          }
-        />
+    <div className="flex h-full flex-col">
+      <ListHeader
+        title={t("drivers.title")}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: t("drivers.search"),
+        }}
+        action={
+          <Button onClick={() => router.push("/drivers/new")}>
+            {t("drivers.add")}
+          </Button>
+        }
+      />
 
-        {/* The same strip the queue and the customers list use — same shape,
+      {/* The same strip the queue and the customers list use — same shape,
             same place, same keyboard behaviour — because these are the same
             kind of control and two spellings of it would be two things to
             learn. */}
-        <div
-          role="tablist"
-          aria-label={t("drivers.title")}
-          className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
-        >
-          {TABS.map(({ key, labelKey, tone }) => (
-            <FilterTab
-              key={key}
-              label={t(labelKey)}
-              count={counts[key]}
-              active={scope === key}
-              tone={tone}
-              onClick={() => show(key)}
-              onKeyDown={tabArrowHandler(
-                TABS.map((one) => one.key),
-                scope,
-                show,
-              )}
-            />
-          ))}
-        </div>
-
-        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
-          <p className="ps-md pb-sm text-[13px] text-text-soft">
-            {t("drivers.blurb")}
-          </p>
-
-          {couriers.isError && (
-            <p role="alert" className="text-[13px] font-medium text-danger">
-              {t("content.failed")}
-            </p>
-          )}
-
-          {couriers.isSuccess && rows.length === 0 && (
-            // The term is named. An empty list with no explanation is
-            // indistinguishable from one that failed to load.
-            <p className="ps-md text-[13px] text-text-faint">
-              {searching
-                ? t("drivers.searchNone", { term: search.trim() })
-                : t("drivers.empty")}
-            </p>
-          )}
-
-          {rows.map((courier) => (
-            <DriverRow
-              key={courier.id}
-              courier={courier}
-              open={open === courier.id}
-              onEdit={guarded(() => setOpen(courier.id))}
-              onOverride={(value) =>
-                save.mutate({
-                  id: courier.id,
-                  draft: {
-                    name: courier.name,
-                    phone: courier.phone,
-                    availableOverride: value,
-                  },
-                  name: courier.name,
-                })
-              }
-              onSetActive={(active) =>
-                active
-                  ? setActive.mutate({
-                      id: courier.id,
-                      active: true,
-                      name: courier.name,
-                    })
-                  : undefined
-              }
-              onDeactivate={async () => {
-                await setActive.mutateAsync({
-                  id: courier.id,
-                  active: false,
-                  name: courier.name,
-                });
-              }}
-            />
-          ))}
-        </div>
+      <div
+        role="tablist"
+        aria-label={t("drivers.title")}
+        className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
+      >
+        {TABS.map(({ key, labelKey, tone }) => (
+          <FilterTab
+            key={key}
+            label={t(labelKey)}
+            count={counts[key]}
+            active={scope === key}
+            tone={tone}
+            onClick={() => show(key)}
+            onKeyDown={tabArrowHandler(
+              TABS.map((one) => one.key),
+              scope,
+              show,
+            )}
+          />
+        ))}
       </div>
 
-      <Panel
-        open={open !== null}
-        onClose={guarded(() => setOpen(null))}
-        label={editing ? t("drivers.edit") : t("drivers.add")}
-      >
-        {open !== null && (
-          <>
-            <PanelHeader
-              title={editing ? editing.name : t("drivers.add")}
-              onClose={guarded(() => setOpen(null))}
-            />
+      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        <p className="ps-md pb-sm text-[13px] text-text-soft">
+          {t("drivers.blurb")}
+        </p>
 
-            <DriverEditor
-              // Keyed on the row, so switching between two drivers starts from
-              // the one that was clicked rather than resuming the previous
-              // person's half-typed name — and so opening Add after an edit
-              // starts blank.
-              key={open}
-              initial={editing}
-              pending={save.isPending}
-              onCancel={guarded(() => setOpen(null))}
-              onSave={(draft) =>
-                save.mutate(
-                  { id: editing?.id ?? null, draft, name: draft.name },
-                  { onSuccess: () => setOpen(null) },
-                )
-              }
-            />
-          </>
+        {couriers.isError && (
+          <p role="alert" className="text-[13px] font-medium text-danger">
+            {t("content.failed")}
+          </p>
         )}
-      </Panel>
+
+        {couriers.isSuccess && rows.length === 0 && (
+          // The term is named. An empty list with no explanation is
+          // indistinguishable from one that failed to load.
+          <p className="ps-md text-[13px] text-text-faint">
+            {searching
+              ? t("drivers.searchNone", { term: search.trim() })
+              : t("drivers.empty")}
+          </p>
+        )}
+
+        {rows.map((courier) => (
+          <DriverRow
+            key={courier.id}
+            courier={courier}
+            open={focus.isFocused(courier.id)}
+            anchor={focus.attach(courier.id)}
+            onEdit={() =>
+              // `?from=list` so Back returns here rather than to the driver's
+              // own page — see `DriverEditor`.
+              router.push(`/drivers/${courier.id}/edit?from=list`)
+            }
+            onOverride={(value) =>
+              save.mutate({
+                id: courier.id,
+                draft: {
+                  name: courier.name,
+                  phone: courier.phone,
+                  availableOverride: value,
+                },
+                name: courier.name,
+              })
+            }
+            onSetActive={(active) =>
+              active
+                ? setActive.mutate({
+                    id: courier.id,
+                    active: true,
+                    name: courier.name,
+                  })
+                : undefined
+            }
+            onDeactivate={async () => {
+              await setActive.mutateAsync({
+                id: courier.id,
+                active: false,
+                name: courier.name,
+              });
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -333,6 +282,7 @@ export function DriversScreen() {
 function DriverRow({
   courier,
   open,
+  anchor,
   onEdit,
   onOverride,
   onSetActive,
@@ -340,6 +290,7 @@ function DriverRow({
 }: {
   courier: Courier;
   open: boolean;
+  anchor: (node: HTMLElement | null) => void;
   onEdit: () => void;
   onOverride: (value: boolean | null) => void;
   onSetActive: (active: boolean) => void;
@@ -349,14 +300,7 @@ function DriverRow({
   const overridden = isOverridden(courier);
 
   return (
-    <div
-      className={cx(
-        ROW,
-        open
-          ? "border-active shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]"
-          : "border-border",
-      )}
-    >
+    <div ref={anchor} className={cx(ROW, open ? FOCUS_RING : "border-border")}>
       <Avatar id={courier.id} name={courier.name} />
 
       <div className="flex min-w-0 flex-grow flex-col gap-xxs">
@@ -450,135 +394,3 @@ function DriverRow({
     </div>
   );
 }
-
-/**
- * A driver's details and their week, in one form.
- *
- * ## The same form for adding and editing
- *
- * It was briefly a two-step wizard on create, on the store's model. That is the
- * right shape for a shop — seven interdependent parts ending in a map pin — and
- * the wrong one here: a driver is a name, a number and a rota, and splitting
- * three answers across two screens adds a click and a decision without removing
- * anything from either. One column, in the order somebody would say it.
- *
- * ## New drivers start from a week rather than a blank one
- *
- * A driver with no working days is never on shift, so a form that defaults to
- * empty creates somebody who can never be dispatched — and the operator finds
- * that out the next time an order needs sending, with no clue why the name is
- * missing. `DEFAULT_WEEK` is a starting point, not a guess to live with: every
- * part of it is one click from being changed.
- */
-export function DriverEditor({
-  initial,
-  pending,
-  onSave,
-  onCancel,
-}: {
-  initial: Courier | null;
-  pending: boolean;
-  onSave: (draft: CourierDraft) => void;
-  onCancel: () => void;
-}) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [phone, setPhone] = useState(initial?.phone ?? "");
-  const [hours, setHours] = useState<DayHours[]>(
-    initial?.hours ?? DEFAULT_WEEK,
-  );
-
-  // A new driver starts from `DEFAULT_WEEK`, so an untouched blank form is not
-  // dirty and closing it asks nothing — which is right: there is nothing there
-  // to lose yet.
-  useUnsavedChanges(
-    changed(
-      { name, phone, hours },
-      {
-        name: initial?.name ?? "",
-        phone: initial?.phone ?? "",
-        hours: initial?.hours ?? DEFAULT_WEEK,
-      },
-    ),
-  );
-
-  /**
-   * The same rule the CHECK constraint carries, applied here so the operator is
-   * told before saving rather than by a constraint name afterwards.
-   *
-   * `digitsOf` runs on the way in as well as in the API, because what they see
-   * before pressing Save should be what gets stored — a field that silently
-   * rewrites the value afterwards leaves somebody unsure which version is real.
-   *
-   * A week with no working days is refused for the reason above: it produces a
-   * driver who is never offered, silently.
-   */
-  const digits = digitsOf(phone);
-  const ready =
-    name.trim().length > 0 && validatePhone(digits).ok && hours.length > 0;
-
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (ready) onSave({ name, phone, hours });
-      }}
-      // No card border: inside a panel the panel *is* the card, and a second
-      // box around the form is a frame within a frame eating the width the
-      // fields need. The body scrolls and the buttons stay put.
-      className="flex min-h-0 flex-1 flex-col"
-    >
-      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
-        <Field label={t("drivers.name")}>
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={t("drivers.namePlaceholder")}
-            maxLength={TEXT.name}
-            autoFocus
-          />
-        </Field>
-
-        <Field label={t("drivers.phone")} hint={t("drivers.phoneHint")}>
-          <PhoneInput
-            value={phone}
-            onChange={setPhone}
-            placeholder={t("drivers.phonePlaceholder")}
-          />
-        </Field>
-
-        <div className="flex flex-col gap-sm border-t border-border pt-lg">
-          <h3 className="text-[15px] font-semibold">
-            {t("drivers.hoursTitle")}
-          </h3>
-          <HoursGrid week={hours} onChange={setHours} />
-        </div>
-      </div>
-
-      {/* Pinned. The grid is seven rows tall and Save would otherwise be below
-          the fold on every driver. */}
-      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t("common.cancel")}
-        </Button>
-        <Button type="submit" disabled={!ready} pending={pending}>
-          {t("common.save")}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-/**
- * The week a new driver starts on.
- *
- * Monday to Saturday, late afternoon into the night — when a delivery driver in
- * this business actually works. Sunday is left off rather than guessed at: a
- * default that is wrong in the *absence* direction is corrected the first time
- * somebody looks, while one that is wrong the other way sends an order to a
- * driver who is at home.
- */
-const DEFAULT_WEEK: DayHours[] = [1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
-  dayOfWeek,
-  opensAt: "16:00",
-  closesAt: "23:00",
-}));

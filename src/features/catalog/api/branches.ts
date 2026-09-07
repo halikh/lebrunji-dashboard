@@ -1,6 +1,8 @@
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
+import { PAGE } from "@/lib/limits";
 import { digitsOf } from "@/lib/phone";
+import { likeAny, searchTerm } from "@/lib/search";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -77,6 +79,15 @@ export type Branch = {
   sortOrder: number;
 };
 
+/**
+ * What a branch is found by.
+ *
+ * Both languages of its name, and the slug — the same three columns every
+ * other named row in this catalogue is searched by, so an operator does not
+ * have to learn which lists understand Arabic.
+ */
+const BRANCH_SEARCH = ["name->>en", "name->>ar", "slug"] as const;
+
 const COLUMNS = `id, store_id, slug, name, latitude, longitude,
   prep_min_minutes, prep_max_minutes, whatsapp_phone, image_url, currency_code,
   is_active, sort_order`;
@@ -100,20 +111,45 @@ function toBranch(row: Record<string, unknown>): Branch {
 }
 
 /**
- * Every branch of one shop, in the order they were arranged.
+ * Every branch of one shop, in the order they were arranged — or the ones
+ * matching a term.
  *
  * Archived ones are left out. A branch that has closed keeps its rows — the
  * orders it took still point at it, and an order whose branch had vanished
  * would be an order from nowhere.
+ *
+ * ## The term goes into the query
+ *
+ * A chain's branch list is short enough that filtering in the browser would
+ * find the same rows today, and that is exactly why it is worth doing properly:
+ * a client-side filter is a habit that is wrong on every list with a cap on it,
+ * where it searches what was *read* rather than what exists.
+ *
+ * ## Capped rather than paged
+ *
+ * The order is `sort_order`, which an operator sets by dragging, and a position
+ * within a page is not a position in the shop's own list — the same argument
+ * `fetchStores` makes about the catalogue. So the limit is the assumption made
+ * checkable: a shop with two hundred places has outgrown a drag-ordered list,
+ * not this query.
  */
-export async function fetchBranches(storeId: string): Promise<Branch[]> {
-  const { data, error } = await getClient()
+export async function fetchBranches(
+  storeId: string,
+  search?: string | null,
+): Promise<Branch[]> {
+  let query = getClient()
     .from("branches")
     .select(COLUMNS)
     .eq("store_id", storeId)
     .is("deleted_at", null)
     .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(PAGE.cap);
+
+  const term = searchTerm(search);
+  if (term) query = query.or(likeAny(BRANCH_SEARCH, term));
+
+  const { data, error } = await query;
 
   if (error) throw new Error(`Could not read the branches: ${error.message}`);
   return (data ?? []).map((row) => toBranch(row as Record<string, unknown>));
@@ -145,13 +181,20 @@ export type ArchivedBranch = {
  */
 export async function fetchArchivedBranches(
   storeId: string,
+  search?: string | null,
 ): Promise<ArchivedBranch[]> {
-  const { data, error } = await getClient()
+  let query = getClient()
     .from("branches")
     .select("id, name, deleted_at")
     .eq("store_id", storeId)
     .not("deleted_at", "is", null)
-    .order("deleted_at", { ascending: false });
+    .order("deleted_at", { ascending: false })
+    .limit(PAGE.cap);
+
+  const term = searchTerm(search);
+  if (term) query = query.or(likeAny(BRANCH_SEARCH, term));
+
+  const { data, error } = await query;
 
   if (error) throw new Error(`Could not read the branches: ${error.message}`);
 
@@ -216,7 +259,10 @@ function requireTradeable(draft: {
   latitude?: number | null;
   longitude?: number | null;
 }): void {
-  if (draft.whatsappPhone !== undefined && !digitsOf(draft.whatsappPhone ?? "")) {
+  if (
+    draft.whatsappPhone !== undefined &&
+    !digitsOf(draft.whatsappPhone ?? "")
+  ) {
     throw new Error(t("branches.whatsappRequired"));
   }
   if (

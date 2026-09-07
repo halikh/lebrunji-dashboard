@@ -66,7 +66,7 @@ export type UploadedImage = {
  */
 export async function uploadImage(
   file: File,
-  folder: "menu-items" | "stores" | "promotions",
+  folder: "menu-items" | "stores" | "promotions" | "category-art",
   options: {
     onProgress?: (fraction: number) => void;
     signal?: AbortSignal;

@@ -1,4 +1,6 @@
 import { t } from "@/i18n/translations";
+import { PAGE } from "@/lib/limits";
+import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import type { Localized } from "@/lib/validation";
 
@@ -659,10 +661,78 @@ export type StoreQuestion = {
   defaultOn: Map<string, string>;
 };
 
+/**
+ * The questions a term matches, as group ids — or null for "no search".
+ *
+ * ## Why a choice counts as a match
+ *
+ * Because of how an operator remembers one of these. A question is called
+ * "Size" or "How would you like it", which is generic by design and repeats
+ * across a shop; what is memorable is the *answer* — "Extra garlic", "Half
+ * kilo". Searching only the titles would make the box useless for exactly the
+ * thing people come here to find.
+ *
+ * ## Two reads, then an `in`
+ *
+ * PostgREST cannot put an embedded column into a top-level `or`, so "the title
+ * matches **or** a choice's name does" cannot be one filter. It resolves to a
+ * set of ids first, which is also what keeps the search on the server: the
+ * alternative is reading every question the shop has and matching in the
+ * browser, which is the habit that is wrong the moment a list is capped.
+ *
+ * An empty array is a real answer — the term matched nothing — and is not the
+ * same as null, which is no search at all.
+ */
+async function questionIdsMatching(
+  storeId: string,
+  term: string,
+): Promise<string[]> {
+  const client = getClient();
+
+  const [byTitle, byChoice] = await Promise.all([
+    client
+      .from("option_groups")
+      .select("id")
+      .eq("store_id", storeId)
+      .or(likeAny(["title->>en", "title->>ar"], term))
+      .limit(PAGE.cap),
+    client
+      .from("item_options")
+      .select("option_group_id, option_groups!inner ( store_id )")
+      .eq("option_groups.store_id", storeId)
+      .or(likeAny(["name->>en", "name->>ar"], term))
+      .limit(PAGE.cap),
+  ]);
+
+  if (byTitle.error) {
+    throw new Error(`Could not search the questions: ${byTitle.error.message}`);
+  }
+  if (byChoice.error) {
+    throw new Error(`Could not search the questions: ${byChoice.error.message}`);
+  }
+
+  const ids = new Set<string>();
+  for (const row of byTitle.data ?? []) ids.add(row.id as string);
+  for (const row of byChoice.data ?? []) {
+    ids.add(row.option_group_id as string);
+  }
+
+  return [...ids];
+}
+
 export async function fetchStoreQuestions(
   storeId: string,
+  search?: string | null,
 ): Promise<StoreQuestion[]> {
   const client = getClient();
+
+  const term = searchTerm(search);
+  const matching = term ? await questionIdsMatching(storeId, term) : null;
+
+  // Nothing matched. Returning early rather than sending `in.()`, which is an
+  // empty filter PostgREST reads as no filter at all — a search for a
+  // nonsense word would come back with the whole shop.
+  if (matching !== null && matching.length === 0) return [];
 
   /*
    * Two reads rather than one embed.
@@ -673,16 +743,24 @@ export async function fetchStoreQuestions(
    * dish asking it, and leaves the regrouping to be done here regardless. One
    * flat read of the shop's exclusions is smaller and says what it is.
    */
+  let groupQuery = client
+    .from("option_groups")
+    .select(
+      `id, title, mode, min_selections, max_selections, is_active, sort_order,
+       menu_item_option_group_links ( menu_item_id, default_option_id ),
+       item_options ( id, name, price, is_active, is_default, sort_order )`,
+    )
+    .eq("store_id", storeId)
+    .order("sort_order", { ascending: true })
+    // Capped rather than paged, for the reason `fetchStores` gives: the order
+    // is `sort_order`, which an operator sets by dragging, and a position
+    // within a page is not a position in the shop's list.
+    .limit(PAGE.cap);
+
+  if (matching) groupQuery = groupQuery.in("id", matching);
+
   const [groups, exclusions] = await Promise.all([
-    client
-      .from("option_groups")
-      .select(
-        `id, title, mode, min_selections, max_selections, is_active, sort_order,
-         menu_item_option_group_links ( menu_item_id, default_option_id ),
-         item_options ( id, name, price, is_active, is_default, sort_order )`,
-      )
-      .eq("store_id", storeId)
-      .order("sort_order", { ascending: true }),
+    groupQuery,
     client
       .from("menu_item_option_exclusions")
       .select(

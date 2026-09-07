@@ -38,6 +38,12 @@ import { deleteObject, imageUrlFor, presignUpload } from "@/lib/storage/bucket";
  * key — is identical for a chime and a photograph, and a second copy of that
  * would be a second place for the operator check to drift.
  *
+ * `category-art` is where a category's empty-state icon goes (`0117`). The
+ * hyphen is not decoration: `categories` is the *old* name of the promotions
+ * folder and live `discounts.image_url` rows still point into it, so a new
+ * writer under that prefix would mix this year's uploads in with objects
+ * nobody can tell apart from them.
+ *
  * `promotions` was called `categories` until the day of this comment, and the
  * name was simply wrong: a category has deliberately had no picture since
  * `0075` (see `features/catalog/api/categories.ts`), so the folder's only
@@ -47,7 +53,13 @@ import { deleteObject, imageUrlFor, presignUpload } from "@/lib/storage/bucket";
  * why the two routes that read a key still know that name. See the `DELETE`
  * shape below and `app/i/[...key]/route.ts`.
  */
-const FOLDERS = ["menu-items", "stores", "promotions", "sounds"] as const;
+const FOLDERS = [
+  "menu-items",
+  "stores",
+  "promotions",
+  "category-art",
+  "sounds",
+] as const;
 type Folder = (typeof FOLDERS)[number];
 
 const EXTENSIONS: Record<string, string> = {
@@ -69,6 +81,7 @@ const ALLOWED: Record<Folder, { types: readonly string[]; maxBytes: number }> =
     "menu-items": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     stores: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     promotions: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
+    "category-art": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     sounds: { types: SOUND.types, maxBytes: SOUND.maxBytes },
   };
 
@@ -152,7 +165,7 @@ export async function DELETE(request: NextRequest) {
   // makes; refusing the old prefix would only mean the orphans it leaves can
   // never be swept up.
   const shape =
-    /^(menu-items|stores|promotions|categories|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
+    /^(menu-items|stores|promotions|categories|category-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
   if (!shape.test(key)) {
     return NextResponse.json({ error: "key" }, { status: 400 });
   }
