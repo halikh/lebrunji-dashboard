@@ -2,6 +2,7 @@
 
 import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
+import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -54,6 +55,9 @@ export function ShopFields({
   onCurrencyCode,
   isFeatured,
   onIsFeatured,
+  exchangeRate,
+  onExchangeRate,
+  exchangeRateError,
   mode,
   onMode,
 }: {
@@ -67,10 +71,23 @@ export function ShopFields({
   onCurrencyCode: (code: string) => void;
   isFeatured: boolean;
   onIsFeatured: (on: boolean) => void;
+  /** Empty for the platform's rate. A string while it is being typed. */
+  exchangeRate: string;
+  onExchangeRate: (value: string) => void;
+  exchangeRateError?: string;
   mode: CurrencyChangeMode;
   onMode: (mode: CurrencyChangeMode) => void;
 }) {
   const { format, currencies } = useMoney();
+  /**
+   * The platform's own rate, for the placeholder.
+   *
+   * The non-base row — the base's is 1 by definition, so "the rate" can only
+   * mean the other side of the pair. Null while the table is still loading,
+   * which leaves the placeholder empty rather than showing a number nobody set.
+   */
+  const platformRate =
+    currencies?.find((one) => !one.isBase)?.rate ?? null;
   // Every category, unfiltered — the same list the shop was filed from when it
   // was created.
   const categories = useCategories("");
@@ -202,6 +219,51 @@ export function ShopFields({
         />
       </Field>
 
+      {/*
+        What a dollar is worth **at this shop** — `0120`.
+
+        ## Why a shop needs its own
+
+        `currencies.rate` is one number for the whole marketplace, and `0028`
+        wrote down why it is set by hand: in this market a rate is a decision
+        somebody makes in the morning rather than a quote a market gives. What
+        it assumed is that there is *one* such decision. Two shops on the same
+        street sell in dollars and quote different lira rates, and a customer
+        reading one shop's menu converted at the other's number is reading a
+        price that shop would not accept.
+
+        ## Empty is a real answer, and the common one
+
+        It means the platform's rate, and it stays a live reference: a shop left
+        alone follows the number on the Pricing screen when that moves. The
+        placeholder shows what that number currently is, so leaving the box
+        empty is a decision somebody can see the consequence of.
+
+        ## It changes what is shown, not what is charged
+
+        The menu is already priced in this shop's own currency and is charged at
+        those figures, so this cannot move a bill. It decides the second
+        currency the app writes beside a price. Delivery and fixed-amount
+        discounts stay on the platform's rate deliberately — they are the
+        marketplace's money, not the shop's, and `0120` says so at length.
+      */}
+      <Field
+        label={t("store.rate")}
+        hint={t("store.rateHint")}
+        error={exchangeRateError}
+      >
+        <NumberInput
+          value={exchangeRate}
+          onChange={(event) => onExchangeRate(event.target.value)}
+          min={0}
+          step="any"
+          placeholder={t("store.ratePlatform", {
+            rate: platformRate ? platformRate.toLocaleString("en-GB") : "",
+          })}
+          aria-label={t("store.rate")}
+        />
+      </Field>
+
       {preview && (
         <div className="flex flex-col gap-md rounded-md border border-danger-wash bg-danger-wash/40 px-lg py-lg">
           <p role="status" className="text-[13px] text-text">
@@ -307,6 +369,8 @@ export function useSaveShop() {
       categoryId: string;
       currencyCode: string;
       isFeatured: boolean;
+      /** Null puts the shop back on the platform's rate. */
+      exchangeRate: number | null;
       mode: CurrencyChangeMode;
     },
   ): Promise<boolean> {
@@ -319,6 +383,10 @@ export function useSaveShop() {
     const categoryMoved =
       next.categoryId !== "" && next.categoryId !== store.categoryId;
     const featureMoved = next.isFeatured !== store.isFeatured;
+    // Null is a value, so this compares rather than checking for truthiness —
+    // clearing the box is how a shop goes back to the platform's rate, and a
+    // falsy check would refuse to write that.
+    const rateMoved = next.exchangeRate !== store.exchangeRate;
 
     if (currencyMoved) {
       try {
@@ -339,7 +407,7 @@ export function useSaveShop() {
     // One write for all three, because they are three columns on the same row:
     // separate requests would mean a shop that got renamed and stayed mis-filed
     // when the second failed.
-    if (nameMoved || categoryMoved || featureMoved) {
+    if (nameMoved || categoryMoved || featureMoved || rateMoved) {
       try {
         await update.mutateAsync({
           id: store.id,
@@ -347,6 +415,7 @@ export function useSaveShop() {
             ...(nameMoved && { name: next.name }),
             ...(categoryMoved && { categoryId: next.categoryId }),
             ...(featureMoved && { isFeatured: next.isFeatured }),
+            ...(rateMoved && { exchangeRate: next.exchangeRate }),
           },
           name: store.name,
         });

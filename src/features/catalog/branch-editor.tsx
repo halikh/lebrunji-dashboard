@@ -178,6 +178,15 @@ function BranchEditor({
   // The shop's, not this branch's — see the note beside the control.
   const [shopFeatured, setShopFeatured] = useState(store?.isFeatured ?? false);
   /**
+   * The shop's own rate, as typed. Empty is the platform's — `0120`.
+   *
+   * A string, like every other number in a form here: `95000.` is not a number
+   * and is perfectly valid halfway through typing one.
+   */
+  const [shopRate, setShopRate] = useState(
+    store?.exchangeRate == null ? "" : String(store.exchangeRate),
+  );
+  /**
    * What a currency change is *for*, defaulted to the common case.
    *
    * `keep` is the wrong-pick fix and is what almost every change will be.
@@ -187,6 +196,7 @@ function BranchEditor({
   const [mode, setMode] = useState<CurrencyChangeMode>("keep");
 
   const [errors, setErrors] = useState<{
+    shopRate?: string;
     name?: string;
     shopName?: string;
     prep?: string;
@@ -212,6 +222,7 @@ function BranchEditor({
         shopCategory,
         shopCurrency,
         shopFeatured,
+        shopRate,
       },
       {
         name: initial?.name ?? {},
@@ -229,6 +240,7 @@ function BranchEditor({
         shopCategory: store?.categoryId ?? "",
         shopCurrency: store?.currencyCode ?? "",
         shopFeatured: store?.isFeatured ?? false,
+        shopRate: store?.exchangeRate == null ? "" : String(store.exchangeRate),
       },
     ),
   );
@@ -249,7 +261,20 @@ function BranchEditor({
       ? validateLocalizedText(shopName, codes, TEXT.name)
       : null;
 
+    // Empty is the answer most shops give — the platform's rate — so it is
+    // not a failure. What is refused is a number typed and unusable: `0120`'s
+    // CHECK would turn that into a Postgres error the operator cannot read,
+    // and the app would fall back to the platform's rate anyway, which looks
+    // like the field being ignored.
+    const rateTyped = shopRate.trim() !== "";
+    const rateValue = Number(shopRate);
+    const rateProblem =
+      rateTyped && (!Number.isFinite(rateValue) || rateValue <= 0)
+        ? t("store.ratePositive")
+        : undefined;
+
     const found = {
+      shopRate: rateProblem,
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
       shopName:
         !shopNameCheck || shopNameCheck.ok
@@ -310,6 +335,10 @@ function BranchEditor({
         categoryId: shopCategory,
         currencyCode: shopCurrency,
         isFeatured: shopFeatured,
+        // Empty is null, which is what puts the shop back on the platform's
+        // rate — not zero, which `0120` refuses and which would read as a shop
+        // quoting nothing per dollar.
+        exchangeRate: shopRate.trim() === "" ? null : Number(shopRate),
         mode,
       }))
     ) {
@@ -388,6 +417,9 @@ function BranchEditor({
             onCurrencyCode={setShopCurrency}
             isFeatured={shopFeatured}
             onIsFeatured={setShopFeatured}
+            exchangeRate={shopRate}
+            onExchangeRate={setShopRate}
+            exchangeRateError={errors.shopRate}
             mode={mode}
             onMode={setMode}
           />

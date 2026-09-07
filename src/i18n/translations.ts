@@ -775,6 +775,23 @@ const en = {
     liveHint: "Customers can find and order from it straight away.",
     // Off by default on a new shop, and the hint says why rather than leaving
     // it to be discovered.
+    /*
+      The shop's own dollar rate — `0120`.
+
+      Named for the decision rather than for the column: an operator setting
+      this is answering "what is a dollar worth here", and the answer is a
+      number they already argue about with the shop.
+
+      The placeholder carries the platform's current rate, so leaving the box
+      empty is a decision somebody can see the consequence of rather than an
+      absence.
+    */
+    rate: "Dollar rate at this shop",
+    rateHint:
+      "Leave empty to follow the platform rate, and it keeps following it when that changes. A number here is what the app converts this shop's prices at — it does not change what is charged, which is already in the shop's own currency.",
+    ratePlatform: "Platform rate ({rate})",
+    ratePositive: "A rate has to be more than zero.",
+
     // Featuring, asked on the form rather than only on the list — see
     // `StoreDraft.isFeatured`.
     featured: "Featured",

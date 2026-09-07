@@ -41,6 +41,21 @@ export type Store = {
    */
   adminSortOrder: number;
   /**
+   * This shop’s own rate for the non-base currency — `0120`.
+   *
+   * Null is the ordinary case and means the platform’s rate, the one on the
+   * Pricing screen. A number here is lira-per-dollar as *this shop* quotes it,
+   * which two shops on the same street genuinely disagree about.
+   *
+   * **Display only.** A shop’s menu is already stored in the shop’s own
+   * currency and `place_order` charges those figures directly, so nothing
+   * billed is converted with this. What reads it is the app, when it writes a
+   * price in the second currency for a customer to read. `0120` says why the
+   * delivery ladder and fixed-amount discounts deliberately stay on the
+   * platform’s rate.
+   */
+  exchangeRate: number | null;
+  /**
    * Where the shop is.
    *
    * Null until a merchant drops the pin, and that is not cosmetic: with no pin
@@ -116,7 +131,8 @@ export async function fetchStores(
     .from("stores")
     .select(
       `id, slug, name, image_url, category_id, currency_code, is_active, is_featured,
-       sort_order, admin_sort_order, latitude, longitude, prep_min_minutes, prep_max_minutes,
+       sort_order, admin_sort_order, exchange_rate,
+       latitude, longitude, prep_min_minutes, prep_max_minutes,
        whatsapp_phone,
        categories ( name ),
        branches ( whatsapp_phone, sort_order, created_at, deleted_at )`,
@@ -158,7 +174,8 @@ export async function fetchStore(id: string): Promise<Store> {
     .from("stores")
     .select(
       `id, slug, name, image_url, category_id, currency_code, is_active, is_featured,
-       sort_order, admin_sort_order, latitude, longitude, prep_min_minutes, prep_max_minutes,
+       sort_order, admin_sort_order, exchange_rate,
+       latitude, longitude, prep_min_minutes, prep_max_minutes,
        whatsapp_phone,
        categories ( name ),
        branches ( whatsapp_phone, sort_order, created_at, deleted_at )`,
@@ -373,6 +390,12 @@ export type StorePatch = {
   imageUrl?: string | null;
   isActive?: boolean;
   isFeatured?: boolean;
+  /**
+   * Null is a value here — it is how a shop is put back on the platform’s
+   * rate — so the check below is for the key being absent, not the value being
+   * falsy.
+   */
+  exchangeRate?: number | null;
   sortOrder?: number;
   prepMinMinutes?: number;
   prepMaxMinutes?: number;
@@ -408,6 +431,9 @@ export async function updateStore(
   if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
+  if (patch.exchangeRate !== undefined) {
+    row.exchange_rate = patch.exchangeRate;
+  }
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
   // `null` is a value for these three — it is how a picture or a pin is
   // removed — so what is tested is the key being absent, not the value.
@@ -516,6 +542,10 @@ function toStore(row: Record<string, unknown>): Store {
     isFeatured: row.is_featured as boolean,
     sortOrder: row.sort_order as number,
     adminSortOrder: (row.admin_sort_order as number | null) ?? 0,
+    // `numeric` arrives as a string from PostgREST — exact there, and parsed
+    // once here so no screen compares "95000" to 95000.
+    exchangeRate:
+      row.exchange_rate == null ? null : Number(row.exchange_rate),
     latitude: (row.latitude as number | null) ?? null,
     longitude: (row.longitude as number | null) ?? null,
     whatsappPhone: (row.whatsapp_phone as string | null) ?? null,
