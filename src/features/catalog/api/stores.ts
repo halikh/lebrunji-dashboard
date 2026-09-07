@@ -255,6 +255,16 @@ export type StoreDraft = {
    */
   isFeatured: boolean;
   /**
+   * This shop's own rate for the non-base currency — `0120`.
+   *
+   * Null is the ordinary case and means the platform's, which is what a shop
+   * added without a word about rates should follow. The form asks anyway: a
+   * shop is usually signed up in the same conversation that settles what its
+   * dollar is worth, and making that a second visit to a second screen is how
+   * it gets forgotten.
+   */
+  exchangeRate: number | null;
+  /**
    * Where an order is sent to the kitchen. Digits, no `+`, as `wa.me` takes it.
    *
    * The wizard now asks for it, on the step that already covers how an order
@@ -350,6 +360,7 @@ export async function createStore(
       prep_max_minutes: draft.prepMaxMinutes,
       is_active: draft.isActive,
       is_featured: draft.isFeatured,
+      exchange_rate: draft.exchangeRate,
       sort_order: sortOrder,
     })
     .select("id")

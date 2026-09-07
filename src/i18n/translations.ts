@@ -786,7 +786,22 @@ const en = {
       empty is a decision somebody can see the consequence of rather than an
       absence.
     */
-    rate: "Dollar rate at this shop",
+    /*
+      Both currencies named, and the direction with them.
+
+      "Dollar rate" is what people actually say here — سعر الدولار — and it is
+      the wrong label for a box you type lira into: it names the currency the
+      number is *not* in. "LBP rate" has the opposite problem, reading as what a
+      lira is worth rather than what a dollar costs.
+
+      So neither idiom. The codes come from the `currencies` table rather than
+      being written in, so the label is right on the day a third currency is
+      switched on or a code changes — and `rateGeneric` covers the moment before
+      that table has loaded, when a label with two blanks in it would be worse
+      than a plain one.
+    */
+    rate: "{other} per {base} at this shop",
+    rateGeneric: "Exchange rate at this shop",
     rateHint:
       "Leave empty to follow the platform rate, and it keeps following it when that changes. A number here is what the app converts this shop's prices at — it does not change what is charged, which is already in the shop's own currency.",
     ratePlatform: "Platform rate ({rate})",

@@ -86,8 +86,23 @@ export function ShopFields({
    * mean the other side of the pair. Null while the table is still loading,
    * which leaves the placeholder empty rather than showing a number nobody set.
    */
-  const platformRate =
-    currencies?.find((one) => !one.isBase)?.rate ?? null;
+  const platformRate = currencies?.find((one) => !one.isBase)?.rate ?? null;
+
+  /**
+   * "LBP per USD at this shop", built from the table.
+   *
+   * The pair rather than either idiom: the number typed here is lira and the
+   * thing being priced is a dollar, so a label naming one of them leaves the
+   * operator guessing which way round it goes. Falls back to a plain label
+   * while the currencies are still loading — a heading with two blanks in it
+   * reads as broken.
+   */
+  const baseCode = currencies?.find((one) => one.isBase)?.code ?? "";
+  const otherCode = currencies?.find((one) => !one.isBase)?.code ?? "";
+  const rateLabel =
+    baseCode && otherCode
+      ? t("store.rate", { other: otherCode, base: baseCode })
+      : t("store.rateGeneric");
   // Every category, unfiltered — the same list the shop was filed from when it
   // was created.
   const categories = useCategories("");
@@ -248,7 +263,7 @@ export function ShopFields({
         marketplace's money, not the shop's, and `0120` says so at length.
       */}
       <Field
-        label={t("store.rate")}
+        label={rateLabel}
         hint={t("store.rateHint")}
         error={exchangeRateError}
       >
@@ -260,7 +275,7 @@ export function ShopFields({
           placeholder={t("store.ratePlatform", {
             rate: platformRate ? platformRate.toLocaleString("en-GB") : "",
           })}
-          aria-label={t("store.rate")}
+          aria-label={rateLabel}
         />
       </Field>
 

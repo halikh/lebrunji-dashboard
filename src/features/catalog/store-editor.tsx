@@ -128,6 +128,29 @@ export function StoreEditor() {
   // shop they have just agreed a promotion for can say so here rather than
   // leaving, finding it in the list and flicking a second switch.
   const [isFeatured, setIsFeatured] = useState(false);
+  /**
+   * The shop's own rate, as typed. Empty is the platform's — `0120`.
+   *
+   * A string, like every other number in a form here: `95000.` is not a number
+   * and is perfectly valid halfway through typing one.
+   */
+  const [exchangeRate, setExchangeRate] = useState("");
+
+  /**
+   * "LBP per USD at this shop", built from the table.
+   *
+   * The pair rather than either idiom: the number typed here is lira and the
+   * thing being priced is a dollar, so a label naming one of them leaves the
+   * operator guessing which way round it goes. The same label the shop panel
+   * draws — see `shop-fields.tsx`.
+   */
+  const platformRate = currencies?.find((one) => !one.isBase)?.rate ?? null;
+  const baseCode = currencies?.find((one) => one.isBase)?.code ?? "";
+  const otherCode = currencies?.find((one) => !one.isBase)?.code ?? "";
+  const rateLabel =
+    baseCode && otherCode
+      ? t("store.rate", { other: otherCode, base: baseCode })
+      : t("store.rateGeneric");
   const [prepMin, setPrepMin] = useState("10");
   const [prepMax, setPrepMax] = useState("20");
   const [isActive, setIsActive] = useState(false);
@@ -139,6 +162,7 @@ export function StoreEditor() {
     pin?: string;
     prep?: string;
     whatsapp?: string;
+    rate?: string;
   }>({});
 
   /**
@@ -158,6 +182,7 @@ export function StoreEditor() {
         pin,
         whatsapp,
         isFeatured,
+        exchangeRate,
         prepMin,
         prepMax,
         isActive,
@@ -170,6 +195,7 @@ export function StoreEditor() {
         pin: "",
         whatsapp: "",
         isFeatured: false,
+        exchangeRate: "",
         prepMin: "10",
         prepMax: "20",
         isActive: false,
@@ -178,6 +204,24 @@ export function StoreEditor() {
   );
 
   const currency = currencyCode;
+
+  /**
+   * The typed rate, parsed once — `check()` reports it and the draft writes it,
+   * and two parses is two places for one of them to read the box differently.
+   *
+   * Empty is the answer most shops give (the platform's rate) so it is not a
+   * failure. What is refused is a number typed and unusable: `0120`'s CHECK
+   * would turn that into a Postgres error the operator cannot read, and the app
+   * would fall back to the platform's rate anyway — which looks like the field
+   * being ignored rather than refused.
+   */
+  const rateTyped = exchangeRate.trim() !== "";
+  const rateValue = Number(exchangeRate);
+  const rateProblem =
+    rateTyped && (!Number.isFinite(rateValue) || rateValue <= 0)
+      ? t("store.ratePositive")
+      : undefined;
+
   const located = parseLocation(pin);
   const coordinates = located.ok ? located : null;
 
@@ -194,6 +238,7 @@ export function StoreEditor() {
     const phone = validatePhone(digitsOf(whatsapp));
 
     return {
+      rate: rateProblem,
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
       // Both columns are `not null` with no default, so an empty one is a
       // refusal from Postgres carrying a constraint name. Caught here so it
@@ -242,6 +287,10 @@ export function StoreEditor() {
       prepMaxMinutes: Number(prepMax),
       whatsappPhone: whatsapp.trim() || null,
       isFeatured,
+      // Empty is null, which is what leaves the shop on the platform's rate —
+      // not zero, which `0120` refuses and which would read as a shop quoting
+      // nothing per dollar.
+      exchangeRate: rateTyped ? rateValue : null,
       isActive,
     };
 
@@ -361,6 +410,26 @@ export function StoreEditor() {
                 value: one.code,
                 label: one.code,
               }))}
+            />
+          </Field>
+
+          {/* Under the currency, because it is a fact *about* it: what this
+              shop's prices convert at for a customer reading the other one.
+              `0120` for why it cannot move what is charged. */}
+          <Field
+            label={rateLabel}
+            hint={t("store.rateHint")}
+            error={errors.rate}
+          >
+            <NumberInput
+              value={exchangeRate}
+              onChange={(event) => setExchangeRate(event.target.value)}
+              min={0}
+              step="any"
+              placeholder={t("store.ratePlatform", {
+                rate: platformRate ? platformRate.toLocaleString("en-GB") : "",
+              })}
+              aria-label={rateLabel}
             />
           </Field>
 
