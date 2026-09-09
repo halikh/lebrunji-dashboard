@@ -31,21 +31,15 @@ import { useStore } from "./use-stores";
  *
  * ## What moved off Details to get here
  *
- * First the pin, the prep window, the WhatsApp number and the opening hours —
- * all four answer "where and when and how does an order reach a kitchen", and
- * all four are wrong the moment a shop has two addresses.
+ * The pin, the prep window, the WhatsApp number and the opening hours — all
+ * four answer "where and when and how does an order reach a kitchen", and all
+ * four are wrong the moment a shop has two addresses.
  *
- * Then the rest of it. What Details had left was three fields — the shop's
- * name, its picture and its currency — on a tab of their own, next to a tab
- * carrying everything else about the same shop. Nothing in either label said
- * which one held the field you wanted.
- *
- * They are in the **panel** now rather than in a card above the list, which was
- * the intermediate answer and kept the same split one level down. Opening a
- * branch opens everything about the shop at that branch, read from the brand
- * downward: what it is called, what it prices in, then what is true of this
- * place. One panel, one Save — see `shop-fields.tsx` for why it is one and not
- * two.
+ * That left Details holding three fields, which were briefly folded into the
+ * branch editor and are now back on a Details tab of their own. The reason is
+ * in `store-details.tsx`, and it is the picture: two records behind one Save,
+ * each with an uploader, is a form where changing the shop's photograph changes
+ * one branch's.
  *
  * ## And a branch may now differ on two of them
  *

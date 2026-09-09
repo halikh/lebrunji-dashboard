@@ -825,8 +825,21 @@ const en = {
     noDefaultCountry:
       "No default country is set up, so a shop cannot be created. That is a database seed, not a setting on this screen.",
 
-    // No `tab` any more: the Details tab is gone, and its three fields are the
-    // card at the top of Branches. See `branches-tab.tsx`.
+    /*
+      The Details tab, back on the shop's own page.
+
+      It was folded into the branch editor under a heading reading "The shop",
+      which is a subheading asked to do the work of a page: the form around it
+      was one branch, and the picture uploader beside it wrote to that branch.
+      An operator changing "the shop's" picture there changed one place's.
+
+      So the shop's answers are on the shop again, and the intro says which row
+      is being edited rather than leaving a heading to imply it.
+    */
+    detailsTab: "Details",
+    detailsIntro:
+      "The shop itself. These are shared by every branch — where it is, when it opens and the number an order goes to belong to a branch, on the Branches tab.",
+    detailsFailed: "Could not load the shop",
     name: "Shop name",
     nameHint: "What customers see at the top of the shop.",
     imageHint: "The picture on the shop's card in the app.",
@@ -2219,14 +2232,9 @@ const en = {
   branches: {
     notFound: "That branch is not here any more.",
     tab: "Branches",
-    // The two headings inside the panel. Opening a branch opens everything
-    // about the shop at that branch, read from the brand downward — so each
-    // half says whose answers it holds. Without them, renaming under "Hamra"
-    // reads as renaming Hamra, and it renames the shop.
-    shopSection: "The shop",
-    shopSectionHint: "Changing these changes every branch of it.",
-    branchSection: "This branch",
-    branchSectionHint: "True of this place only.",
+    // There were two headings here — "The shop" and "This branch" — from when
+    // the branch editor carried both records. It carries one now, so the page
+    // needs no heading to say which: see `store-details.tsx`.
 
     // The two a branch may differ on since 0110. Both say what leaving them
     // alone means, because "empty" and "the same as the shop" look identical

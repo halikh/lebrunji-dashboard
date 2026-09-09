@@ -14,6 +14,7 @@ import { t } from "@/i18n/translations";
 import { BranchesTab } from "./branches-tab";
 import { StoreFacts, StoreThumb } from "./store-identity";
 import { StoreArchive } from "./store-archive";
+import { StoreDetails } from "./store-details";
 import { StoreHours } from "./store-hours";
 import { StoreMenu } from "./store-menu";
 import { StoreOptions } from "./store-options";
@@ -44,18 +45,25 @@ import { useStore } from "./use-stores";
 const TABS = [
   { key: "menu", labelKey: "menu.title" },
   /**
-   * The shop, and the places it trades from.
+   * The shop itself — its name, its picture, what it prices in.
    *
-   * There was a Details tab in front of this one, and by the end it held three
-   * fields — the name, the picture and the currency — because `0101` had
-   * already moved the pin, the prep window, the WhatsApp number and the hours
-   * onto the branch that owns them. Two tabs about the same shop, and neither
-   * label said which one had the field you wanted.
+   * This tab was removed once. `0101` moved the pin, the prep window, the
+   * WhatsApp number and the hours onto the branch that owns them, which left
+   * Details holding three fields beside a Branches tab carrying everything else
+   * about the same shop — so the three were folded into the branch editor under
+   * a heading reading "The shop".
    *
-   * So Details is gone and its three fields are the card at the top of this
-   * tab. `?tab=details` still lands somewhere sensible: an unknown tab falls
-   * back to the menu, which is where the link was pointing at a shop anyway.
+   * That was wrong in a way a heading cannot fix. The branch editor is a form
+   * over one branch's row, and the picture uploader in it writes to that row;
+   * an operator changing the shop's photograph there changed one place's and
+   * left the shop's alone. Two records behind one Save, told apart by a
+   * subheading.
+   *
+   * So it is a tab again, and the branch editor is only about a branch. See
+   * `store-details.tsx`.
    */
+  { key: "details", labelKey: "store.detailsTab" },
+  /** The places the shop trades from. */
   { key: "branches", labelKey: "branches.tab" },
   // One tab, not two. It was Options (an item's questions) beside Common
   // options (a question's items) — the same rows read in opposite directions,
@@ -221,6 +229,9 @@ export function StoreScreen({ storeId }: { storeId: string }) {
             one waits to exist until it has been opened. See `visited`. */}
         <Pane show={tab === "menu"} mounted={visited.has("menu")}>
           <StoreMenu storeId={storeId} />
+        </Pane>
+        <Pane show={tab === "details"} mounted={visited.has("details")}>
+          <StoreDetails storeId={storeId} />
         </Pane>
         {/* Mounted only when open, like Archive: it has no scroll position
             worth preserving, and its query would otherwise run on every visit

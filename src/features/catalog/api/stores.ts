@@ -5,6 +5,8 @@ import { digitsOf } from "@/lib/phone";
 import { formatLocalized } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
+import { createBranch } from "./branches";
+
 /**
  * Stores — the shops a customer browses.
  *
@@ -204,11 +206,11 @@ const NAME_FORMAT = "upper" as const;
  * The two answers a shop cannot trade without — the same pair, and the same
  * reasoning, as `requireTradeable` in `api/branches.ts`.
  *
- * A shop created by the wizard gets a branch of its own from `0101`'s trigger,
- * so in practice these two rows carry the same number and the same pin on the
- * day a shop is made. Refusing both here means neither can be the one that
- * slipped through: the wizard writes the store, the trigger copies it, and a
- * blank on this row would be a blank on that one.
+ * A shop created here gets a branch of its own from `0121`'s trigger, copied
+ * from these very columns, so the two rows carry the same number and the same
+ * pin on the day a shop is made. Refusing both here means neither can be the
+ * one that slipped through: the form writes the store, the trigger copies it,
+ * and a blank on this row would be a blank on that one.
  */
 function requireTradeable(draft: {
   whatsappPhone?: string | null;
@@ -367,7 +369,83 @@ export async function createStore(
     .single();
 
   if (error) throw new Error(friendly(error.message));
-  return data.id as string;
+
+  const id = data.id as string;
+  await ensureFirstBranch(id, draft);
+  return id;
+}
+
+/**
+ * The branch a new shop cannot trade without, if the database has not already
+ * made it.
+ *
+ * ## Why this exists at all
+ *
+ * `0121` puts a trigger on `stores` that writes the first branch in the same
+ * transaction as the shop, which is where the rule belongs: a branch is what
+ * makes a shop orderable, and an invariant that only holds when one client
+ * remembers to write two rows is not an invariant.
+ *
+ * This is the belt to that pair of braces, and it is here because of what
+ * happened without it. `0101` split the brand from the place and backfilled a
+ * branch for every shop that existed **at the time**, with a plain insert that
+ * ran once. Nothing kept it true afterwards, and nothing noticed for twenty
+ * migrations: every shop created since came up with an empty Branches tab, no
+ * hours to set, and no branch for `api_v1_branch_menu` to quote from.
+ *
+ * So the check is cheap and it is made where the mistake was made. If the
+ * trigger is there — the ordinary case, and the only case on a database that is
+ * up to date — this is one `select` returning one row and nothing else happens.
+ *
+ * ## Why a failure here is not the create failing
+ *
+ * The shop is already written. Throwing would report a failure for something
+ * that in fact succeeded, and the obvious response to that is to fill the form
+ * in again — which makes a second shop. A shop with no branch is recoverable in
+ * a way a duplicate is not: the Branches tab is on screen, empty, with a New
+ * branch button on it.
+ */
+async function ensureFirstBranch(
+  storeId: string,
+  draft: StoreDraft,
+): Promise<void> {
+  try {
+    const { data, error } = await getClient()
+      .from("branches")
+      .select("id")
+      .eq("store_id", storeId)
+      .is("deleted_at", null)
+      .limit(1);
+
+    if (error || (data && data.length > 0)) return;
+
+    await createBranch(
+      storeId,
+      {
+        // The shop's own name, as `0101` and `0121` both copy it. Renaming it
+        // to "Hamra" is the operator's first job on a shop that turns out to be
+        // a chain.
+        name: draft.name,
+        latitude: draft.latitude,
+        longitude: draft.longitude,
+        prepMinMinutes: draft.prepMinMinutes,
+        prepMaxMinutes: draft.prepMaxMinutes,
+        // `?? null` because the store's own is optional and a branch's is not
+        // a `string | undefined`. `createBranch` refuses an empty one anyway —
+        // the form asks for it, so this is a type gap rather than a real state.
+        whatsappPhone: draft.whatsappPhone ?? null,
+        // Null on both, which is the live reference to the shop's rather than a
+        // copy of them — see the note on `Branch`. A copy made here would be a
+        // branch that stopped following the brand before anybody had opened it.
+        imageUrl: null,
+        currencyCode: null,
+        isActive: draft.isActive,
+      },
+      0,
+    );
+  } catch {
+    // Deliberately swallowed — see the note above.
+  }
 }
 
 export type StorePatch = {

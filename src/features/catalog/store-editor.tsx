@@ -142,7 +142,7 @@ export function StoreEditor() {
    * The pair rather than either idiom: the number typed here is lira and the
    * thing being priced is a dollar, so a label naming one of them leaves the
    * operator guessing which way round it goes. The same label the shop panel
-   * draws — see `shop-fields.tsx`.
+   * draws — see `store-details.tsx`.
    */
   const platformRate = currencies?.find((one) => !one.isBase)?.rate ?? null;
   const baseCode = currencies?.find((one) => one.isBase)?.code ?? "";

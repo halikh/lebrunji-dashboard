@@ -22,11 +22,18 @@ import type { Localized } from "@/lib/validation";
  *
  * ## Every store has at least one
  *
- * Migration `0101` gave every existing shop a branch called after itself,
- * holding the pin and the phone and the hours that shop already had. So there
- * is no "shop with no branches" state to design around: the list is never
- * empty, and a shop that has never been thought about as a chain simply has one
- * row in it.
+ * Migration `0101` gave every shop that existed *at the time* a branch called
+ * after itself, holding the pin and the phone and the hours that shop already
+ * had — and then nothing kept that true. It was a one-off insert with no
+ * trigger behind it, so every shop created afterwards came up with an empty
+ * list, no hours to set and nothing for `api_v1_branch_menu` to quote from.
+ * `0121` is the trigger that was missing, plus the backfill for the shops made
+ * in the gap.
+ *
+ * So there is no "shop with no branches" state to design around: the list is
+ * never empty, and a shop that has never been thought about as a chain simply
+ * has one row in it. `verify.sql` asserts both halves — that no live store is
+ * without a branch, and that the trigger keeping it so is still attached.
  *
  * As elsewhere, the shapes here are the dashboard's rather than the database's
  * — column names stay in this file, so a rename is one edit.
@@ -315,9 +322,17 @@ export async function createBranch(
       currency_code: draft.currencyCode,
       is_active: draft.isActive,
       sort_order: sortOrder,
-      // No `slug`: derived from the English name by the same trigger every
-      // other catalogue row uses, inside the insert's own transaction — the
-      // only way to make it unique without racing another tab.
+      // No `slug`: derived from the English name by the same `fill_slug`
+      // trigger every other catalogue row uses, inside the insert's own
+      // transaction — the only way to make it unique without racing another
+      // tab.
+      //
+      // True since `0121` and not before. `0071` attached that trigger to the
+      // six tables that existed then; `branches` arrived in `0101` and was
+      // never added, so this column sat on its `''` default — and
+      // `branches_store_slug_live_idx` is unique on `(store_id, slug)`, which
+      // meant a shop could hold one branch and the second was refused by a
+      // constraint name.
     })
     .select("id")
     .single();

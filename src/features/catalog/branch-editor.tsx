@@ -28,8 +28,7 @@ import {
 } from "@/lib/validation";
 
 import type { Branch, BranchDraft } from "./api/branches";
-import type { CurrencyChangeMode, Store } from "./api/stores";
-import { ShopFields, useSaveShop } from "./shop-fields";
+import type { Store } from "./api/stores";
 import { ShopLine, StoreFacts, StoreThumb } from "./store-identity";
 import { useBranches, useCreateBranch, useUpdateBranch } from "./use-branches";
 import { useStore } from "./use-stores";
@@ -39,14 +38,26 @@ import { useStore } from "./use-stores";
  *
  * ## Why it is no longer a panel
  *
- * This is the widest form in the dashboard: the shop's own name and currency,
- * this place's name, its picture, its pin on a map, a phone number and a prep
- * window. In 420pt the map was a postage stamp and the currency warning wrapped
- * to four lines.
+ * This place's name, its picture, its pin on a map, a phone number and a prep
+ * window. In 420pt the map was a postage stamp.
  *
  * What the panel gave and a page has to be told to give back is the list
  * position: Back and Cancel return `?focus=<id>`, and the row scrolls into
  * view. See `useRowFocus`.
+ *
+ * ## One record, and only one
+ *
+ * The shop's own answers — its name, its picture, its category, its currency —
+ * were on this page for a while, in a section headed "The shop" above the
+ * branch's. They are not any more. A form whose title is a branch's name, whose
+ * every other control writes to that branch's row, and which carries a picture
+ * uploader for each of the two records, cannot keep them apart with a
+ * subheading: what an operator did was change the shop's photograph and get one
+ * branch's. They are on the shop's own Details tab now — see
+ * `store-details.tsx`.
+ *
+ * The shop is still *read* here, for the header and for the two fields that
+ * fall back to it.
  */
 export function BranchEditorScreen({
   storeId,
@@ -128,10 +139,9 @@ function BranchEditor({
   /**
    * The shop this branch belongs to, or null while it is still loading.
    *
-   * The panel edits it — see `ShopFields` — and the branch's own picture and
-   * currency are shown against it, because both fall back to it. Null only
-   * happens on the first paint, and the section simply is not drawn until the
-   * row arrives rather than rendering empty fields somebody could type into.
+   * **Read, never written.** It fills the header, and it is what the branch's
+   * own picture and currency are shown against, because both fall back to it.
+   * Editing it is the Details tab's job — see the note at the top of this file.
    */
   store: Store | null;
   /** The branch's name, or "Add a branch". */
@@ -143,7 +153,6 @@ function BranchEditor({
 }) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
-  const shop = useSaveShop();
   const { currencies } = useMoney();
 
   const [name, setName] = useState<Localized>(initial?.name ?? {});
@@ -171,42 +180,13 @@ function BranchEditor({
     initial?.currencyCode ?? null,
   );
 
-  /** The shop's own answers, edited in the same panel and saved first. */
-  const [shopName, setShopName] = useState<Localized>(store?.name ?? {});
-  const [shopCategory, setShopCategory] = useState(store?.categoryId ?? "");
-  const [shopCurrency, setShopCurrency] = useState(store?.currencyCode ?? "");
-  // The shop's, not this branch's — see the note beside the control.
-  const [shopFeatured, setShopFeatured] = useState(store?.isFeatured ?? false);
-  /**
-   * The shop's own rate, as typed. Empty is the platform's — `0120`.
-   *
-   * A string, like every other number in a form here: `95000.` is not a number
-   * and is perfectly valid halfway through typing one.
-   */
-  const [shopRate, setShopRate] = useState(
-    store?.exchangeRate == null ? "" : String(store.exchangeRate),
-  );
-  /**
-   * What a currency change is *for*, defaulted to the common case.
-   *
-   * `keep` is the wrong-pick fix and is what almost every change will be.
-   * `convert` is a shop genuinely re-denominating, which happens once if ever —
-   * so it is the deliberate choice rather than the one you land on.
-   */
-  const [mode, setMode] = useState<CurrencyChangeMode>("keep");
-
   const [errors, setErrors] = useState<{
-    shopRate?: string;
     name?: string;
-    shopName?: string;
     prep?: string;
     whatsapp?: string;
     pin?: string;
   }>({});
 
-  // `mode` is left out on purpose: it is a question *about* a currency change
-  // rather than a value of its own, and it cannot be reached without moving
-  // `shopCurrency` first — which is compared.
   useUnsavedChanges(
     changed(
       {
@@ -218,11 +198,6 @@ function BranchEditor({
         pin,
         imageUrl,
         currencyCode,
-        shopName,
-        shopCategory,
-        shopCurrency,
-        shopFeatured,
-        shopRate,
       },
       {
         name: initial?.name ?? {},
@@ -236,11 +211,6 @@ function BranchEditor({
             : "",
         imageUrl: initial?.imageUrl ?? null,
         currencyCode: initial?.currencyCode ?? null,
-        shopName: store?.name ?? {},
-        shopCategory: store?.categoryId ?? "",
-        shopCurrency: store?.currencyCode ?? "",
-        shopFeatured: store?.isFeatured ?? false,
-        shopRate: store?.exchangeRate == null ? "" : String(store.exchangeRate),
       },
     ),
   );
@@ -248,38 +218,16 @@ function BranchEditor({
   const located = parseLocation(pin);
   const coordinates = located.ok ? located : null;
 
-  async function save() {
+  function save() {
     const min = Number(prepMin);
     const max = Number(prepMax);
 
     const nameCheck = validateLocalizedText(name, codes, TEXT.name);
     const prepCheck = validatePrepWindow(min, max);
     const phoneCheck = validatePhone(digitsOf(whatsapp));
-    // Only when the shop is loaded. Nothing can have been typed into a section
-    // that was not drawn, so an absent store is not an empty name.
-    const shopNameCheck = store
-      ? validateLocalizedText(shopName, codes, TEXT.name)
-      : null;
-
-    // Empty is the answer most shops give — the platform's rate — so it is
-    // not a failure. What is refused is a number typed and unusable: `0120`'s
-    // CHECK would turn that into a Postgres error the operator cannot read,
-    // and the app would fall back to the platform's rate anyway, which looks
-    // like the field being ignored.
-    const rateTyped = shopRate.trim() !== "";
-    const rateValue = Number(shopRate);
-    const rateProblem =
-      rateTyped && (!Number.isFinite(rateValue) || rateValue <= 0)
-        ? t("store.ratePositive")
-        : undefined;
 
     const found = {
-      shopRate: rateProblem,
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
-      shopName:
-        !shopNameCheck || shopNameCheck.ok
-          ? undefined
-          : t(shopNameCheck.key, shopNameCheck.params),
       prep: prepCheck.ok ? undefined : t(prepCheck.key, prepCheck.params),
       /*
        * Required now, where it used to be optional.
@@ -318,32 +266,6 @@ function BranchEditor({
 
     setErrors(found);
     if (Object.values(found).some(Boolean)) return;
-
-    /*
-     * The shop first, and only what moved.
-     *
-     * Its currency rewrites every price in the shop and has to be atomic on its
-     * own, so it cannot be folded into the branch's write — see `useSaveShop`.
-     * Going first means a failure stops before the branch is touched: the
-     * reverse order would leave a branch saved against a shop whose prices did
-     * not move, which is a screen and a database disagreeing about money.
-     */
-    if (
-      store &&
-      !(await shop.saveShop(store, {
-        name: shopName,
-        categoryId: shopCategory,
-        currencyCode: shopCurrency,
-        isFeatured: shopFeatured,
-        // Empty is null, which is what puts the shop back on the platform's
-        // rate — not zero, which `0120` refuses and which would read as a shop
-        // quoting nothing per dollar.
-        exchangeRate: shopRate.trim() === "" ? null : Number(shopRate),
-        mode,
-      }))
-    ) {
-      return;
-    }
 
     // The pin and the number are checked above, so their fallbacks are
     // unreachable — they are here because the columns are still nullable in the
@@ -396,56 +318,19 @@ function BranchEditor({
           <Button variant="secondary" onClick={onCancel} disabled={pending}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={() => void save()} pending={pending || shop.pending}>
+          <Button onClick={save} pending={pending}>
             {t("common.save")}
           </Button>
         </>
       }
     >
-      {/* The brand first, then this place. Anything typed here changes the
-          shop and every branch of it, which is why the section says so. */}
-      {store && (
-        <>
-          <ShopFields
-            store={store}
-            name={shopName}
-            onName={setShopName}
-            nameError={errors.shopName}
-            categoryId={shopCategory}
-            onCategoryId={setShopCategory}
-            currencyCode={shopCurrency}
-            onCurrencyCode={setShopCurrency}
-            isFeatured={shopFeatured}
-            onIsFeatured={setShopFeatured}
-            exchangeRate={shopRate}
-            onExchangeRate={setShopRate}
-            exchangeRateError={errors.shopRate}
-            mode={mode}
-            onMode={setMode}
-          />
-
-          <hr className="border-border" />
-
-          <div className="flex flex-col gap-xxs">
-            <h3 className="ps-md text-[17px]">{t("branches.branchSection")}</h3>
-            <p className="ps-md text-[12px] text-text-faint">
-              {t("branches.branchSectionHint")}
-            </p>
-          </div>
-        </>
-      )}
-
       {/**
        * Two equal columns on a wide screen, one on a narrow one.
        *
-       * The shop's section above stays full width, because it is about a
-       * different record and a rule closes it — splitting *that* would read as
-       * two shops rather than as one shop and its branch.
-       *
-       * Below it the split is what a branch is made of. On the left, **who it
-       * is**: its name and its picture. On the right, **where it is and how it
-       * works**: the pin, the map, the prep window, the number an order goes to,
-       * the currency and whether it is live.
+       * The split is what a branch is made of. On the left, **who it is**: its
+       * name and its picture. On the right, **where it is and how it works**:
+       * the pin, the map, the prep window, the number an order goes to, the
+       * currency and whether it is live.
        *
        * The map is the reason this page wanted the width in the first place —
        * the note at the top of this file records it being a postage stamp in a
@@ -508,7 +393,7 @@ function BranchEditor({
                 {
                   value: "",
                   label: t("branches.currencySame", {
-                    code: shopCurrency || store?.currencyCode || "",
+                    code: store?.currencyCode ?? "",
                   }),
                 },
                 ...(currencies ?? []).map((one) => ({
