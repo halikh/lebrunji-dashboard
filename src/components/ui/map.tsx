@@ -103,10 +103,20 @@ export function Map({
         title={label}
         src={source.toString()}
         loading="lazy"
-        // Nothing in an embedded map needs scripts from us, storage, or the
-        // ability to navigate the page it sits in. Stated rather than assumed.
-        sandbox="allow-scripts"
-        referrerPolicy="no-referrer"
+        // The embed needs scripts to draw itself and its own origin to fetch
+        // tiles as itself; navigating the page it sits in, forms and plugins
+        // stay denied. `allow-same-origin` hands the frame *its* origin, not
+        // ours — which is safe precisely because the frame is cross-origin —
+        // and the popup permissions are what make OpenStreetMap's attribution
+        // links clickable, which the tile licence asks for.
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        // OpenStreetMap's volunteer tile servers refuse traffic they cannot
+        // attribute to an app, and answer with an "Access blocked" tile rather
+        // than a map. Traffic from an opaque sandbox origin, or with its
+        // referrer stripped, is exactly that unattributable traffic. So the
+        // frame sends our origin — scheme and host, never the path a customer
+        // is looking at and never a query string with an order id in it.
+        referrerPolicy="origin"
         className="h-[200px] w-full rounded-md border border-border bg-neutral-fill"
       />
       <a
