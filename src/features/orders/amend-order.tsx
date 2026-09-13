@@ -238,6 +238,7 @@ export function AmendOrder({
                     line={line}
                     storeId={store.storeId}
                     currencyCode={order.currencyCode}
+                    shopRate={order.shopRate}
                     count={counts[line.id] ?? line.quantity}
                     onCount={(next) =>
                       setCounts((current) => ({ ...current, [line.id]: next }))
@@ -303,10 +304,19 @@ export function AmendOrder({
                 // phone the operator is saying "it was X, it is now Y", and
                 // both halves of that sentence should be readable at once.
                 <span className="text-[13px] text-text-faint line-through">
-                  <Price value={order.total} code={order.currencyCode} />
+                  <Price
+                    value={order.total}
+                    code={order.currencyCode}
+                    shopRate={order.shopRate}
+                  />
                 </span>
               )}
-              <Price value={total} code={order.currencyCode} align="end" />
+              <Price
+                value={total}
+                code={order.currencyCode}
+                shopRate={order.shopRate}
+                align="end"
+              />
             </div>
           </div>
 
@@ -345,6 +355,7 @@ function AmendLine({
   line,
   storeId,
   currencyCode,
+  shopRate,
   count,
   onCount,
   swap,
@@ -355,6 +366,8 @@ function AmendLine({
   line: OrderLine;
   storeId: string;
   currencyCode: string;
+  /** The rate this order reads at — see `Order.shopRate`. */
+  shopRate: number | null;
   count: number;
   onCount: (next: number) => void;
   swap: string | null;
@@ -431,7 +444,12 @@ function AmendLine({
         >
           {line.name}
         </span>
-        <Price value={line.unitPrice * count} code={currencyCode} align="end" />
+        <Price
+          value={line.unitPrice * count}
+          code={currencyCode}
+          shopRate={shopRate}
+          align="end"
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-lg">

@@ -724,9 +724,13 @@ function OrderRow({
         {formatDate(order.placedAt)}
       </span>
 
+      {/* This one order's own shop rate — `0120`. The tiles above deliberately
+          do not take one: a lifetime total spans shops, and no single shop's
+          rate is right for a sum of other shops' money. */}
       <Price
         value={order.total}
         code={order.currencyCode}
+        shopRate={order.shopRate}
         align="end"
         className="text-[13px] font-semibold"
       />

@@ -3,6 +3,7 @@ import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
 import { businessMonthKey, businessWeekday, recentMonthKeys } from "@/lib/time";
+import { oneShopRate } from "@/features/reference/shop-rate";
 
 /**
  * Customers.
@@ -222,6 +223,15 @@ export type CustomerOrder = {
   placedAt: string;
   total: number;
   currencyCode: string;
+  /**
+   * The rate this order's total is **read** at, or null for the platform's.
+   *
+   * `stores.exchange_rate` — `0120` — when exactly one shop is on the order.
+   * The same rule `Order.shopRate` states, and deliberately the same: a total
+   * on this page and the same total on the order panel have to agree, and they
+   * would not if one of them read at the shop's rate and the other did not.
+   */
+  shopRate: number | null;
   /** The snapshot taken when the order was placed, not the address book's. */
   addressLine: string;
   /**
@@ -336,7 +346,8 @@ export async function fetchCustomerOrders(options: {
     .from("orders")
     .select(
       `id, code, placed_at, total, currency_code, address_line,
-       order_stores ( order_statuses ( slug, name ) )`,
+       order_stores ( store_id, stores ( exchange_rate ),
+         order_statuses ( slug, name ) )`,
     )
     .eq("user_id", id)
     .is("deleted_at", null)
@@ -354,6 +365,7 @@ export async function fetchCustomerOrders(options: {
     placedAt: row.placed_at as string,
     total: row.total as number,
     currencyCode: row.currency_code as string,
+    shopRate: oneShopRate(asArray(row.order_stores)),
     addressLine: (row.address_line as string) ?? "",
     // Deduplicated on the slug: two shops at the same step are one chip, not
     // the same word twice.

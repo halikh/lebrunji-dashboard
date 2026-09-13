@@ -141,25 +141,36 @@ export function OrderBody({
           store={store}
           lines={order.lines.filter((line) => line.orderStoreId === store.id)}
           currencyCode={order.currencyCode}
+          shopRate={order.shopRate}
         />
       ))}
 
       <div className="flex flex-col gap-sm border-t border-border pt-lg text-[14px]">
+        {/* Every line of the bill at the one rate, the platform's money on it
+            included. The ladder and the discount were *charged* at the
+            platform's rate — `0120` left the money path alone — but what is
+            being read here is the bill the customer settles at the door, and
+            they settle all of it in one currency at one shop's number. A
+            delivery fee converted at a different rate from the subtotal above
+            it would not add up to the total below it. */}
         <Money
           label={t("orders.subtotal")}
           value={order.subtotal}
           code={order.currencyCode}
+          shopRate={order.shopRate}
         />
         <Money
           label={t("orders.delivery")}
           value={order.deliveryFee}
           code={order.currencyCode}
+          shopRate={order.shopRate}
         />
         {order.discount > 0 && (
           <Money
             label={t("orders.discount")}
             value={-order.discount}
             code={order.currencyCode}
+            shopRate={order.shopRate}
           />
         )}
         <div className="flex items-baseline justify-between pt-xs">
@@ -167,6 +178,7 @@ export function OrderBody({
           <Price
             value={order.total}
             code={order.currencyCode}
+            shopRate={order.shopRate}
             align="end"
             className="text-[16px] font-bold"
           />
@@ -348,10 +360,13 @@ function StoreSection({
   store,
   lines,
   currencyCode,
+  shopRate,
 }: {
   store: OrderStore;
   lines: OrderLine[];
   currencyCode: string;
+  /** The rate this order reads at — see `Order.shopRate`. */
+  shopRate: number | null;
 }) {
   const tone = statusTone(store.statusSlug);
 
@@ -439,6 +454,7 @@ function StoreSection({
                 <Price
                   value={line.unitPrice * coming}
                   code={currencyCode}
+                  shopRate={shopRate}
                   align="end"
                   className={cx("font-semibold", gone && "opacity-50")}
                 />
@@ -507,15 +523,18 @@ function Money({
   label,
   value,
   code,
+  shopRate,
 }: {
   label: string;
   value: number;
   code: string;
+  /** The rate this order reads at — see `Order.shopRate`. */
+  shopRate?: number | null;
 }) {
   return (
     <div className="flex items-baseline justify-between text-text-soft">
       <span>{label}</span>
-      <Price value={value} code={code} align="end" />
+      <Price value={value} code={code} shopRate={shopRate} align="end" />
     </div>
   );
 }

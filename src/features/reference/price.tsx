@@ -29,16 +29,38 @@ import { useMoney } from "./use-currencies";
  * The secondary is **absent rather than approximate**: `convertTo` returns null
  * when a rate is missing or not yet loaded, and a converted figure that quietly
  * used a rate of 1 would be a number somebody might read out to a customer.
+ *
+ * ## Whose rate the second line is read at
+ *
+ * The platform's, unless the caller says otherwise with `shopRate`. Two shops
+ * on the same street quote different lira rates — that is the whole of `0120` —
+ * so a shop's own money has to be read at the shop's own number or the operator
+ * is quoting a figure that shop would not honour.
+ *
+ * A prop and not a context, even though it means every shop-money call site has
+ * to pass it. A provider would make the correct case implicit and the incorrect
+ * one silent: a delivery band or a cross-shop total rendered anywhere inside the
+ * subtree would pick up a rate that does not apply to it, and nothing on screen
+ * would say so. Missing the prop leaves the old answer; inheriting one wrongly
+ * invents a new one.
  */
 export function Price({
   value,
   code,
+  shopRate,
   align = "start",
   className,
 }: {
   /** Minor units, in `code`. */
   value: number;
   code: string;
+  /**
+   * The rate of the shop this money belongs to — `stores.exchange_rate`, 0120.
+   *
+   * Omit for the platform's own money: a delivery band, a fixed-amount
+   * discount, or any figure totalled across more than one shop.
+   */
+  shopRate?: number | null;
   /** `end` in a column of figures, where the units digits should line up. */
   align?: "start" | "end";
   /** Type for the primary line. The secondary keeps its own, deliberately. */
@@ -47,7 +69,7 @@ export function Price({
   const { format, convertTo, secondaryCode } = useMoney();
 
   const other = secondaryCode(code);
-  const converted = other ? convertTo(value, code, other) : null;
+  const converted = other ? convertTo(value, code, other, shopRate) : null;
 
   return (
     <span

@@ -29,6 +29,21 @@ export type Currency = {
   decimalDigits: number;
   decimalSeparator: string;
   groupSeparator: string;
+  /**
+   * The rate the **shop that priced this** quotes, when it quotes its own.
+   *
+   * `0120`. Null or absent is the ordinary case and means the platform's rate
+   * from the `currencies` table — the same live reference a null means
+   * everywhere else in this schema.
+   *
+   * On the type for parity with the app, where the currency object is fetched
+   * with the shop and so carries the rate for free. Here a screen names a
+   * currency by **code** and looks the row up from shared reference data, so
+   * there is no per-shop object to hang it on: it is passed to
+   * {@link convertMoney} instead, and `useMoney().convertTo` is the seam that
+   * takes it. Which side it replaces is the same either way.
+   */
+  shopRate?: number | null;
 };
 
 /** A currency that also knows what it is worth — see {@link convertMoney}. */
@@ -106,17 +121,48 @@ export function formatMoney(minorUnits: number, currency: Currency): string {
  * The arithmetic goes through the minor units in one expression rather than
  * converting to major units first: `1875` cents at 89,000 is 1,668,750 lira
  * exactly, and rounding once at the end is what keeps it that way.
+ *
+ * ## A shop's own rate, when it has one
+ *
+ * `shopRate` replaces the **non-base** side — `isBase` names the currency every
+ * other rate is quoted against, and its own row is 1 by definition, so a shop
+ * saying "my rate is 95,000" can only be talking about the other one. It works
+ * out the same in both directions: a dollar menu read in lira and a lira menu
+ * read in dollars both go through the one number the shop set.
+ *
+ * A non-positive override is ignored rather than applied. `0120`'s CHECK
+ * refuses one, so this is about a hand-built object — and a conversion through
+ * a zero is a confident wrong number where falling back to the platform's rate
+ * is merely the old answer.
+ *
+ * ## Where it must **not** be passed
+ *
+ * The two figures in the money path that are converted server-side — the
+ * delivery ladder and a fixed-amount discount — are the platform's money, and
+ * `convert_money` bills them at the platform's rate whatever the shop quotes.
+ * Showing them at a shop's rate would be the dashboard disagreeing with what
+ * the customer is actually charged. The Pricing screen and the reports are the
+ * screens this applies to; `restatePrice` is a third, for its own reason.
  */
 export function convertMoney(
   minorUnits: number,
   from: ConvertibleCurrency,
   to: ConvertibleCurrency,
+  shopRate?: number | null,
 ): number {
   if (from.code === to.code || !(from.rate > 0) || !(to.rate > 0))
     return minorUnits;
 
+  const override = shopRate != null && shopRate > 0 ? shopRate : null;
+  const rateOf = (currency: ConvertibleCurrency) =>
+    override !== null && !currency.isBase ? override : currency.rate;
+
+  const fromRate = rateOf(from);
+  const toRate = rateOf(to);
+  if (!(fromRate > 0) || !(toRate > 0)) return minorUnits;
+
   const scale = 10 ** (to.decimalDigits - from.decimalDigits);
-  return Math.round(minorUnits * (to.rate / from.rate) * scale);
+  return Math.round(minorUnits * (toRate / fromRate) * scale);
 }
 
 /**
@@ -146,6 +192,15 @@ export function convertMoney(
  * **Lossy when the new currency has fewer decimal places**, and not
  * recoverable: `$12.34` restated into a currency with no subunit is `12`, and
  * coming back gives `$12.00`.
+ *
+ * ## It takes no shop rate, on purpose
+ *
+ * `convertMoney` grew one with `0120`; this must not pass it on. What this
+ * previews is a **write** — `api_v1_set_store_currency` rewriting the shop's
+ * stored prices — and that function converts with `currencies.rate`, because
+ * `0120` left the money path untouched. A preview at the shop's own rate would
+ * show digits the write is not going to produce, which is the one failure the
+ * paragraph above says this function exists to prevent.
  */
 export function restatePrice(
   minorUnits: number,

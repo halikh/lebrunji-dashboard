@@ -56,14 +56,25 @@ export function useMoney() {
    * `null` rather than a fallback: a converted figure that quietly used a rate
    * of 1 would be a number somebody might read out to a customer. Absent is
    * safer than wrong.
+   *
+   * `shopRate` is `stores.exchange_rate` — `0120` — for the shop whose money
+   * this is. Omitted or null converts at the platform's rate, which is what
+   * every figure here did before the column existed and is still the right
+   * answer for the platform's own money: the delivery ladder, a fixed-amount
+   * discount, and anything totalled across shops. See `convertMoney`.
    */
   const convertTo = useCallback(
-    (minorUnits: number, fromCode: string, toCode: string): string | null => {
+    (
+      minorUnits: number,
+      fromCode: string,
+      toCode: string,
+      shopRate?: number | null,
+    ): string | null => {
       const from = find(fromCode);
       const to = find(toCode);
       if (!from || !to || from.code === to.code) return null;
       if (!(from.rate > 0) || !(to.rate > 0)) return null;
-      return formatMoney(convertMoney(minorUnits, from, to), to);
+      return formatMoney(convertMoney(minorUnits, from, to, shopRate), to);
     },
     [find],
   );

@@ -239,6 +239,7 @@ export function DriverProfile({ id }: { id: string }) {
                       <Price
                         value={row.orderTotal}
                         code={row.currencyCode}
+                        shopRate={row.shopRate}
                         align="end"
                       />
                     </span>

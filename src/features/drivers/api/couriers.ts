@@ -4,6 +4,7 @@ import { digitsOf } from "@/lib/phone";
 import { isOpenNow } from "@/lib/week";
 import { matchesLike } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
+import { oneShopRate } from "@/features/reference/shop-rate";
 
 /**
  * The drivers an order can be handed to.
@@ -155,6 +156,8 @@ export type Dispatch = {
   orderCode: string;
   orderTotal: number;
   currencyCode: string;
+  /** The rate this order's total is read at — see `oneShopRate`. */
+  shopRate: number | null;
   statusSlug: string;
   statusName: string;
 };
@@ -169,7 +172,8 @@ export async function fetchDispatches(
     .select(
       `id, dispatched_at,
        orders ( id, code, total, currency_code,
-         order_stores ( order_statuses ( slug, name ) ) )`,
+         order_stores ( store_id, stores ( exchange_rate ),
+           order_statuses ( slug, name ) ) )`,
     )
     .eq("courier_id", courierId)
     .order("dispatched_at", { ascending: false })
@@ -197,6 +201,7 @@ export async function fetchDispatches(
         orderCode: order.code as string,
         orderTotal: Number(order.total),
         currencyCode: order.currency_code as string,
+        shopRate: oneShopRate(asArray(order.order_stores)),
         statusSlug: (status?.slug as string) ?? "",
         statusName: localizedName(status?.name),
       },

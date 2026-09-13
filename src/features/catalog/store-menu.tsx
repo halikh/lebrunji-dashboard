@@ -353,6 +353,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                   key={item.id}
                   item={item}
                   currencyCode={store.data?.currencyCode ?? ""}
+                  shopRate={store.data?.exchangeRate ?? null}
                   sectionTitle={pickLocalized(
                     sections.find((one) => one.id === item.sectionId)?.title ??
                       {},
@@ -384,6 +385,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                   key={section.id}
                   section={section}
                   currencyCode={store.data?.currencyCode ?? ""}
+                  shopRate={store.data?.exchangeRate ?? null}
                   focus={focus}
                   carried={sectionOrder.movingId === section.id}
                   rowProps={sectionOrder.rowProps}
@@ -510,6 +512,7 @@ type ReorderProps = {
 function Section({
   section,
   currencyCode,
+  shopRate,
   focus,
   rowProps,
   handleProps,
@@ -530,6 +533,8 @@ function Section({
 }: {
   section: MenuSection;
   currencyCode: string;
+  /** This shop's own rate — see `ItemRow`. */
+  shopRate: number | null;
   /** Which row was just returned from, and how to scroll it back into view. */
   focus: ReturnType<typeof useRowFocus>;
   /** This section's name is being edited, in place of its heading. */
@@ -683,6 +688,7 @@ function Section({
               key={item.id}
               item={item}
               currencyCode={currencyCode}
+              shopRate={shopRate}
               handleProps={itemOrder.handleProps}
               rowProps={itemOrder.rowProps}
               carried={itemOrder.movingId === item.id}
@@ -749,6 +755,7 @@ function Section({
 function ItemRow({
   item,
   currencyCode,
+  shopRate,
   anchor,
   carried,
   rowProps,
@@ -759,6 +766,14 @@ function ItemRow({
 }: {
   item: MenuItem;
   currencyCode: string;
+  /**
+   * `stores.exchange_rate` — `0120` — so the lira line under a dollar price is
+   * the number this shop quotes rather than the platform's.
+   *
+   * Passed down rather than read here: the rate is the shop's, and this row
+   * knows about a dish. See `Price`.
+   */
+  shopRate: number | null;
   anchor: (node: HTMLElement | null) => void;
   /** Being dragged, so it sheds everything that is not identity. */
   carried: boolean;
@@ -829,6 +844,7 @@ function ItemRow({
         <Price
           value={item.price}
           code={currencyCode}
+          shopRate={shopRate}
           align="end"
           className="text-[15px] font-semibold"
         />
@@ -1017,6 +1033,7 @@ function nextSortOrder(section: MenuSection | undefined): number {
 function SearchResult({
   item,
   currencyCode,
+  shopRate,
   sectionTitle,
   onEdit,
   onToggle,
@@ -1024,6 +1041,8 @@ function SearchResult({
 }: {
   item: MenuItem;
   currencyCode: string;
+  /** This shop's own rate — see `ItemRow`. */
+  shopRate: number | null;
   sectionTitle: string;
   onEdit: () => void;
   onToggle: () => void;
@@ -1066,6 +1085,7 @@ function SearchResult({
         <Price
           value={item.price}
           code={currencyCode}
+          shopRate={shopRate}
           align="end"
           className="text-[15px] font-semibold"
         />

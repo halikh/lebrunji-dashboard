@@ -1,3 +1,4 @@
+import { oneShopRate } from "@/features/reference/shop-rate";
 import { getClient } from "@/lib/supabase/client";
 import { startOfBusinessDay } from "@/lib/time";
 
@@ -109,6 +110,19 @@ export type Order = {
   latitude: number | null;
   longitude: number | null;
   currencyCode: string;
+  /**
+   * The rate this order's figures are **read** at, or null for the platform's.
+   *
+   * `stores.exchange_rate` — `0120` — when exactly one shop is on the order,
+   * because that is the shop whose menu the customer read and whose door they
+   * will settle at. More than one shop and it is null: two shops quoting two
+   * rates give a cross-shop total no single rate is right for, and picking one
+   * would be the dashboard deciding whose dollar is the real one.
+   *
+   * Display only, like every conversion. What was charged is `total` in
+   * `currencyCode`, and `0120` left the money path alone.
+   */
+  shopRate: number | null;
   subtotal: number;
   deliveryFee: number;
   discount: number;
@@ -221,12 +235,15 @@ export async function fetchOrders(options: {
   // An order spanning two shops at different statuses legitimately appears
   // under both tabs. That is the schema's shape and the operator has to act on
   // each leg separately.
+  // `exchange_rate` is the shop's own rate — `0120`. Read wherever an order
+  // is, because `toOrder` resolves the rate its figures are read at and the
+  // queue and the panel must not disagree about that.
   const embed = filterSlugs
     ? `order_stores!inner ( id, store_id, subtotal,
-         stores ( name ),
+         stores ( name, exchange_rate ),
          order_statuses!inner ( slug, name, progress ) )`
     : `order_stores ( id, store_id, subtotal,
-         stores ( name ),
+         stores ( name, exchange_rate ),
          order_statuses ( slug, name, progress ) )`;
 
   let query = getClient()
@@ -290,7 +307,7 @@ export async function fetchOrder(
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal,
-         stores ( name, image_url, whatsapp_phone ),
+         stores ( name, image_url, whatsapp_phone, exchange_rate ),
          order_statuses ( slug, name, progress ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
            fulfilled_quantity, replaces_line_id, amendment_reason,
@@ -490,6 +507,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     latitude: (address?.latitude as number | null) ?? null,
     longitude: (address?.longitude as number | null) ?? null,
     currencyCode: row.currency_code as string,
+    shopRate: oneShopRate(asArray(row.order_stores)),
     subtotal: row.subtotal as number,
     deliveryFee: row.delivery_fee as number,
     discount: row.discount as number,

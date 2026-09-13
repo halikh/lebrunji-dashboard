@@ -62,7 +62,11 @@ export function OrderHistory({ order }: { order: Order }) {
                   always "the customer says it was X" — and one number cannot
                   answer it. */}
               <span className="text-text-faint line-through">
-                <Price value={one.previousTotal} code={order.currencyCode} />
+                <Price
+                  value={one.previousTotal}
+                  code={order.currencyCode}
+                  shopRate={order.shopRate}
+                />
               </span>
               {/* An SVG rather than an arrow character: the lint rule that
                   bans literal strings in JSX is what keeps every user-facing
@@ -83,7 +87,11 @@ export function OrderHistory({ order }: { order: Order }) {
               >
                 <path d="M5 12h14M13 6l6 6-6 6" />
               </svg>
-              <Price value={one.newTotal} code={order.currencyCode} />
+              <Price
+                value={one.newTotal}
+                code={order.currencyCode}
+                shopRate={order.shopRate}
+              />
             </span>
           </div>
           {one.note && <p className="text-[13px] text-text-soft">{one.note}</p>}

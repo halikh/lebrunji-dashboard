@@ -386,6 +386,13 @@ export function ReportsScreen() {
 
             {stats.isSuccess && (
               <>
+                {/* No `shopRate` on any figure here, and that is the decision
+                    rather than the omission. These are sums over whatever the
+                    filters admit — often many shops, and always including the
+                    delivery fees and discounts that are the platform's money
+                    and are charged at the platform's rate whatever a shop
+                    quotes. A total read at one shop's rate would be a number
+                    in no shop's currency. See `convertMoney`. */}
                 <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
                   <Tile
                     label={t("reports.tileRevenue")}

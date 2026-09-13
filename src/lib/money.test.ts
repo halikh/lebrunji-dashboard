@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { restatePrice, type ConvertibleCurrency } from "./money";
+import {
+  convertMoney,
+  restatePrice,
+  type ConvertibleCurrency,
+} from "./money";
 
 /**
  * Restating a shop's prices when its currency changes — migration 0097.
@@ -97,5 +101,39 @@ describe("restatePrice — convert", () => {
 
   it("leaves a free choice free", () => {
     expect(restatePrice(0, USD, LBP, "convert")).toBe(0);
+  });
+});
+
+/**
+ * A shop's own rate — migration 0120.
+ *
+ * The bug this guards is the one that was actually shipped: a shop set
+ * 90,000 lira to the dollar on its own row, and every price in the dashboard
+ * went on being read at the platform's 89,700 because nothing passed the
+ * column through. Nothing errored. The figure was simply the wrong shop's.
+ */
+describe("convertMoney — a shop's own rate", () => {
+  it("reads a dollar price at the shop's lira rate, not the platform's", () => {
+    expect(convertMoney(500, USD, LBP)).toBe(448_500);
+    expect(convertMoney(500, USD, LBP, 90_000)).toBe(450_000);
+  });
+
+  it("replaces the same side going the other way", () => {
+    // A lira menu read in dollars goes through the one number the shop set.
+    expect(convertMoney(450_000, LBP, USD, 90_000)).toBe(500);
+  });
+
+  it("ignores a non-positive rate rather than converting through it", () => {
+    // `0120`'s CHECK refuses one, so this is a hand-built object — and the
+    // platform's rate is the old answer where a zero is a confident wrong one.
+    expect(convertMoney(500, USD, LBP, 0)).toBe(448_500);
+    expect(convertMoney(500, USD, LBP, -1)).toBe(448_500);
+    expect(convertMoney(500, USD, LBP, null)).toBe(448_500);
+  });
+
+  it("leaves restatePrice alone, which previews a write at the platform's", () => {
+    // `api_v1_set_store_currency` converts with `currencies.rate`; a preview at
+    // the shop's would show digits the write is not going to produce.
+    expect(restatePrice(1200, USD, LBP, "convert")).toBe(1_076_400);
   });
 });
