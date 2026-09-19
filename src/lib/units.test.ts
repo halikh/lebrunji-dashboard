@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { asPriceUnit, itemUnit, pricePerUnit, unitAmount } from "./units";
+import {
+  asPriceUnit,
+  itemUnit,
+  linePrice,
+  pricePerUnit,
+  unitAmount,
+} from "./units";
 
 describe("itemUnit", () => {
   it("is null unless both columns are there", () => {
@@ -130,5 +136,70 @@ describe("asPriceUnit", () => {
     expect(asPriceUnit("KG")).toBeNull();
     expect(asPriceUnit(null)).toBeNull();
     expect(asPriceUnit(1)).toBeNull();
+  });
+});
+
+describe("linePrice", () => {
+  const perKilo = { unit: "kg", quantity: 1, step: 0.5 } as const;
+
+  it("is the price times the count when nothing is stepped", () => {
+    // Every item on the menu before `0122`, and every pack since.
+    const pack = { unit: "g", quantity: 500, step: null } as const;
+    expect(linePrice(1200, 0, pack, 1)).toBe(1200);
+    expect(linePrice(1200, 0, pack, 3)).toBe(3600);
+    expect(linePrice(1200, 0, null, 3)).toBe(3600);
+  });
+
+  it("charges a stepped line in proportion to the amount", () => {
+    // $12.00 the kilo, moving by 500 g: the example `0122` is written around.
+    expect(linePrice(1200, 0, perKilo, 1)).toBe(1200); // 1 kg
+    expect(linePrice(1200, 0, perKilo, 2)).toBe(1800); // 1.5 kg
+    expect(linePrice(1200, 0, perKilo, 3)).toBe(2400); // 2 kg
+  });
+
+  it("handles a step that is a quarter of the unit", () => {
+    // "$12.00, and $3.00 for the 0.25".
+    const quarters = { unit: "kg", quantity: 1, step: 0.25 } as const;
+    expect(linePrice(1200, 0, quarters, 2)).toBe(1500); // 1.25 kg
+    expect(linePrice(1200, 0, quarters, 3)).toBe(1800); // 1.5 kg
+  });
+
+  it("is proportional from a starting amount that is not one unit", () => {
+    // Half a kilo at $6.00 is the same rate — $12.00 the kilo — read from the
+    // other end, which is what "0.5 is 6" means.
+    const half = { unit: "kg", quantity: 0.5, step: 0.5 } as const;
+    expect(linePrice(600, 0, half, 1)).toBe(600);
+    expect(linePrice(600, 0, half, 2)).toBe(1200);
+  });
+
+  it("keeps the floor at the starting amount", () => {
+    // `0119`'s "we sell from five kilos". A count below one press is still one.
+    const fromFive = { unit: "kg", quantity: 5, step: 5 } as const;
+    expect(linePrice(1000, 0, fromFive, 0)).toBe(1000);
+    expect(linePrice(1000, 0, fromFive, 2)).toBe(2000);
+  });
+
+  it("adds the options once on a stepped line and per press otherwise", () => {
+    // A $1.00 vacuum pack is done once to 2 kg of meat, and once to each of
+    // three packs.
+    expect(linePrice(1300, 100, perKilo, 3)).toBe(2500); // 2 kg + $1.00
+    const pack = { unit: "g", quantity: 500, step: null } as const;
+    expect(linePrice(1300, 100, pack, 3)).toBe(3900);
+  });
+
+  it("rounds the amount before it multiplies", () => {
+    // 0.1 + 0.2 is not 0.3 in binary, and `numeric(10, 3)` is the whole
+    // precision the columns have — so the amount is rounded first, in both
+    // this and `line_price`. Without it the third press is 0.30000000000000004
+    // of a litre and the money drifts a minor unit.
+    const tenths = { unit: "l", quantity: 0.1, step: 0.1 } as const;
+    expect(linePrice(1000, 0, tenths, 3)).toBe(3000);
+  });
+
+  it("falls back to a multiple when the quantity cannot be divided by", () => {
+    // `0095` refuses this from the database; an `ItemUnit` built by hand can
+    // still hold it, and an Infinity reaching the money would be worse.
+    const broken = { unit: "kg", quantity: 0, step: 1 } as const;
+    expect(linePrice(1200, 0, broken, 2)).toBe(2400);
   });
 });

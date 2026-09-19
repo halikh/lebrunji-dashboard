@@ -12,6 +12,8 @@ import { Price } from "@/features/reference/price";
 import { t } from "@/i18n/translations";
 import { formatPhone } from "@/lib/phone";
 import { statusTone } from "@/lib/order-status";
+import { unitLabel } from "@/lib/unit-label";
+import { itemUnit, linePrice } from "@/lib/units";
 
 import type { Order, OrderLine, OrderStore, OrderStatus } from "./api/orders";
 
@@ -407,13 +409,21 @@ function StoreSection({
           return (
             <div key={line.id} className="flex items-start gap-md text-[14px]">
               <Thumbnail src={line.imageUrl} size={44} name={line.name} />
+              {/* The amount for a line sold by weight, the count otherwise.
+                Since `0122` the price beside it is a proportion of the amount,
+                and "2×" is a number that cannot be checked against it — see
+                `linePrice`. Wider when it holds an amount: "1.5 kg" does not
+                fit the column "2×" was sized for. */}
               <span
                 className={cx(
-                  "w-[26px] shrink-0 pt-xs font-bold tabular-nums",
+                  "shrink-0 pt-xs font-bold tabular-nums",
+                  itemUnit(line)?.step == null ? "w-[26px]" : "w-[58px]",
                   gone ? "text-text-faint" : "text-text-soft",
                 )}
               >
-                {t("orders.quantity", { count: coming })}
+                {itemUnit(line)?.step == null
+                  ? t("orders.quantity", { count: coming })
+                  : unitLabel(line, coming)}
               </span>
               <div className="flex min-w-0 flex-grow flex-col gap-xxs">
                 {/* Struck through rather than removed. "We could not bring your
@@ -437,7 +447,10 @@ function StoreSection({
                   <span className="text-[12px] font-semibold text-danger">
                     {gone
                       ? t("amend.outOfStock")
-                      : t("amend.short", { count: coming })}
+                      : // The amount on a line sold by weight — "Only 1 kg
+                        // available" is the sentence that was said on the
+                        // phone, where "Only 1 available" is not. `0122`.
+                        t("amend.short", { count: unitLabel(line, coming) })}
                   </span>
                 )}
                 {line.amendmentReason === "substitute" && (
@@ -452,7 +465,14 @@ function StoreSection({
               </div>
               <div className="shrink-0 pt-xs">
                 <Price
-                  value={line.unitPrice * coming}
+                  // The line's own snapshot, not today's menu: a receipt says
+                  // what was charged. `0122`.
+                  value={linePrice(
+                    line.unitPrice,
+                    line.optionsPrice,
+                    itemUnit(line),
+                    coming,
+                  )}
                   code={currencyCode}
                   shopRate={shopRate}
                   align="end"

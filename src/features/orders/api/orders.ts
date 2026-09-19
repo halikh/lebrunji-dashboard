@@ -1,6 +1,7 @@
 import { oneShopRate } from "@/features/reference/shop-rate";
 import { getClient } from "@/lib/supabase/client";
 import { startOfBusinessDay } from "@/lib/time";
+import { unitNumber } from "@/lib/units";
 
 /**
  * Reading and advancing orders.
@@ -72,6 +73,22 @@ export type OrderLine = {
   /** Why this line differs. See migration 0082 for the vocabulary. */
   amendmentReason: string | null;
   unitPrice: number;
+  /**
+   * The options' share of `unitPrice` — added once to a line sold by amount
+   * rather than scaled with it. `0` on every line placed before `0122`, which
+   * is right: those lines are counted, and `linePrice` never reads it.
+   */
+  optionsPrice: number;
+  /**
+   * What this line was sold by, snapshotted at placement — `0122`.
+   *
+   * Not read live off `menu_items`, unlike the picture above: a line is the
+   * record of what was agreed, and repricing it against a menu that has since
+   * changed its step would restate somebody's bill.
+   */
+  priceUnit: string | null;
+  unitQuantity: number | null;
+  unitStep: number | null;
   note: string | null;
   options: string[];
 };
@@ -310,6 +327,7 @@ export async function fetchOrder(
          stores ( name, image_url, whatsapp_phone, exchange_rate ),
          order_statuses ( slug, name, progress ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
+           options_price, price_unit, unit_quantity, unit_step,
            fulfilled_quantity, replaces_line_id, amendment_reason,
            menu_items ( image_url ),
            order_line_options ( item_options ( name ) ) ) )`,
@@ -336,6 +354,12 @@ export async function fetchOrder(
         replacesLineId: (line.replaces_line_id as string | null) ?? null,
         amendmentReason: (line.amendment_reason as string | null) ?? null,
         unitPrice: line.unit_price as number,
+        optionsPrice: (line.options_price as number | null) ?? 0,
+        priceUnit: (line.price_unit as string | null) ?? null,
+        // `numeric` arrives from PostgREST as a string — arbitrary precision,
+        // which JSON has no type for. Parsed here rather than at each screen.
+        unitQuantity: unitNumber(line.unit_quantity as string | number | null),
+        unitStep: unitNumber(line.unit_step as string | number | null),
         note: (line.note as string | null) ?? null,
         imageUrl:
           (asRecord(line.menu_items)?.image_url as string | null) ?? null,

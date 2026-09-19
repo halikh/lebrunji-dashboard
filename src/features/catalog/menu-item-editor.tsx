@@ -24,7 +24,13 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
 import type { Localized } from "@/lib/validation";
-import { PRICE_UNITS, unitAmount, unitKey, type PriceUnit } from "@/lib/units";
+import {
+  linePrice,
+  PRICE_UNITS,
+  unitAmount,
+  unitKey,
+  type PriceUnit,
+} from "@/lib/units";
 import {
   validateLocalizedText,
   validatePrice,
@@ -144,7 +150,7 @@ export function MenuItemEditor({
   // The same query the menu screen around this already runs, so it is a cache
   // read rather than a second fetch.
   const store = useStore(storeId);
-  const { decimalsOf } = useMoney();
+  const { decimalsOf, format } = useMoney();
   const decimals = decimalsOf(store.data?.currencyCode ?? "");
 
   /**
@@ -247,12 +253,21 @@ export function MenuItemEditor({
    * route.
    */
   /**
-   * The stepper, spelled out — or null when there is no unit to spell.
+   * The stepper, spelled out — **with what each press costs**.
    *
-   * Built from `unitAmount`, which is the app's own arithmetic: three presses
-   * here and three presses on a phone are the same three numbers because they
-   * come from the same function, rather than from a description of it that can
-   * drift.
+   * Built from `unitAmount` and `linePrice`, which are the app's own
+   * arithmetic: three presses here and three presses on a phone are the same
+   * three amounts at the same three prices, because both come from the same
+   * two functions rather than from a description of them that can drift.
+   *
+   * ## Why the money is in it
+   *
+   * This used to show the amounts alone, with a warning underneath for the case
+   * where the step did not match — "each press adds one more price, so this
+   * only adds up when the step matches the amount". That was true, and it was
+   * the wrong answer: a shop quoting per kilo means per kilo. `0122` made the
+   * price a rate, and the honest way to say so is to show the prices and let
+   * the operator read them.
    *
    * Three is enough to show a pattern and short enough to read at a glance.
    */
@@ -278,26 +293,31 @@ export function MenuItemEditor({
     }
 
     const unit = { unit: priceUnit, quantity, step: typedStep };
+    const minor = price.trim() === "" ? NaN : Number(price);
+    const code = store.data?.currencyCode ?? "";
+
     const chain = [1, 2, 3]
-      .map((press) =>
-        t("units.size", { quantity: unitAmount(unit, press), unit: word }),
-      )
+      .map((press) => {
+        const size = t("units.size", {
+          quantity: unitAmount(unit, press),
+          unit: word,
+        });
+
+        // The amount alone until there is a price to scale and a currency to
+        // say it in — the same rule `MoneyInput` above follows, and for the
+        // same reason: a figure in the wrong currency's clothes is worse than
+        // no figure. Options are nothing here; this is the dish by itself.
+        if (!Number.isFinite(minor) || code === "") return size;
+
+        return t("units.stepPreviewStop", {
+          size,
+          price: format(linePrice(minor, 0, unit, press), code),
+        });
+      })
       .join(" → ");
 
     return t("units.stepPreview", { chain });
   })();
-
-  /**
-   * A step that does not match the amount — the case the money stops being
-   * proportional in. Not an error: a shop is allowed to price that way, and
-   * `0119` says why the database does not decide it for them.
-   */
-  const stepUneven =
-    priceUnit !== "" &&
-    unitStep.trim() !== "" &&
-    Number(unitStep) > 0 &&
-    Number(unitQuantity) > 0 &&
-    Number(unitStep) !== Number(unitQuantity);
 
   const form = useRef<HTMLDivElement>(null);
   const attempt = useRef(0);
@@ -644,16 +664,6 @@ export function MenuItemEditor({
             */}
             {stepPreview && (
               <p className="ps-md text-[12px] text-text-faint">{stepPreview}</p>
-            )}
-
-            {/* The one thing a step can get wrong, and only said when it is
-              actually wrong. Each press writes one more line and a line is one
-              price, so a step that is not the amount is not proportional —
-              which `0119` leaves to the shop rather than deciding. */}
-            {stepUneven && (
-              <p className="ps-md text-[12px] font-semibold text-text-soft">
-                {t("units.stepUneven")}
-              </p>
             )}
           </Field>
 

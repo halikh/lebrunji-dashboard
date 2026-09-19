@@ -1397,7 +1397,8 @@ const en = {
     hint: "For anything priced by weight or volume. Leave the unit empty for an item sold as itself.",
     none: "No unit",
     quantity: "Amount",
-    quantityHint: "How much of that unit one of these is — 1 kg, or 500 g.",
+    quantityHint:
+      "How much of that unit the price above buys — 1 kg, or 500 g.",
     quantityRequired: "Say how much, or clear the unit.",
     quantityPositive: "The amount must be more than zero.",
 
@@ -1405,17 +1406,21 @@ const en = {
     // different question from how much one of these *is*, and the reason a
     // butcher can say "from five kilos, five at a time".
     step: "Steps by",
-    stepHint: "Leave empty and the customer counts whole items.",
+    // Says what setting it *does*, since `0122`: a step turns the price into a
+    // rate, and that is the decision being made here rather than a detail of
+    // the buttons. The preview underneath then shows it happening.
+    stepHint:
+      "Set this and the price becomes a rate — any amount costs it in proportion. Leave it empty and the customer counts whole items.",
     stepPositive: "The step must be more than zero.",
     // What the buttons will actually do, spelled out. A shop setting this is
     // describing a range, and a range is far easier to check by reading it
     // than by reasoning about two numbers.
     stepPreview: "In the app: {chain}",
     stepPreviewNone: "In the app: 1, 2, 3 × {size}",
-    // The one thing a step can get wrong. `0119` explains why the database
-    // does not decide it: each press adds one line, and a line is one price.
-    stepUneven:
-      "Each press adds one more price, so this only adds up when the step matches the amount.",
+    // One stop on that range: what the customer gets, and what they pay for it.
+    // The pair is the whole point — an amount with no price beside it is the
+    // half of this that was never in doubt.
+    stepPreviewStop: "{size} · {price}",
   },
 
   options: {

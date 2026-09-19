@@ -2,6 +2,8 @@ import { t } from "@/i18n/translations";
 import { formatDateTime } from "@/lib/time";
 import { formatMoney, type Currency } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
+import { unitLabel } from "@/lib/unit-label";
+import { itemUnit, linePrice } from "@/lib/units";
 
 import type { Order, OrderLine } from "./api/orders";
 
@@ -107,10 +109,20 @@ export function dispatchMessage(
     for (const line of order.lines.filter(
       (one) => one.orderStoreId === store.id,
     )) {
-      const amount = money(line.unitPrice * line.quantity);
-      lines.push(
-        `• ${line.quantity} × ${line.name}${amount ? ` — ${amount}` : ""}`,
+      const amount = money(
+        linePrice(
+          line.unitPrice,
+          line.optionsPrice,
+          itemUnit(line),
+          line.quantity,
+        ),
       );
+      // "2 × Kafta" for a counted dish, "1.5 kg Kafta" for one sold by weight.
+      // The `×` goes with the count: it belongs in front of a number of things
+      // and reads as a multiplication in front of an amount. See `0122`.
+      const much = unitLabel(line, line.quantity);
+      const size = itemUnit(line)?.step == null ? `${much} × ` : `${much} `;
+      lines.push(`• ${size}${line.name}${amount ? ` — ${amount}` : ""}`);
       // Indented under the dish, because an option on its own line at the same
       // level reads as a second thing to pack.
       for (const option of line.options) lines.push(`   ${option}`);
@@ -199,7 +211,10 @@ export function kitchenMessage(
     const quantity = line.fulfilledQuantity ?? line.quantity;
     if (quantity === 0) continue;
 
-    lines.push(`• ${quantity} × ${line.name}`);
+    // The amount for a line sold by weight, the count otherwise — as above.
+    const much = unitLabel(line, quantity);
+    const size = itemUnit(line)?.step == null ? `${much} × ` : `${much} `;
+    lines.push(`• ${size}${line.name}`);
     for (const option of line.options) lines.push(`   ${option}`);
     if (line.note)
       lines.push(`   ${t("dispatch.lineNote", { note: line.note })}`);

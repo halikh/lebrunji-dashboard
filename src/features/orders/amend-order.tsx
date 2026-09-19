@@ -17,6 +17,8 @@ import { useMenu } from "@/features/catalog/use-menu";
 import { useItemOptionGroups } from "@/features/catalog/use-options";
 import { Price } from "@/features/reference/price";
 import { useMoney } from "@/features/reference/use-currencies";
+import { unitLabel } from "@/lib/unit-label";
+import { itemUnit, linePrice } from "@/lib/units";
 import { formatMoney } from "@/lib/money";
 
 import { amendOrder, type LineChange, type Substitution } from "./api/amend";
@@ -176,7 +178,16 @@ export function AmendOrder({
    */
   const subtotal = lines.reduce((sum, line) => {
     const quantity = counts[line.id] ?? line.fulfilledQuantity ?? line.quantity;
-    const kept = line.unitPrice * quantity;
+    // `linePrice`, not a multiplication — `api_v1_amend_order` reprices with
+    // the SQL twin of this, and the preview has to land on the same figure.
+    // On a line sold by weight, shortening it is a smaller *amount* rather
+    // than a fraction of the presses. See `0122`.
+    const kept = linePrice(
+      line.unitPrice,
+      line.optionsPrice,
+      itemUnit(line),
+      quantity,
+    );
 
     // A substitution is the original at its reduced quantity **plus** the
     // replacement at the quantity that went missing — which is what the
@@ -445,7 +456,12 @@ function AmendLine({
           {line.name}
         </span>
         <Price
-          value={line.unitPrice * count}
+          value={linePrice(
+            line.unitPrice,
+            line.optionsPrice,
+            itemUnit(line),
+            count,
+          )}
           code={currencyCode}
           shopRate={shopRate}
           align="end"
@@ -468,18 +484,26 @@ function AmendLine({
                 onClick={() => onCount(value)}
                 aria-pressed={count === value}
                 className={cx(
-                  "size-[32px] rounded-md border text-[14px] font-semibold tabular-nums transition-[background-color,border-color]",
+                  "h-[32px] rounded-md border text-[14px] font-semibold tabular-nums transition-[background-color,border-color]",
+                  // A square for a count, wider for an amount: "1.5 kg" does
+                  // not fit a 32px box, and since `0122` the amount is what
+                  // the operator is agreeing to on the phone — the press
+                  // number behind it is an implementation detail of the
+                  // stepper the customer used.
+                  itemUnit(line)?.step == null ? "w-[32px]" : "min-w-[32px] px-sm",
                   count === value
                     ? "border-active bg-active-wash text-active-ink"
                     : "border-border text-text-soft",
                 )}
               >
-                {value}
+                {/* Zero is none of it, whatever the unit — "0 kg" is a
+                    quantity nobody says, and the button beside it is "1 kg". */}
+                {value === 0 ? 0 : unitLabel(line, value)}
               </button>
             ))}
           </div>
           <span className="text-[12px] text-text-faint">
-            {t("amend.ordered", { count: line.quantity })}
+            {t("amend.ordered", { count: unitLabel(line, line.quantity) })}
           </span>
         </div>
 

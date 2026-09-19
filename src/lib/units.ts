@@ -24,6 +24,14 @@
  * and the unit is a label under the name. See `unitAmount`, which is the only
  * place the arithmetic lives.
  *
+ * ## A step means the price is a rate
+ *
+ * Migration `0122`. With a step, `price` is the price of `unit_quantity` of the
+ * thing and any other amount costs it in proportion — 1 kg at $12.00 makes
+ * 1.5 kg $18.00. Without one, the stepper counts things and the price is per
+ * thing, which is every item written before `0122` and every item still sold by
+ * the pack. `linePrice` is the only place that arithmetic lives.
+ *
  * The **word** is not here. "kg" is "كغ" in Arabic, so it is chrome and lives
  * in each app's translation bundle beside every other piece of user-facing
  * text — see `unitKey`.
@@ -182,9 +190,10 @@ export function pricePerUnit(
 /**
  * How much of the unit the customer has asked for, at a given press count.
  *
- * The cart still counts in whole lines — `cart_lines.quantity` is an integer
- * and the money is `price × quantity`, unchanged by `0119`. This is the
- * translation from that count into what the screen says: the amount.
+ * The cart still counts in whole lines — `cart_lines.quantity` is an integer —
+ * and this is the translation from that count into what the screen says: the
+ * amount. What the amount *costs* is `linePrice`, which since `0122` is a
+ * proportion of it rather than a multiple of the price.
  *
  * ## Why the null step falls out rather than being special-cased
  *
@@ -208,4 +217,89 @@ export function unitAmount(unit: ItemUnit, count: number): number {
   const presses = Math.max(1, Math.trunc(count));
   const step = unit.step ?? unit.quantity;
   return Math.round((unit.quantity + (presses - 1) * step) * 1000) / 1000;
+}
+
+/**
+ * What one line costs, in minor units.
+ *
+ * ## The two cases, and why they are one function
+ *
+ * An item with no step is a *count* of things: three 500 g packs are three
+ * times the price of a pack, and an option chosen on it was chosen on each one.
+ * That is `(price + options) × count` — what the cart did before `0122`, and
+ * what it still does for every item that has no step.
+ *
+ * An item *with* a step is sold by amount, and the price is a **rate**: the
+ * price of `quantity` of the unit. Any other amount costs it in proportion.
+ *
+ *     1 kg at $12.00  →  1.5 kg is $18.00,  1.25 kg is $15.00
+ *
+ * Migration `0119` left this open on purpose and the dashboard carried the
+ * refusal to the operator as a warning beside the field. `0122` decided it: a
+ * shop quoting per kilo means per kilo.
+ *
+ * ## Options are not weighed
+ *
+ * A $1.00 vacuum-pack charge on 2 kg of meat is $1.00 — something done once to
+ * the line rather than a property of the weight — so it is added after the
+ * proportion rather than scaled inside it.
+ *
+ * `unitPrice` is the item *plus* its options, which is the number
+ * `order_lines.unit_price` has always held, so the item's own share is the
+ * subtraction below. The pair is passed rather than the difference because a
+ * caller that had to do the subtraction itself is a caller that can get it
+ * backwards.
+ *
+ * ## The rounding
+ *
+ * Once, at the end, for the reason `pricePerUnit` gives — and on the *amount*
+ * before that, inside `unitAmount`, because `numeric(10, 3)` is the whole
+ * precision either column has. `line_price` in `0122` is this function in SQL
+ * and rounds in both the same places. The two drifting apart is the silent
+ * class of bug `supabase/tests/branch-pricing.sql` exists for.
+ */
+export function linePrice(
+  /** The price of one press: the item plus every option on the line. */
+  unitPrice: number,
+  /** The options' share of it — the part that is added, never scaled. */
+  options: number,
+  /** The item's unit, or null when it is simply sold as itself. */
+  unit: ItemUnit | null,
+  /** The press count. `cart_lines.quantity`, always whole. */
+  count: number,
+): number {
+  const presses = Math.max(1, Math.trunc(count));
+
+  // No step is the counted stepper, and a count is a multiplier. A null unit
+  // lands here too — an item sold as itself has nothing to be proportional to —
+  // as does a non-positive quantity, which cannot be divided by. `0095` refuses
+  // one from the database; this covers an `ItemUnit` built by hand.
+  if (!unit || unit.step === null || !(unit.quantity > 0)) {
+    return unitPrice * presses;
+  }
+
+  return (
+    Math.round(
+      ((unitPrice - options) * unitAmount(unit, presses)) / unit.quantity,
+    ) + options
+  );
+}
+
+/**
+ * A `numeric(10, 3)` column off the wire, as a number — or null.
+ *
+ * PostgREST sends `numeric` as a **string**: it is arbitrary precision and JSON
+ * has no type for that. `unit_quantity` and `unit_step` are the two columns
+ * here that are one, and a screen that forgot would add "5" to 5 and get "55",
+ * which is why the parse lives beside them rather than at each stepper.
+ *
+ * Anything unparseable reads as null — "no unit", the state every item without
+ * one is already in — rather than as a `NaN` that would spread into money.
+ */
+export function unitNumber(
+  value: string | number | null | undefined,
+): number | null {
+  if (value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
