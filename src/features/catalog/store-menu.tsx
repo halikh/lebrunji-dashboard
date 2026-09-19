@@ -792,6 +792,11 @@ function ItemRow({
     ),
   );
 
+  /** The line under the name: what it is sold by, and what it is. */
+  const detail = [unitSize(item), pickLocalized(item.description)]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <div {...row} ref={anchor}>
       <button {...handleProps(item.id)}>
@@ -826,14 +831,22 @@ function ItemRow({
         >
           {pickLocalized(item.name)}
         </span>
-        <span className="truncate text-[12px] text-text-faint">
-          {[unitSize(item), pickLocalized(item.description)]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
+        {/* Rendered only when it says something.
+
+            An empty `<span>` is a flex item of zero height, but the column's
+            `gap-xxs` is charged for it anyway — so a dish with neither a unit
+            nor a description got a trailing gap below its name, the column
+            grew by that much, and `items-center` on the row pushed the name
+            half a gap **above** the picture and the price beside it. Every
+            such row sat visibly high against the ones that had a subtitle. */}
+        {detail && (
+          <span className="truncate text-[12px] text-text-faint">{detail}</span>
+        )}
         {/* What a customer sees on the dish, shown where the operator is
             already looking. Without it, checking which dishes carry "Spicy"
-            means opening every one of them. */}
+            means opening every one of them.
+
+            Returns null with no tags, so it costs no gap either. */}
         <ItemTags ids={item.tagIds} />
       </button>
 
@@ -1048,6 +1061,9 @@ function SearchResult({
   onToggle: () => void;
   onArchive: () => Promise<void>;
 }) {
+  /** The line under the name — see `ItemRow` on why it is not always drawn. */
+  const detail = [unitSize(item), sectionTitle].filter(Boolean).join(" · ");
+
   return (
     <div
       className={cx(
@@ -1075,9 +1091,9 @@ function SearchResult({
         >
           {pickLocalized(item.name)}
         </span>
-        <span className="truncate text-[12px] text-text-faint">
-          {[unitSize(item), sectionTitle].filter(Boolean).join(" · ")}
-        </span>
+        {detail && (
+          <span className="truncate text-[12px] text-text-faint">{detail}</span>
+        )}
         <ItemTags ids={item.tagIds} />
       </button>
 
