@@ -860,6 +860,16 @@ const en = {
     prepHint: "The range the app quotes with the delivery estimate.",
     prepTo: "to",
     minutes: "minutes",
+    /**
+     * The shopfront block on Details, shown only for a shop with one branch.
+     *
+     * Named for the place rather than for the table: "Branch" would be the
+     * database's word for something the operator has never had to think of as
+     * separate, and the whole point of the block is that they do not have to.
+     */
+    placeSection: "Where it is",
+    placeSectionHint:
+      "This shop trades from one address, so these are edited here. Add a second branch and each one answers for itself.",
     locationTitle: "Location",
     pin: "Coordinates",
     pinHint:

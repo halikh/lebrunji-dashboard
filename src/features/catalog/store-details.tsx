@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { Field } from "@/components/ui/field";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
+import { Map } from "@/components/ui/map";
 import { NumberInput } from "@/components/ui/number-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
@@ -15,10 +17,19 @@ import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
+import { parseLocation } from "@/lib/location";
 import { restatePrice } from "@/lib/money";
-import { validateLocalizedText, type Localized } from "@/lib/validation";
+import { digitsOf } from "@/lib/phone";
+import {
+  validateLocalizedText,
+  validatePhone,
+  validatePrepWindow,
+  type Localized,
+} from "@/lib/validation";
 
+import type { Branch } from "./api/branches";
 import type { CurrencyChangeMode, Store } from "./api/stores";
+import { useBranches, useUpdateBranch } from "./use-branches";
 import { useCategories } from "./use-categories";
 import { useMenu } from "./use-menu";
 import { useSetStoreCurrency, useStore, useUpdateStore } from "./use-stores";
@@ -62,8 +73,16 @@ import { useSetStoreCurrency, useStore, useUpdateStore } from "./use-stores";
  */
 export function StoreDetails({ storeId }: { storeId: string }) {
   const store = useStore(storeId);
+  /**
+   * The shop's places, because a shop with exactly one of them is edited here.
+   *
+   * See `sole` below for the whole argument. Waited on rather than raced: the
+   * form is keyed on what it read, so it has to read the branch before it
+   * builds its fields or the pin would arrive after the boxes did.
+   */
+  const branches = useBranches(storeId);
 
-  if (store.isPending) {
+  if (store.isPending || branches.isPending) {
     return (
       <div aria-hidden className="flex flex-col gap-lg p-xxl">
         {[0, 1, 2, 3].map((row) => (
@@ -84,6 +103,31 @@ export function StoreDetails({ storeId }: { storeId: string }) {
     );
   }
 
+  /**
+   * The shop's only branch, when it has only one.
+   *
+   * ## Why this tab edits it at all
+   *
+   * `0101` split the brand from the place and this file exists to keep the two
+   * apart — read the note at the top. That split is right for a chain and is a
+   * fiction for the shop that has one address: the store and its single branch
+   * are the same shopfront, and the dashboard was asking for them twice.
+   *
+   * The cost was not merely typing it twice. `branches.name` is drawn in one
+   * place in the app — the branch switcher — and the switcher is hidden on a
+   * shop with one branch, so renaming the branch changed *nothing a customer
+   * could see*, while the pin that decides the delivery fee lived only on the
+   * branch and could not be reached from here at all. A shop's name and its
+   * location, edited in two tabs, one of which was a decoy.
+   *
+   * So with one branch this tab owns the whole shopfront and writes to both
+   * rows. With two or more, `sole` is null, the place fields are not drawn, and
+   * the Branches tab is where a place is edited — which is correct there,
+   * because then the places genuinely differ.
+   */
+  const rows = branches.data ?? [];
+  const sole = rows.length === 1 ? rows[0] : null;
+
   return (
     /*
       Keyed on the row as it was read, the way the Hours tab keys its grid: a
@@ -91,12 +135,16 @@ export function StoreDetails({ storeId }: { storeId: string }) {
       sitting on top of newer data. After a save the two agree, so nothing is
       thrown away by the invalidation the save itself causes.
      */
-    <DetailsForm key={signature(store.data)} store={store.data} />
+    <DetailsForm
+      key={signature(store.data, sole)}
+      store={store.data}
+      sole={sole}
+    />
   );
 }
 
 /** What the form initialises from — see the `key` above. */
-function signature(store: Store): string {
+function signature(store: Store, sole: Branch | null): string {
   return JSON.stringify([
     store.id,
     store.name,
@@ -105,10 +153,17 @@ function signature(store: Store): string {
     store.currencyCode,
     store.isFeatured,
     store.exchangeRate,
+    // The branch's half, so a pin changed elsewhere rebuilds these fields too.
+    sole?.id ?? null,
+    sole?.latitude ?? null,
+    sole?.longitude ?? null,
+    sole?.prepMinMinutes ?? null,
+    sole?.prepMaxMinutes ?? null,
+    sole?.whatsappPhone ?? null,
   ]);
 }
 
-function DetailsForm({ store }: { store: Store }) {
+function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
   const { format, currencies } = useMoney();
@@ -121,6 +176,7 @@ function DetailsForm({ store }: { store: Store }) {
   const menu = useMenu(store.id);
 
   const update = useUpdateStore();
+  const updateBranch = useUpdateBranch(store.id);
   const setCurrency = useSetStoreCurrency();
 
   const [name, setName] = useState<Localized>(store.name);
@@ -146,14 +202,50 @@ function DetailsForm({ store }: { store: Store }) {
    */
   const [mode, setMode] = useState<CurrencyChangeMode>("keep");
 
-  const [errors, setErrors] = useState<{ name?: string; rate?: string }>({});
+  /**
+   * The shopfront's own answers, when this shop is a single place — see `sole`.
+   *
+   * `pin` is a typed string rather than a pair of numbers for the reason the
+   * branch editor gives: "33.89," is not a coordinate and is a perfectly
+   * reasonable thing to be halfway through typing.
+   */
+  const [pin, setPin] = useState(
+    sole && sole.latitude !== null && sole.longitude !== null
+      ? `${sole.latitude}, ${sole.longitude}`
+      : "",
+  );
+  const [prepMin, setPrepMin] = useState(String(sole?.prepMinMinutes ?? 10));
+  const [prepMax, setPrepMax] = useState(String(sole?.prepMaxMinutes ?? 20));
+  const [whatsapp, setWhatsapp] = useState(sole?.whatsappPhone ?? "");
+
+  const located = parseLocation(pin);
+  const coordinates = located.ok ? located : null;
+
+  const [errors, setErrors] = useState<{
+    name?: string;
+    rate?: string;
+    pin?: string;
+    prep?: string;
+    whatsapp?: string;
+  }>({});
 
   // `mode` is left out on purpose: it is a question *about* a currency change
   // rather than a value of its own, and it cannot be reached without moving
   // `currencyCode` first — which is compared.
   useUnsavedChanges(
     changed(
-      { name, imageUrl, categoryId, currencyCode, isFeatured, rate },
+      {
+        name,
+        imageUrl,
+        categoryId,
+        currencyCode,
+        isFeatured,
+        rate,
+        pin,
+        prepMin,
+        prepMax,
+        whatsapp,
+      },
       {
         name: store.name,
         imageUrl: store.imageUrl,
@@ -161,6 +253,13 @@ function DetailsForm({ store }: { store: Store }) {
         currencyCode: store.currencyCode,
         isFeatured: store.isFeatured,
         rate: store.exchangeRate == null ? "" : String(store.exchangeRate),
+        pin:
+          sole && sole.latitude !== null && sole.longitude !== null
+            ? `${sole.latitude}, ${sole.longitude}`
+            : "",
+        prepMin: String(sole?.prepMinMinutes ?? 10),
+        prepMax: String(sole?.prepMaxMinutes ?? 20),
+        whatsapp: sole?.whatsappPhone ?? "",
       },
     ),
   );
@@ -254,11 +353,42 @@ function DetailsForm({ store }: { store: Store }) {
     // field being ignored.
     const rateTyped = rate.trim() !== "";
     const rateValue = Number(rate);
+
+    /*
+     * The shopfront's checks, and only when this shop is one — the same three
+     * the branch panel makes, through the same functions, because they are the
+     * same three columns.
+     *
+     * The pin is allowed to be empty and refused when it is typed and
+     * unreadable. An empty pin is a shop nobody has located yet; a broken one
+     * would be saved as null and read as the same thing, which is the field
+     * silently ignoring what was typed into it.
+     */
+    const prepCheck = sole
+      ? validatePrepWindow(Number(prepMin), Number(prepMax))
+      : null;
+    const phoneCheck =
+      sole && whatsapp.trim() !== ""
+        ? validatePhone(digitsOf(whatsapp))
+        : null;
+
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
       rate:
         rateTyped && (!Number.isFinite(rateValue) || rateValue <= 0)
           ? t("store.ratePositive")
+          : undefined,
+      pin:
+        sole && pin.trim() !== "" && !coordinates
+          ? t("store.pinInvalid")
+          : undefined,
+      prep:
+        prepCheck && !prepCheck.ok
+          ? t(prepCheck.key, prepCheck.params)
+          : undefined,
+      whatsapp:
+        phoneCheck && !phoneCheck.ok
+          ? t(phoneCheck.key, phoneCheck.params)
           : undefined,
     };
 
@@ -310,9 +440,63 @@ function DetailsForm({ store }: { store: Store }) {
         name: store.name,
       });
     }
+
+    /*
+     * And the same shopfront, on its branch row.
+     *
+     * ## The name goes too, and that is the point
+     *
+     * `0121` copies the store's name onto the first branch at creation and then
+     * never looks again, so the two drift the first time a shop is renamed —
+     * which is the bug this whole arrangement is here to fix. With one branch
+     * the two names are one name, so the rename writes both.
+     *
+     * It stops mattering the moment a second branch exists: `sole` is null
+     * then, none of this runs, and each place is named on its own panel. A
+     * branch that has been deliberately renamed is therefore never overwritten
+     * by this, because a shop with a deliberately-named branch has more than
+     * one.
+     *
+     * ## Why a second request rather than one
+     *
+     * They are two tables. There is no RPC that writes both, and inventing one
+     * to save a round trip would put a schema change on the critical path of a
+     * form fix. The failure mode is mild and visible: the branch write reports
+     * its own error and the form is still open on what was typed.
+     */
+    if (!sole) return;
+
+    const pinMoved =
+      (coordinates?.latitude ?? null) !== sole.latitude ||
+      (coordinates?.longitude ?? null) !== sole.longitude;
+    const prepMoved =
+      Number(prepMin) !== sole.prepMinMinutes ||
+      Number(prepMax) !== sole.prepMaxMinutes;
+    const phone = digitsOf(whatsapp) || null;
+    const phoneMoved = phone !== sole.whatsappPhone;
+
+    if (nameMoved || pinMoved || prepMoved || phoneMoved) {
+      updateBranch.mutate({
+        id: sole.id,
+        patch: {
+          ...(nameMoved && { name }),
+          ...(pinMoved && {
+            latitude: coordinates?.latitude ?? null,
+            longitude: coordinates?.longitude ?? null,
+          }),
+          ...(prepMoved && {
+            prepMinMinutes: Number(prepMin),
+            prepMaxMinutes: Number(prepMax),
+          }),
+          ...(phoneMoved && { whatsappPhone: phone }),
+        },
+        name: pickLocalized(sole.name),
+      });
+    }
   }
 
-  const pending = update.isPending || setCurrency.isPending;
+  const pending =
+    update.isPending || setCurrency.isPending || updateBranch.isPending;
 
   return (
     /*
@@ -527,6 +711,89 @@ function DetailsForm({ store }: { store: Store }) {
             </Field>
           </div>
         </div>
+
+        {/*
+          The shopfront, for a shop that is one place — see `sole`.
+
+          Below the brand rather than beside it, because it answers a different
+          question: everything above is *who this is*, and this is *where an
+          order reaches it*. Absent entirely on a chain, where the answer is
+          per branch and the Branches tab asks it there.
+        */}
+        {sole && (
+          <div className="flex flex-col gap-lg border-t border-border pt-xxl">
+            <div className="flex flex-col gap-xxs">
+              <h3 className="ps-md text-[17px]">{t("store.placeSection")}</h3>
+              <p className="ps-md text-[12px] text-text-faint">
+                {t("store.placeSectionHint")}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2 lg:gap-xxl">
+              <div className="flex min-w-0 flex-col gap-lg">
+                <Field
+                  label={t("store.pin")}
+                  hint={t("store.pinHint")}
+                  error={errors.pin}
+                >
+                  <Input
+                    value={pin}
+                    onChange={(event) => setPin(event.target.value)}
+                    placeholder="33.8938, 35.5018"
+                    inputMode="text"
+                  />
+                </Field>
+
+                <Field
+                  label={t("branches.whatsapp")}
+                  hint={t("branches.whatsappHint")}
+                  error={errors.whatsapp}
+                >
+                  <PhoneInput value={whatsapp} onChange={setWhatsapp} />
+                </Field>
+
+                <Field
+                  label={t("store.prep")}
+                  hint={t("store.prepHint")}
+                  error={errors.prep}
+                >
+                  <div className="flex flex-wrap items-center gap-sm">
+                    <NumberInput
+                      value={prepMin}
+                      onChange={(event) => setPrepMin(event.target.value)}
+                      min={0}
+                      aria-label={t("store.prepMin")}
+                      className="w-[92px]"
+                    />
+                    <span className="text-[14px] text-text-soft">
+                      {t("store.prepTo")}
+                    </span>
+                    <NumberInput
+                      value={prepMax}
+                      onChange={(event) => setPrepMax(event.target.value)}
+                      min={0}
+                      aria-label={t("store.prepMax")}
+                      className="w-[92px]"
+                    />
+                    <span className="text-[14px] text-text-soft">
+                      {t("store.minutes")}
+                    </span>
+                  </div>
+                </Field>
+              </div>
+
+              {/* The pin, drawn. A pair of numbers is not something anybody can
+                  check by reading; a marker on a map is. */}
+              <Map
+                latitude={coordinates?.latitude ?? null}
+                longitude={coordinates?.longitude ?? null}
+                label={pickLocalized(name)}
+                emptyKey="store.noPinYet"
+                className="h-[240px] w-full rounded-md"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
