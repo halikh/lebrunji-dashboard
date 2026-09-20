@@ -321,6 +321,13 @@ svg,
 .group:focus-visible [data-anim="leave"] {
   animation-name: icon-leave;
 }
+/* The scooter's wheels. The icon has carried `data-anim="roll"` since it was
+   drawn and there was no rule for it, so Drivers was the one item in the rail
+   that did nothing on hover — the attribute was there, the keyframes were not. */
+.group:hover [data-anim="roll"],
+.group:focus-visible [data-anim="roll"] {
+  animation-name: icon-roll;
+}
 
 /* The line is drawn rather than moved: a dash offset that runs to zero reads as
    printing, where a slide would read as the line arriving from off-paper. */
@@ -389,6 +396,25 @@ svg,
   }
   100% {
     transform: translateX(0);
+  }
+}
+
+/* The scooter's wheels turn.
+ *
+ * The one animation in this set that does not go out and come back, because a
+ * wheel that returned to where it started would be a wheel rocking rather than
+ * rolling. It turns a half-circle and stops, which reads as the thing having
+ * moved off.
+ *
+ * Each wheel carries its own `<g>` with a spoke in it — see `icons.tsx`. The
+ * spoke is load-bearing: without it there is nothing on a stroked circle to
+ * show that it turned. */
+@keyframes icon-roll {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(180deg);
   }
 }
 

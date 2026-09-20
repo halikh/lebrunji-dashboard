@@ -112,9 +112,24 @@ const PATHS: Record<IconName, React.ReactNode> = {
   // carries the meaning, as everywhere else in this set.
   drivers: (
     <>
+      {/* One group per wheel, each with a spoke.
+
+          Both were in a single `<g>` and it could not work: `[data-anim]` sets
+          `transform-box: fill-box`, so one group spanning both wheels turns
+          about the point between them and the scooter's wheels swing around
+          its middle. Split, each box is its own wheel and each turns on its
+          own hub.
+
+          The spoke is what makes the turn visible at all — a stroked circle
+          rotating about its centre is a stroked circle standing still, which
+          is the other half of why this animation never read. */}
       <g data-anim="roll">
         <circle cx="5.5" cy="17.5" r="2.5" />
+        <path d="M5.5 15.5v2" />
+      </g>
+      <g data-anim="roll">
         <circle cx="18.5" cy="17.5" r="2.5" />
+        <path d="M18.5 15.5v2" />
       </g>
       <path d="M8 17.5h8" />
       <path d="M18.5 17.5V11a2 2 0 0 0-2-2H14" />
