@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Button, cx } from "@/components/ui";
 import { ColorPicker, isHex } from "@/components/ui/color-picker";
+import { IconPicker } from "@/components/ui/icon-picker";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { EditorPage } from "@/components/ui/editor-page";
 import { Field } from "@/components/ui/field";
@@ -161,7 +162,7 @@ function Form({
     kindId: string;
     isActive: boolean;
     hasMenuNav: boolean;
-    emptyIconUrl: string | null;
+    emptyIcon: string | null;
     iconUrl: string | null;
     emptyBackgroundColor: string | null;
     storeTextColor: string | null;
@@ -186,8 +187,8 @@ function Form({
    * one would quietly turn a category that follows the palette into one that
    * has an opinion.
    */
-  const [emptyIconUrl, setEmptyIconUrl] = useState<string | null>(
-    initial?.emptyIconUrl ?? null,
+  const [emptyIcon, setEmptyIcon] = useState<string | null>(
+    initial?.emptyIcon ?? null,
   );
   const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
   const [emptyBackground, setEmptyBackground] = useState<string | null>(
@@ -222,7 +223,7 @@ function Form({
         kindId,
         isActive,
         hasMenuNav,
-        emptyIconUrl,
+        emptyIcon,
         iconUrl,
         emptyBackground,
         storeText,
@@ -232,7 +233,7 @@ function Form({
         kindId: initial?.kindId ?? "",
         isActive: initial?.isActive ?? true,
         hasMenuNav: initial?.hasMenuNav ?? true,
-        emptyIconUrl: initial?.emptyIconUrl ?? null,
+        emptyIcon: initial?.emptyIcon ?? null,
         iconUrl: initial?.iconUrl ?? null,
         emptyBackground: initial?.emptyBackgroundColor ?? null,
         storeText: initial?.storeTextColor ?? null,
@@ -261,7 +262,7 @@ function Form({
       // Half-typed hex is not a colour and not an error either — it is somebody
       // mid-word. Anything that is not six digits is saved as "not set", which
       // is what the database's own shape check would otherwise refuse.
-      emptyIconUrl,
+      emptyIcon,
       iconUrl,
       emptyBackgroundColor: isHex(emptyBackground) ? emptyBackground : null,
       storeTextColor: isHex(storeText) ? storeText : null,
@@ -381,10 +382,9 @@ function Form({
             label={t("categories.emptyIcon")}
             hint={t("categories.emptyIconHint")}
           >
-            <ImageUploader
-              value={emptyIconUrl}
-              onChange={setEmptyIconUrl}
-              folder="category-art"
+            <IconPicker
+              value={emptyIcon}
+              onChange={setEmptyIcon}
               disabled={pending}
             />
           </Field>

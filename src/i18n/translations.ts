@@ -983,7 +983,11 @@ const en = {
       "Shown beside this category's name in the app's category strip. Empty for the app's own glyph. Best uploaded for every category or none — a strip of three photographs and nine glyphs looks worse than twelve glyphs.",
     emptyIcon: "Empty-state icon",
     emptyIconHint:
-      "Shown in a shop's empty picture well. Empty for the app's own glyph for this category.",
+      "Drawn on any dish in this category that has no picture of its own. It takes the category's colour, so pick the shape rather than the shade.",
+    // The cell that clears the choice. "None" would read as "draw nothing",
+    // which is the one thing it does not mean — the app still draws its own.
+    iconNone: "Use the app's own icon",
+    iconNoneShort: "Auto",
     emptyBackground: "Empty-state background",
     emptyBackgroundHint: "The colour behind that icon.",
     storeText: "Text on a shop's page",

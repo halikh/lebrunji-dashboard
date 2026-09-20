@@ -61,16 +61,26 @@ export type Category = {
    * value, which is why nothing here is defaulted: a category left alone still
    * follows the palette if the palette moves.
    */
-  emptyIconUrl: string | null;
+  /**
+   * The glyph a dish with no photograph falls back to — `0124`.
+   *
+   * A name out of the shared vocabulary, not a URL: this is drawn at 22pt in
+   * one colour beside type, which is a glyph rather than a picture. See
+   * `lib/category-icons.ts`.
+   *
+   * Null means the app's own table decides, which is what every category did
+   * before the column existed.
+   */
+  emptyIcon: string | null;
   emptyBackgroundColor: string | null;
   storeTextColor: string | null;
   /**
    * The category's own mark, in the app's category strip — `0123`.
    *
-   * Not `emptyIconUrl`, which stands in for a *shop* with no photograph and is
-   * drawn card-sized behind a name. This one is chip-sized beside the category's
-   * own word. The same file may well suit both; the columns are separate so the
-   * merchant can decide that rather than the schema assuming it.
+   * A real picture, shown at 36pt as itself — unlike `emptyIcon`, which is a
+   * glyph the app strokes in the category's accent. The two are different kinds
+   * of answer to different questions, which is why `0124` made one a name and
+   * left this one a file.
    */
   iconUrl: string | null;
   /**
@@ -97,7 +107,7 @@ export type Category = {
 // would have done exactly that).
 const COLUMNS = `id, slug, category_kind_id, name,
    is_active, has_menu_nav, sort_order,
-   empty_icon_url, empty_background_color, store_text_color, icon_url,
+   empty_icon, empty_background_color, store_text_color, icon_url,
    stores ( count )`;
 
 /**
@@ -156,7 +166,7 @@ export async function fetchCategories(
     isActive: row.is_active as boolean,
     hasMenuNav: row.has_menu_nav as boolean,
     sortOrder: row.sort_order as number,
-    emptyIconUrl: (row.empty_icon_url as string | null) ?? null,
+    emptyIcon: (row.empty_icon as string | null) ?? null,
     iconUrl: (row.icon_url as string | null) ?? null,
     emptyBackgroundColor: (row.empty_background_color as string | null) ?? null,
     storeTextColor: (row.store_text_color as string | null) ?? null,
@@ -219,7 +229,17 @@ export type CategoryDraft = {
   isActive: boolean;
   hasMenuNav: boolean;
   /** See `Category` — null means the app's own table decides. */
-  emptyIconUrl: string | null;
+  /**
+   * The glyph a dish with no photograph falls back to — `0124`.
+   *
+   * A name out of the shared vocabulary, not a URL: this is drawn at 22pt in
+   * one colour beside type, which is a glyph rather than a picture. See
+   * `lib/category-icons.ts`.
+   *
+   * Null means the app's own table decides, which is what every category did
+   * before the column existed.
+   */
+  emptyIcon: string | null;
   iconUrl: string | null;
   emptyBackgroundColor: string | null;
   storeTextColor: string | null;
@@ -236,7 +256,7 @@ export async function createCategory(
       name: formatLocalized(draft.name, NAME_FORMAT),
       is_active: draft.isActive,
       has_menu_nav: draft.hasMenuNav,
-      empty_icon_url: draft.emptyIconUrl,
+      empty_icon: draft.emptyIcon,
       icon_url: draft.iconUrl,
       empty_background_color: draft.emptyBackgroundColor,
       store_text_color: draft.storeTextColor,
@@ -262,7 +282,7 @@ export async function updateCategory(
   if (patch.hasMenuNav !== undefined) row.has_menu_nav = patch.hasMenuNav;
   // Written when present, `null` included — clearing one is how a category is
   // put back to following the app's own table.
-  if (patch.emptyIconUrl !== undefined) row.empty_icon_url = patch.emptyIconUrl;
+  if (patch.emptyIcon !== undefined) row.empty_icon = patch.emptyIcon;
   if (patch.iconUrl !== undefined) row.icon_url = patch.iconUrl;
   if (patch.emptyBackgroundColor !== undefined)
     row.empty_background_color = patch.emptyBackgroundColor;
