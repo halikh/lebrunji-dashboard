@@ -642,7 +642,10 @@ function Section({
           onCancel={onRenameCancel}
         />
       ) : (
-        <div className="flex items-center gap-md">
+        // `relative`, so the toggle's stretched hit area below has something to
+        // be absolute against. The item rows get this from `ROW`; a section
+        // heading is not a `ROW` and has to say it itself.
+        <div className="relative flex items-center gap-md">
           <button {...handleProps(section.id)}>
             <GripIcon />
           </button>
@@ -652,13 +655,23 @@ function Section({
             reads to decide whether this is the section they meant should also
             be the thing they press.
 
+            `ROW_TARGET` takes that further: the whole heading **row** toggles,
+            including the empty space between the count and the buttons at the
+            far end. A strip that responds to a click on the words and ignores
+            a click two inches to the right is a target you have to aim at.
+            The button stays the control, so the accessible name is the
+            section's and `aria-expanded` is on the thing that says it.
+
             The count comes inside the button, because closed it is the whole
             of what the section says. */}
           <button
             type="button"
             onClick={() => setOpen(!open)}
             aria-expanded={open}
-            className="flex min-w-0 items-center gap-md text-left"
+            className={cx(
+              ROW_TARGET,
+              "flex min-w-0 items-center gap-md text-left",
+            )}
           >
             <svg
               width="14"
@@ -700,9 +713,13 @@ function Section({
             operator is actually reading.
 
             Hidden while the section is being carried: they are things to press,
-            and nothing in a block travelling under the cursor is pressable. */}
+            and nothing in a block travelling under the cursor is pressable.
+
+            `ROW_ABOVE` keeps them above the heading's stretched hit area —
+            without it, Rename and Archive would both just toggle the section. */}
           <div
             className={cx(
+              ROW_ABOVE,
               "ms-auto flex items-center gap-sm",
               carried && "hidden",
             )}
