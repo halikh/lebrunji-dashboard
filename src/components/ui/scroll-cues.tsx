@@ -53,10 +53,23 @@ const SLACK = 24;
 /** How much of a pane one press moves — most of it, with an overlap to read. */
 const PAGE = 0.8;
 
+/**
+ * How far a pane must be scrolled before it offers to go back to the top.
+ *
+ * More than half a screenful, and deliberately not `SLACK`. The down cue
+ * answers "is that everything", which is worth saying the moment anything is
+ * hidden. Going back to the top is only worth offering once the top is far
+ * enough away to be a nuisance to reach — at forty pixels down, a cue telling
+ * you how to travel forty pixels is noise.
+ */
+const FAR = 0.6;
+
 type Cue = {
   /** Identity across frames, so React keeps the same node and it can animate. */
-  key: number;
+  key: string;
   pane: HTMLElement;
+  /** Which edge, which decides the words, the arrow and where it goes. */
+  dir: "up" | "down";
   /** Where to draw, in viewport coordinates. */
   left: number;
   top: number;
@@ -84,7 +97,8 @@ export function ScrollCues() {
       )) {
         const more =
           node.scrollHeight - node.clientHeight - node.scrollTop > SLACK;
-        if (!more) continue;
+        const far = node.scrollTop > node.clientHeight * FAR;
+        if (!more && !far) continue;
 
         const box = node.getBoundingClientRect();
         // A pane scrolled out of view, or collapsed to nothing by a hidden
@@ -98,12 +112,28 @@ export function ScrollCues() {
           ids.current.set(node, id);
         }
 
-        found.push({
-          key: id,
-          pane: node,
-          left: box.left + box.width / 2,
-          top: box.bottom,
-        });
+        const middle = box.left + box.width / 2;
+
+        // Both can be true at once — the middle of a long list is exactly
+        // where somebody wants to know they can go either way.
+        if (far) {
+          found.push({
+            key: `${id}-up`,
+            pane: node,
+            dir: "up",
+            left: middle,
+            top: box.top,
+          });
+        }
+        if (more) {
+          found.push({
+            key: `${id}-down`,
+            pane: node,
+            dir: "down",
+            left: middle,
+            top: box.bottom,
+          });
+        }
       }
 
       setCues((current) => (same(current, found) ? current : found));
@@ -151,15 +181,20 @@ export function ScrollCues() {
           key={cue.key}
           type="button"
           onClick={() =>
-            cue.pane.scrollBy({
-              top: cue.pane.clientHeight * PAGE,
-              behavior: "smooth",
-            })
+            cue.dir === "down"
+              ? cue.pane.scrollBy({
+                  top: cue.pane.clientHeight * PAGE,
+                  behavior: "smooth",
+                })
+              : // All the way, not one page back. Pressing "back to top" twice
+                // to reach the top would be a control that does not do what it
+                // says, and the way down is the scroll wheel either way.
+                cue.pane.scrollTo({ top: 0, behavior: "smooth" })
           }
           style={{ left: cue.left, top: cue.top }}
-          className="scroll-cue"
+          className={cue.dir === "down" ? "scroll-cue" : "scroll-cue is-up"}
         >
-          {t("common.scrollMore")}
+          {cue.dir === "down" ? t("common.scrollMore") : t("common.scrollTop")}
           <svg
             width="14"
             height="14"
@@ -171,7 +206,11 @@ export function ScrollCues() {
             strokeLinejoin="round"
             aria-hidden
           >
-            <path d="M12 5v14M5 12l7 7 7-7" />
+            {cue.dir === "down" ? (
+              <path d="M12 5v14M5 12l7 7 7-7" />
+            ) : (
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            )}
           </svg>
         </button>
       ))}

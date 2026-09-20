@@ -45,6 +45,14 @@ const en = {
      * as much as fits over a list without becoming part of it.
      */
     scrollMore: "More below",
+    /**
+     * Its twin at the top edge, once a pane is far enough down to make
+     * getting back a chore — see `FAR` in `ScrollCues`.
+     *
+     * Names the destination rather than the direction: "Up" would leave open
+     * how far, and this one goes all the way.
+     */
+    scrollTop: "Back to top",
     signOut: "Sign out",
     somethingWentWrong: "Something went wrong. Try again.",
     close: "Close",

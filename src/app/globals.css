@@ -779,6 +779,19 @@ dialog[open]::backdrop {
   box-shadow: 0 1px 2px rgb(30 27 24 / 0.08);
 }
 
+/**
+ * The same pill at the **top** edge — "back to top".
+ *
+ * It hangs below its edge where the other hangs above its own, so each sits
+ * inside the pane it belongs to rather than over the chrome next to it. The
+ * `margin-top` is flipped with it: on the down cue that lifts the pill clear
+ * of the bottom edge, and here it has to push down instead.
+ */
+.scroll-cue.is-up {
+  transform: translate(-50%, 0);
+  margin-top: var(--spacing-sm);
+}
+
 .scroll-cue:hover {
   color: var(--color-text);
   border-color: var(--color-active);
