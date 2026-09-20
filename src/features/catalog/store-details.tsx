@@ -58,13 +58,27 @@ import { useSetStoreCurrency, useStore, useUpdateStore } from "./use-stores";
  * about a branch, and the two pictures — the shop's here, the branch's override
  * there — are edited on the pages of the rows they belong to.
  *
- * ## What is deliberately not here
+ * ## The place is here too, for a shop that is one place
  *
- * The pin, the prep window, the WhatsApp number and the opening hours. All four
- * moved to `branches` in `0101` and answer "where and when does an order reach
- * a kitchen", which is wrong the moment a shop has two addresses. The columns
- * still exist on `stores` for shops created before the move; nothing on this
- * screen writes them.
+ * The pin, the prep window and the WhatsApp number moved to `branches` in
+ * `0101`, and they belong there: they answer "where and when does an order
+ * reach a kitchen", which is a different answer per address the moment a shop
+ * has two.
+ *
+ * A shop with **one** address is the case that made that reading wrong in
+ * practice. Its store row and its only branch are the same shopfront, and
+ * splitting them across two tabs meant the shop's name was asked for twice and
+ * its location could not be reached from the page called Details at all —
+ * with the branch's copy of the name being the one nothing in the app draws.
+ * See `sole` for the rest.
+ *
+ * So with one branch this page owns the whole shopfront and writes both rows.
+ * With two or more it goes back to being about the brand alone. The **hours**
+ * stay on the branch either way; they are a grid rather than a field and have
+ * a tab of their own.
+ *
+ * `stores.latitude` and `stores.longitude` still exist for shops created
+ * before `0101`; nothing on this screen writes them.
  *
  * Visibility is not here either. A shop is put on and off the storefront from
  * the shops list, where the switch acts on the row and asks first — see

@@ -142,8 +142,27 @@ export function BranchesTab({ storeId }: { storeId: string }) {
             imageUrl={branch.imageUrl ?? store.data?.imageUrl ?? null}
             categoryName={store.data?.categoryName ?? ""}
             anchor={focus.attach(branch.id)}
+            /**
+             * The shop's only branch opens **Details**, not the branch editor.
+             *
+             * With one branch the two rows are one shopfront, and Details now
+             * owns it — the name, the pin, the prep window, the WhatsApp
+             * number, all writing through to this branch. What the branch
+             * editor would still offer is a name nothing in the app draws, an
+             * image and a currency that can only override the shop's with the
+             * shop's own values, and an active switch that cannot be turned
+             * off. Every field on it is a no-op, which is the decoy this whole
+             * change is about.
+             *
+             * It opens normally the moment a second branch exists, because
+             * then each of those fields means something.
+             */
             onEdit={guarded(() =>
-              router.push(`/catalogue/${storeId}/branches/${branch.id}`),
+              router.push(
+                !searching && rows.length === 1
+                  ? `/catalogue/${storeId}?tab=details`
+                  : `/catalogue/${storeId}/branches/${branch.id}`,
+              ),
             )}
             /* Its own page rather than a tab on the editor: the editor is a
                  form with a Save, and this is a list of switches that write as
@@ -253,7 +272,10 @@ function BranchRow({
         onClick={onEdit}
         // `ROW_TARGET` stretches this button's hit area over the whole row —
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
-        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col items-start gap-xxs text-left")}
+        className={cx(
+          ROW_TARGET,
+          "flex min-w-0 flex-grow flex-col items-start gap-xxs text-left",
+        )}
       >
         <span className="flex items-center gap-sm">
           <span className="truncate text-[15px] font-semibold">{name}</span>
