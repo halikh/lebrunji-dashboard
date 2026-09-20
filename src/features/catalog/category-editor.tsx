@@ -162,6 +162,7 @@ function Form({
     isActive: boolean;
     hasMenuNav: boolean;
     emptyIconUrl: string | null;
+    iconUrl: string | null;
     emptyBackgroundColor: string | null;
     storeTextColor: string | null;
   } | null;
@@ -188,6 +189,7 @@ function Form({
   const [emptyIconUrl, setEmptyIconUrl] = useState<string | null>(
     initial?.emptyIconUrl ?? null,
   );
+  const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
   const [emptyBackground, setEmptyBackground] = useState<string | null>(
     initial?.emptyBackgroundColor ?? null,
   );
@@ -221,6 +223,7 @@ function Form({
         isActive,
         hasMenuNav,
         emptyIconUrl,
+        iconUrl,
         emptyBackground,
         storeText,
       },
@@ -230,6 +233,7 @@ function Form({
         isActive: initial?.isActive ?? true,
         hasMenuNav: initial?.hasMenuNav ?? true,
         emptyIconUrl: initial?.emptyIconUrl ?? null,
+        iconUrl: initial?.iconUrl ?? null,
         emptyBackground: initial?.emptyBackgroundColor ?? null,
         storeText: initial?.storeTextColor ?? null,
       },
@@ -258,6 +262,7 @@ function Form({
       // mid-word. Anything that is not six digits is saved as "not set", which
       // is what the database's own shape check would otherwise refuse.
       emptyIconUrl,
+      iconUrl,
       emptyBackgroundColor: isHex(emptyBackground) ? emptyBackground : null,
       storeTextColor: isHex(storeText) ? storeText : null,
     });
@@ -358,6 +363,19 @@ function Form({
               {t("categories.artworkSectionHint")}
             </p>
           </div>
+
+          {/* The category's own mark, first — it is the one a customer meets,
+              in the strip across the top of Home and Search. The two below it
+              are about how a *shop* in this category is drawn when it has sent
+              nothing of its own, which is a narrower question. */}
+          <Field label={t("categories.icon")} hint={t("categories.iconHint")}>
+            <ImageUploader
+              value={iconUrl}
+              onChange={setIconUrl}
+              folder="category-art"
+              disabled={pending}
+            />
+          </Field>
 
           <Field
             label={t("categories.emptyIcon")}

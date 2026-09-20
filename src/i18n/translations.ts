@@ -969,12 +969,18 @@ const en = {
 
     // ---- the artwork (0117) -------------------------------------------------
     //
-    // Three overrides on what the app draws a category as. Each says what it is
+    // Four overrides on what the app draws a category as. Each says what it is
     // *for* rather than naming a column, and each says what leaving it empty
     // does — because empty is a real answer here and the common one.
     artworkSection: "Artwork",
     artworkSectionHint:
-      "How this category looks in the app when a shop has sent no photograph of its own. Leave any of them empty and the app's own answer is used.",
+      "How this category looks in the app. Leave any of them empty and the app's own answer is used.",
+    // The category's own mark. Named for where it appears, because the field
+    // under it is also an icon and the difference between them is *what they
+    // stand for* — this one the category, that one a shop inside it.
+    icon: "Category icon",
+    iconHint:
+      "Shown beside this category's name in the app's category strip. Empty for the app's own glyph. Best uploaded for every category or none — a strip of three photographs and nine glyphs looks worse than twelve glyphs.",
     emptyIcon: "Empty-state icon",
     emptyIconHint:
       "Shown in a shop's empty picture well. Empty for the app's own glyph for this category.",
