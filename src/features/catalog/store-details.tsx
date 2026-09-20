@@ -368,9 +368,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
       ? validatePrepWindow(Number(prepMin), Number(prepMax))
       : null;
     const phoneCheck =
-      sole && whatsapp.trim() !== ""
-        ? validatePhone(digitsOf(whatsapp))
-        : null;
+      sole && whatsapp.trim() !== "" ? validatePhone(digitsOf(whatsapp)) : null;
 
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
