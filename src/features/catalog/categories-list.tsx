@@ -15,10 +15,7 @@ import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
-import {
-  CATEGORY_ICONS,
-  type CategoryIconName,
-} from "@/lib/category-icons";
+import { CATEGORY_ICONS, type CategoryIconName } from "@/lib/category-icons";
 
 import { applyOrder } from "./api/menu";
 import type { Category } from "./api/categories";

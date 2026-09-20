@@ -10,6 +10,7 @@ import { Button, cx } from "@/components/ui";
 import { SearchInput } from "@/components/ui/search-input";
 import { useRowFocus } from "@/components/ui/row-focus";
 import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
+import { Collapse } from "@/components/ui/collapse";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedField } from "@/components/ui/localized-field";
@@ -569,6 +570,48 @@ function Section({
   const [pasting, setPasting] = useState(false);
   const guarded = useGuardedAction();
 
+  /**
+   * Whether this section's items are showing. **Closed to begin with.**
+   *
+   * A shop's menu is several sections of a dozen-odd rows, and open by default
+   * it is a page that has to be scrolled past rather than read: the thing an
+   * operator usually wants — which section holds the dish, or what order the
+   * sections are in — is the part that was hardest to see. Closed, the whole
+   * menu is a short list of headings with their counts, and opening one is a
+   * click.
+   *
+   * It is also what makes dragging sections usable, which is the one control
+   * on this screen that decides what a customer sees first.
+   *
+   * ## Why the state is here and not lifted
+   *
+   * A section is keyed by its id in the list above, so this survives every
+   * re-render, reorder and refetch for as long as the row exists. Lifting it
+   * would buy persistence across navigations, which is not obviously wanted:
+   * coming back to a menu you were editing and finding it as you left it is
+   * nice, and coming back to a *different* shop's menu with someone else's
+   * sections open is not.
+   */
+  const [open, setOpen] = useState(false);
+
+  /**
+   * Opened by the row focus, so returning from an item's page shows it.
+   *
+   * `useRowFocus` scrolls the edited row back under the operator's eye — and a
+   * row inside a closed section cannot be scrolled to. Adjusted during render
+   * rather than in an effect, which is the pattern `StoreScreen` uses for the
+   * same kind of state and for the same reason: an effect would paint the
+   * section closed once and then open, which is a flash on every return.
+   */
+  const focused =
+    focus.isFocused(section.id) ||
+    section.items.some((item) => focus.isFocused(item.id));
+  const [wasFocused, setWasFocused] = useState(focused);
+  if (focused !== wasFocused) {
+    setWasFocused(focused);
+    if (focused) setOpen(true);
+  }
+
   const itemOrder = useReorder({
     ids: section.items.map((item) => item.id),
     onReorder: onReorderItems,
@@ -604,21 +647,53 @@ function Section({
             <GripIcon />
           </button>
 
-          {/* Marked and scrolled to on the way back from renaming it — the same
-            signal an item row gets, for the same "this is the one you were
-            working on". */}
-          <h2
-            ref={focus.attach(section.id)}
-            className={cx(
-              "text-[18px]",
-              focus.isFocused(section.id) && "text-active",
-            )}
+          {/* The heading opens the section, not a chevron beside it — the same
+            call `store-options` makes for its groups: the line an operator
+            reads to decide whether this is the section they meant should also
+            be the thing they press.
+
+            The count comes inside the button, because closed it is the whole
+            of what the section says. */}
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            className="flex min-w-0 items-center gap-md text-left"
           >
-            {title}
-          </h2>
-          <span className="text-[13px] text-text-faint">
-            {t("menu.itemCount", { count: section.items.length })}
-          </span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              className={cx(
+                "shrink-0 text-text-faint transition-transform",
+                open && "rotate-90",
+              )}
+            >
+              <path d="M9 5l7 7-7 7" />
+            </svg>
+
+            {/* Marked and scrolled to on the way back from renaming it — the
+              same signal an item row gets, for the same "this is the one you
+              were working on". */}
+            <h2
+              ref={focus.attach(section.id)}
+              className={cx(
+                "truncate text-[18px]",
+                focus.isFocused(section.id) && "text-active",
+              )}
+            >
+              {title}
+            </h2>
+            <span className="shrink-0 text-[13px] text-text-faint">
+              {t("menu.itemCount", { count: section.items.length })}
+            </span>
+          </button>
 
           {/* Pushed to the far end. These are the section's own controls and
             should not compete with the items under it, which is what the
@@ -658,13 +733,21 @@ function Section({
 
       {itemOrder.instructions}
 
-      {section.items.length === 0 && !carried && (
-        <p className="rounded-md border border-dashed border-border px-lg py-md text-[13px] text-text-faint">
-          {t("menu.sectionEmpty")}
-        </p>
-      )}
+      {/* Everything below the heading, in one collapse.
 
-      {/* ## Carried, a section is only its heading
+        `open && !carried` rather than two nested wrappers: a carried section is
+        already only its heading (see the note below), and that is the same
+        state this draws — so the two conditions are one. It also means the
+        items do not animate open the moment a drag ends. */}
+      <Collapse open={open && !carried}>
+        <div className="flex flex-col gap-sm">
+          {section.items.length === 0 && (
+            <p className="rounded-md border border-dashed border-border px-lg py-md text-[13px] text-text-faint">
+              {t("menu.sectionEmpty")}
+            </p>
+          )}
+
+          {/* ## Carried, a section is only its heading
 
           Dragging the whole block meant an opaque slab the height of a screen
           passing over the list and hiding whatever was under it — three items
@@ -679,75 +762,83 @@ function Section({
           Changing a row's size mid-drag is normally the one thing that breaks
           all of this — every stored position would be wrong. It is safe here
           because it happens at the instant the drag begins, which is the one
-          moment `useReorder` re-measures on purpose. */}
-      {!carried &&
-        itemOrder
-          .ordered(section.items, (item) => item.id)
-          .map((item) => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              currencyCode={currencyCode}
-              shopRate={shopRate}
-              handleProps={itemOrder.handleProps}
-              rowProps={itemOrder.rowProps}
-              carried={itemOrder.movingId === item.id}
-              // Marked and scrolled to on the way back from its own page.
-              anchor={focus.attach(item.id)}
-              onEdit={() => onEdit(item.id)}
-              onToggle={() => onToggle(item)}
-              onArchive={() => onArchive(item)}
-            />
-          ))}
+          moment `useReorder` re-measures on purpose.
 
-      {/* At the bottom of the section, not in a header. It is where the eye
+          The `Collapse` above is what folds them now; this note stays because
+          it is *why* a carried section closes, which the condition alone does
+          not say. */}
+          {itemOrder
+            .ordered(section.items, (item) => item.id)
+            .map((item) => (
+              <ItemRow
+                key={item.id}
+                item={item}
+                currencyCode={currencyCode}
+                shopRate={shopRate}
+                handleProps={itemOrder.handleProps}
+                rowProps={itemOrder.rowProps}
+                carried={itemOrder.movingId === item.id}
+                // Marked and scrolled to on the way back from its own page.
+                anchor={focus.attach(item.id)}
+                onEdit={() => onEdit(item.id)}
+                onToggle={() => onToggle(item)}
+                onArchive={() => onArchive(item)}
+              />
+            ))}
+
+          {/* At the bottom of the section, not in a header. It is where the eye
           already is after reading the list. */}
-      {pasting ? (
-        <BulkForm
-          kind="items"
-          // An item without a price is not an item — unlike a choice, where
-          // free is the common case.
-          price="required"
-          decimals={decimals}
-          pending={bulk.pending}
-          onCancel={guarded(() => setPasting(false))}
-          onSubmit={(rows) => {
-            bulk.add(
-              section.id,
-              // Never null under the `required` rule.
-              rows.map((row) => ({ name: row.name, price: row.price ?? 0 })),
-              nextSortOrder(section),
-            );
-            setPasting(false);
-          }}
-        />
-      ) : (
-        <div className="flex flex-wrap items-center gap-sm">
-          <button
-            type="button"
-            onClick={onAdd}
-            className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-faint hover:bg-neutral-fill hover:text-text-soft"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              strokeLinecap="round"
-              aria-hidden
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            {t("menu.addItem", { section: title })}
-          </button>
+          {pasting ? (
+            <BulkForm
+              kind="items"
+              // An item without a price is not an item — unlike a choice, where
+              // free is the common case.
+              price="required"
+              decimals={decimals}
+              pending={bulk.pending}
+              onCancel={guarded(() => setPasting(false))}
+              onSubmit={(rows) => {
+                bulk.add(
+                  section.id,
+                  // Never null under the `required` rule.
+                  rows.map((row) => ({
+                    name: row.name,
+                    price: row.price ?? 0,
+                  })),
+                  nextSortOrder(section),
+                );
+                setPasting(false);
+              }}
+            />
+          ) : (
+            <div className="flex flex-wrap items-center gap-sm">
+              <button
+                type="button"
+                onClick={onAdd}
+                className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-faint hover:bg-neutral-fill hover:text-text-soft"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  aria-hidden
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                {t("menu.addItem", { section: title })}
+              </button>
 
-          <Button variant="secondary" onClick={() => setPasting(true)}>
-            {t("menu.bulkItems")}
-          </Button>
+              <Button variant="secondary" onClick={() => setPasting(true)}>
+                {t("menu.bulkItems")}
+              </Button>
+            </div>
+          )}
         </div>
-      )}
+      </Collapse>
     </section>
   );
 }
@@ -823,7 +914,10 @@ function ItemRow({
         onClick={onEdit}
         // `ROW_TARGET` stretches this button's hit area over the whole row —
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
-        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
+        className={cx(
+          ROW_TARGET,
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+        )}
       >
         <span
           className={cx(
@@ -1086,7 +1180,10 @@ function SearchResult({
         onClick={onEdit}
         // `ROW_TARGET` stretches this button's hit area over the whole row —
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
-        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
+        className={cx(
+          ROW_TARGET,
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+        )}
       >
         <span
           className={cx(
