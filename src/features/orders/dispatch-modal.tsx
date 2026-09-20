@@ -138,7 +138,7 @@ export function DispatchModal({
           )}
         </div>
 
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
           {/* The kitchen first, because it is the earlier step: a shop that has
               not been told what to cook has nothing for a driver to collect.
 

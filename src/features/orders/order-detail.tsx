@@ -65,7 +65,7 @@ export function OrderBody({
   from: ReadFrom;
 }) {
   return (
-    <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+    <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
       <section className="flex flex-col gap-sm">
         <SectionTitle>{t("orders.customer")}</SectionTitle>
         <div className="flex flex-wrap items-baseline gap-md">

@@ -195,9 +195,7 @@ export function StoreScreen({ storeId }: { storeId: string }) {
               <h1 className="truncate text-[24px]">
                 {store.data ? pickLocalized(store.data.name) : ""}
               </h1>
-              {store.data && (
-                <StoreFacts store={store.data} />
-              )}
+              {store.data && <StoreFacts store={store.data} />}
             </div>
           </div>
 

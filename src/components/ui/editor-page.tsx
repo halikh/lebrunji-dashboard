@@ -119,7 +119,7 @@ export function EditorPage({
         on the first field is sliced down its edge. The same reason
         `store-brand.tsx` records for its own column.
       */}
-      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto scroll-hint p-xxl">
         {/* See `width`: capped to a readable measure, or handed the whole
             width for an editor that divides it into columns of its own. */}
         <div

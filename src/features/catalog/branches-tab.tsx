@@ -111,7 +111,7 @@ export function BranchesTab({ storeId }: { storeId: string }) {
         </Button>
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
         {/* Says why the tab exists on a shop with one branch, which is the
               first question it gets. */}
         <p className="ps-md text-[13px] text-text-faint">

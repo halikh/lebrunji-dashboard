@@ -330,7 +330,7 @@ function ItemQuestions({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto px-xxl pb-xxl pt-lg">
+      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto scroll-hint px-xxl pb-xxl pt-lg">
         {/*
           Only when it says something new.
           
@@ -1182,7 +1182,7 @@ function ItemPicker({
         </Button>
       </div>
 
-      <div className="flex max-h-[420px] flex-col gap-lg overflow-y-auto rounded-md border border-border p-lg">
+      <div className="flex max-h-[420px] flex-col gap-lg overflow-y-auto scroll-hint rounded-md border border-border p-lg">
         {sections.map((section) => {
           const ids = section.items.map((item) => item.id);
           const on = ids.filter((id) => chosen.has(id)).length;

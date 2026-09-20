@@ -204,7 +204,7 @@ export function ReportsScreen() {
         <h1 className="flex-grow text-[24px]">{t("reports.title")}</h1>
       </div>
 
-      <div className="min-h-0 flex-grow overflow-y-auto">
+      <div className="min-h-0 flex-grow overflow-y-auto scroll-hint">
         <div className="flex flex-col gap-xxl p-xxl">
           {/* ---- What still needs somebody ---------------------------------
               First, and above the range, because it is the thing that cannot

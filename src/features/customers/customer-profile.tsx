@@ -357,7 +357,7 @@ export function CustomerProfile({ id }: { id: string }) {
           position, and flash a skeleton at somebody returning to a list they
           were just reading — and on this page it would do that to an infinite
           list they had scrolled a long way down. */}
-      <div className="min-h-0 flex-grow overflow-y-auto">
+      <div className="min-h-0 flex-grow overflow-y-auto scroll-hint">
         <div className={cx("p-xxl", tab !== "overview" && "hidden")}>
           <div className="flex flex-col gap-xxl">
             {closed && (

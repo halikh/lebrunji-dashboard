@@ -191,7 +191,7 @@ export function DriversScreen() {
         ))}
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
         <p className="ps-md pb-sm text-[13px] text-text-soft">
           {t("drivers.blurb")}
         </p>

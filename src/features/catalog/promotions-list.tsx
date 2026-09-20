@@ -119,7 +119,7 @@ export function PromotionsList() {
           }
         />
 
-        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("promotions.searchHint")}
           </p>
@@ -257,7 +257,10 @@ function Row({
         onClick={onEdit}
         // `ROW_TARGET` stretches this button's hit area over the whole row —
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
-        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
+        className={cx(
+          ROW_TARGET,
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+        )}
       >
         <span className="truncate text-[15px] font-semibold">
           {promotion.slug}

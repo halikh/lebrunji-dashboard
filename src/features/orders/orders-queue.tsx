@@ -324,7 +324,7 @@ export function OrdersQueue() {
         {/* The one part that scrolls. `min-h-0` for the same reason as the
           layout's main — without it this grows to its content and the header
           and tabs get squeezed instead. */}
-        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
           {orders.isPending && <Skeleton />}
 
           {orders.isError && (

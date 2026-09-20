@@ -181,7 +181,7 @@ export function OrderScreen({ id }: { id: string }) {
 
           Siblings rather than one swapped child, so a half-scrolled receipt
           survives a look at the history and back. */}
-      <div className="flex min-h-0 flex-grow flex-col overflow-y-auto">
+      <div className="flex min-h-0 flex-grow flex-col overflow-y-auto scroll-hint">
         <div className={cx("flex flex-col", tab !== "details" && "hidden")}>
           <OrderBody order={order.data} from={"page"} />
         </div>

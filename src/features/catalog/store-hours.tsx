@@ -333,7 +333,7 @@ function Grid({
           week and the wrong one for *checking* it — "Mon–Fri 11:00–23:00,
           closed Sunday" is the same information in the form a person actually
           holds it in, and it is what catches the day left shut by accident. */}
-      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl lg:flex-row lg:items-start">
+      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl lg:flex-row lg:items-start">
         <div className="flex flex-1 flex-col gap-lg">
           <div className="flex flex-col gap-sm">
             {DISPLAY_ORDER.map((index) => {

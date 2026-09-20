@@ -218,7 +218,7 @@ export function AmendOrder({
           <p className="text-[13px] text-text-soft">{t("amend.blurb")}</p>
         </div>
 
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
           {/* Grouped under the shop, with its picture, exactly as the receipt
               is. A two-shop order is two kitchens, and "we are out of the
               kibbeh" is a fact about one of them — a flat list of dishes leaves
@@ -490,7 +490,9 @@ function AmendLine({
                   // the operator is agreeing to on the phone — the press
                   // number behind it is an implementation detail of the
                   // stepper the customer used.
-                  itemUnit(line)?.step == null ? "w-[32px]" : "min-w-[32px] px-sm",
+                  itemUnit(line)?.step == null
+                    ? "w-[32px]"
+                    : "min-w-[32px] px-sm",
                   count === value
                     ? "border-active bg-active-wash text-active-ink"
                     : "border-border text-text-soft",

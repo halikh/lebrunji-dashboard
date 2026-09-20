@@ -672,3 +672,71 @@ dialog[open]::backdrop {
     scroll-behavior: smooth;
   }
 }
+
+/* ===========================================================================
+ * Scroll hints — "there is more below this"
+ * ===========================================================================
+ *
+ * A soft shadow at the edge a pane can still be scrolled towards, and nothing
+ * at the edge it cannot. It is the answer to the one question a cut-off list
+ * raises — *is that everything?* — asked on every pane in the dashboard, which
+ * is why it is a class here rather than an overlay each screen remembers to
+ * draw.
+ *
+ * ## No JavaScript, and that is what makes it reliable
+ *
+ * The trick is `background-attachment`. Two **cover** layers are `local`, so
+ * they travel with the content: at the top of a pane the top cover sits over
+ * the top shadow and hides it, and it scrolls away as soon as the content
+ * does. Two **shadow** layers are `scroll`, so they stay pinned to the
+ * scrollport. The result is a shadow that is revealed and re-covered by the
+ * scrolling itself.
+ *
+ * Nothing listens, so nothing can be out of date: a pane that grows because a
+ * query landed, a row that was deleted, a window that was resized and a list
+ * that is filtered as somebody types are all correct on the same frame they
+ * change, with no observer to wire up and no scroll handler on 37 containers.
+ *
+ * ## Why the shorthand is avoided
+ *
+ * `background: …` would take the *colour* too and every pane using a Tailwind
+ * `bg-` utility would lose it. The four longhands leave `background-color`
+ * alone, so this composes with whatever the element already had.
+ *
+ * The cover layers do have to be painted in the pane's own ground, and that is
+ * this rule's one assumption: a pane sits on `--color-surface`. Every one in
+ * the dashboard does — both surface and background are white — and a pane that
+ * ever sits on a tint should set `--scroll-hint-ground` to match.
+ */
+.scroll-hint {
+  --scroll-hint-ground: var(--color-surface);
+
+  background-image:
+    linear-gradient(to bottom, var(--scroll-hint-ground) 30%, transparent),
+    linear-gradient(to top, var(--scroll-hint-ground) 30%, transparent),
+    radial-gradient(
+      farthest-side at 50% 0,
+      rgb(30 27 24 / 0.16),
+      rgb(30 27 24 / 0)
+    ),
+    radial-gradient(
+      farthest-side at 50% 100%,
+      rgb(30 27 24 / 0.16),
+      rgb(30 27 24 / 0)
+    );
+
+  background-position:
+    top center,
+    bottom center,
+    top center,
+    bottom center;
+  background-repeat: no-repeat;
+  /* The covers are taller than the shadows so a shadow is fully hidden at rest
+     rather than leaving a hairline at the very top of an unscrolled pane. */
+  background-size:
+    100% 32px,
+    100% 32px,
+    100% 12px,
+    100% 12px;
+  background-attachment: local, local, scroll, scroll;
+}

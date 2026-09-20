@@ -222,7 +222,7 @@ function HelpTab() {
           </Button>
         </div>
 
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("content.helpBlurb")}
           </p>
@@ -337,7 +337,10 @@ function HelpRow({
         onClick={onEdit}
         // `ROW_TARGET` stretches this button's hit area over the whole row —
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
-        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
+        className={cx(
+          ROW_TARGET,
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+        )}
       >
         <span className="truncate text-[15px] font-semibold">{name}</span>
         <span className="truncate text-[12px] text-text-faint">
@@ -478,7 +481,7 @@ function LegalTab() {
           </Button>
         </div>
 
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("content.legalBlurb")}
           </p>
@@ -578,7 +581,10 @@ function PolicyRow({
         onClick={onEdit}
         // `ROW_TARGET` stretches this button's hit area over the whole row —
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
-        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
+        className={cx(
+          ROW_TARGET,
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+        )}
       >
         <span className="truncate text-[15px] font-semibold">{name}</span>
         {/* One line of the body, as a reminder of which section this is — a
@@ -628,7 +634,7 @@ function PaymentsTab() {
   const codes = languages.data?.map((language) => language.code) ?? [];
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-lg overflow-y-auto p-xxl">
+    <div className="flex h-full min-h-0 flex-col gap-lg overflow-y-auto scroll-hint p-xxl">
       <p className="ps-md text-[13px] text-text-soft">
         {t("content.paymentsBlurb")}
       </p>
@@ -722,7 +728,7 @@ function StepsTab() {
   const current = rows.find((one) => one.id === selected) ?? rows[0] ?? null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-xxl overflow-y-auto p-xxl">
+    <div className="flex h-full min-h-0 flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
       <p className="ps-md text-[13px] text-text-soft">
         {t("content.stepsBlurb")}
       </p>

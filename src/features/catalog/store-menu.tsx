@@ -250,7 +250,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             {t("menu.searchHint")}
           </span>
         </div>
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
           {menu.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (

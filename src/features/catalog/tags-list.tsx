@@ -86,7 +86,7 @@ export function TagsList() {
           }
         />
 
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
           {/* What the list is for, said once at the top. A vocabulary screen
               with no explanation reads as a settings table; the sentence is
               what makes "Popular" here and a chip on a phone the same thing. */}
@@ -170,7 +170,7 @@ function Row({
     // Marked, not dimmed — fading a row takes its controls with it, and a
     // faded button reads as a disabled one.
     !tag.isActive && "border-danger-wash bg-danger-wash/30",
-      tag.isActive && "border-border",
+    tag.isActive && "border-border",
     tag.isActive && open && "border-active",
   );
 
@@ -181,7 +181,10 @@ function Row({
         onClick={onEdit}
         // `ROW_TARGET` stretches this button's hit area over the whole row —
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
-        className={cx(ROW_TARGET, "flex min-w-0 flex-grow items-center gap-md text-left")}
+        className={cx(
+          ROW_TARGET,
+          "flex min-w-0 flex-grow items-center gap-md text-left",
+        )}
       >
         {/* The chip itself, at the size a phone draws it. The row shows the
             thing rather than describing it — a tone named in words would ask

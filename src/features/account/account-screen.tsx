@@ -129,7 +129,7 @@ export function AccountScreen() {
           The two forms below stay siblings, so the state the note on them is
           about still survives moving between Password and Email. */}
       {tab !== "general" && (
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
           {/* Full width and first: which account these two forms are about is
               the thing to establish before either of them is filled in. */}
           <section className="flex flex-col gap-xs rounded-md border border-border bg-surface p-lg">

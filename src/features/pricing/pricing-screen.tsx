@@ -176,8 +176,8 @@ function Rate() {
   });
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-      <section className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto scroll-hint lg:flex-row lg:overflow-hidden">
+      <section className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto scroll-hint">
         <div className="flex flex-col gap-xs">
           <h2 className="ps-md text-[18px]">{t("pricing.rateTitle")}</h2>
           <p className="ps-md text-[14px] text-text-soft">
@@ -333,7 +333,7 @@ function Conversions({
     formatMoney(convertMoney(minor, from, { ...to, rate }), to);
 
   return (
-    <aside className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto">
+    <aside className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto scroll-hint">
       <div className="flex flex-col gap-xs">
         <h3 className="ps-md text-[15px] font-semibold">
           {t("pricing.whatItMeans")}
@@ -510,7 +510,7 @@ function Ladder() {
     // distance, a fee, and what the last one means — so it uses the window
     // rather than sharing it.
     <div className="flex h-full min-h-0 flex-col">
-      <section className="flex min-h-0 flex-1 flex-col gap-lg overflow-y-auto p-xxl">
+      <section className="flex min-h-0 flex-1 flex-col gap-lg overflow-y-auto scroll-hint p-xxl">
         <div className="flex flex-col gap-xs">
           <h2 className="ps-md text-[18px]">{t("pricing.ladderTitle")}</h2>
           <p className="ps-md text-[14px] text-text-soft">

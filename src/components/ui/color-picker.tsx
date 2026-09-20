@@ -84,9 +84,7 @@ export function ColorPicker({
             onClick={preset.onSelect}
             className={cx(
               "size-[34px] rounded-full border-2",
-              preset.on
-                ? "border-active"
-                : "border-border hover:border-active",
+              preset.on ? "border-active" : "border-border hover:border-active",
             )}
             style={{ background: preset.hex }}
           />

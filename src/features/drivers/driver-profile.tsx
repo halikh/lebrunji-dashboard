@@ -174,7 +174,7 @@ export function DriverProfile({ id }: { id: string }) {
             page's own ground carries the content — the same separation every
             other screen has between the bar that identifies a record and the
             record itself. */}
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
           <div className="flex flex-wrap gap-lg">
             <Stat label={t("drivers.statToday")} value={String(today)} />
             <Stat label={t("drivers.statThisWeek")} value={String(thisWeek)} />

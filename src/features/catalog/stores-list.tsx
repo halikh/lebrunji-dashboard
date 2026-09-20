@@ -113,7 +113,7 @@ export function StoresList() {
         }
       />
 
-      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
         {stores.isPending && (
           <div aria-hidden className="flex flex-col gap-sm">
             {[0, 1, 2, 3].map((row) => (
@@ -148,31 +148,33 @@ export function StoresList() {
           />
         )}
 
-        {order.ordered(rows, (row) => row.id).map((store) => (
-          <StoreRow
-            key={store.id}
-            store={store}
-            rowProps={order.rowProps(store.id)}
-            handleProps={order.handleProps(store.id)}
-            onToggleActive={() =>
-              update.mutate({
-                id: store.id,
-                patch: { isActive: !store.isActive },
-              })
-            }
-            onToggleFeatured={() =>
-              update.mutate({
-                id: store.id,
-                patch: { isFeatured: !store.isFeatured },
-              })
-            }
-            // Awaited and discarded: `ConfirmButton` keeps its dialog open
-            // until this settles, and catches a rejection to report inside it.
-            onArchive={async () => {
-              await archive.mutateAsync({ id: store.id, name: store.name });
-            }}
-          />
-        ))}
+        {order
+          .ordered(rows, (row) => row.id)
+          .map((store) => (
+            <StoreRow
+              key={store.id}
+              store={store}
+              rowProps={order.rowProps(store.id)}
+              handleProps={order.handleProps(store.id)}
+              onToggleActive={() =>
+                update.mutate({
+                  id: store.id,
+                  patch: { isActive: !store.isActive },
+                })
+              }
+              onToggleFeatured={() =>
+                update.mutate({
+                  id: store.id,
+                  patch: { isFeatured: !store.isFeatured },
+                })
+              }
+              // Awaited and discarded: `ConfirmButton` keeps its dialog open
+              // until this settles, and catches a rejection to report inside it.
+              onArchive={async () => {
+                await archive.mutateAsync({ id: store.id, name: store.name });
+              }}
+            />
+          ))}
 
         {/* Said out loud rather than silently truncating. A catalogue that is
             quietly missing shops is the kind of wrong nobody notices until a

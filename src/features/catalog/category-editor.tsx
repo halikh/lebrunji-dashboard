@@ -190,7 +190,9 @@ function Form({
   const [emptyIcon, setEmptyIcon] = useState<string | null>(
     initial?.emptyIcon ?? null,
   );
-  const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
+  const [iconUrl, setIconUrl] = useState<string | null>(
+    initial?.iconUrl ?? null,
+  );
   const [emptyBackground, setEmptyBackground] = useState<string | null>(
     initial?.emptyBackgroundColor ?? null,
   );
