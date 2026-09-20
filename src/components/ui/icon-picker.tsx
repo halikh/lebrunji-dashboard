@@ -2,8 +2,9 @@
 
 import { cx } from "@/components/ui";
 import {
+  CATEGORY_ICONS,
   CATEGORY_ICON_NAMES,
-  categoryIcon,
+
   type CategoryIconName,
 } from "@/lib/category-icons";
 import { t } from "@/i18n/translations";
@@ -89,8 +90,12 @@ function IconCell({
   disabled: boolean;
   onClick: () => void;
 }) {
-  const Glyph = categoryIcon(name);
-  if (!Glyph) return null;
+  // Indexed out of the constant map rather than through `categoryIcon`: the
+  // React Compiler reads a *call* that returns a component as creating one
+  // during render, and refuses it. A property access on a frozen record is the
+  // same lookup without the ambiguity — and `name` is typed to the map's own
+  // keys here, so there is nothing for the null branch to catch.
+  const Glyph = CATEGORY_ICONS[name];
 
   return (
     <Cell
