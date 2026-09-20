@@ -9,11 +9,16 @@ import { ListHeader } from "@/components/ui/list-header";
 import { ROW } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
+import { PreviewImage } from "@/components/ui/image-preview";
 import { useRowFocus } from "@/components/ui/row-focus";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
+import {
+  CATEGORY_ICONS,
+  type CategoryIconName,
+} from "@/lib/category-icons";
 
 import { applyOrder } from "./api/menu";
 import type { Category } from "./api/categories";
@@ -219,6 +224,8 @@ function Row({
         <GripIcon />
       </button>
 
+      <Artwork category={category} name={pickLocalized(category.name)} />
+
       <button
         type="button"
         onClick={onEdit}
@@ -274,6 +281,81 @@ function Row({
       >
         {t("categories.archive")}
       </ConfirmButton>
+    </div>
+  );
+}
+
+/**
+ * What this category looks like in the app, at a glance down the list.
+ *
+ * Two marks, because the editor sets two different things and they are easy to
+ * confuse until you see them side by side:
+ *
+ *   1. **The category icon** — `icon_url`, the picture in the app's category
+ *      strip. Drawn bare, on no ground, exactly as the strip draws it.
+ *   2. **The empty state** — the glyph a dish with no photograph of its own
+ *      falls back to, on the ground the category sets for it.
+ *
+ * ## The glyph's colour here is an approximation, deliberately
+ *
+ * The app strokes it in the category's `accent`, which lives only in the app's
+ * own theme table — it is not a column and the dashboard cannot know it. So
+ * this draws the glyph in `store_text_color`, the one colour of the
+ * category's the dashboard *does* hold. The shape, the ground and the fact
+ * that a glyph is chosen at all are all exact; only the stroke is stood in
+ * for, and it is the one part of the pair the operator cannot set anyway.
+ */
+function Artwork({
+  category,
+  name,
+}: {
+  /** What the picture is of, for the lightbox `PreviewImage` opens. */
+  name: string;
+  category: {
+    iconUrl: string | null;
+    emptyIcon: string | null;
+    emptyBackgroundColor: string | null;
+    storeTextColor: string | null;
+  };
+}) {
+  // Indexed rather than called — a function returning a component is what the
+  // React Compiler reads as creating one during render. See `IconPicker`.
+  const Glyph = category.emptyIcon
+    ? CATEGORY_ICONS[category.emptyIcon as CategoryIconName]
+    : undefined;
+
+  return (
+    <div className="flex shrink-0 items-center gap-sm">
+      {/* The strip's mark. A dashed well when there is none, so an empty slot
+          reads as "nothing uploaded" rather than as a picture that failed. */}
+      {category.iconUrl ? (
+        <PreviewImage
+          src={category.iconUrl}
+          name={name}
+          className="size-[32px] shrink-0 object-contain"
+        />
+      ) : (
+        <span
+          aria-hidden
+          className="size-[32px] shrink-0 rounded-md border border-dashed border-border"
+        />
+      )}
+
+      {/* The empty-state well, at the app's own proportions: a rounded square
+          with the glyph centred in it. */}
+      <span
+        className="flex size-[32px] shrink-0 items-center justify-center rounded-md"
+        style={{ background: category.emptyBackgroundColor ?? "#f0eae1" }}
+      >
+        {Glyph ? (
+          <Glyph
+            size={17}
+            strokeWidth={1.8}
+            color={category.storeTextColor ?? "#1e1b18"}
+            aria-hidden
+          />
+        ) : null}
+      </span>
     </div>
   );
 }
