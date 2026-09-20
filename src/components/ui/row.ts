@@ -64,3 +64,40 @@ export const ROW =
 export const ROW_STATIC =
   "relative flex items-center gap-lg rounded-md border border-border " +
   "bg-surface px-lg py-md";
+
+/**
+ * What makes the **whole row** the target, applied to the thing inside it that
+ * already opens the row — the name's link or button.
+ *
+ * ## Why this is a class and not a wrapper
+ *
+ * The hit area has to cover the row while the *control* stays the name, so the
+ * accessible name is "Bakery" rather than "row" and there is exactly one tab
+ * stop. `after:absolute after:inset-0` against `ROW`'s `relative` does that
+ * with no extra element and no JavaScript. Wrapping the row in a button is the
+ * obvious alternative and is not available: rows carry their own buttons — a
+ * toggle, an archive, a drag handle — and a button inside a button is invalid
+ * and behaves differently in every browser.
+ *
+ * ## Why it is here rather than written out per list
+ *
+ * `ROW`'s note above already describes this pattern as how these rows work,
+ * and five lists implement it. The other eight never did, so their rows were
+ * clickable only across the text in the middle — the artwork, the counts and
+ * the gaps all did nothing, on rows whose border lights up on hover to say the
+ * whole strip is a target. That is the decay this file was written about: a
+ * convention repeated by hand is one the next list misses.
+ *
+ * Pair it with `ROW_ABOVE` on anything that must stay separately clickable.
+ */
+export const ROW_TARGET = "after:absolute after:inset-0 after:rounded-md";
+
+/**
+ * For a row's own controls, so the stretched target does not swallow them.
+ *
+ * An absolutely-positioned `::after` paints over in-flow siblings whatever
+ * their order, so a toggle left static becomes unreachable the moment
+ * `ROW_TARGET` is added — the row would open instead of the switch flipping.
+ * Positioning them and lifting them one layer is what keeps both true.
+ */
+export const ROW_ABOVE = "relative z-10";

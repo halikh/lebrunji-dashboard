@@ -9,7 +9,7 @@ import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, cx } from "@/components/ui";
 import { SearchInput } from "@/components/ui/search-input";
 import { useRowFocus } from "@/components/ui/row-focus";
-import { ROW } from "@/components/ui/row";
+import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedField } from "@/components/ui/localized-field";
@@ -821,7 +821,9 @@ function ItemRow({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
+        // `ROW_TARGET` stretches this button's hit area over the whole row —
+        // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
+        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
       >
         <span
           className={cx(
@@ -894,10 +896,11 @@ function ItemRow({
               bodyKey: "menu.hideBody",
               confirmKey: "menu.hideConfirm",
             }}
-            className="w-[92px]"
+            className={cx(ROW_ABOVE, "w-[92px]")}
           />
 
           <ConfirmButton
+            className={ROW_ABOVE}
             onConfirm={onArchive}
             titleKey="menu.archiveTitle"
             bodyKey="menu.archiveBody"
@@ -1081,7 +1084,9 @@ function SearchResult({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
+        // `ROW_TARGET` stretches this button's hit area over the whole row —
+        // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
+        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
       >
         <span
           className={cx(
@@ -1126,10 +1131,11 @@ function SearchResult({
           bodyKey: "menu.hideBody",
           confirmKey: "menu.hideConfirm",
         }}
-        className="w-[92px]"
+        className={cx(ROW_ABOVE, "w-[92px]")}
       />
 
       <ConfirmButton
+        className={ROW_ABOVE}
         onConfirm={onArchive}
         titleKey="menu.archiveTitle"
         bodyKey="menu.archiveBody"

@@ -11,7 +11,7 @@ import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { useRowFocus } from "@/components/ui/row-focus";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
-import { ROW } from "@/components/ui/row";
+import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
 import { Select } from "@/components/ui/select";
 import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 
@@ -335,7 +335,9 @@ function HelpRow({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
+        // `ROW_TARGET` stretches this button's hit area over the whole row —
+        // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
+        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
       >
         <span className="truncate text-[15px] font-semibold">{name}</span>
         <span className="truncate text-[12px] text-text-faint">
@@ -359,10 +361,11 @@ function HelpRow({
           bodyKey: "content.hideBody",
           confirmKey: "content.hideConfirm",
         }}
-        className="w-[104px]"
+        className={cx(ROW_ABOVE, "w-[104px]")}
       />
 
       <ConfirmButton
+        className={ROW_ABOVE}
         onConfirm={onRemove}
         titleKey="content.removeTopicTitle"
         // Says "cannot be undone" and means it: `help_topics` has no
@@ -573,7 +576,9 @@ function PolicyRow({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
+        // `ROW_TARGET` stretches this button's hit area over the whole row —
+        // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
+        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
       >
         <span className="truncate text-[15px] font-semibold">{name}</span>
         {/* One line of the body, as a reminder of which section this is — a
@@ -585,6 +590,7 @@ function PolicyRow({
       </button>
 
       <ConfirmButton
+        className={ROW_ABOVE}
         onConfirm={onRemove}
         titleKey="content.removeSectionTitle"
         bodyKey="content.removeSectionBody"

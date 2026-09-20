@@ -6,7 +6,7 @@ import { useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button, cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
-import { ROW } from "@/components/ui/row";
+import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { PreviewImage } from "@/components/ui/image-preview";
@@ -224,12 +224,22 @@ function Row({
         <GripIcon />
       </button>
 
-      <Artwork category={category} name={pickLocalized(category.name)} />
+      {/* Above it too, so the picture still opens its own lightbox rather than
+          the editor — a preview is a different intent from an edit. */}
+      <span className={ROW_ABOVE}>
+        <Artwork category={category} name={pickLocalized(category.name)} />
+      </span>
 
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow items-center gap-md text-left"
+        // `ROW_TARGET` makes the whole row the hit area while this button stays
+        // the control, so the accessible name is the category's and there is
+        // one tab stop. See `row.ts`.
+        className={cx(
+          "flex min-w-0 flex-grow items-center gap-md text-left",
+          ROW_TARGET,
+        )}
       >
         <span className="truncate text-[15px] font-semibold">
           {pickLocalized(category.name)}
@@ -247,8 +257,9 @@ function Row({
       </button>
 
       {/* Under each other, so a row stays one line high whatever the labels
-          say — the same arrangement the shop list uses. */}
-      <div className="flex shrink-0 flex-col gap-xs">
+          say — the same arrangement the shop list uses. `ROW_ABOVE` keeps them
+          above the name's stretched hit area. */}
+      <div className={cx(ROW_ABOVE, "flex shrink-0 flex-col gap-xs")}>
         <ConfirmToggle
           on={category.isActive}
           onChange={onToggleActive}
@@ -269,18 +280,22 @@ function Row({
         />
       </div>
 
-      <ConfirmButton
-        onConfirm={onArchive}
-        titleKey="categories.archiveTitle"
-        bodyKey="categories.archiveBody"
-        confirmKey="categories.archiveConfirm"
-        params={{ name: pickLocalized(category.name) }}
-        variant="danger"
-        triggerVariant="danger"
-        size="sm"
-      >
-        {t("categories.archive")}
-      </ConfirmButton>
+      {/* Above the stretched target as well — archiving is the one action on
+          this row that must never be reached by a stray click on the row. */}
+      <span className={ROW_ABOVE}>
+        <ConfirmButton
+          onConfirm={onArchive}
+          titleKey="categories.archiveTitle"
+          bodyKey="categories.archiveBody"
+          confirmKey="categories.archiveConfirm"
+          params={{ name: pickLocalized(category.name) }}
+          variant="danger"
+          triggerVariant="danger"
+          size="sm"
+        >
+          {t("categories.archive")}
+        </ConfirmButton>
+      </span>
     </div>
   );
 }

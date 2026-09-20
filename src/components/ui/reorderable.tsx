@@ -14,6 +14,7 @@ import {
 import { t } from "@/i18n/translations";
 
 import { cx } from "./index";
+import { ROW_ABOVE } from "./row";
 
 /**
  * Putting a list in the order the merchant wants it in.
@@ -970,6 +971,12 @@ export function useReorder({
         "flex size-[28px] shrink-0 touch-none items-center justify-center rounded-sm text-text-faint",
         "hover:bg-neutral-fill hover:text-text-soft",
         moving === id ? "cursor-grabbing" : "cursor-grab",
+        // Above the row's stretched hit area — see `ROW_TARGET` in `row.ts`.
+        // Set here for the same reason `hidden` above is: every list renders
+        // this handle, and a rule repeated per call site is one the next list
+        // forgets. Without it a grab would open the editor instead of moving
+        // the row.
+        ROW_ABOVE,
       ),
     }),
     [

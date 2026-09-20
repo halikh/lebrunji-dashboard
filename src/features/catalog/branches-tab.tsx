@@ -7,7 +7,7 @@ import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { useRowFocus } from "@/components/ui/row-focus";
-import { ROW } from "@/components/ui/row";
+import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
 import { SearchInput } from "@/components/ui/search-input";
 import { useGuardedAction } from "@/components/unsaved-changes";
 import { pickLocalized } from "@/i18n/db-text";
@@ -251,7 +251,9 @@ function BranchRow({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col items-start gap-xxs text-left"
+        // `ROW_TARGET` stretches this button's hit area over the whole row —
+        // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
+        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col items-start gap-xxs text-left")}
       >
         <span className="flex items-center gap-sm">
           <span className="truncate text-[15px] font-semibold">{name}</span>
@@ -291,6 +293,7 @@ function BranchRow({
           </Button>
 
           <ConfirmButton
+            className={ROW_ABOVE}
             onConfirm={onClose}
             titleKey="branches.closeTitle"
             bodyKey="branches.closeBody"

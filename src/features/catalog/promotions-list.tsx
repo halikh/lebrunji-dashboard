@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
-import { ROW } from "@/components/ui/row";
+import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { useRowFocus } from "@/components/ui/row-focus";
@@ -255,7 +255,9 @@ function Row({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow flex-col gap-xxs text-left"
+        // `ROW_TARGET` stretches this button's hit area over the whole row —
+        // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
+        className={cx(ROW_TARGET, "flex min-w-0 flex-grow flex-col gap-xxs text-left")}
       >
         <span className="truncate text-[15px] font-semibold">
           {promotion.slug}
@@ -298,10 +300,11 @@ function Row({
           bodyKey: "promotions.hideBody",
           confirmKey: "promotions.hideConfirm",
         }}
-        className="w-[104px]"
+        className={cx(ROW_ABOVE, "w-[104px]")}
       />
 
       <ConfirmButton
+        className={ROW_ABOVE}
         onConfirm={onArchive}
         titleKey="promotions.archiveTitle"
         bodyKey="promotions.archiveBody"

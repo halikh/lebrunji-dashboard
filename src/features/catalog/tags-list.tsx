@@ -6,7 +6,7 @@ import { useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button, cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
-import { ROW } from "@/components/ui/row";
+import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { useRowFocus } from "@/components/ui/row-focus";
@@ -179,7 +179,9 @@ function Row({
       <button
         type="button"
         onClick={onEdit}
-        className="flex min-w-0 flex-grow items-center gap-md text-left"
+        // `ROW_TARGET` stretches this button's hit area over the whole row —
+        // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
+        className={cx(ROW_TARGET, "flex min-w-0 flex-grow items-center gap-md text-left")}
       >
         {/* The chip itself, at the size a phone draws it. The row shows the
             thing rather than describing it — a tone named in words would ask
@@ -209,10 +211,11 @@ function Row({
           bodyKey: "tags.hideBody",
           confirmKey: "tags.hideConfirm",
         }}
-        className="w-[104px]"
+        className={cx(ROW_ABOVE, "w-[104px]")}
       />
 
       <ConfirmButton
+        className={ROW_ABOVE}
         onConfirm={onArchive}
         titleKey="tags.archiveTitle"
         bodyKey="tags.archiveBody"
