@@ -4,7 +4,6 @@ import { cx } from "@/components/ui";
 import {
   CATEGORY_ICONS,
   CATEGORY_ICON_NAMES,
-
   type CategoryIconName,
 } from "@/lib/category-icons";
 import { t } from "@/i18n/translations";
