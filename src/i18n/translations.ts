@@ -36,6 +36,15 @@ const en = {
   common: {
     save: "Save",
     cancel: "Cancel",
+    /**
+     * The cue at the foot of a pane that has more in it — see `ScrollCues`.
+     *
+     * "More below" rather than "Scroll down": it says what is true, where an
+     * instruction says what to do about it, and the operator may well be about
+     * to use the wheel rather than press this. It is also two words, which is
+     * as much as fits over a list without becoming part of it.
+     */
+    scrollMore: "More below",
     signOut: "Sign out",
     somethingWentWrong: "Something went wrong. Try again.",
     close: "Close",

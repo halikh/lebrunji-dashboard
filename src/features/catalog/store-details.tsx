@@ -439,7 +439,10 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     // One write for all of them, because they are columns on the same row:
     // separate requests would mean a shop that got renamed and stayed mis-filed
     // when the second failed.
-    if (nameMoved || imageMoved || categoryMoved || featureMoved || rateMoved) {
+    const storeMoved =
+      nameMoved || imageMoved || categoryMoved || featureMoved || rateMoved;
+
+    if (storeMoved) {
       update.mutate({
         id: store.id,
         patch: {
@@ -503,6 +506,10 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
           ...(phoneMoved && { whatsappPhone: phone }),
         },
         name: pickLocalized(sole.name),
+        // One Save is one notice. Silent when the store write above has
+        // already said it, and spoken when this is the only write there is —
+        // a pin changed on its own still has to be confirmed. See the hook.
+        quiet: storeMoved,
       });
     }
   }

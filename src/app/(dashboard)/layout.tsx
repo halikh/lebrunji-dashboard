@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Wordmark } from "@/components/brand/wordmark";
 import { SignOutButton } from "@/components/sign-out-button";
 import { LiveRail } from "@/components/shell/live-rail";
+import { ScrollCues } from "@/components/ui/scroll-cues";
 import { Providers } from "@/app/providers";
 import { t } from "@/i18n/translations";
 
@@ -106,6 +107,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <main id="main" className="min-h-0 flex-1 overflow-hidden">
           {children}
         </main>
+
+        {/* Mounted once for the whole dashboard rather than per screen: it
+            finds the panes by the class they already carry. See `ScrollCues`
+            for why it is one component and not thirty. */}
+        <ScrollCues />
       </div>
     </Providers>
   );

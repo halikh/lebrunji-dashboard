@@ -75,14 +75,38 @@ export function useUpdateBranch(storeId: string) {
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: (input: { id: string; patch: BranchPatch; name: string }) =>
-      updateBranch(input.id, input.patch),
+    mutationFn: (input: {
+      id: string;
+      patch: BranchPatch;
+      name: string;
+      /**
+       * Write the branch without announcing it.
+       *
+       * For the one caller that is not editing *a branch*: the Details tab of a
+       * shop with a single branch, which writes both rows behind one Save. Two
+       * mutations ran and each raised its own notice, so saving a shop said
+       * "Khalifeh Resturant saved" twice — one save reported twice, the second
+       * naming the branch that carries the same name.
+       *
+       * Per call rather than per hook, because it depends on what moved: that
+       * tab silences this only when the **store** write also ran and has
+       * already said it. Change nothing but the pin and this is the only write
+       * there is, so it speaks.
+       *
+       * Only the success notice is silenced. The invalidation still happens
+       * and a failure is still reported — that is the half an operator can act
+       * on, and it must never be swallowed.
+       */
+      quiet?: boolean;
+    }) => updateBranch(input.id, input.patch),
     onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({
         queryKey: branchKeys.list(storeId),
       });
       void queryClient.invalidateQueries({ queryKey: ["stores"] });
-      toast.success(t("branches.saved", { name: input.name }));
+      if (!input.quiet) {
+        toast.success(t("branches.saved", { name: input.name }));
+      }
     },
     onError: (error) =>
       toast.danger(

@@ -740,3 +740,46 @@ dialog[open]::backdrop {
     100% 12px;
   background-attachment: local, local, scroll, scroll;
 }
+
+/**
+ * The words on top of that shadow — see `ScrollCues`.
+ *
+ * The shadow above says *this pane scrolls*, which is a convention and reads
+ * as one only to somebody who already knows it. This says what it means, in
+ * words, and can be pressed to do it.
+ *
+ * `fixed` and centred on the pane's bottom edge, positioned by the component
+ * from a measured rectangle. It is deliberately outside the scroller: a cue
+ * placed *inside* one adds its own height to the content the scroller measures
+ * to decide whether there is more, which is a feedback loop rather than a cue.
+ *
+ * Small and quiet on purpose. It sits over content on every pane in the
+ * dashboard, so it has to be legible without ever being the thing the eye goes
+ * to first — the shadow under it is doing the attracting.
+ */
+.scroll-cue {
+  position: fixed;
+  z-index: 30;
+  /* Centred on the edge and lifted clear of it. */
+  transform: translate(-50%, -100%);
+  margin-top: calc(var(--spacing-sm) * -1);
+
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 2px var(--spacing-sm);
+
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgb(30 27 24 / 0.08);
+}
+
+.scroll-cue:hover {
+  color: var(--color-text);
+  border-color: var(--color-active);
+}
