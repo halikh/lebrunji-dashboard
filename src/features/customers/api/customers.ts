@@ -2,6 +2,7 @@ import { matchesLike } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
+import { statusName } from "@/lib/order-status";
 import { businessMonthKey, businessWeekday, recentMonthKeys } from "@/lib/time";
 import { oneShopRate } from "@/features/reference/shop-rate";
 
@@ -338,16 +339,14 @@ export async function fetchCustomerOrders(options: {
   id: string;
   before?: string | null;
   limit?: number;
-  locale?: string;
 }): Promise<CustomerOrderPage> {
-  const { id, before = null, limit = PAGE.size, locale = "en" } = options;
+  const { id, before = null, limit = PAGE.size } = options;
 
   let query = getClient()
     .from("orders")
     .select(
       `id, code, placed_at, total, currency_code, address_line,
-       order_stores ( store_id, stores ( exchange_rate ),
-         order_statuses ( slug, name ) )`,
+       order_stores ( store_id, status, stores ( exchange_rate ) )`,
     )
     .eq("user_id", id)
     .is("deleted_at", null)
@@ -372,13 +371,9 @@ export async function fetchCustomerOrders(options: {
     statuses: [
       ...new Map(
         asArray(row.order_stores).flatMap((portion) => {
-          const status = asArray(portion.order_statuses)[0];
-          if (!status) return [];
-          const slug = status.slug as string;
-          const name = status.name as Record<string, string> | null;
-          return [
-            [slug, { slug, name: name?.[locale] || name?.en || slug }] as const,
-          ];
+          const slug = portion.status as string | null;
+          if (!slug) return [];
+          return [[slug, { slug, name: statusName(slug) }] as const];
         }),
       ).values(),
     ],

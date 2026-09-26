@@ -47,11 +47,6 @@ const EXPECTED: Record<string, number> = {
   option_groups_title_len: TEXT.title,
   item_options_name_len: TEXT.name,
   menu_item_tags_name_len: TEXT.tag,
-  order_statuses_name_len: TEXT.statusName,
-  order_statuses_timeline_title_len: TEXT.statusTimelineTitle,
-  order_statuses_timeline_detail_len: TEXT.statusTimelineDetail,
-  payment_methods_name_len: TEXT.paymentMethodName,
-  payment_methods_detail_len: TEXT.paymentMethodDetail,
   help_topics_group_name_len: TEXT.helpGroupName,
   help_topics_question_len: TEXT.helpQuestion,
   help_topics_answer_len: TEXT.helpAnswer,
@@ -67,7 +62,7 @@ const EXPECTED: Record<string, number> = {
 };
 
 /**
- * The slug constraints all carry the same length, and there are thirteen of
+ * The slug constraints all carry the same length, and there are a dozen of
  * them, so they are generated rather than listed.
  */
 const SLUG_TABLES = [
@@ -80,8 +75,6 @@ const SLUG_TABLES = [
   'item_options',
   'menu_item_tags',
   'discounts',
-  'order_statuses',
-  'payment_methods',
   'help_topics',
   'policy_sections',
   'address_kinds',

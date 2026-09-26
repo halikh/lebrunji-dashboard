@@ -125,9 +125,9 @@ export function OrdersQueue() {
   );
 
   const statuses = useOrderStatuses();
-  const counts = useStatusCounts(statuses.data, scope);
-  const orders = useOrders(scope, statusSlug, search, statuses.data);
-  const { advance } = useAdvanceOrder(statuses.data);
+  const counts = useStatusCounts(scope);
+  const orders = useOrders(scope, statusSlug, search);
+  const { advance } = useAdvanceOrder(statuses);
   const { format } = useMoney();
   const undoLast = useUndoLast();
 
@@ -215,8 +215,8 @@ export function OrdersQueue() {
         if (!order) return;
         // The whole order, not a shop. A customer who ordered from two shops
         // placed one order, and it moves as one.
-        const status = orderStatus(order, statuses.data);
-        const next = status ? nextStatus(statuses.data, status.slug) : null;
+        const status = orderStatus(order, statuses);
+        const next = status ? nextStatus(statuses, status.slug) : null;
         if (!next || !status) return;
         event.preventDefault();
         advance({
@@ -232,15 +232,7 @@ export function OrdersQueue() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
-    rows,
-    active,
-    statuses.data,
-    advance,
-    openOrderId,
-    setOpenOrderId,
-    undoLast,
-  ]);
+  }, [rows, active, statuses, advance, openOrderId, setOpenOrderId, undoLast]);
 
   return (
     // The queue and the panel side by side. `relative` so the panel can cover
@@ -306,9 +298,9 @@ export function OrdersQueue() {
             active={statusSlug === null}
             onClick={() => setStatusSlug(null)}
           />
-          {statuses.data?.map((status) => (
+          {statuses.map((status) => (
             <Tab
-              key={status.id}
+              key={status.slug}
               label={status.name}
               count={counts.data?.[status.slug]}
               active={statusSlug === status.slug}
@@ -353,7 +345,7 @@ export function OrdersQueue() {
             <OrderRow
               key={order.id}
               order={order}
-              statuses={statuses.data}
+              statuses={statuses}
               focused={index === active}
               onOpen={() => {
                 setFocused(index);
@@ -361,7 +353,7 @@ export function OrdersQueue() {
               }}
               money={format}
               onAdvance={(to) => {
-                const status = orderStatus(order, statuses.data);
+                const status = orderStatus(order, statuses);
                 advance({
                   orderId: order.id,
                   code: order.code,

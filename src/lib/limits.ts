@@ -42,12 +42,6 @@ export const TEXT = {
    * the dish's own line. Twenty-four is already wider than most dish names.
    */
   tag: 24,
-  /** `order_statuses.name` — appears on a timeline dot. */
-  statusName: 40,
-  statusTimelineTitle: 80,
-  statusTimelineDetail: 200,
-  paymentMethodName: 60,
-  paymentMethodDetail: 200,
   helpGroupName: 80,
   helpQuestion: 200,
   helpAnswer: 4000,

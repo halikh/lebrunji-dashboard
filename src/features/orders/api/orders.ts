@@ -1,5 +1,11 @@
 import { oneShopRate } from "@/features/reference/shop-rate";
 import { getClient } from "@/lib/supabase/client";
+import {
+  isFinishedSlug,
+  ORDER_STATUS_SLUGS,
+  statusName,
+  statusProgress,
+} from "@/lib/order-status";
 import { startOfBusinessDay } from "@/lib/time";
 import { unitNumber } from "@/lib/units";
 
@@ -147,40 +153,7 @@ export type Order = {
   stores: OrderStore[];
 };
 
-export type OrderStatus = {
-  id: string;
-  slug: string;
-  name: string;
-  progress: number | null;
-};
-
-/**
- * Every status, in path order.
- *
- * `order_statuses` is a lookup table rather than an enum precisely so a
- * merchant can insert a step without an app release, so the queue's tabs are
- * built from this rather than from a hardcoded list.
- *
- * Cancelled has `progress: null` and sorts last — it is off the path, not at
- * the end of it.
- */
-export async function fetchOrderStatuses(
-  locale = "en",
-): Promise<OrderStatus[]> {
-  const { data, error } = await getClient()
-    .from("order_statuses")
-    .select("id, slug, name, progress")
-    .order("progress", { ascending: true, nullsFirst: false });
-
-  if (error) throw new Error(`Could not read order statuses: ${error.message}`);
-
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    slug: row.slug as string,
-    name: localized(row.name, locale),
-    progress: row.progress as number | null,
-  }));
-}
+export type { OrderStatus } from "@/lib/order-status";
 
 /**
  * Which orders the queue is looking at.
@@ -212,8 +185,6 @@ export type OrderPage = {
 export async function fetchOrders(options: {
   scope?: Scope;
   statusSlug?: string | null;
-  /** Every status, so "live" can be derived rather than hardcoded. */
-  statuses?: readonly OrderStatus[];
   search?: string | null;
   before?: string | null;
   limit?: number;
@@ -222,7 +193,6 @@ export async function fetchOrders(options: {
   const {
     scope = "live",
     statusSlug = null,
-    statuses = [],
     search = null,
     before = null,
     limit = 50,
@@ -230,18 +200,15 @@ export async function fetchOrders(options: {
   } = options;
 
   // The scope decides which statuses are in play before the tab narrows it
-  // further. `live` is the set that still needs somebody — read from the data,
-  // never a hardcoded list of slugs, because `order_statuses` exists to be
-  // added to and a new step would silently fall outside a hardcoded set. An
-  // order nobody can see is the worst bug this screen could have.
-  const liveSlugs = liveStatusSlugs(statuses);
+  // further. `live` is the set that still needs somebody — every status that
+  // is not finished.
   const filterSlugs = statusSlug
     ? [statusSlug]
-    : scope === "live" && liveSlugs.length > 0
-      ? liveSlugs
+    : scope === "live"
+      ? liveStatusSlugs()
       : null;
 
-  // `!inner` on the status is what makes the tab filter work.
+  // `!inner` on the portions is what makes the tab filter work.
   //
   // A plain embed filters the *child*: the order stays in the list with no
   // shops attached, so a tab shows rows that do not belong to it. An inner join
@@ -256,12 +223,10 @@ export async function fetchOrders(options: {
   // is, because `toOrder` resolves the rate its figures are read at and the
   // queue and the panel must not disagree about that.
   const embed = filterSlugs
-    ? `order_stores!inner ( id, store_id, subtotal,
-         stores ( name, exchange_rate ),
-         order_statuses!inner ( slug, name, progress ) )`
-    : `order_stores ( id, store_id, subtotal,
-         stores ( name, exchange_rate ),
-         order_statuses ( slug, name, progress ) )`;
+    ? `order_stores!inner ( id, store_id, subtotal, status,
+         stores ( name, exchange_rate ) )`
+    : `order_stores ( id, store_id, subtotal, status,
+         stores ( name, exchange_rate ) )`;
 
   let query = getClient()
     .from("orders")
@@ -279,7 +244,7 @@ export async function fetchOrders(options: {
   if (before) query = query.lt("placed_at", before);
 
   if (filterSlugs) {
-    query = query.in("order_stores.order_statuses.slug", filterSlugs);
+    query = query.in("order_stores.status", filterSlugs);
   }
 
   if (scope === "today") {
@@ -323,9 +288,8 @@ export async function fetchOrder(
        user_id,
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
-       order_stores ( id, store_id, subtotal,
+       order_stores ( id, store_id, subtotal, status,
          stores ( name, image_url, whatsapp_phone, exchange_rate ),
-         order_statuses ( slug, name, progress ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
            options_price, price_unit, unit_quantity, unit_step,
            fulfilled_quantity, replaces_line_id, amendment_reason,
@@ -394,28 +358,26 @@ export async function fetchOrder(
  * week the business succeeds.
  */
 export async function fetchStatusCounts(
-  statuses: readonly OrderStatus[],
   scope: Scope = "all",
 ): Promise<Record<string, number>> {
   const since = scope === "today" ? startOfBusinessDay().toISOString() : null;
 
   const results = await Promise.all(
-    statuses.map(async (status) => {
+    ORDER_STATUS_SLUGS.map(async (slug) => {
       let query = getClient()
         .from("orders")
-        .select("id, order_stores!inner(order_statuses!inner(slug))", {
+        .select("id, order_stores!inner(status)", {
           count: "exact",
           head: true,
         })
         .is("deleted_at", null)
-        .eq("order_stores.order_statuses.slug", status.slug);
+        .eq("order_stores.status", slug);
 
       if (since) query = query.gte("placed_at", since);
 
       const { count, error } = await query;
-      if (error)
-        throw new Error(`Could not count ${status.slug}: ${error.message}`);
-      return [status.slug, count ?? 0] as const;
+      if (error) throw new Error(`Could not count ${slug}: ${error.message}`);
+      return [slug, count ?? 0] as const;
     }),
   );
 
@@ -537,7 +499,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     discount: row.discount as number,
     total: row.total as number,
     stores: asArray(row.order_stores).map((store) => {
-      const status = asRecord(store.order_statuses);
+      const slug = (store.status as string | null) ?? "";
       return {
         id: store.id as string,
         storeId: store.store_id as string,
@@ -546,26 +508,15 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
           (asRecord(store.stores)?.whatsapp_phone as string | null) ?? null,
         storeImageUrl:
           (asRecord(store.stores)?.image_url as string | null) ?? null,
-        statusSlug: (status?.slug as string) ?? "",
-        statusName: localized(status?.name, locale),
-        progress: (status?.progress as number | null) ?? null,
+        statusSlug: slug,
+        statusName: statusName(slug),
+        progress: statusProgress(slug),
         subtotal: store.subtotal as number,
       };
     }),
   };
 }
 
-/**
- * The statuses an order can still be moved on from.
- *
- * Terminal is derived: `progress: null` is off the path (cancelled), and the
- * highest `progress` is the end of it (delivered). Everything else is live.
- *
- * Derived rather than listed because `order_statuses` is a lookup table
- * specifically so a merchant can insert a step (migration 0032 says so). A
- * hardcoded `['ordered', 'confirmed', 'driverSent']` would exclude any new one
- * from the default view — orders that exist and that nobody is shown.
- */
 /**
  * How many orders still need somebody, for the rail's badge.
  *
@@ -581,39 +532,32 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
  * the plan's rule is that a count is never a select whose rows are counted in
  * the browser.
  *
- * ## "Live" is read from the data
+ * ## "Live" is every status that is not finished
  *
- * `liveStatusSlugs` derives it from `progress` rather than a hardcoded list of
- * slugs, because `order_statuses` exists to be added to and a new step would
- * silently fall outside a hardcoded set. An order nobody can see is the worst
- * bug this screen could have, and a badge that undercounts is the quiet version
- * of it.
+ * `liveStatusSlugs` derives it from the hardcoded path, so the badge, the
+ * queue's Live scope and `live_order_count()` in the database mean the same
+ * thing by it.
  */
-export async function fetchLiveOrderCount(
-  statuses: readonly OrderStatus[],
-): Promise<number> {
-  const slugs = liveStatusSlugs(statuses);
-  if (slugs.length === 0) return 0;
-
+export async function fetchLiveOrderCount(): Promise<number> {
   const { count, error } = await getClient()
     .from("orders")
-    .select("id, order_stores!inner(order_statuses!inner(slug))", {
+    .select("id, order_stores!inner(status)", {
       count: "exact",
       head: true,
     })
     .is("deleted_at", null)
-    .in("order_stores.order_statuses.slug", slugs);
+    .in("order_stores.status", liveStatusSlugs());
 
   if (error) throw new Error(`Could not count live orders: ${error.message}`);
   return count ?? 0;
 }
 
-export function liveStatusSlugs(statuses: readonly OrderStatus[]): string[] {
-  const onPath = statuses.filter((s) => s.progress !== null);
-  if (onPath.length === 0) return [];
-
-  const last = Math.max(...onPath.map((s) => s.progress as number));
-  return onPath.filter((s) => (s.progress as number) < last).map((s) => s.slug);
+/**
+ * The statuses an order can still be moved on from — everything but delivered
+ * and cancelled, in path order.
+ */
+export function liveStatusSlugs(): string[] {
+  return ORDER_STATUS_SLUGS.filter((slug) => !isFinishedSlug(slug));
 }
 
 /**

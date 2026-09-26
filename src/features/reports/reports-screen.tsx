@@ -100,17 +100,18 @@ export function ReportsScreen() {
 
   const statuses = useOrderStatuses();
   // Unfiltered by date, deliberately — see the note above.
-  const counts = useStatusCounts(statuses.data, "all");
+  const counts = useStatusCounts("all");
 
   const { format, currencies } = useMoney();
   const toast = useToasts();
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
 
-  // The funnel comes back keyed on slugs; the readable names are already
-  // loaded for the tiles above. Showing `driver-sent` to an operator when the
-  // product calls it "On the way" is a gap nobody would guess is cosmetic.
-  const statusNames = new Map(
-    (statuses.data ?? []).map((status) => [status.slug, status.name]),
+  // The funnel comes back keyed on slugs; the readable names are the
+  // hardcoded ones the tiles above use. Showing `driverSent` to an operator
+  // when the product calls it "On the way" is a gap nobody would guess is
+  // cosmetic.
+  const statusNames = new Map<string, string>(
+    statuses.map((status) => [status.slug, status.name]),
   );
 
   /**
@@ -220,24 +221,22 @@ export function ReportsScreen() {
               </span>
             </div>
 
-            {statuses.isError || counts.isError ? (
+            {counts.isError ? (
               <p role="alert" className="text-[13px] font-medium text-danger">
                 {t("reports.countsFailed")}
               </p>
             ) : (
               <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
-                {(statuses.data ?? [])
-                  // Terminal statuses are not work. Read from `progress`
-                  // rather than a hardcoded list of slugs, because
-                  // `order_statuses` exists to be added to and a new step
-                  // must not silently fall outside the set.
+                {statuses
+                  // Cancelled is off the path and not work; everything on
+                  // the path gets a tile.
                   .filter((status) => status.progress !== null)
                   .map((status) => {
                     const tone = statusTone(status.slug);
                     const count = counts.data?.[status.slug] ?? 0;
                     return (
                       <Link
-                        key={status.id}
+                        key={status.slug}
                         // Straight into the queue on that tab — the number is
                         // only useful if you can act on what it counts.
                         href={`/?status=${status.slug}`}

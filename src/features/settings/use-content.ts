@@ -13,14 +13,10 @@ import {
   deleteHelpTopic,
   deletePolicySection,
   fetchHelpTopics,
-  fetchOrderStatusContent,
-  fetchPaymentMethods,
   fetchPolicySections,
   renameHelpGroup,
   setContentOrder,
   updateHelpTopic,
-  updateOrderStatusContent,
-  updatePaymentMethod,
   updatePolicySection,
   type HelpTopicDraft,
   type HelpTopicPatch,
@@ -35,12 +31,10 @@ export const contentKeys = {
     ["content", "policy", document] as const,
   policyList: (document: PolicyDocument, search: string) =>
     ["content", "policy", document, search] as const,
-  payments: ["content", "payments"] as const,
-  statuses: ["content", "statuses"] as const,
 };
 
 /**
- * All four reads are cached hard.
+ * Both reads are cached hard.
  *
  * This is content somebody writes once and revisits when it is wrong. A stale
  * FAQ for a minute is not a failure; refetching it on every focus would be.
@@ -68,22 +62,6 @@ export function usePolicySections(document: PolicyDocument, search = "") {
     queryFn: () => fetchPolicySections(document, term),
     ...SETTLED,
     placeholderData: (previous) => previous,
-  });
-}
-
-export function usePaymentMethods() {
-  return useQuery({
-    queryKey: contentKeys.payments,
-    queryFn: fetchPaymentMethods,
-    ...SETTLED,
-  });
-}
-
-export function useOrderStatusContent() {
-  return useQuery({
-    queryKey: contentKeys.statuses,
-    queryFn: fetchOrderStatusContent,
-    ...SETTLED,
   });
 }
 
@@ -219,43 +197,6 @@ export function useReorderPolicySections(document: PolicyDocument) {
   }>(
     (input) => setContentOrder("policy_sections", input.updates),
     contentKeys.policy(document),
-    "content.saved",
-  );
-}
-
-// ---- reference -------------------------------------------------------------
-
-export function useUpdatePaymentMethod() {
-  return useContentMutation<{
-    id: string;
-    patch: { name?: Localized; detail?: Localized; isEnabled?: boolean };
-    name?: string;
-  }>(
-    (input) => updatePaymentMethod(input.id, input.patch),
-    contentKeys.payments,
-    "content.saved",
-  );
-}
-
-export function useUpdateOrderStatusContent() {
-  const queryClient = useQueryClient();
-
-  return useContentMutation<{
-    id: string;
-    patch: {
-      name?: Localized;
-      timelineTitle?: Localized;
-      timelineDetail?: Localized;
-    };
-    name?: string;
-  }>(
-    async (input) => {
-      await updateOrderStatusContent(input.id, input.patch);
-      // The queue draws its tabs from these names, so a rename here has to
-      // reach a screen this one does not own.
-      void queryClient.invalidateQueries({ queryKey: ["orders"] });
-    },
-    contentKeys.statuses,
     "content.saved",
   );
 }

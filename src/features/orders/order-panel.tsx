@@ -164,7 +164,7 @@ export function OrderPanel({
           </div>
 
           <OrderBody order={order.data} from={"panel"} />
-          <OrderActions order={order.data} statuses={statuses.data} />
+          <OrderActions order={order.data} statuses={statuses} />
         </>
       )}
     </Panel>

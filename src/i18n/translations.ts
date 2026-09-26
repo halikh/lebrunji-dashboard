@@ -472,6 +472,19 @@ const en = {
     soundLimits: "MP3, under {size} KB and {seconds} seconds",
   },
 
+  /**
+   * Order status names — hardcoded, like the path itself. See
+   * `src/lib/order-status.ts`. The app's own wording, so the operator and the
+   * customer call a step the same thing.
+   */
+  orderStatus: {
+    ordered: "Placed",
+    confirmed: "Confirmed",
+    driverSent: "On the way",
+    delivered: "Delivered",
+    cancelled: "Cancelled",
+  },
+
   orders: {
     title: "Orders",
     searchPlaceholder: "Code, name or phone",
@@ -2024,8 +2037,6 @@ const en = {
     title: "Settings",
     tabHelp: "Help",
     tabLegal: "Legal",
-    tabPayments: "Payments",
-    tabSteps: "Order steps",
     failed: "Could not load this. Try again.",
     searchHelp: "Search questions",
     searchLegal: "Search this document",
@@ -2086,35 +2097,6 @@ const en = {
     removeSectionTitle: "Remove {name}?",
     removeSectionBody:
       "This cannot be undone — the section is deleted outright rather than archived.",
-
-    // ---- payments ----------------------------------------------------------
-    // There is one row and no gateway anywhere in the codebase, so the tab
-    // renames what is there rather than offering to add anything.
-    // Says why there is nothing to switch. A screen with one row and no
-    // controls invites "is this broken"; a sentence answers it once.
-    paymentsBlurb:
-      "How customers pay. There is one method and no payment gateway in this product, so you can rename it and describe it — there is nothing to turn on or off. Switching it off would stop every checkout in the app, so the database refuses that too.",
-    methodName: "Name",
-    methodDetail: "Description",
-    enabled: "Accepted",
-    disabled: "Not accepted",
-    enableTitle: "Accept {name} again?",
-    enableBody: "Customers can choose it at checkout straight away.",
-    enableConfirm: "Accept it",
-    disableTitle: "Stop accepting {name}?",
-    // Not a presentation change: it is the only way to pay.
-    disableBody:
-      "This is the only payment method, so turning it off leaves customers with no way to check out.",
-    disableConfirm: "Stop accepting it",
-
-    // ---- order steps -------------------------------------------------------
-    stepsBlurb:
-      "What a customer is told at each step of an order. The steps themselves — which comes first, which ends an order — are set by migration, because changing them changes how the business runs rather than how it reads.",
-    stepName: "Name",
-    timelineTitle: "Timeline heading",
-    timelineDetail: "Timeline detail",
-    step: "Step {at}",
-    offPath: "Ends the order",
   },
 
   reorder: {

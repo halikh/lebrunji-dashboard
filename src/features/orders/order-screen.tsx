@@ -108,7 +108,7 @@ export function OrderScreen({ id }: { id: string }) {
     );
   }
 
-  const status = orderStatus(order.data, statuses.data);
+  const status = orderStatus(order.data, statuses);
   const tone = status ? statusTone(status.slug) : null;
 
   return (
@@ -195,7 +195,7 @@ export function OrderScreen({ id }: { id: string }) {
         </div>
       </div>
 
-      <OrderActions order={order.data} statuses={statuses.data} />
+      <OrderActions order={order.data} statuses={statuses} />
     </div>
   );
 }

@@ -279,9 +279,9 @@
  * grepping the emitted CSS.
  *
  * A plain custom-property block is never shaken. Nothing is lost by moving
- * them: they could never have been Tailwind utilities anyway, because
- * `order_statuses` is a lookup table and the slug set is not known at build
- * time — which is the whole reason they are applied inline.
+ * them: they could never have been Tailwind utilities anyway, because the
+ * slug arrives as data at runtime and a class built from it would be purged —
+ * which is the whole reason they are applied inline.
  */
 :root {
   /* ---- Order status ----------------------------------------------------
@@ -336,10 +336,10 @@
   --color-status-cancelled-on-fill: #ffffff;
   --color-status-cancelled-wash: var(--color-red-danger-tint);
 
-  /* `order_statuses` is a lookup table, not an enum — a merchant may add a
- * step, and it will arrive with no colour. Neutral rather than transparent:
- * a missing dot reads as a bug, a grey one reads as a step nobody has
- * chosen a colour for yet. */
+  /* A slug outside the hardcoded list in `src/lib/order-status.ts` should be
+ * impossible — the database constrains it — but if one ever arrives it gets
+ * this rather than no colour. Neutral rather than transparent: a missing dot
+ * reads as a bug, a grey one reads as a step nobody has chosen a colour for. */
   --color-status-unknown: var(--color-faint);
   --color-status-unknown-ink: var(--color-muted);
   --color-status-unknown-fill: var(--color-muted);

@@ -1,5 +1,6 @@
 import type { DayHours } from "@/features/catalog/api/hours";
 import { SEARCH } from "@/lib/limits";
+import { statusName } from "@/lib/order-status";
 import { digitsOf } from "@/lib/phone";
 import { isOpenNow } from "@/lib/week";
 import { matchesLike } from "@/lib/search";
@@ -172,8 +173,7 @@ export async function fetchDispatches(
     .select(
       `id, dispatched_at,
        orders ( id, code, total, currency_code,
-         order_stores ( store_id, stores ( exchange_rate ),
-           order_statuses ( slug, name ) ) )`,
+         order_stores ( store_id, status, stores ( exchange_rate ) ) )`,
     )
     .eq("courier_id", courierId)
     .order("dispatched_at", { ascending: false })
@@ -189,9 +189,10 @@ export async function fetchDispatches(
     // *least advanced* one, because "what still needs doing" is the question a
     // driver's page is being read to answer — and an order that is half
     // delivered is not delivered.
-    const status = asArray(order.order_stores)
-      .map((portion) => asRecord(portion.order_statuses))
-      .find(Boolean);
+    const slug =
+      asArray(order.order_stores)
+        .map((portion) => portion.status as string | null)
+        .find(Boolean) ?? "";
 
     return [
       {
@@ -202,8 +203,8 @@ export async function fetchDispatches(
         orderTotal: Number(order.total),
         currencyCode: order.currency_code as string,
         shopRate: oneShopRate(asArray(order.order_stores)),
-        statusSlug: (status?.slug as string) ?? "",
-        statusName: localizedName(status?.name),
+        statusSlug: slug,
+        statusName: statusName(slug),
       },
     ];
   });
@@ -239,14 +240,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function asArray(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
-}
-
-/** A jsonb name, in English or whatever there is. */
-function localizedName(value: unknown): string {
-  if (typeof value === "string") return value;
-  const record = value as Record<string, string> | null;
-  if (!record) return "";
-  return record.en ?? Object.values(record)[0] ?? "";
 }
 
 export type CourierDraft = {

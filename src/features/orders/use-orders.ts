@@ -6,15 +6,15 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 import { useToasts } from "@/components/ui/toast";
 import { t } from "@/i18n/translations";
+import { orderStatuses } from "@/lib/order-status";
 
 import {
   advanceOrder,
   fetchOrder,
-  fetchOrderStatuses,
   fetchOrders,
   fetchLiveOrderCount,
   fetchStatusCounts,
@@ -32,21 +32,21 @@ import {
  */
 export const orderKeys = {
   all: ["orders"] as const,
-  statuses: () => ["orders", "statuses"] as const,
   counts: (scope: Scope) => ["orders", "counts", scope] as const,
   list: (scope: Scope, statusSlug: string | null, search: string) =>
     ["orders", "list", scope, statusSlug, search] as const,
   detail: (id: string) => ["orders", "detail", id] as const,
 };
 
-export function useOrderStatuses() {
-  return useQuery({
-    queryKey: orderKeys.statuses(),
-    queryFn: () => fetchOrderStatuses(),
-    // Reference data. It changes when a merchant edits the path, which is
-    // approximately never, and the realtime handler does not touch it.
-    staleTime: 10 * 60_000,
-  });
+/**
+ * Every status, in path order, named in the dashboard's language.
+ *
+ * Not a query: the path is hardcoded (see `src/lib/order-status.ts`), so there
+ * is nothing to wait for and nothing that can fail. Memoised so the array
+ * keeps its identity across renders for the hooks that depend on it.
+ */
+export function useOrderStatuses(): OrderStatus[] {
+  return useMemo(() => orderStatuses(), []);
 }
 
 /**
@@ -64,30 +64,22 @@ export function useOrderStatuses() {
  *
  * Kept a little stale on purpose: the realtime subscription invalidates it the
  * moment an order arrives, so polling it hard would only add requests to a
- * number that is already pushed. `enabled` waits for the statuses, because
- * "live" cannot be answered before they are known and an unfiltered count would
- * be every order ever placed.
+ * number that is already pushed.
  */
-export function useLiveOrderCount(statuses: OrderStatus[] | undefined) {
+export function useLiveOrderCount() {
   return useQuery({
     queryKey: [...orderKeys.all, "live-total"] as const,
-    queryFn: () => fetchLiveOrderCount(statuses ?? []),
-    enabled: (statuses?.length ?? 0) > 0,
+    queryFn: () => fetchLiveOrderCount(),
     staleTime: 60_000,
   });
 }
 
-export function useStatusCounts(
-  statuses: OrderStatus[] | undefined,
-  scope: Scope,
-) {
+export function useStatusCounts(scope: Scope) {
   return useQuery({
     queryKey: orderKeys.counts(scope),
     // `live` and `all` count the same rows — the live tabs *are* the
     // non-terminal statuses, so there is nothing extra to filter.
-    queryFn: () =>
-      fetchStatusCounts(statuses ?? [], scope === "today" ? "today" : "all"),
-    enabled: (statuses?.length ?? 0) > 0,
+    queryFn: () => fetchStatusCounts(scope === "today" ? "today" : "all"),
   });
 }
 
@@ -108,26 +100,18 @@ export function useOrders(
   scope: Scope,
   statusSlug: string | null,
   search: string,
-  statuses: OrderStatus[] | undefined,
 ) {
   return useInfiniteQuery({
-    // `statuses` is not in the key: it is reference data that changes about
-    // never, and putting it there would refetch every list the first time it
-    // loads. It only decides *which* slugs "live" means.
     queryKey: orderKeys.list(scope, statusSlug, search),
     queryFn: ({ pageParam }) =>
       fetchOrders({
         scope,
         statusSlug,
-        statuses,
         search: search || null,
         before: pageParam,
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.cursor,
-    // "live" cannot be answered before the statuses are known — without them it
-    // would fall through to an unfiltered list, which is the whole bug.
-    enabled: scope !== "live" || (statuses?.length ?? 0) > 0,
     // A list that blanks on every keystroke is unusable to search with; the
     // previous pages stay under the new query until it resolves.
     placeholderData: (previous) => previous,
@@ -142,14 +126,6 @@ export function useOrder(id: string | null) {
   });
 }
 
-/**
- * The next step for a shop's portion of an order.
- *
- * Read from the statuses table rather than hardcoded, because `order_statuses`
- * is a lookup table exactly so a merchant can insert a step. Terminal statuses
- * (`progress: null`, or the last one on the path) have no next step, and the
- * RPC refuses to move off them anyway.
- */
 /** Terminal: off the path, or the end of it. Mirrors the RPC's own rule. */
 function isTerminalSlug(
   slug: string,
@@ -162,6 +138,12 @@ function isTerminalSlug(
   return status.progress >= highest;
 }
 
+/**
+ * The next step for a shop's portion of an order.
+ *
+ * Terminal statuses (`progress: null`, or the last one on the path) have no
+ * next step, and the RPC refuses to move off them anyway.
+ */
 export function nextStatus(
   statuses: OrderStatus[] | undefined,
   currentSlug: string,
@@ -197,7 +179,7 @@ export function orderStatus(
 ): OrderStatus | null {
   if (!statuses || order.stores.length === 0) return null;
 
-  const bySlug = new Map(statuses.map((s) => [s.slug, s]));
+  const bySlug = new Map<string, OrderStatus>(statuses.map((s) => [s.slug, s]));
   const present = order.stores
     .map((store) => bySlug.get(store.statusSlug))
     .filter((s): s is OrderStatus => s !== undefined);

@@ -226,13 +226,9 @@ export function OrderActions({
    * offers to remove a dish from it is offering something nobody can carry out.
    * So the control goes away one step earlier than Cancel does.
    *
-   * **Derived from `progress`, never from a slug.** `order_statuses` is a
-   * lookup table precisely so a merchant can insert a step (`0032` says so),
-   * and a hardcoded list of "amendable" slugs would silently exclude any new
-   * one — which is the same failure that would hide orders from the queue. The
-   * rule instead is structural: amending is possible while **more than one move
-   * remains**, because the last remaining move is always the one that ends the
-   * order.
+   * **Derived from `progress`, not from a list of slugs.** The rule is
+   * structural: amending is possible while **more than one move remains**,
+   * because the last remaining move is always the one that ends the order.
    *
    * Hidden rather than disabled. A disabled button is a promise the screen
    * cannot keep, and there is nothing the operator could do to re-enable it —

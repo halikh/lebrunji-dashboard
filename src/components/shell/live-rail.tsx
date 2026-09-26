@@ -2,10 +2,7 @@
 
 import { Rail } from "@/components/shell/rail";
 import { useOrderRealtime } from "@/features/orders/use-order-realtime";
-import {
-  useLiveOrderCount,
-  useOrderStatuses,
-} from "@/features/orders/use-orders";
+import { useLiveOrderCount } from "@/features/orders/use-orders";
 
 /**
  * The rail, kept live — and the one place the order subscription is opened.
@@ -42,8 +39,7 @@ import {
 export function LiveRail() {
   useOrderRealtime();
 
-  const statuses = useOrderStatuses();
-  const live = useLiveOrderCount(statuses.data);
+  const live = useLiveOrderCount();
 
   return <Rail liveOrders={live.data ?? 0} />;
 }
