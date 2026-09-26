@@ -17,6 +17,7 @@ import {
   type SelectOption,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
+import { EmptyState } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -83,9 +84,7 @@ export function PromotionEditor({ id }: { id: string | null }) {
         {promotions.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
         ) : (
-          <p className="text-[14px] text-text-soft">
-            {t("promotions.notFound")}
-          </p>
+          <EmptyState titleKey="promotions.notFound" mood="lost" />
         )}
       </EditorPage>
     );

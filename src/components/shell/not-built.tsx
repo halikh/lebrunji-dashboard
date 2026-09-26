@@ -1,3 +1,4 @@
+import { Lebrunji } from "@/components/brand/lebrunji";
 import { t, type TranslationKey } from "@/i18n/translations";
 
 /**
@@ -12,6 +13,9 @@ import { t, type TranslationKey } from "@/i18n/translations";
  * operator nothing about whether to wait five minutes or go and use the SQL
  * editor; a phase number is at least a thing that can be looked up and asked
  * about.
+ *
+ * The mascot is running rather than asleep: an empty list is nothing on its
+ * way, and an unbuilt section is something that is.
  */
 export function NotBuilt({
   sectionKey,
@@ -22,6 +26,7 @@ export function NotBuilt({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-sm px-xxl py-huge text-center">
+      <Lebrunji mood="running" size={120} className="mb-md" />
       <p className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
         {t(sectionKey)}
       </p>

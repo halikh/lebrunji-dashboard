@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { EditorPage } from "@/components/ui/editor-page";
+import { EmptyState } from "@/components/ui/empty-state";
 import { t } from "@/i18n/translations";
 
 import type { Branch } from "./api/branches";
@@ -91,7 +92,7 @@ export function BranchMenuScreen({
         {branches.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
         ) : (
-          <p className="text-[14px] text-text-soft">{t("branches.notFound")}</p>
+          <EmptyState titleKey="branches.notFound" mood="lost" />
         )}
       </EditorPage>
     );
@@ -187,7 +188,7 @@ function BranchMenuPanel({
 
   if (sections.length === 0) {
     return (
-      <p className="text-[14px] text-text-faint">{t("branchMenu.noMenu")}</p>
+      <EmptyState titleKey="branchMenu.noMenu" />
     );
   }
 

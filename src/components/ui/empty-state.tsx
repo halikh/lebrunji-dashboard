@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+
+import { Lebrunji, type MascotMood } from "@/components/brand/lebrunji";
 import { t, type Params, type TranslationKey } from "@/i18n/translations";
 
 import { cx } from "./index";
@@ -31,6 +34,7 @@ export function EmptyState({
   bodyKey,
   params,
   mood = "waiting",
+  action,
   className,
 }: {
   titleKey: TranslationKey;
@@ -46,6 +50,12 @@ export function EmptyState({
   /** Filled into both lines. Usually the search term that found nothing. */
   params?: Params;
   mood?: "waiting" | "done" | "lost";
+  /**
+   * The way out, where there is one — a link or a button under the words.
+   * The app's empty states always carry one; here most do not, because the
+   * screen's own toolbar already holds the action.
+   */
+  action?: ReactNode;
   className?: string;
 }) {
   return (
@@ -55,55 +65,36 @@ export function EmptyState({
         className,
       )}
     >
-      <Placeholder mood={mood} />
+      <Lebrunji mood={POSE[mood]} size={MASCOT} />
       <div className="flex max-w-[380px] flex-col gap-xs">
         <h2 className="text-[18px]">{t(titleKey, params)}</h2>
         {bodyKey && (
           <p className="text-[14px] text-text-soft">{t(bodyKey, params)}</p>
         )}
       </div>
+      {action}
     </div>
   );
 }
 
 /**
- * A stand-in for the mascot.
- *
- * `lebrunji.tsx` in the app is 937 lines of `react-native-svg` across six
- * moods, and porting it is its own piece of work rather than something to do
- * badly in passing — the app's own docblock also notes the artwork is a
- * placeholder pending final art, so porting it now would mean porting it twice.
- *
- * This holds the space at the right size and weight so the layout is real, and
- * is the one thing in the shell that is deliberately temporary.
+ * The mascot, in pixels wide. Smaller than the app's 160pt: there he is the
+ * whole of a phone screen, and here he often sits inside one tab of a panel.
  */
-function Placeholder({ mood }: { mood: "waiting" | "done" | "lost" }) {
-  const tone = {
-    waiting: "text-text-faint",
-    done: "text-accent",
-    lost: "text-text-faint",
-  }[mood];
+const MASCOT = 120;
 
-  return (
-    <svg
-      width={72}
-      height={72}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.25}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      className={tone}
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9 10h.01M15 10h.01" />
-      {mood === "done" ? (
-        <path d="M8.5 14.5a4 4 0 0 0 7 0" />
-      ) : (
-        <path d="M9 15h6" />
-      )}
-    </svg>
-  );
-}
+/**
+ * The dashboard's three moods, as the app's poses.
+ *
+ * - **waiting** — asleep on the delivery box. Nothing is on its way, which is
+ *   the app's own reading of `sleeping` (its empty orders list).
+ * - **lost** — the empty, crumpled bag and the drained bottle, blinking. A
+ *   search that found nothing; the app's `empty` is its no-results pose.
+ * - **done** — waving. The live queue is clear, or there is nothing left to
+ *   restore: work finished, not work missing.
+ */
+const POSE: Record<"waiting" | "done" | "lost", MascotMood> = {
+  waiting: "sleeping",
+  lost: "empty",
+  done: "wave",
+};

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui";
 import { EditorPage } from "@/components/ui/editor-page";
 import { LocalizedField } from "@/components/ui/localized-field";
+import { EmptyState } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
@@ -74,7 +75,7 @@ export function PolicySectionEditor({ id }: { id: string | null }) {
         {sections.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
         ) : (
-          <p className="text-[14px] text-text-soft">{t("content.notFound")}</p>
+          <EmptyState titleKey="content.notFound" mood="lost" />
         )}
       </EditorPage>
     );

@@ -9,6 +9,7 @@ import { EditorPage } from "@/components/ui/editor-page";
 import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Toggle } from "@/components/ui/toggle";
+import { EmptyState } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
@@ -77,7 +78,7 @@ export function TagEditor({ id }: { id: string | null }) {
         {tags.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
         ) : (
-          <p className="text-[14px] text-text-soft">{t("tags.notFound")}</p>
+          <EmptyState titleKey="tags.notFound" mood="lost" />
         )}
       </EditorPage>
     );

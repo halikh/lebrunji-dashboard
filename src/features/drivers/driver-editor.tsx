@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button, Field, Input } from "@/components/ui";
 import { EditorPage } from "@/components/ui/editor-page";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { EmptyState } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import type { DayHours } from "@/features/catalog/api/hours";
 import { t } from "@/i18n/translations";
@@ -82,7 +83,7 @@ export function DriverEditor({ id }: { id: string | null }) {
         {courier.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
         ) : (
-          <p className="text-[14px] text-text-soft">{t("drivers.notFound")}</p>
+          <EmptyState titleKey="drivers.notFound" mood="lost" />
         )}
       </EditorPage>
     );

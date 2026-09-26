@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { t } from "@/i18n/translations";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useClock } from "@/features/settings/use-clock";
 import { Price } from "@/features/reference/price";
 
@@ -133,7 +134,7 @@ export function OrderHistory({ order }: { order: Order }) {
       )}
 
       {!loading && entries.length === 0 && (
-        <p className="text-[13px] text-text-faint">{t("history.nothing")}</p>
+        <EmptyState titleKey="history.nothing" />
       )}
 
       {entries.map((entry) => (

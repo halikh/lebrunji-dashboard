@@ -557,6 +557,82 @@ dialog[open]::backdrop {
 }
 
 /**
+ * The mascot's two idle loops — see `components/brand/lebrunji.tsx`.
+ *
+ * The blink: shut from 93% to 97% of a 4.2s cycle, instantly, because an eye
+ * that fades shut reads as fainting rather than blinking.
+ *
+ * The `z`s: each rises 24 units and drifts 10 right over 2.8s, fading in over
+ * the first quarter and out over the rest. The second runs 900ms ahead of the
+ * first so they read as a pair rather than as one glyph twice. `px` here is a
+ * drawing unit — CSS transforms on SVG content act in its own coordinates.
+ *
+ * The resting styles are the still picture, which is what the reduced-motion
+ * rule below leaves behind.
+ */
+@keyframes mascot-blink-open {
+  0%,
+  93% {
+    opacity: 1;
+  }
+  93.01%,
+  97% {
+    opacity: 0;
+  }
+  97.01%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes mascot-blink-shut {
+  0%,
+  93% {
+    opacity: 0;
+  }
+  93.01%,
+  97% {
+    opacity: 1;
+  }
+  97.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes mascot-z {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(2.5px, -6px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(10px, -24px);
+  }
+}
+
+.mascot-eyes-open {
+  animation: mascot-blink-open 4200ms linear infinite;
+}
+
+.mascot-eyes-shut {
+  opacity: 0;
+  animation: mascot-blink-shut 4200ms linear infinite;
+}
+
+.mascot-sleep text {
+  animation: mascot-z 2800ms linear infinite;
+}
+
+.mascot-sleep text + text {
+  animation-delay: -900ms;
+}
+
+/**
  * Respect the setting. The app has `use-reduce-motion.ts` for the same reason:
  * the toast that slides in and the row that animates on advance are pleasant,
  * and they are not information.

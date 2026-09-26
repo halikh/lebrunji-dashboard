@@ -12,6 +12,7 @@ import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
+import { EmptyState } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
@@ -142,7 +143,7 @@ function Frame({
         <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
       )}
       {missing && (
-        <p className="text-[14px] text-text-soft">{t("categories.notFound")}</p>
+        <EmptyState titleKey="categories.notFound" mood="lost" />
       )}
     </EditorPage>
   );

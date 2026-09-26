@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Copyable } from "@/components/ui/copyable";
 import { ROW } from "@/components/ui/row";
 import { Toggle } from "@/components/ui/toggle";
+import { EmptyState } from "@/components/ui/empty-state";
 import { t } from "@/i18n/translations";
 import { Price } from "@/features/reference/price";
 import { statusTone } from "@/lib/order-status";
@@ -66,7 +67,7 @@ export function DriverProfile({ id }: { id: string }) {
     return (
       <div className="flex h-full flex-col gap-lg p-xxl">
         <Back />
-        <p className="text-[15px] text-text-soft">{t("drivers.notFound")}</p>
+        <EmptyState titleKey="drivers.notFound" mood="lost" />
       </div>
     );
   }

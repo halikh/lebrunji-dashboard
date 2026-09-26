@@ -16,6 +16,7 @@ import { BUSINESS_TIMEZONE, toWallClock } from "@/lib/time";
 import { isOpenAt, summarise, type DayWindow } from "@/lib/week";
 
 import { Select } from "@/components/ui/select";
+import { EmptyState } from "@/components/ui/empty-state";
 import { pickLocalized } from "@/i18n/db-text";
 
 import { fetchBranchHours, saveBranchHours, type DayHours } from "./api/hours";
@@ -120,9 +121,7 @@ export function StoreHours({ storeId }: { storeId: string }) {
     // `0101` gives every shop a branch, so this is a schema that has not been
     // migrated rather than an empty state anybody should meet.
     return (
-      <p className="p-xxl text-[14px] text-text-faint">
-        {t("branches.noneYet")}
-      </p>
+      <EmptyState titleKey="branches.noneYet" />
     );
   }
 

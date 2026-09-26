@@ -7,6 +7,7 @@ import { Button, cx } from "@/components/ui";
 import { Avatar } from "@/components/ui/avatar";
 import { Modal } from "@/components/ui/modal";
 import { SearchInput } from "@/components/ui/search-input";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   useCouriers,
   useRecordDispatch,
@@ -221,24 +222,28 @@ export function DispatchModal({
           )}
 
           {couriers.isSuccess && live.length === 0 && searching && (
-            <p className="text-[13px] text-text-faint">
-              {t("drivers.searchNone", { term: search.trim() })}
-            </p>
+            <EmptyState
+              titleKey="drivers.searchNone"
+              params={{ term: search.trim() }}
+              mood="lost"
+            />
           )}
 
           {couriers.isSuccess && live.length === 0 && !searching && (
             // Not a broken control and not an empty list — a sentence with the
             // next step in it. A button that opened an empty chat would be
             // worse than one that is absent.
-            <p className="text-[13px] text-text-faint">
-              {t("dispatch.noDrivers")}{" "}
-              <Link
-                href="/drivers"
-                className="font-semibold text-primary hover:underline"
-              >
-                {t("dispatch.addDriver")}
-              </Link>
-            </p>
+            <EmptyState
+              titleKey="dispatch.noDrivers"
+              action={
+                <Link
+                  href="/drivers"
+                  className="font-semibold text-primary hover:underline"
+                >
+                  {t("dispatch.addDriver")}
+                </Link>
+              }
+            />
           )}
 
           {live.map((driver) => (

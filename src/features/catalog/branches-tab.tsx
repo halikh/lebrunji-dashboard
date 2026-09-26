@@ -9,6 +9,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { useRowFocus } from "@/components/ui/row-focus";
 import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
 import { SearchInput } from "@/components/ui/search-input";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useGuardedAction } from "@/components/unsaved-changes";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -130,9 +131,7 @@ export function BranchesTab({ storeId }: { storeId: string }) {
             the list simply empties, which reads as a shop that has lost its
             branches rather than as a term that found none. */}
         {branches.isSuccess && rows.length === 0 && searching && (
-          <p className="ps-md text-[13px] text-text-soft">
-            {t("branches.noMatches")}
-          </p>
+          <EmptyState titleKey="branches.noMatches" mood="lost" />
         )}
 
         {rows.map((branch) => (

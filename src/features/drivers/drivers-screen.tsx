@@ -12,6 +12,7 @@ import { ROW } from "@/components/ui/row";
 import { Toggle } from "@/components/ui/toggle";
 import { ListHeader } from "@/components/ui/list-header";
 import { FilterTab, tabArrowHandler, type TabTone } from "@/components/ui/tab";
+import { EmptyState } from "@/components/ui/empty-state";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
 import { formatPhone } from "@/lib/phone";
@@ -205,11 +206,11 @@ export function DriversScreen() {
         {couriers.isSuccess && rows.length === 0 && (
           // The term is named. An empty list with no explanation is
           // indistinguishable from one that failed to load.
-          <p className="ps-md text-[13px] text-text-faint">
-            {searching
-              ? t("drivers.searchNone", { term: search.trim() })
-              : t("drivers.empty")}
-          </p>
+          <EmptyState
+            titleKey={searching ? "drivers.searchNone" : "drivers.empty"}
+            params={{ term: search.trim() }}
+            mood={searching ? "lost" : "waiting"}
+          />
         )}
 
         {rows.map((courier) => (

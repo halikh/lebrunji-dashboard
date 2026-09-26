@@ -12,6 +12,7 @@ import { NumberInput } from "@/components/ui/number-input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
+import { EmptyState } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useMoney } from "@/features/reference/use-currencies";
 import { useLanguages } from "@/features/reference/use-languages";
@@ -92,7 +93,7 @@ export function BranchEditorScreen({
         {branches.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
         ) : (
-          <p className="text-[14px] text-text-soft">{t("branches.notFound")}</p>
+          <EmptyState titleKey="branches.notFound" mood="lost" />
         )}
       </EditorPage>
     );
