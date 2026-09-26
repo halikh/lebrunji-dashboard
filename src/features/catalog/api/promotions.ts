@@ -193,7 +193,7 @@ export async function fetchPromotions(
 export type PromotionDraft = {
   /** The English label the slug is derived from. Never shown to a customer. */
   name: string;
-  /** Both languages, or null for no card at all. See `Promotion.imageUrl`. */
+  /** English and any others, or null for no card at all. See `Promotion.imageUrl`. */
   imageUrl: Localized | null;
   placements: Placement[];
   startsAt: string | null;

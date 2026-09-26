@@ -1,5 +1,9 @@
 import { TEXT } from "@/lib/limits";
-import { validatePrice, type Localized } from "@/lib/validation";
+import {
+  FALLBACK_LANGUAGE,
+  validatePrice,
+  type Localized,
+} from "@/lib/validation";
 
 /**
  * Reading a list of named rows out of a block of typed text.
@@ -40,9 +44,12 @@ import { validatePrice, type Localized } from "@/lib/validation";
  * hint on screen is built from the same array so what is asked for and what is
  * read can never disagree.
  *
- * Every language is required, because `0051` requires them: `item_options.name`
- * must carry a non-empty string for each, and a row missing one is refused by
- * the database rather than saved half-translated.
+ * Every column is there on every line, but only the English one must have
+ * something in it — `0128` made that the whole of the `_locales` rule, and every
+ * reader shows English where another language is blank. So `Small | | 1` is a
+ * choice called Small, in English only, costing 1. The empty column stays
+ * rather than being dropped because, with the price optional, `Small | 1`
+ * could not say whether `1` is the Arabic or the price.
  *
  * ## The price is the last column and may be left off
  *
@@ -117,7 +124,7 @@ export function parseBulkRows(
 ): BulkParse {
   const problems: LineProblem[] = [];
   const rows: ParsedRow[] = [];
-  /** Lower-cased first-language names, to catch a list pasted twice. */
+  /** Lower-cased English names, to catch a list pasted twice. */
   const seen = new Map<string, number>();
 
   const lines = text.split("\n");
@@ -149,6 +156,8 @@ export function parseBulkRows(
 
     for (let column = 0; column < codes.length; column += 1) {
       const value = columns[column];
+      // A blank translation is left out, not stored as "". See the note above.
+      if (value === "" && codes[column] !== FALLBACK_LANGUAGE) continue;
       if (value === "") {
         problems.push({
           line: at,
@@ -192,13 +201,17 @@ export function parseBulkRows(
     // on the shop is the database's business — the slug indexes from `0067` and
     // `0071` are unique per group and per store — and repeating those rules
     // here would be a second copy of them to drift.
-    const handle = (name[codes[0]] ?? "").toLowerCase();
+    //
+    // Compared by English, which every line has. The first column was used
+    // while every column was required; now it could be a blank translation,
+    // and two lines with no Arabic would be reported as the same line.
+    const handle = (name[FALLBACK_LANGUAGE] ?? "").toLowerCase();
     const first = seen.get(handle);
     if (first !== undefined) {
       problems.push({
         line: at,
         key: "bulk.duplicate",
-        params: { name: name[codes[0]] ?? "", first },
+        params: { name: name[FALLBACK_LANGUAGE] ?? "", first },
       });
       continue;
     }

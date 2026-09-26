@@ -75,21 +75,27 @@ describe("validateLocalizedText", () => {
     ).toBe(true);
   });
 
-  it("names the missing language rather than failing anonymously", () => {
+  it("accepts English alone, because Arabic falls back to it", () => {
+    expect(
+      validateLocalizedText({ en: "Kibbeh" }, languages, TEXT.name).ok,
+    ).toBe(true);
+    expect(
+      validateLocalizedText({ en: "Kibbeh", ar: "   " }, languages, TEXT.name)
+        .ok,
+    ).toBe(true);
+  });
+
+  it("names English when only another language is filled", () => {
     // This is the case the locales CHECK constraint would otherwise report as
     // `menu_items_name_locales`, which tells the operator nothing.
-    const result = validateLocalizedText(
-      { en: "Kibbeh" },
-      languages,
-      TEXT.name,
-    );
+    const result = validateLocalizedText({ ar: "كبة" }, languages, TEXT.name);
     expect(key(result)).toBe("form.stillNeeded");
-    expect(params(result)?.languages).toBe("ar");
+    expect(params(result)?.languages).toBe("en");
   });
 
   it("treats whitespace as empty, because the constraint does too", () => {
     expect(
-      validateLocalizedText({ en: "Kibbeh", ar: "   " }, languages, TEXT.name)
+      validateLocalizedText({ en: "   ", ar: "كبة" }, languages, TEXT.name)
         .ok,
     ).toBe(false);
   });
@@ -100,9 +106,14 @@ describe("validateLocalizedText", () => {
         optional: true,
       }).ok,
     ).toBe(true);
-    // …but half of an optional value is still half a value.
+    // …and an optional value that is there still needs its English.
     expect(
       validateLocalizedText({ en: "Fresh" }, languages, TEXT.description, {
+        optional: true,
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateLocalizedText({ ar: "طازج" }, languages, TEXT.description, {
         optional: true,
       }).ok,
     ).toBe(false);
@@ -115,15 +126,23 @@ describe("validateLocalizedText", () => {
     expect(params(result)?.languages).toBe("en");
   });
 
+  it("still holds an optional language to the length limit", () => {
+    const over = { en: "Kibbeh", ar: "x".repeat(TEXT.name + 1) };
+    const result = validateLocalizedText(over, languages, TEXT.name);
+    expect(key(result)).toBe("validation.tooLongIn");
+    expect(params(result)?.languages).toBe("ar");
+  });
+
   it("follows the languages it is given, not a hardcoded pair", () => {
-    // The point of reading `languages` from the database: adding one is a row.
+    // The point of reading `languages` from the database: adding one is a row
+    // — and, like Arabic, an optional one.
     const three = ["en", "ar", "ku"];
     expect(
       validateLocalizedText({ en: "a", ar: "b" }, three, TEXT.name).ok,
-    ).toBe(false);
-    expect(
-      validateLocalizedText({ en: "a", ar: "b", ku: "c" }, three, TEXT.name).ok,
     ).toBe(true);
+    expect(
+      validateLocalizedText({ ar: "b", ku: "c" }, three, TEXT.name).ok,
+    ).toBe(false);
   });
 });
 

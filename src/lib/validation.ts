@@ -63,23 +63,33 @@ const fail = (key: TranslationKey, params?: Params): Valid => ({
 export type Localized = Record<string, string>;
 
 /**
+ * The one language a translated value must have.
+ *
+ * Every reader falls back to it — the app's `pickLocalized`, this dashboard's,
+ * and `api_v1_store_menu` — so a value with English is never a blank line on
+ * anybody's screen, and a value without it is a blank line on every English
+ * one. Since `0128` the `_locales` constraints require it and nothing else.
+ */
+export const FALLBACK_LANGUAGE = "en";
+
+/**
  * A localised value as the database wants it: the object, or **null** when
  * every language is blank.
  *
- * The `_locales` CHECK constraints (migration 0051) allow an optional column to
- * be null outright, and otherwise require *every* locale to be present and
- * non-empty. An empty form field therefore has two possible encodings and only
- * one of them is legal — `{}` and `{ en: "", ar: "" }` are both rejected, with
- * a message naming a constraint.
+ * The `_locales` CHECK constraints allow an optional column to be null
+ * outright, and otherwise require English to be present and non-empty (`0128`;
+ * before it, every locale). An empty form field therefore has two possible
+ * encodings and only one of them is legal — `{}` and `{ en: "", ar: "" }` are
+ * both rejected, with a message naming a constraint.
  *
  * That is exactly what happened: a dish saved with no description sent `{}`,
  * Postgres refused it, and the operator was told "every language needs a value"
  * about a field they had deliberately left blank.
  *
  * So an all-blank value becomes null here, once, rather than in each form.
- * Blank *entries* are dropped too — a partly-filled value has already been
- * refused by `validateLocalizedText`, and sending `{ en: "x", ar: "" }` would
- * hit the constraint rather than the form's own message.
+ * Blank *entries* are dropped too: `{ en: "x", ar: "" }` is stored as
+ * `{ en: "x" }`, so a missing Arabic is absent rather than an empty string that
+ * every reader has to know to skip.
  */
 export function localizedOrNull(
   value: Localized | null | undefined,
@@ -111,10 +121,12 @@ export function validateSlug(value: string): Valid {
  * a database table and not a constant — that is what makes adding one a row
  * rather than a release.
  *
- * **Every language is required.** Not a house style: the `<table>_<col>_locales`
- * CHECK constraints from migration 0051 reject an object missing one, so a form
- * that allowed a partial value would fail at Save with a constraint name instead
- * of a sentence. Naming the missing languages here is the whole difference.
+ * **English is required; every other language is optional.** A blank Arabic
+ * is read as English by the app and the dashboard alike, so it is a gap in the
+ * translation rather than a hole in the screen. A blank English is a hole —
+ * which is why `0128` left it the one thing the `_locales` constraints check,
+ * and why a value filled in Arabic only is refused here, with a sentence,
+ * rather than at Save with a constraint name.
  */
 export function validateLocalizedText(
   value: Localized | null | undefined,
@@ -129,11 +141,11 @@ export function validateLocalizedText(
     return options.optional ? OK : fail("validation.required");
   }
 
-  // Partly filled is the case worth a good message: the operator has done most
-  // of the work and is about to lose it to a constraint violation.
-  const missing = languages.filter((code) => !isFilled(code));
-  if (missing.length > 0) {
-    return fail("form.stillNeeded", { languages: missing.join(", ") });
+  // Filled in, but not in the language everybody falls back to. Named, because
+  // the operator has done the work in another box and needs to know which one
+  // is still empty.
+  if (languages.includes(FALLBACK_LANGUAGE) && !isFilled(FALLBACK_LANGUAGE)) {
+    return fail("form.stillNeeded", { languages: FALLBACK_LANGUAGE });
   }
 
   const tooLong = languages.filter(

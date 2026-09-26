@@ -19,11 +19,10 @@ import {
 import { Toggle } from "@/components/ui/toggle";
 import { EmptyState } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
-import { useLanguages } from "@/features/reference/use-languages";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
-import type { Localized } from "@/lib/validation";
+import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
 import {
   PLACEMENTS,
@@ -233,11 +232,6 @@ function Form({
 
   const stores = useStores("");
   const categories = useCategories("");
-  // For the artwork check below: a card needs one file per language, and the
-  // languages are a table rather than a constant.
-  const languages = useLanguages();
-  const codes = languages.data?.map((language) => language.code) ?? [];
-
   const [name, setName] = useState(initial?.slug ?? "");
   const [imageUrl, setImageUrl] = useState<Localized | null>(
     initial?.imageUrl ?? null,
@@ -415,12 +409,13 @@ function Form({
           ? t("promotions.targetsRequired")
           : undefined,
 
-      // Both cards or neither. `discounts_image_url_locales` refuses a
-      // half-filled object, so without this the save comes back as a constraint
-      // name — and the operator has no way to know it is about the picture.
+      // Any card means an English one. `discounts_image_url_locales` refuses a
+      // card with no English (`0128`) — it is what every device falls back to —
+      // so without this the save comes back as a constraint name, and the
+      // operator has no way to know it is about the picture.
       image:
-        imageUrl && codes.some((code) => !(imageUrl[code] ?? "").trim())
-          ? t("promotions.imageBothLanguages")
+        imageUrl && !(imageUrl[FALLBACK_LANGUAGE] ?? "").trim()
+          ? t("promotions.imageNeedsEnglish")
           : undefined,
     };
 

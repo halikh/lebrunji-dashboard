@@ -4,7 +4,7 @@ import { useId } from "react";
 
 import { useLanguages } from "@/features/reference/use-languages";
 import { t } from "@/i18n/translations";
-import type { Localized } from "@/lib/validation";
+import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
 import { ImageUploader } from "./image-uploader";
 import { cx } from "./index";
@@ -26,11 +26,13 @@ import { cx } from "./index";
  * ## The same shape `LocalizedField` has, for the same reasons
  *
  * The list comes from the `languages` table rather than a constant, so a third
- * language is a row rather than a release. Both are required or neither is:
- * `discounts_image_url_locales` refuses a half-filled object, so a form that
- * let one through would submit and come back with a constraint name the
- * operator can do nothing with. Naming the missing language here is the whole
- * difference between that and "still needed in: ar".
+ * language is a row rather than a release. The English card is required
+ * whenever there is any card, and the rest are optional (`0128`): an Arabic
+ * device with no Arabic card is shown the English one, which is a card it may
+ * not read but never an empty frame. A card in Arabic only would submit and
+ * come back from `discounts_image_url_locales` with a constraint name; naming
+ * the missing box here is the difference between that and "still needed in:
+ * en".
  *
  * ## Null means "no card", `{}` means nothing
  *
@@ -48,7 +50,7 @@ export function LocalizedImageField({
   disabled = false,
 }: {
   label: string;
-  /** Both languages, or null for no picture at all. */
+  /** English and any others, or null for no picture at all. */
   value: Localized | null;
   onChange: (value: Localized | null) => void;
   folder: "menu-items" | "stores" | "promotions";
@@ -73,16 +75,13 @@ export function LocalizedImageField({
     );
   }
 
-  const filled = languages.data.filter(
-    (language) => (value?.[language.code] ?? "").trim().length > 0,
-  );
-  const missing = languages.data
-    .filter((language) => (value?.[language.code] ?? "").trim().length === 0)
-    .map((language) => language.code);
+  const isBlank = (code: string) => (value?.[code] ?? "").trim().length === 0;
 
-  // Only *partly* filled is a problem. None at all is a promotion with no card,
-  // which is a legitimate thing to be.
-  const partial = filled.length > 0 && missing.length > 0;
+  // Only a card with the English one left out is a problem. None at all is a
+  // promotion with no card, and no Arabic card falls back to the English.
+  const partial =
+    isBlank(FALLBACK_LANGUAGE) &&
+    languages.data.some((language) => !isBlank(language.code));
 
   function set(code: string, url: string | null) {
     const next: Localized = { ...(value ?? {}) };
@@ -132,7 +131,7 @@ export function LocalizedImageField({
         // Names the language rather than saying "incomplete" — the operator has
         // done most of the work and what they need is which box is empty.
         <p role="alert" className="ps-md text-[13px] font-medium text-danger">
-          {t("form.stillNeeded", { languages: missing.join(", ") })}
+          {t("form.stillNeeded", { languages: FALLBACK_LANGUAGE })}
         </p>
       ) : (
         hint && (

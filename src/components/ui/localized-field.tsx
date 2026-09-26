@@ -5,23 +5,24 @@ import { useId, useState } from "react";
 import { useLanguages } from "@/features/reference/use-languages";
 import { t } from "@/i18n/translations";
 import { formatText, rejectedIn, type TextFormat } from "@/lib/text-format";
-import type { Localized } from "@/lib/validation";
+import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
 import { cx, Input } from "./index";
 
 /**
  * A field with one input per language.
  *
- * ## Every language is required, and that is the database's rule
+ * ## English is required; the rest are optional
  *
- * Since migration 0051 each translated column is one `jsonb` object, with a
- * `<table>_<col>_locales` CHECK constraint requiring **all** of them. So a form
- * that let a value through in English only would not be lenient — it would
- * submit, and Postgres would reject it with a constraint name the operator can
- * do nothing with.
+ * Each translated column is one `jsonb` object, and since `0128` its
+ * `<table>_<col>_locales` CHECK constraint requires English and nothing else.
+ * Every reader — the app, this dashboard, the menu RPC — shows English where a
+ * language is blank, so an empty Arabic box is a translation still to do rather
+ * than a blank line on a phone.
  *
- * Naming the missing languages here is the entire difference between that and
- * "still needed in: ar".
+ * English is the one box that is flagged: a value typed in Arabic only would
+ * submit and come back with a constraint name, and naming the box here is the
+ * difference between that and "still needed in: en".
  *
  * ## Why the list comes from the database
  *
@@ -153,13 +154,14 @@ export function LocalizedField({
     );
   }
 
-  const missing = languages.data
-    .filter((language) => (value[language.code] ?? "").trim().length === 0)
-    .map((language) => language.code);
+  const isBlank = (code: string) => (value[code] ?? "").trim().length === 0;
 
-  // Empty is a legitimate state for an optional column — it is only *partly*
-  // filled that the constraint refuses.
-  const partial = missing.length > 0 && missing.length < languages.data.length;
+  // Empty is a legitimate state for an optional column, and a blank Arabic is
+  // a legitimate state for any column. What the constraint refuses is something
+  // written with the English left out.
+  const partial =
+    isBlank(FALLBACK_LANGUAGE) &&
+    languages.data.some((language) => !isBlank(language.code));
 
   return (
     <div className="flex flex-col gap-xs">
@@ -185,7 +187,7 @@ export function LocalizedField({
         {languages.data.map((language) => {
           const inputId = `${id}-${language.code}`;
           const text = value[language.code] ?? "";
-          const isMissing = partial && text.trim().length === 0;
+          const isMissing = partial && language.code === FALLBACK_LANGUAGE;
 
           return (
             // `dir` on the wrapper rather than only on the input, so the
@@ -273,7 +275,7 @@ export function LocalizedField({
         // Names the languages rather than saying "incomplete". The operator has
         // done most of the work; what they need is which box is empty.
         <p role="alert" className="ps-md text-[13px] font-medium text-danger">
-          {t("form.stillNeeded", { languages: missing.join(", ") })}
+          {t("form.stillNeeded", { languages: FALLBACK_LANGUAGE })}
         </p>
       ) : (
         // The same slot as the error, never a second line: showing both means

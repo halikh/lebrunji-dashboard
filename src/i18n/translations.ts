@@ -1724,11 +1724,13 @@ const en = {
       "Your own label for it, never shown to a customer. Cannot be changed later.",
     nameRequired: "Give it a name so you can find it again.",
     // One card per language, because the wording is inside the picture — `0013`
-    // dropped a discount's text columns on exactly that reasoning.
+    // dropped a discount's text columns on exactly that reasoning. Only the
+    // English one is required: a device with no card in its language is shown
+    // the English card (`0128`).
     imageHint:
-      "The card as customers see it. Wide, not square — one per language.",
-    imageBothLanguages:
-      "A card is needed in every language, or none at all — the words are inside the picture.",
+      "The card as customers see it. Wide, not square. English is required; without an Arabic card, the English one is shown.",
+    imageNeedsEnglish:
+      "Add the English card — it is the one shown wherever another language has none.",
     // A link to a promotion that has since been archived, or a mistyped id.
     notFound: "That promotion is not here any more.",
 

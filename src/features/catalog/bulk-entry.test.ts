@@ -55,14 +55,35 @@ describe("parseBulkRows", () => {
     expect(result.rows).toHaveLength(2);
   });
 
-  it("names the line and the language when a name is missing", () => {
+  it("leaves a blank translation out rather than refusing the line", () => {
     const result = parseBulkRows("Small |   | 1", CODES, USD, "optional");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows).toEqual([{ name: { en: "Small" }, price: 100 }]);
+  });
+
+  it("names the line and the language when the English is missing", () => {
+    const result = parseBulkRows("  | صغير | 1", CODES, USD, "optional");
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.problems).toEqual([
-      { line: 1, key: "bulk.nameMissing", params: { code: "AR" } },
+      { line: 1, key: "bulk.nameMissing", params: { code: "EN" } },
     ]);
+  });
+
+  it("does not take two English-only lines for duplicates", () => {
+    const result = parseBulkRows(
+      "Small | | 1\nLarge | | 2",
+      CODES,
+      USD,
+      "optional",
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows).toHaveLength(2);
   });
 
   it("reports the wrong number of columns against the languages there are", () => {
