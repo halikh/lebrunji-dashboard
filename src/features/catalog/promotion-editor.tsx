@@ -409,12 +409,20 @@ function Form({
           ? t("promotions.targetsRequired")
           : undefined,
 
-      // Any card means an English one. `discounts_image_url_locales` refuses a
-      // card with no English (`0128`) — it is what every device falls back to —
-      // so without this the save comes back as a constraint name, and the
-      // operator has no way to know it is about the picture.
-      image:
-        imageUrl && !(imageUrl[FALLBACK_LANGUAGE] ?? "").trim()
+      // A card is required, and it means an English one.
+      //
+      // Required because the card *is* the promotion to a customer — `0013`
+      // dropped a discount's text columns on that reasoning, so one saved
+      // without a card has nothing to show on a phone but an empty frame.
+      //
+      // English because it is what every device falls back to (`0128`), and
+      // `discounts_image_url_locales` refuses a card without it — without this
+      // the save would come back as a constraint name. Two messages, because
+      // "add a card" to somebody who added an Arabic one is not a thing they
+      // can act on.
+      image: !imageUrl
+        ? t("promotions.imageRequired")
+        : !(imageUrl[FALLBACK_LANGUAGE] ?? "").trim()
           ? t("promotions.imageNeedsEnglish")
           : undefined,
     };

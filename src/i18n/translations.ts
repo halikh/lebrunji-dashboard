@@ -1014,13 +1014,14 @@ const en = {
     // does — because empty is a real answer here and the common one.
     artworkSection: "Artwork",
     artworkSectionHint:
-      "How this category looks in the app. Leave any of them empty and the app's own answer is used.",
+      "How this category looks in the app. The icon is required; leave any of the others empty and the app's own answer is used.",
     // The category's own mark. Named for where it appears, because the field
     // under it is also an icon and the difference between them is *what they
     // stand for* — this one the category, that one a shop inside it.
     icon: "Category icon",
     iconHint:
-      "Shown beside this category's name in the app's category strip. Empty for the app's own glyph. Best uploaded for every category or none — a strip of three photographs and nine glyphs looks worse than twelve glyphs.",
+      "Shown beside this category's name in the app's category strip.",
+    iconRequired: "Add an icon — every category needs one to be saved.",
     emptyIcon: "Empty-state icon",
     emptyIconHint:
       "Drawn on any dish in this category that has no picture of its own. It takes the category's colour, so pick the shape rather than the shade.",
@@ -1729,6 +1730,8 @@ const en = {
     // the English card (`0128`).
     imageHint:
       "The card as customers see it. Wide, not square. English is required; without an Arabic card, the English one is shown.",
+    imageRequired:
+      "Add the card — it is what customers see, so a promotion cannot be saved without one.",
     imageNeedsEnglish:
       "Add the English card — it is the one shown wherever another language has none.",
     // A link to a promotion that has since been archived, or a mistyped id.

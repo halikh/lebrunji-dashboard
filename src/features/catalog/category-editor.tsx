@@ -201,7 +201,11 @@ function Form({
     initial?.storeTextColor ?? null,
   );
 
-  const [errors, setErrors] = useState<{ name?: string; kind?: string }>({});
+  const [errors, setErrors] = useState<{
+    name?: string;
+    kind?: string;
+    icon?: string;
+  }>({});
 
   // The pair the preview below draws, measured live. `0114`'s rule: the shape
   // is the database's business and the legibility is this screen's.
@@ -252,10 +256,14 @@ function Form({
       // refusal from Postgres rather than a message about the field it came
       // from. Caught here so it reads as a form.
       kind: kindId ? undefined : t("categories.kindRequired"),
+      // Every category carries its own icon. The strip across Home and Search
+      // is all of them side by side, and one drawn with the app's glyph among
+      // uploaded pictures reads as the one that is broken.
+      icon: iconUrl ? undefined : t("categories.iconRequired"),
     };
 
     setErrors(found);
-    if (found.name || found.kind) return;
+    if (found.name || found.kind || found.icon) return;
 
     onSave({
       name,
@@ -356,9 +364,9 @@ function Form({
         </div>
 
         <div className="flex min-w-0 flex-col gap-lg">
-          {/* Says whose answers these are and, more importantly, that leaving
-              them alone is a real answer — the app has its own table and a null
-              here follows it. */}
+          {/* Says whose answers these are and which of them may be left alone:
+              the icon is required, and the rest follow the app's own table
+              when they are null. */}
           <div className="flex flex-col gap-xxs">
             <h3 className="ps-md text-[17px]">
               {t("categories.artworkSection")}
@@ -372,7 +380,11 @@ function Form({
               in the strip across the top of Home and Search. The two below it
               are about how a *shop* in this category is drawn when it has sent
               nothing of its own, which is a narrower question. */}
-          <Field label={t("categories.icon")} hint={t("categories.iconHint")}>
+          <Field
+            label={t("categories.icon")}
+            hint={t("categories.iconHint")}
+            error={errors.icon}
+          >
             <ImageUploader
               value={iconUrl}
               onChange={setIconUrl}
