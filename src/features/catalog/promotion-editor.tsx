@@ -1,13 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
 
 import { Button, Field, Input } from "@/components/ui";
 import { DateField } from "@/components/ui/date-field";
 import { EditorPage } from "@/components/ui/editor-page";
-import { LocalizedImageField } from "@/components/ui/localized-image-field";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import {
@@ -22,14 +22,11 @@ import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
-import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
 import {
-  PLACEMENTS,
   PROMOTION_KINDS,
   fetchDishesByIds,
   searchDishes,
-  type Placement,
   type Promotion,
   type PromotionDraft,
   type PromotionKind,
@@ -54,9 +51,12 @@ const LIST_HREF = "/catalogue?tab=promotions";
  *
  * This is the form that most needed the room. A promotion carries a kind, a
  * value, a floor, a cap, two redemption limits, a first-order flag, a scope
- * with a target picker, a date window, three placements and a card per
- * language — the file's own note calls it "a lot of control for a screen used a
- * handful of times a year". None of that belonged in a 420pt column.
+ * with a target picker and a date window — the file's own note calls it "a lot
+ * of control for a screen used a handful of times a year". None of that
+ * belonged in a 420pt column.
+ *
+ * The card and where it is shown used to be here too. `0129` moved them to
+ * `artworks` — see `ArtworkEditor` — and this form links there instead.
  */
 export function PromotionEditor({ id }: { id: string | null }) {
   const router = useRouter();
@@ -233,20 +233,6 @@ function Form({
   const stores = useStores("");
   const categories = useCategories("");
   const [name, setName] = useState(initial?.slug ?? "");
-  const [imageUrl, setImageUrl] = useState<Localized | null>(
-    initial?.imageUrl ?? null,
-  );
-  /**
-   * Where the card is shown, and nothing about who gets the discount.
-   *
-   * `discount_for_order` does not read this — an unplaced promotion still
-   * applies at checkout — so the field is about advertising and says so. A new
-   * promotion starts on Home, which is where every promotion has been shown
-   * since `0053`.
-   */
-  const [placements, setPlacements] = useState<Placement[]>(
-    initial?.placements ?? ["home"],
-  );
   const [startsAt, setStartsAt] = useState<string | null>(
     initial?.startsAt ?? null,
   );
@@ -316,8 +302,6 @@ function Form({
     changed(
       {
         name,
-        imageUrl,
-        placements,
         startsAt,
         endsAt,
         isActive,
@@ -335,8 +319,6 @@ function Form({
       },
       {
         name: initial?.slug ?? "",
-        imageUrl: initial?.imageUrl ?? null,
-        placements: initial?.placements ?? ["home"],
         startsAt: initial?.startsAt ?? null,
         endsAt: initial?.endsAt ?? null,
         isActive: initial?.isActive ?? true,
@@ -366,7 +348,6 @@ function Form({
     value?: string;
     window?: string;
     targets?: string;
-    image?: string;
   }>({});
 
   /** `freeDelivery` takes the delivery fee, so there is no amount to set. */
@@ -408,40 +389,13 @@ function Form({
         scopeType !== "order" && targets.length === 0
           ? t("promotions.targetsRequired")
           : undefined,
-
-      // A card is required, and it means an English one.
-      //
-      // Required because the card *is* the promotion to a customer — `0013`
-      // dropped a discount's text columns on that reasoning, so one saved
-      // without a card has nothing to show on a phone but an empty frame.
-      //
-      // English because it is what every device falls back to (`0128`), and
-      // `discounts_image_url_locales` refuses a card without it — without this
-      // the save would come back as a constraint name. Two messages, because
-      // "add a card" to somebody who added an Arabic one is not a thing they
-      // can act on.
-      image: !imageUrl
-        ? t("promotions.imageRequired")
-        : !(imageUrl[FALLBACK_LANGUAGE] ?? "").trim()
-          ? t("promotions.imageNeedsEnglish")
-          : undefined,
     };
 
     setErrors(found);
-    if (
-      found.name ||
-      found.value ||
-      found.window ||
-      found.targets ||
-      found.image
-    ) {
-      return;
-    }
+    if (found.name || found.value || found.window || found.targets) return;
 
     onSave({
       name: name.trim(),
-      imageUrl,
-      placements,
       startsAt,
       endsAt,
       isActive,
@@ -467,8 +421,8 @@ function Form({
       title={initial ? initial.slug : t("promotions.add")}
       backHref={initial ? `${LIST_HREF}&focus=${initial.id}` : LIST_HREF}
       backLabel={t("promotions.tab")}
-      /* Two columns — the card on the left, what it does on the right. See the
-         grid below. */
+      /* Two columns — the reference on the left, what it does on the right. See
+         the grid below. */
       width="wide"
       footer={
         <>
@@ -482,15 +436,12 @@ function Form({
       }
     >
       {/**
-       * The card, and the discount behind it.
+       * The reference, and the discount behind it.
        *
-       * A promotion is two things and the form was a single column of them: on
-       * the left is the **artwork** — its reference, the picture in each
-       * language, and where the card is shown; on the right is what it actually
-       * *does* — the kind, what it applies to, when it runs, and whether it is
-       * live. They are read together, which is why they sit side by side, and
-       * the plain-English summary at the foot of the right column is the answer
-       * both halves add up to.
+       * On the left is the promotion's **name** and a pointer to its pictures;
+       * on the right is what it actually *does* — the kind, what it applies to,
+       * when it runs, and whether it is live. The plain-English summary at the
+       * foot of the right column is the answer the form adds up to.
        *
        * One column below `lg`, in the order the form always had.
        */}
@@ -509,82 +460,30 @@ function Form({
             />
           </Field>
 
-          {/* One card per language, because the words are inside the picture —
-            `0013` dropped a discount's text columns on exactly that reasoning,
-            so an Arabic customer shown the English card is looking at an advert
-            they cannot read. See `LocalizedImageField`. */}
-          <LocalizedImageField
-            label={t("images.label")}
-            hint={t("promotions.imageHint")}
-            value={imageUrl}
-            onChange={setImageUrl}
-            folder="promotions"
-            disabled={pending}
-            error={errors.image}
-          />
-
-          {/*
-          Where the card is shown — a decision, not something derived.
-
-          Toggles rather than a select: the answers are not exclusive, a
-          promotion can reasonably be on two screens, and all three fit at once.
-          Each says what it means, because "Store" alone does not distinguish
-          "on the shop's page" from "for a shop's promotion".
-        */}
-          <Field
-            label={t("promotions.placement")}
-            hint={t("promotions.placementHint")}
-          >
-            {/*
-            One switch per screen, not a set of checkboxes.
-
-            The answers are not exclusive — a promotion can reasonably be on two
-            screens — and each one is independently on or off, which is what a
-            switch says and a checkbox only implies. It also matches every other
-            on/off in the product: the shop's Live, the tag's, the promotion's
-            own. A second idiom for the same question is one more thing to read.
-
-            Each carries its own line, because "The shop's page" does not say
-            *which* shops, and the answer — the ones this promotion covers — is
-            the difference between a useful placement and a puzzling one.
-          */}
-            <div className="flex flex-col gap-md">
-              {PLACEMENTS.map((option) => (
-                <div
-                  key={option}
-                  className="flex items-start justify-between gap-lg rounded-md border border-border bg-surface px-lg py-md"
-                >
-                  <span className="flex min-w-0 flex-col gap-xxs">
-                    <span className="text-[14px] font-semibold text-text">
-                      {t(`promotions.placements.${option}`)}
-                    </span>
-                    <span className="text-[12px] text-text-faint">
-                      {t(`promotions.placementsHint.${option}`)}
-                    </span>
-                  </span>
-
-                  <Toggle
-                    on={placements.includes(option)}
-                    onChange={() =>
-                      setPlacements((current) =>
-                        current.includes(option)
-                          ? current.filter((one) => one !== option)
-                          : // Kept in the declared order rather than appended, so
-                            // the value written does not depend on the order the
-                            // operator happened to press them in.
-                            PLACEMENTS.filter(
-                              (one) => one === option || current.includes(one),
-                            ),
-                      )
-                    }
-                    labelOn={t("promotions.placementOn")}
-                    labelOff={t("promotions.placementOff")}
-                    className="w-[104px] shrink-0"
-                  />
-                </div>
-              ))}
-            </div>
-          </Field>
+          {/* The pictures are managed where the other artwork is — `0129`
+            gave them a table of their own, and one promotion may have a banner
+            and a tile, or none. A pointer rather than a field, so the operator
+            is not left looking for a card box that is no longer here. */}
+          <div className="flex flex-col gap-xs rounded-md bg-neutral-fill px-lg py-md">
+            <span className="text-[14px] font-semibold text-text">
+              {t("promotions.artworkTitle")}
+            </span>
+            <p className="text-[13px] text-text-soft">
+              {t("promotions.artworkBody")}
+            </p>
+            <Link
+              href={
+                initial
+                  ? `/catalogue/artworks/new?discount=${initial.id}`
+                  : "/catalogue?tab=artworks"
+              }
+              className="self-start text-[13px] font-semibold text-primary underline-offset-2 hover:underline"
+            >
+              {initial
+                ? t("promotions.artworkAdd")
+                : t("promotions.artworkOpen")}
+            </Link>
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-col gap-lg">
@@ -825,20 +724,31 @@ function Form({
           </Section>
 
           <Section title={t("promotions.whenSection")}>
-            <Field
-              label={t("promotions.startsAt")}
-              hint={t("promotions.startsHint")}
-            >
-              <DateField value={startsAt} onChange={setStartsAt} />
-            </Field>
+            {/* Side by side, because they are one answer — the window — read
+                left to right as from and to. `items-start` so the error under
+                Ends does not stretch Starts to match it.
 
-            <Field
-              label={t("promotions.endsAt")}
-              hint={t("promotions.endsHint")}
-              error={errors.window}
-            >
-              <DateField value={endsAt} onChange={setEndsAt} />
-            </Field>
+                A container query, not a viewport one: on a wide screen this
+                form is half the page, so the viewport says nothing about
+                whether two 240px pickers fit. 32rem is the pair plus the gap. */}
+            <div className="@container">
+              <div className="grid grid-cols-1 items-start gap-lg @[32rem]:grid-cols-2">
+                <Field
+                  label={t("promotions.startsAt")}
+                  hint={t("promotions.startsHint")}
+                >
+                  <DateField value={startsAt} onChange={setStartsAt} />
+                </Field>
+
+                <Field
+                  label={t("promotions.endsAt")}
+                  hint={t("promotions.endsHint")}
+                  error={errors.window}
+                >
+                  <DateField value={endsAt} onChange={setEndsAt} />
+                </Field>
+              </div>
+            </div>
 
             <Field
               label={t("promotions.visibility")}

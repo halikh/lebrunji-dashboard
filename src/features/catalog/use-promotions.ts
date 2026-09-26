@@ -15,6 +15,7 @@ import {
   type PromotionDraft,
   type PromotionPatch,
 } from "./api/promotions";
+import { artworkKeys } from "./use-artworks";
 
 export const promotionKeys = {
   all: ["promotions"] as const,
@@ -124,6 +125,9 @@ export function useArchivePromotion() {
       archivePromotion(input.id),
     onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: promotionKeys.all });
+      // Its pictures come down with it in the app, and the Artwork tab says so
+      // on each of them — which it can only do from a fresh read.
+      void queryClient.invalidateQueries({ queryKey: artworkKeys.all });
       toast.success(t("promotions.archived", { name: input.name }));
     },
     onError: (error) => {

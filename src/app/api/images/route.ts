@@ -40,23 +40,28 @@ import { deleteObject, imageUrlFor, presignUpload } from "@/lib/storage/bucket";
  *
  * `category-art` is where a category's empty-state icon goes (`0117`). The
  * hyphen is not decoration: `categories` is the *old* name of the promotions
- * folder and live `discounts.image_url` rows still point into it, so a new
- * writer under that prefix would mix this year's uploads in with objects
- * nobody can tell apart from them.
+ * folder and live `artworks.image_url` rows (on `discounts` before `0129`)
+ * still point into it, so a new writer under that prefix would mix this year's
+ * uploads in with objects nobody can tell apart from them.
  *
  * `promotions` was called `categories` until the day of this comment, and the
  * name was simply wrong: a category has deliberately had no picture since
  * `0075` (see `features/catalog/api/categories.ts`), so the folder's only
  * writer was ever the promotion editor. Nothing else uploaded there, so this
  * is a rename rather than a migration — but the objects already written under
- * the old prefix are what live `discounts.image_url` rows point at, which is
+ * the old prefix are what live `artworks.image_url` rows (moved there from `discounts` by `0129`) point at, which is
  * why the two routes that read a key still know that name. See the `DELETE`
  * shape below and `app/i/[...key]/route.ts`.
+ *
+ * `artwork` is where the Artwork tab uploads since `0129` gave pictures a table
+ * of their own. `promotions` stays: the banners `0129` moved still point into
+ * it, and so does anything uploaded before.
  */
 const FOLDERS = [
   "menu-items",
   "stores",
   "promotions",
+  "artwork",
   "category-art",
   "sounds",
 ] as const;
@@ -81,6 +86,7 @@ const ALLOWED: Record<Folder, { types: readonly string[]; maxBytes: number }> =
     "menu-items": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     stores: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     promotions: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
+    artwork: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     "category-art": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     sounds: { types: SOUND.types, maxBytes: SOUND.maxBytes },
   };
@@ -165,7 +171,7 @@ export async function DELETE(request: NextRequest) {
   // makes; refusing the old prefix would only mean the orphans it leaves can
   // never be swept up.
   const shape =
-    /^(menu-items|stores|promotions|categories|category-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
+    /^(menu-items|stores|promotions|artwork|categories|category-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
   if (!shape.test(key)) {
     return NextResponse.json({ error: "key" }, { status: 400 });
   }

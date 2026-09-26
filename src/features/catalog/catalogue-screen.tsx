@@ -7,6 +7,7 @@ import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { useConfirmLeave } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 
+import { ArtworksList } from "./artworks-list";
 import { CatalogueArchive } from "./catalogue-archive";
 import { CategoriesList } from "./categories-list";
 import { PromotionsList } from "./promotions-list";
@@ -45,6 +46,10 @@ const TABS = [
   { key: "shops", labelKey: "catalogue.stores" },
   { key: "categories", labelKey: "categories.tab" },
   { key: "promotions", labelKey: "promotions.tab" },
+  // Beside promotions because the two are one errand more often than not — a
+  // promotion is usually announced by a picture — but its own tab since `0129`,
+  // because plenty of pictures announce nothing but the app itself.
+  { key: "artworks", labelKey: "artworks.tab" },
   { key: "tags", labelKey: "tags.tab" },
   // Last, like the shop page's. It is where you go to undo something rather
   // than part of building the catalogue up, and the tab order should read as
@@ -126,6 +131,9 @@ export function CatalogueScreen() {
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "promotions" && "hidden")}>
         <PromotionsList />
+      </div>
+      <div className={cx("min-h-0 flex-1", tab !== "artworks" && "hidden")}>
+        <ArtworksList />
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "tags" && "hidden")}>
         <TagsList />

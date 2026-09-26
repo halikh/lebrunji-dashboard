@@ -1019,8 +1019,7 @@ const en = {
     // under it is also an icon and the difference between them is *what they
     // stand for* — this one the category, that one a shop inside it.
     icon: "Category icon",
-    iconHint:
-      "Shown beside this category's name in the app's category strip.",
+    iconHint: "Shown beside this category's name in the app's category strip.",
     iconRequired: "Add an icon — every category needs one to be saved.",
     emptyIcon: "Empty-state icon",
     emptyIconHint:
@@ -1724,51 +1723,23 @@ const en = {
     nameHint:
       "Your own label for it, never shown to a customer. Cannot be changed later.",
     nameRequired: "Give it a name so you can find it again.",
-    // One card per language, because the wording is inside the picture — `0013`
-    // dropped a discount's text columns on exactly that reasoning. Only the
-    // English one is required: a device with no card in its language is shown
-    // the English card (`0128`).
-    imageHint:
-      "The card as customers see it. Wide, not square. English is required; without an Arabic card, the English one is shown.",
-    imageRequired:
-      "Add the card — it is what customers see, so a promotion cannot be saved without one.",
-    imageNeedsEnglish:
-      "Add the English card — it is the one shown wherever another language has none.",
     // A link to a promotion that has since been archived, or a mistyped id.
     notFound: "That promotion is not here any more.",
 
-    /**
-     * Where the card is shown.
-     *
-     * Says out loud that this is advertising and not eligibility, because the
-     * two are one word apart and getting them confused means a merchant
-     * unticking a box and expecting the discount to stop being given.
-     */
-    placement: "Show it on",
-    placementHint:
-      "Where customers see the card. It does not change who gets the discount — an unplaced promotion still applies at checkout.",
-    // The switch's two words. The same pair on all three, because this is one
-    // property being turned on and off rather than two named states.
-    placementOn: "Shown",
-    placementOff: "Hidden",
-    placements: {
-      home: "Home",
-      store: "The shop's page",
-      cart: "The basket",
-    },
-    placementsHint: {
-      home: "The rail near the top, to everyone.",
-      store:
-        "On the page of a shop this promotion covers — where somebody is already looking.",
-      cart: "Above the basket, where a minimum spend is a number the customer can act on.",
-    },
+    // The pictures moved to their own tab in `0129`. A pointer, so nobody
+    // goes looking for the card box that used to be on this form.
+    artworkTitle: "Pictures",
+    artworkBody:
+      "The banners and tiles that advertise a promotion are managed on the Artwork tab. A linked picture is shown only while this promotion is live.",
+    artworkAdd: "Add a picture for this promotion",
+    artworkOpen: "Open the Artwork tab",
 
     search: "Search promotions",
     // The slug is the only text a promotion has: 0013 dropped the label,
     // headline and note columns because the card is artwork. Worth saying, or
     // the operator searches for wording that lives inside a picture.
     searchHint:
-      "Searches the reference you gave each promotion — the card itself is artwork, so there is no wording to search.",
+      "Searches the reference you gave each promotion — its pictures are artwork, so there is no wording to search.",
     reorderHint: "Drag the rows to reorder. Searching turns that off.",
     searchNone: "No promotion matches {term}.",
 
@@ -1868,7 +1839,6 @@ const en = {
       "A promotion shows only when it is on and inside its dates.",
     live: "Live",
     hidden: "Hidden",
-    noArtwork: "No artwork",
     save: "Save promotion",
     added: "{name} added",
     saved: "{name} saved",
@@ -1876,9 +1846,8 @@ const en = {
     archive: "Archive",
     archiveTitle: "Archive {name}?",
     archiveBody:
-      "The card disappears from the app immediately and it stops discounting anything. It can be brought back.",
+      "It stops discounting anything immediately, and any pictures linked to it come down from the app. It can be brought back.",
     archiveConfirm: "Archive",
-    thisBanner: "this promotion",
 
     // ---- summaries ---------------------------------------------------------
     previewLabel: "In the app",
@@ -1902,15 +1871,142 @@ const en = {
     startsOn: "Switched on, but does not start until {when}",
     ended: "Switched on, but its dates have passed",
 
-    showTitle: "Show {name} on the home screen?",
+    showTitle: "Switch {name} on?",
     showBody:
       "It appears straight away, as long as today is inside its dates — and it starts coming off bills.",
     showConfirm: "Show it",
     hideTitle: "Hide {name}?",
     hideBody:
-      "The card disappears from the home screen straight away and it stops discounting anything.",
+      "It stops discounting anything straight away, and any pictures linked to it come down from the app.",
     hideConfirm: "Hide it",
     formLabel: "Promotion details",
+  },
+
+  artworks: {
+    tab: "Artwork",
+    add: "New artwork",
+    edit: "Artwork",
+    save: "Save artwork",
+    added: "Artwork added",
+    saved: "Artwork saved",
+    deleted: "Artwork deleted",
+    // A link to a picture that has since been deleted, or a mistyped id.
+    notFound: "That picture is not here any more.",
+    reorderHint:
+      "Drag the rows to reorder. Banners and tiles are ordered separately.",
+    empty: "No artwork yet",
+    emptyBody:
+      "Banners run in the carousel and tiles sit three to a row. Either can advertise a promotion or stand on its own.",
+
+    sections: {
+      banner: "Banners",
+      tile: "Tiles",
+    },
+    sectionsHint: {
+      banner: "Wide cards in the carousel, one at a time.",
+      tile: "Small squares, three to a row — customers scroll for more.",
+    },
+    sectionsEmpty: {
+      banner: "No banners yet.",
+      tile: "No tiles yet.",
+    },
+
+    // ---- format ------------------------------------------------------------
+    format: "Format",
+    formatHint:
+      "A banner is the wide card in the carousel. A tile is a small square, three to a row.",
+    formats: {
+      banner: "Banner",
+      tile: "Tile",
+    },
+    formatNotes: {
+      banner: "Wide, 21:9",
+      tile: "Square, 1:1",
+    },
+    formatUnknown: "That format is not one the app can draw.",
+
+    // ---- image -------------------------------------------------------------
+    // The shape is stated because the app crops to it: the carousel card is
+    // 21:9 (the app's `offer-card.tsx`) and a tile is square.
+    imageHint: {
+      banner:
+        "Wide, 21:9 — for example 2100 × 900 pixels. The words are in the picture, so each language gets its own. English is required; without an Arabic one, the English is shown.",
+      tile: "Square, 1:1 — for example 600 × 600 pixels. The words are in the picture, so each language gets its own. English is required; without an Arabic one, the English is shown.",
+    },
+    imageRequired: "Add the picture — without one there is nothing to show.",
+    imageNeedsEnglish:
+      "Add the English picture — it is the one shown wherever another language has none.",
+
+    // ---- linked promotion --------------------------------------------------
+    promotion: "Linked promotion",
+    promotionHint:
+      "A linked picture is shown only while its promotion is live, and on shop pages only where the promotion applies. Artwork only is always shown within its own dates.",
+    noPromotion: "None — artwork only",
+    archivedPromotionOption: "{slug} (archived)",
+    promotionGone: "That promotion no longer exists. Choose another, or none.",
+    linkedTo: "Linked to {slug}",
+    artworkOnly: "Artwork only",
+
+    // ---- screens -----------------------------------------------------------
+    placement: "Show it on",
+    placementHint:
+      "Where customers see the picture. Turn every screen off to keep it as a draft, shown nowhere.",
+    placementOn: "Shown",
+    placementOff: "Hidden",
+    placements: {
+      home: "Home",
+      store: "The shop's page",
+      cart: "The basket",
+    },
+    placementsHint: {
+      home: "Near the top, to everyone.",
+      store:
+        "On shop pages — only the shops its promotion covers, or every shop for artwork only.",
+      cart: "Above the basket, where a minimum spend is a number the customer can act on.",
+    },
+    placementsUnknown: "One of those screens is not one the app knows.",
+    shownOn: "On {screens}",
+    draft: "Draft — shown on no screen",
+
+    // ---- when --------------------------------------------------------------
+    startsAt: "Starts",
+    startsHint: "Leave empty to start as soon as it is switched on.",
+    endsAt: "Ends",
+    endsHint: "Leave empty to run until you switch it off.",
+    windowBackwards: "The end has to come after the start.",
+    visibility: "Visibility",
+    visibilityHint:
+      "Shown only when it is on and inside its dates — and, if linked, while its promotion is live.",
+    live: "Live",
+    hidden: "Hidden",
+
+    // The window in words. A picture can be switched on and invisible, which
+    // is the state worth naming.
+    always: "Runs until you switch it off",
+    whilePromotion: "Runs while its promotion is live",
+    between: "{from} to {to}",
+    until: "Until {to}",
+    startsOn: "Switched on, but does not start until {when}",
+    ended: "Switched on, but its dates have passed",
+    stateOff: "Switched off",
+    promotionArchived:
+      "Not shown — its promotion is archived. Bring the promotion back, or link another.",
+
+    // ---- row actions -------------------------------------------------------
+    // `{name}` is "Linked to …" or "Artwork only" — a picture has no name of
+    // its own, the words are in the image.
+    showTitle: "Show this picture? ({name})",
+    showBody:
+      "It appears in the app straight away, as long as today is inside its dates.",
+    showConfirm: "Show it",
+    hideTitle: "Hide this picture? ({name})",
+    hideBody: "It disappears from the app straight away.",
+    hideConfirm: "Hide it",
+    delete: "Delete",
+    deleteTitle: "Delete this picture? ({name})",
+    deleteBody:
+      "It comes out of the app immediately and cannot be brought back. The promotion it advertised is not affected.",
+    deleteConfirm: "Delete",
   },
 
   reports: {

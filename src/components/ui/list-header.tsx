@@ -39,7 +39,12 @@ export function ListHeader({
   action,
 }: {
   title: string;
-  search: {
+  /**
+   * Optional for a list with nothing to type into — the artwork list has no
+   * text column at all. The box's column still takes the slack, so the action
+   * stays at the end of the bar.
+   */
+  search?: {
     value: string;
     onChange: (value: string) => void;
     /** Also the accessible name — a search box rarely has a visible label. */
@@ -94,12 +99,14 @@ export function ListHeader({
         {title}
       </h1>
 
-      <SearchInput
-        className="col-start-2 row-start-1 self-center"
-        value={search.value}
-        onChange={search.onChange}
-        placeholder={search.placeholder}
-      />
+      {search && (
+        <SearchInput
+          className="col-start-2 row-start-1 self-center"
+          value={search.value}
+          onChange={search.onChange}
+          placeholder={search.placeholder}
+        />
+      )}
 
       {action && (
         <div className="col-start-3 row-start-1 self-center">{action}</div>

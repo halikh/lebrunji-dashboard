@@ -150,7 +150,16 @@ export function useCatalogueRestore() {
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: catalogueArchiveKey });
-    for (const key of ["stores", "categories", "tags", "promotions", "menu"]) {
+    // `artworks` too: a restored promotion puts its pictures back in the app,
+    // and the Artwork tab says which ones are waiting on an archived one.
+    for (const key of [
+      "stores",
+      "categories",
+      "tags",
+      "promotions",
+      "artworks",
+      "menu",
+    ]) {
       void queryClient.invalidateQueries({ queryKey: [key] });
     }
   }

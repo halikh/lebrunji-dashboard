@@ -91,6 +91,12 @@ export type ArchivedPromotion = {
   id: string;
   /** A promotion has no customer-facing name — the slug is the operator's. */
   slug: string;
+  /**
+   * One of its pictures, to recognise it by — its first banner, else its first
+   * tile. `0129` moved the card off `discounts` into `artworks`; an archived
+   * promotion's pictures stay there (only a hard delete cascades), so there is
+   * still one to show.
+   */
   imageUrl: string | null;
   archivedAt: string;
 };
@@ -276,7 +282,7 @@ export async function fetchArchivedPromotions(
 
   let query = getClient()
     .from("discounts")
-    .select("id, slug, image_url, deleted_at")
+    .select("id, slug, deleted_at, artworks ( format, image_url, sort_order )")
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false })
     .order("id", { ascending: false })
@@ -293,11 +299,23 @@ export async function fetchArchivedPromotions(
   const rows = (data ?? []).map((row) => ({
     id: row.id as string,
     slug: row.slug as string,
-    imageUrl: (row.image_url as string | null) ?? null,
+    imageUrl: coverOf(row.artworks),
     archivedAt: row.deleted_at as string,
   }));
 
   return { rows, cursor: cursorOf(rows, limit) };
+}
+
+/** The picture a promotion is recognised by: first banner, else first tile. */
+function coverOf(value: unknown): string | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const pictures = [...(value as Record<string, unknown>[])].sort(
+    (a, b) =>
+      Number(a.format !== "banner") - Number(b.format !== "banner") ||
+      ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0),
+  );
+  const url = pickLocalized((pictures[0].image_url as Localized) ?? {});
+  return url || null;
 }
 
 /**

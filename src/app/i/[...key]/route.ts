@@ -7,8 +7,8 @@ import { getObject } from "@/lib/storage/bucket";
  *
  * ## Why this route exists at all
  *
- * `stores.image_url`, `menu_items.image_url` and `discounts.image_url` are
- * plain text columns the **customer app** hands to an
+ * `stores.image_url`, `menu_items.image_url` and `artworks.image_url` hold
+ * plain URLs the **customer app** hands to an
  * `<Image>` while signed out. They need a URL that works forever and needs no
  * credential.
  *
@@ -45,13 +45,13 @@ import { getObject } from "@/lib/storage/bucket";
  *
  * `categories` is where promotion pictures were uploaded before that folder was
  * renamed to `promotions`. The rename does not move objects, and it must not:
- * a key is written into `discounts.image_url` and the row goes on pointing at
- * it forever. Dropping the old prefix here would 404 every promotion picture
+ * a key is written into `artworks.image_url` (on `discounts` before `0129`)
+ * and the row goes on pointing at it forever. Dropping the old prefix here would 404 every promotion picture
  * saved before the rename — a blank card in the customer app, with a URL that
  * looks perfectly correct.
  */
 const KEY =
-  /^(menu-items|stores|promotions|categories|category-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
+  /^(menu-items|stores|promotions|artwork|categories|category-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
 
 const TYPES: Record<string, string> = {
   jpg: "image/jpeg",

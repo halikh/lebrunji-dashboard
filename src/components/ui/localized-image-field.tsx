@@ -30,7 +30,7 @@ import { cx } from "./index";
  * whenever there is any card, and the rest are optional (`0128`): an Arabic
  * device with no Arabic card is shown the English one, which is a card it may
  * not read but never an empty frame. A card in Arabic only would submit and
- * come back from `discounts_image_url_locales` with a constraint name; naming
+ * come back from `artworks_image_url_locales` with a constraint name; naming
  * the missing box here is the difference between that and "still needed in:
  * en".
  *
@@ -53,7 +53,7 @@ export function LocalizedImageField({
   /** English and any others, or null for no picture at all. */
   value: Localized | null;
   onChange: (value: Localized | null) => void;
-  folder: "menu-items" | "stores" | "promotions";
+  folder: "menu-items" | "stores" | "promotions" | "artwork";
   hint?: string;
   error?: string | null;
   disabled?: boolean;

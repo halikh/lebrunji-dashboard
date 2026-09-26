@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, cx } from "@/components/ui";
 import { ListHeader } from "@/components/ui/list-header";
 import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
@@ -13,7 +12,6 @@ import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { useRowFocus } from "@/components/ui/row-focus";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { useMoney } from "@/features/reference/use-currencies";
-import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
 import { formatDate } from "@/lib/time";
@@ -27,7 +25,10 @@ import {
 } from "./use-promotions";
 
 /**
- * The promotions on the app's home screen — the card, and what it takes off.
+ * The promotions — what each takes off a bill.
+ *
+ * The pictures that advertise them are on the Artwork tab since `0129`, so a
+ * row here is the deal alone and is named by its reference.
  *
  * ## This screen used to manage artwork only, and said so
  *
@@ -226,31 +227,6 @@ function Row({
       <button {...handleProps(promotion.id)}>
         <GripIcon />
       </button>
-
-      {/* Wide, because that is the shape it is on the home screen and the
-          picture is the whole content — a thumbnail would show the middle of a
-          card and tell nobody whether it reads. */}
-      {pickLocalized(promotion.imageUrl ?? {}) ? (
-        // The one picture in the dashboard the operator is really judging
-        // rather than recognising: artwork that does not read is the whole
-        // failure mode of a promotion, and 128 by 64 is not enough to tell.
-        //
-        // One language's card on the row — the operator's own — because a row
-        // is for recognising the promotion. Both are in the editor, which is
-        // where they are being judged.
-        <PreviewImage
-          src={pickLocalized(promotion.imageUrl ?? {})}
-          name={promotion.slug}
-          className={cx(
-            "h-[64px] w-[128px] rounded-md",
-            !promotion.isActive && "opacity-50 grayscale",
-          )}
-        />
-      ) : (
-        <ImagePlaceholder className="flex h-[64px] w-[128px] items-center justify-center rounded-md text-[11px] text-text-faint">
-          {t("promotions.noArtwork")}
-        </ImagePlaceholder>
-      )}
 
       <button
         type="button"
