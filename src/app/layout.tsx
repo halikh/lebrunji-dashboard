@@ -42,6 +42,7 @@ const cairo = Cairo({
 export const metadata: Metadata = {
   title: "Lebrunji",
   description: "Operations for Lebrunji.",
+  icons: { icon: { url: "/favicon.svg", type: "image/svg+xml" } },
   // Nothing here is for the public, and a staff login page in a search index is
   // an invitation rather than a feature.
   robots: { index: false, follow: false },
