@@ -3,11 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 
 import { Button, Field, Input } from "@/components/ui";
 import { DateField } from "@/components/ui/date-field";
 import { EditorPage } from "@/components/ui/editor-page";
+import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import {
@@ -459,8 +460,8 @@ function Form({
       title={initial ? initial.slug : t("promotions.add")}
       backHref={initial ? `${LIST_HREF}&focus=${initial.id}` : LIST_HREF}
       backLabel={t("promotions.tab")}
-      /* Two columns — the reference on the left, what it does on the right. See
-         the grid below. */
+      /* The questions in a wide column, the answer beside them. See the grid
+         below. */
       width="wide"
       footer={
         <>
@@ -474,29 +475,360 @@ function Form({
       }
     >
       {/**
-       * The reference, and the discount behind it.
+       * The questions, and what they add up to.
        *
-       * On the left is the promotion's **name** and a pointer to its pictures;
-       * on the right is what it actually *does* — the kind, what it applies to,
-       * when it runs, and whether it is live. The plain-English summary at the
-       * foot of the right column is the answer the form adds up to.
+       * The main column is the discount itself, as a run of cards — what comes
+       * off, who gets it, how often, when — with the fields inside each card
+       * paired two to a row where they are one answer read left to right.
+       * Halving the page used to leave the reference and its pictures on the
+       * left and every other control stacked down the right, a form twice as
+       * long on one side as the other.
        *
-       * One column below `lg`, in the order the form always had.
+       * The side column is what the operator checks rather than fills in: the
+       * plain-English summary, and how the promotion appears in the app — its
+       * pictures and where a tap on them leads. Pinned on a wide screen, so the
+       * summary stays in view while the fields that change it are scrolled.
+       *
+       * One column below `lg`, summary after the fields that produce it.
        */}
-      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2 lg:gap-xxl">
+      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-xxl">
         <div className="flex min-w-0 flex-col gap-lg">
-          <Field
-            label={t("promotions.name")}
-            hint={t("promotions.nameHint")}
-            error={errors.name}
-          >
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="ramadan-2026"
-              disabled={Boolean(initial)}
-            />
-          </Field>
+          <FormSection>
+            <FieldPair>
+              <Field
+                label={t("promotions.name")}
+                hint={t("promotions.nameHint")}
+                error={errors.name}
+              >
+                <Input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="ramadan-2026"
+                  disabled={Boolean(initial)}
+                />
+              </Field>
+
+              <Field
+                label={t("promotions.visibility")}
+                hint={t("promotions.visibilityHint")}
+              >
+                {/* A plain switch, not a confirming one.
+                  The switch in the *row* confirms, because flipping it there
+                  publishes or withdraws a promotion straight away. In here
+                  nothing has happened yet — the form is a draft until Save —
+                  and asking "are you sure" about a value that is not yet
+                  written is the empty question `ConfirmButton` warns about. */}
+                <Toggle
+                  on={isActive}
+                  onChange={() => setIsActive((current) => !current)}
+                  labelOn={t("promotions.live")}
+                  labelOff={t("promotions.hidden")}
+                />
+              </Field>
+            </FieldPair>
+          </FormSection>
+
+          <FormSection title={t("promotions.discountSection")}>
+            <FieldPair>
+              <Field
+                label={t("promotions.kind")}
+                hint={t("promotions.kindHint")}
+              >
+                <Select
+                  value={kind}
+                  onChange={(next) => setKind(next as PromotionKind)}
+                  options={PROMOTION_KINDS.map((option) => ({
+                    value: option,
+                    label: t(`promotions.kinds.${option}`),
+                    note: t(`promotions.kindNotes.${option}`),
+                  }))}
+                />
+              </Field>
+
+              {takesValue && (
+                <Field
+                  label={
+                    kind === "percentage"
+                      ? t("promotions.percentLabel")
+                      : t("promotions.amountLabel")
+                  }
+                  hint={
+                    kind === "percentage"
+                      ? t("promotions.percentHint")
+                      : t("promotions.amountHint", { code })
+                  }
+                  error={errors.value}
+                >
+                  <Amount
+                    value={value}
+                    onChange={setValue}
+                    decimalDigits={baseDecimals}
+                    max={kind === "percentage" ? 100 : undefined}
+                    placeholder={kind === "percentage" ? "20" : "5.00"}
+                    // A percentage is not money, so it gets no echo — showing
+                    // "$0.20" under a field reading 20 would be worse than
+                    // nothing.
+                    money={kind !== "percentage"}
+                  />
+                </Field>
+              )}
+            </FieldPair>
+
+            <FieldPair>
+              <Field
+                label={t("promotions.minSubtotal")}
+                hint={t("promotions.minSubtotalHint", { code })}
+              >
+                <Amount
+                  value={minSubtotal}
+                  onChange={setMinSubtotal}
+                  decimalDigits={baseDecimals}
+                  placeholder={t("promotions.noMinimum")}
+                  money
+                />
+              </Field>
+
+              {/* Only where it can bite. A ceiling on a fixed amount is the
+                same number twice, and on free delivery it would cap a fee the
+                operator does not set here — a control that cannot change the
+                outcome is worse than no control. */}
+              {kind === "percentage" && (
+                <Field
+                  label={t("promotions.maxDiscount")}
+                  hint={t("promotions.maxDiscountHint", { code })}
+                >
+                  <Amount
+                    value={maxDiscount}
+                    onChange={setMaxDiscount}
+                    decimalDigits={baseDecimals}
+                    placeholder={t("promotions.noCeiling")}
+                    money
+                  />
+                </Field>
+              )}
+            </FieldPair>
+          </FormSection>
+
+          <FormSection title={t("promotions.whoSection")}>
+            <FieldPair>
+              <Field
+                label={t("promotions.appliesTo")}
+                hint={t("promotions.appliesToHint")}
+                error={errors.targets}
+              >
+                {shape.kind === "mixed" ? (
+                  <p className="rounded-md border border-border bg-neutral-fill px-lg py-md text-[13px] text-text-soft">
+                    {t("promotions.scopesMixed")}
+                  </p>
+                ) : (
+                  <Select
+                    value={scopeType}
+                    onChange={(next) => setScopeType(next as ScopeType)}
+                    options={(
+                      ["order", "store", "category", "menuItem"] as ScopeType[]
+                    ).map((option) => ({
+                      value: option,
+                      label: t(`promotions.scopes.${option}`),
+                    }))}
+                  />
+                )}
+              </Field>
+
+              <Field
+                label={t("promotions.firstOrderLabel")}
+                hint={t("promotions.firstOrderHint")}
+              >
+                <Toggle
+                  on={firstOrderOnly}
+                  onChange={() => setFirstOrderOnly((current) => !current)}
+                  labelOn={t("promotions.firstOrderOn")}
+                  labelOff={t("promotions.firstOrderOff")}
+                />
+              </Field>
+            </FieldPair>
+
+            {/* The targets get the card's full width: a multi-select grows a
+                chip per pick, and half a card fills after three. */}
+            {shape.kind === "single" && scopeType === "store" && (
+              <Field label={t("promotions.pickShops")}>
+                <MultiSelect
+                  value={storeIds}
+                  onChange={setStoreIds}
+                  placeholder={t("promotions.pickShopsPlaceholder")}
+                  disabled={pending || !stores.isSuccess}
+                  options={(stores.data?.stores ?? []).map((store) => ({
+                    value: store.id,
+                    label: pickLocalized(store.name),
+                  }))}
+                />
+              </Field>
+            )}
+
+            {shape.kind === "single" && scopeType === "category" && (
+              <Field label={t("promotions.pickCategories")}>
+                <MultiSelect
+                  value={categoryIds}
+                  onChange={setCategoryIds}
+                  placeholder={t("promotions.pickCategoriesPlaceholder")}
+                  disabled={pending || !categories.isSuccess}
+                  options={(categories.data ?? []).map((category) => ({
+                    value: category.id,
+                    label: pickLocalized(category.name),
+                  }))}
+                />
+              </Field>
+            )}
+
+            {shape.kind === "single" && scopeType === "menuItem" && (
+              /* The shop first, then its dishes — side by side, because the
+                first is only the way into the second.
+                Searching every menu at once looked convenient and was not: a
+                dozen shops sell something called "Hummus", so the list came
+                back as near-identical names told apart only by a shop in grey
+                after them — and picking the wrong one attaches the promotion to
+                another merchant's dish, which nothing downstream questions.
+                The same move the options tab makes: narrow the set before
+                anything is chosen. */
+              <FieldPair>
+                <Field label={t("promotions.pickDishShop")}>
+                  <Select
+                    value={dishStoreId}
+                    onChange={(value) => {
+                      setDishStoreId(value);
+                      // Dishes already chosen belong to the previous shop, and
+                      // a promotion holding two shops' dishes under a
+                      // single-shop question is a scope nobody intended.
+                      // Cleared out loud rather than left to be noticed on the
+                      // bill.
+                      setDishes([]);
+                    }}
+                    options={(stores.data?.stores ?? []).map((store) => ({
+                      value: store.id,
+                      label: pickLocalized(store.name),
+                    }))}
+                    placeholder={t("promotions.pickDishShopPlaceholder")}
+                    disabled={pending || !stores.isSuccess}
+                  />
+                </Field>
+
+                <Field
+                  label={t("promotions.pickDishes")}
+                  hint={t("promotions.pickDishesHint")}
+                >
+                  <AsyncMultiSelect
+                    value={dishes}
+                    onChange={setDishes}
+                    loadOptions={async (input) => {
+                      if (!dishStoreId) return [];
+                      const found = await searchDishes(input, dishStoreId);
+                      return found.map((dish) => ({
+                        value: dish.id,
+                        label: dish.label,
+                      }));
+                    }}
+                    placeholder={t("promotions.pickDishesPlaceholder")}
+                    // Nothing to search until a shop is chosen. Disabled
+                    // rather than hidden: the field appearing out of nowhere
+                    // after the select is answered is a layout jump, and the
+                    // operator should be able to see what the next step is.
+                    disabled={pending || !dishStoreId}
+                    noOptionsMessage={(input) =>
+                      !dishStoreId
+                        ? t("promotions.pickShopFirst")
+                        : input
+                          ? t("promotions.noDishes", { term: input })
+                          : t("promotions.typeToFindDishes")
+                    }
+                  />
+                </Field>
+              </FieldPair>
+            )}
+          </FormSection>
+
+          <FormSection title={t("promotions.limitsSection")}>
+            <FieldPair>
+              <Field
+                label={t("promotions.perUser")}
+                hint={t("promotions.perUserHint")}
+              >
+                <NumberInput
+                  min={1}
+                  step={1}
+                  value={perUser}
+                  onChange={(event) => setPerUser(event.target.value)}
+                  placeholder={t("promotions.noLimit")}
+                />
+              </Field>
+
+              <Field
+                label={t("promotions.totalCap")}
+                hint={
+                  initial
+                    ? t("promotions.totalCapHintUsed", {
+                        count: initial.redeemed,
+                      })
+                    : t("promotions.totalCapHint")
+                }
+              >
+                <NumberInput
+                  min={1}
+                  step={1}
+                  value={total}
+                  onChange={(event) => setTotal(event.target.value)}
+                  placeholder={t("promotions.noLimit")}
+                />
+              </Field>
+            </FieldPair>
+          </FormSection>
+
+          <FormSection title={t("promotions.whenSection")}>
+            {/* Side by side, because they are one answer — the window — read
+                left to right as from and to. */}
+            <FieldPair>
+              <Field
+                label={t("promotions.startsAt")}
+                hint={t("promotions.startsHint")}
+              >
+                <DateField value={startsAt} onChange={setStartsAt} />
+              </Field>
+
+              <Field
+                label={t("promotions.endsAt")}
+                hint={t("promotions.endsHint")}
+                error={errors.window}
+              >
+                <DateField value={endsAt} onChange={setEndsAt} />
+              </Field>
+            </FieldPair>
+          </FormSection>
+        </div>
+
+        {/* `sticky` against the editor's scroller, so the summary is still in
+            view at the foot of a long form. Last in the source, so below `lg`
+            it lands after the fields that produce it. */}
+        <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
+          {/* What the promotion comes to, assembled from the fields. The
+            settings are individually clear and jointly hard to hold in your
+            head — "20%, minimum $25, capped at $10, first order only" is four
+            numbers whose combined effect nobody should have to simulate.
+
+            **Not drawn as a field.** A white ground inside a bordered, rounded
+            box is the exact shape of every `Input` on the page, so a line that
+            is only ever read looked like one more thing to fill in. A tinted
+            ground with no border says "this is the answer, not another
+            question", and the label says whose answer it is. */}
+          <div className="flex flex-col gap-xxs rounded-md bg-accent-wash px-lg py-md">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+              {t("promotions.previewLabel")}
+            </span>
+            <p className="text-[14px] font-semibold text-text">
+              {describeDraft(
+                { kind, value, minSubtotal, firstOrderOnly },
+                format,
+                code,
+              )}
+            </p>
+          </div>
 
           {/* The pictures are managed where the other artwork is — `0129`
             gave them a table of their own, and one promotion may have a banner
@@ -564,316 +896,7 @@ function Form({
             disabled={pending}
             error={errors.link}
           />
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-lg">
-          <Section title={t("promotions.discountSection")}>
-            <Field label={t("promotions.kind")} hint={t("promotions.kindHint")}>
-              <Select
-                value={kind}
-                onChange={(next) => setKind(next as PromotionKind)}
-                options={PROMOTION_KINDS.map((option) => ({
-                  value: option,
-                  label: t(`promotions.kinds.${option}`),
-                  note: t(`promotions.kindNotes.${option}`),
-                }))}
-              />
-            </Field>
-
-            {takesValue && (
-              <Field
-                label={
-                  kind === "percentage"
-                    ? t("promotions.percentLabel")
-                    : t("promotions.amountLabel")
-                }
-                hint={
-                  kind === "percentage"
-                    ? t("promotions.percentHint")
-                    : t("promotions.amountHint", { code })
-                }
-                error={errors.value}
-              >
-                <Amount
-                  value={value}
-                  onChange={setValue}
-                  decimalDigits={baseDecimals}
-                  max={kind === "percentage" ? 100 : undefined}
-                  placeholder={kind === "percentage" ? "20" : "5.00"}
-                  // A percentage is not money, so it gets no echo — showing
-                  // "$0.20" under a field reading 20 would be worse than nothing.
-                  money={kind !== "percentage"}
-                />
-              </Field>
-            )}
-
-            <Field
-              label={t("promotions.minSubtotal")}
-              hint={t("promotions.minSubtotalHint", { code })}
-            >
-              <Amount
-                value={minSubtotal}
-                onChange={setMinSubtotal}
-                decimalDigits={baseDecimals}
-                placeholder={t("promotions.noMinimum")}
-                money
-              />
-            </Field>
-
-            {/* Only where it can bite. A ceiling on a fixed amount is the same
-              number twice, and on free delivery it would cap a fee the operator
-              does not set here — a control that cannot change the outcome is
-              worse than no control. */}
-            {kind === "percentage" && (
-              <Field
-                label={t("promotions.maxDiscount")}
-                hint={t("promotions.maxDiscountHint", { code })}
-              >
-                <Amount
-                  value={maxDiscount}
-                  onChange={setMaxDiscount}
-                  decimalDigits={baseDecimals}
-                  placeholder={t("promotions.noCeiling")}
-                  money
-                />
-              </Field>
-            )}
-          </Section>
-
-          <Section title={t("promotions.whoSection")}>
-            <Field
-              label={t("promotions.appliesTo")}
-              hint={t("promotions.appliesToHint")}
-              error={errors.targets}
-            >
-              {shape.kind === "mixed" ? (
-                <p className="rounded-md border border-border bg-neutral-fill px-lg py-md text-[13px] text-text-soft">
-                  {t("promotions.scopesMixed")}
-                </p>
-              ) : (
-                <Select
-                  value={scopeType}
-                  onChange={(next) => setScopeType(next as ScopeType)}
-                  options={(
-                    ["order", "store", "category", "menuItem"] as ScopeType[]
-                  ).map((option) => ({
-                    value: option,
-                    label: t(`promotions.scopes.${option}`),
-                  }))}
-                />
-              )}
-            </Field>
-
-            {shape.kind === "single" && scopeType === "store" && (
-              <Field label={t("promotions.pickShops")}>
-                <MultiSelect
-                  value={storeIds}
-                  onChange={setStoreIds}
-                  placeholder={t("promotions.pickShopsPlaceholder")}
-                  disabled={pending || !stores.isSuccess}
-                  options={(stores.data?.stores ?? []).map((store) => ({
-                    value: store.id,
-                    label: pickLocalized(store.name),
-                  }))}
-                />
-              </Field>
-            )}
-
-            {shape.kind === "single" && scopeType === "category" && (
-              <Field label={t("promotions.pickCategories")}>
-                <MultiSelect
-                  value={categoryIds}
-                  onChange={setCategoryIds}
-                  placeholder={t("promotions.pickCategoriesPlaceholder")}
-                  disabled={pending || !categories.isSuccess}
-                  options={(categories.data ?? []).map((category) => ({
-                    value: category.id,
-                    label: pickLocalized(category.name),
-                  }))}
-                />
-              </Field>
-            )}
-
-            {shape.kind === "single" && scopeType === "menuItem" && (
-              <>
-                {/* The shop first, then its dishes.
-                  Searching every menu at once looked convenient and was not: a
-                  dozen shops sell something called "Hummus", so the list came
-                  back as near-identical names told apart only by a shop in grey
-                  after them — and picking the wrong one attaches the promotion
-                  to another merchant's dish, which nothing downstream
-                  questions.
-                  The same move the options tab makes: narrow the set before
-                  anything is chosen. */}
-                <Field label={t("promotions.pickDishShop")}>
-                  <Select
-                    value={dishStoreId}
-                    onChange={(value) => {
-                      setDishStoreId(value);
-                      // Dishes already chosen belong to the previous shop, and a
-                      // promotion holding two shops' dishes under a single-shop
-                      // question is a scope nobody intended. Cleared out loud
-                      // rather than left to be noticed on the bill.
-                      setDishes([]);
-                    }}
-                    options={(stores.data?.stores ?? []).map((store) => ({
-                      value: store.id,
-                      label: pickLocalized(store.name),
-                    }))}
-                    placeholder={t("promotions.pickDishShopPlaceholder")}
-                    disabled={pending || !stores.isSuccess}
-                  />
-                </Field>
-
-                <Field
-                  label={t("promotions.pickDishes")}
-                  hint={t("promotions.pickDishesHint")}
-                >
-                  <AsyncMultiSelect
-                    value={dishes}
-                    onChange={setDishes}
-                    loadOptions={async (input) => {
-                      if (!dishStoreId) return [];
-                      const found = await searchDishes(input, dishStoreId);
-                      return found.map((dish) => ({
-                        value: dish.id,
-                        label: dish.label,
-                      }));
-                    }}
-                    placeholder={t("promotions.pickDishesPlaceholder")}
-                    // Nothing to search until a shop is chosen. Disabled rather
-                    // than hidden: the field appearing out of nowhere after the
-                    // select is answered is a layout jump, and the operator
-                    // should be able to see what the next step is.
-                    disabled={pending || !dishStoreId}
-                    noOptionsMessage={(input) =>
-                      !dishStoreId
-                        ? t("promotions.pickShopFirst")
-                        : input
-                          ? t("promotions.noDishes", { term: input })
-                          : t("promotions.typeToFindDishes")
-                    }
-                  />
-                </Field>
-              </>
-            )}
-
-            <Field
-              label={t("promotions.firstOrderLabel")}
-              hint={t("promotions.firstOrderHint")}
-            >
-              <Toggle
-                on={firstOrderOnly}
-                onChange={() => setFirstOrderOnly((current) => !current)}
-                labelOn={t("promotions.firstOrderOn")}
-                labelOff={t("promotions.firstOrderOff")}
-              />
-            </Field>
-
-            <Field
-              label={t("promotions.perUser")}
-              hint={t("promotions.perUserHint")}
-            >
-              <NumberInput
-                min={1}
-                step={1}
-                value={perUser}
-                onChange={(event) => setPerUser(event.target.value)}
-                placeholder={t("promotions.noLimit")}
-              />
-            </Field>
-
-            <Field
-              label={t("promotions.totalCap")}
-              hint={
-                initial
-                  ? t("promotions.totalCapHintUsed", {
-                      count: initial.redeemed,
-                    })
-                  : t("promotions.totalCapHint")
-              }
-            >
-              <NumberInput
-                min={1}
-                step={1}
-                value={total}
-                onChange={(event) => setTotal(event.target.value)}
-                placeholder={t("promotions.noLimit")}
-              />
-            </Field>
-          </Section>
-
-          <Section title={t("promotions.whenSection")}>
-            {/* Side by side, because they are one answer — the window — read
-                left to right as from and to. `items-start` so the error under
-                Ends does not stretch Starts to match it.
-
-                A container query, not a viewport one: on a wide screen this
-                form is half the page, so the viewport says nothing about
-                whether two 240px pickers fit. 32rem is the pair plus the gap. */}
-            <div className="@container">
-              <div className="grid grid-cols-1 items-start gap-lg @[32rem]:grid-cols-2">
-                <Field
-                  label={t("promotions.startsAt")}
-                  hint={t("promotions.startsHint")}
-                >
-                  <DateField value={startsAt} onChange={setStartsAt} />
-                </Field>
-
-                <Field
-                  label={t("promotions.endsAt")}
-                  hint={t("promotions.endsHint")}
-                  error={errors.window}
-                >
-                  <DateField value={endsAt} onChange={setEndsAt} />
-                </Field>
-              </div>
-            </div>
-
-            <Field
-              label={t("promotions.visibility")}
-              hint={t("promotions.visibilityHint")}
-            >
-              {/* A plain switch, not a confirming one.
-                The switch in the *row* confirms, because flipping it there
-                publishes or withdraws a promotion straight away. In here
-                nothing has happened yet — the form is a draft until Save — and
-                asking "are you sure" about a value that is not yet written is
-                the empty question `ConfirmButton` warns about. */}
-              <Toggle
-                on={isActive}
-                onChange={() => setIsActive((current) => !current)}
-                labelOn={t("promotions.live")}
-                labelOff={t("promotions.hidden")}
-              />
-            </Field>
-          </Section>
-
-          {/* What the promotion comes to, assembled from the fields above. The
-            settings are individually clear and jointly hard to hold in your
-            head — "20%, minimum $25, capped at $10, first order only" is four
-            numbers whose combined effect nobody should have to simulate.
-
-            **Not drawn as a field.** A white ground inside a bordered, rounded
-            box is the exact shape of every `Input` on the panel, so a line that
-            is only ever read looked like one more thing to fill in — at the
-            bottom of a form, which is where somebody is checking they have
-            filled everything in. A tinted ground with no border says "this is
-            the answer, not another question", and the label says whose answer
-            it is. */}
-          <div className="flex flex-col gap-xxs rounded-md bg-accent-wash px-lg py-md">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-text-faint">
-              {t("promotions.previewLabel")}
-            </span>
-            <p className="text-[14px] font-semibold text-text">
-              {describeDraft(
-                { kind, value, minSubtotal, firstOrderOnly },
-                format,
-                code,
-              )}
-            </p>
-          </div>
-        </div>
+        </aside>
       </div>
     </EditorPage>
   );
@@ -947,24 +970,6 @@ function Amount({
       decimalDigits={decimalDigits}
       placeholder={placeholder}
     />
-  );
-}
-
-/**
- * A heading over a run of related fields.
- *
- * The form asks three separate questions — what it takes off, who gets it, and
- * when — and thirteen controls in one column reads as a settings dump. The
- * headings are what turn it back into three decisions.
- */
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-lg border-t border-border pt-lg">
-      <h3 className="ps-md text-[13px] font-semibold uppercase tracking-wide text-text-faint">
-        {title}
-      </h3>
-      {children}
-    </section>
   );
 }
 

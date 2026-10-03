@@ -1791,6 +1791,9 @@ const en = {
     capsPositive:
       "A limit of zero would switch it off — leave it empty instead.",
 
+    // ---- how often ---------------------------------------------------------
+    limitsSection: "How often",
+
     // ---- when --------------------------------------------------------------
     whenSection: "When",
     startsAt: "Starts",
@@ -1919,6 +1922,11 @@ const en = {
       banner: "No banners yet.",
       tile: "No tiles yet.",
     },
+
+    // The editor's cards.
+    pictureSection: "The picture",
+    whereSection: "Where it shows",
+    whenSection: "When it runs",
 
     // ---- format ------------------------------------------------------------
     format: "Format",

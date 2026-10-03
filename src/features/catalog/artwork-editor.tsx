@@ -7,6 +7,7 @@ import { Button, Field, cx } from "@/components/ui";
 import { DateField } from "@/components/ui/date-field";
 import { EditorPage } from "@/components/ui/editor-page";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { LocalizedImageField } from "@/components/ui/localized-image-field";
 import { MultiSelect, Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
@@ -285,147 +286,164 @@ function Form({
         </>
       }
     >
-      {/* The picture on the left — its shape and the files; where and when it
-          is shown on the right. */}
-      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2 lg:gap-xxl">
+      {/* The same frame as `PromotionEditor`: the picture and where it is shown
+          as cards in a wide column; when it runs and where a tap leads in a
+          narrow one beside it, pinned while the long list of screens scrolls.
+          One column below `lg`. */}
+      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-xxl">
         <div className="flex min-w-0 flex-col gap-lg">
-          <Field label={t("artworks.format")} hint={t("artworks.formatHint")}>
-            <FormatChoice
-              value={format}
-              onChange={setFormat}
-              disabled={pending}
-            />
-          </Field>
+          <FormSection title={t("artworks.pictureSection")}>
+            <FieldPair>
+              <Field
+                label={t("artworks.format")}
+                hint={t("artworks.formatHint")}
+              >
+                <FormatChoice
+                  value={format}
+                  onChange={setFormat}
+                  disabled={pending}
+                />
+              </Field>
 
-          {/* One file per language, because the words are inside the picture.
-              The expected shape is stated with it, since a banner cropped to a
-              square or a tile stretched wide is the likeliest way to get this
-              wrong. */}
-          <LocalizedImageField
-            label={t("images.label")}
-            hint={t(`artworks.imageHint.${format}`)}
-            value={imageUrl}
-            onChange={setImageUrl}
-            folder="artwork"
-            disabled={pending}
-            error={errors.image}
-          />
+              <Field
+                label={t("artworks.visibility")}
+                hint={t("artworks.visibilityHint")}
+              >
+                {/* A plain switch: nothing is published until Save. See the
+                    same note in `PromotionEditor`. */}
+                <Toggle
+                  on={isActive}
+                  onChange={() => setIsActive((current) => !current)}
+                  labelOn={t("artworks.live")}
+                  labelOff={t("artworks.hidden")}
+                />
+              </Field>
+            </FieldPair>
+
+            {/* One file per language, because the words are inside the
+                picture. The expected shape is stated with it, since a banner
+                cropped to a square or a tile stretched wide is the likeliest
+                way to get this wrong. */}
+            <LocalizedImageField
+              label={t("images.label")}
+              hint={t(`artworks.imageHint.${format}`)}
+              value={imageUrl}
+              onChange={setImageUrl}
+              folder="artwork"
+              disabled={pending}
+              error={errors.image}
+            />
+          </FormSection>
+
+          <FormSection title={t("artworks.whereSection")}>
+            <Field
+              label={t("artworks.placement")}
+              hint={t("artworks.placementHint")}
+            >
+              {/* One switch per screen — the answers are not exclusive, and
+                  each is independently on or off. Moved here from the
+                  promotion editor by `0129`, because a promotion with a banner
+                  on Home and a tile in the basket is two answers to "where".
+
+                  Two to a row once the card has room: there are fifteen
+                  screens, and one long column of them was most of the page. */}
+              <div className="grid grid-cols-1 gap-md @[40rem]:grid-cols-2">
+                {PLACEMENTS.map((option) => (
+                  <div
+                    key={option}
+                    className="flex items-start justify-between gap-lg rounded-md border border-border bg-surface px-lg py-md"
+                  >
+                    <span className="flex min-w-0 flex-col gap-xxs">
+                      <span className="text-[14px] font-semibold text-text">
+                        {t(`artworks.placements.${option}`)}
+                      </span>
+                      <span className="text-[12px] text-text-faint">
+                        {t(`artworks.placementsHint.${option}`)}
+                      </span>
+                    </span>
+
+                    <Toggle
+                      on={placements.includes(option)}
+                      onChange={() =>
+                        setPlacements((current) =>
+                          togglePlacement(current, option),
+                        )
+                      }
+                      labelOn={t("artworks.placementOn")}
+                      labelOff={t("artworks.placementOff")}
+                      className="w-[104px] shrink-0"
+                    />
+                  </div>
+                ))}
+              </div>
+            </Field>
+
+            {/* Which shops' pages — `artwork_stores`. Only while the shop page
+                is one of the screens; empty is every shop, which is what the
+                placeholder says rather than leaving a blank box to
+                interpret. */}
+            {placements.includes("store") && (
+              <Field
+                label={t("artworks.storesLabel")}
+                hint={t("artworks.storesHint")}
+              >
+                <MultiSelect
+                  value={storeIds}
+                  onChange={setStoreIds}
+                  placeholder={t("artworks.storesPlaceholder")}
+                  options={(stores.data?.stores ?? []).map((store) => ({
+                    value: store.id,
+                    label: pickLocalized(store.name),
+                  }))}
+                  disabled={pending || !stores.isSuccess}
+                />
+              </Field>
+            )}
+          </FormSection>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-lg">
-          <Field
-            label={t("artworks.promotion")}
-            hint={t("artworks.promotionHint")}
-          >
-            <Select
-              value={discountId ?? ""}
-              onChange={(next) => setDiscountId(next === "" ? null : next)}
-              options={options}
-              disabled={pending || !promotions.isSuccess}
-            />
-          </Field>
-
-          <Field
-            label={t("artworks.placement")}
-            hint={t("artworks.placementHint")}
-          >
-            {/* One switch per screen — the answers are not exclusive, and each
-                is independently on or off. Moved here from the promotion
-                editor by `0129`, because a promotion with a banner on Home and
-                a tile in the basket is two answers to "where". */}
-            <div className="flex flex-col gap-md">
-              {PLACEMENTS.map((option) => (
-                <div
-                  key={option}
-                  className="flex items-start justify-between gap-lg rounded-md border border-border bg-surface px-lg py-md"
-                >
-                  <span className="flex min-w-0 flex-col gap-xxs">
-                    <span className="text-[14px] font-semibold text-text">
-                      {t(`artworks.placements.${option}`)}
-                    </span>
-                    <span className="text-[12px] text-text-faint">
-                      {t(`artworks.placementsHint.${option}`)}
-                    </span>
-                  </span>
-
-                  <Toggle
-                    on={placements.includes(option)}
-                    onChange={() =>
-                      setPlacements((current) =>
-                        togglePlacement(current, option),
-                      )
-                    }
-                    labelOn={t("artworks.placementOn")}
-                    labelOff={t("artworks.placementOff")}
-                    className="w-[104px] shrink-0"
-                  />
-                </div>
-              ))}
-            </div>
-          </Field>
-
-          {/* Which shops' pages — `artwork_stores`. Only while the shop page
-              is one of the screens; empty is every shop, which is what the
-              placeholder says rather than leaving a blank box to interpret. */}
-          {placements.includes("store") && (
+        <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
+          <FormSection title={t("artworks.whenSection")}>
+            {/* The promotion leads this card because it decides the rest of
+                it: a linked picture runs on the promotion's dates. */}
             <Field
-              label={t("artworks.storesLabel")}
-              hint={t("artworks.storesHint")}
+              label={t("artworks.promotion")}
+              hint={t("artworks.promotionHint")}
             >
-              <MultiSelect
-                value={storeIds}
-                onChange={setStoreIds}
-                placeholder={t("artworks.storesPlaceholder")}
-                options={(stores.data?.stores ?? []).map((store) => ({
-                  value: store.id,
-                  label: pickLocalized(store.name),
-                }))}
-                disabled={pending || !stores.isSuccess}
+              <Select
+                value={discountId ?? ""}
+                onChange={(next) => setDiscountId(next === "" ? null : next)}
+                options={options}
+                disabled={pending || !promotions.isSuccess}
               />
             </Field>
-          )}
 
-          {/* Where a tap leads — `0137`. A linked picture with none of its own
-              follows its promotion's, and the hint says what that is. */}
-          <LinkFields
-            value={link}
-            onChange={setLink}
-            disabled={pending}
-            error={errors.link}
-            hint={
-              discountId && link.kind === null
-                ? t("artworks.followsPromotion", { destination: inherited })
-                : undefined
-            }
-          />
-
-          {/* A linked picture has no dates of its own (`0136`) — it runs on
-              its promotion's, said here in place of the two fields. */}
-          {discountId ? (
-            <p className="rounded-md bg-neutral-fill px-lg py-md text-[13px] text-text-soft">
-              {promotion && (promotion.startsAt || promotion.endsAt)
-                ? t("artworks.runsOnPromotion", {
-                    window:
-                      promotion.startsAt && promotion.endsAt
-                        ? t("artworks.between", {
-                            from: formatDate(promotion.startsAt),
-                            to: formatDate(promotion.endsAt),
-                          })
-                        : promotion.endsAt
-                          ? t("artworks.until", {
+            {/* A linked picture has no dates of its own (`0136`) — it runs on
+                its promotion's, said here in place of the two fields. */}
+            {discountId ? (
+              <p className="rounded-md bg-neutral-fill px-lg py-md text-[13px] text-text-soft">
+                {promotion && (promotion.startsAt || promotion.endsAt)
+                  ? t("artworks.runsOnPromotion", {
+                      window:
+                        promotion.startsAt && promotion.endsAt
+                          ? t("artworks.between", {
+                              from: formatDate(promotion.startsAt),
                               to: formatDate(promotion.endsAt),
                             })
-                          : t("artworks.startsFrom", {
-                              from: formatDate(promotion.startsAt!),
-                            }),
-                  })
-                : t("artworks.runsOnPromotionOpen")}
-            </p>
-          ) : (
-            /* Side by side, as in `PromotionEditor` — see the note there on
-               why it is a container query and why 32rem. */
-            <div className="@container">
-              <div className="grid grid-cols-1 items-start gap-lg @[32rem]:grid-cols-2">
+                          : promotion.endsAt
+                            ? t("artworks.until", {
+                                to: formatDate(promotion.endsAt),
+                              })
+                            : t("artworks.startsFrom", {
+                                from: formatDate(promotion.startsAt!),
+                              }),
+                    })
+                  : t("artworks.runsOnPromotionOpen")}
+              </p>
+            ) : (
+              /* Side by side where the card is wide enough — below `lg`,
+                 where it spans the page. See `FieldPair`. */
+              <FieldPair>
                 <Field
                   label={t("artworks.startsAt")}
                   hint={t("artworks.startsHint")}
@@ -440,24 +458,26 @@ function Form({
                 >
                   <DateField value={endsAt} onChange={setEndsAt} />
                 </Field>
-              </div>
-            </div>
-          )}
+              </FieldPair>
+            )}
+          </FormSection>
 
-          <Field
-            label={t("artworks.visibility")}
-            hint={t("artworks.visibilityHint")}
-          >
-            {/* A plain switch: nothing is published until Save. See the same
-                note in `PromotionEditor`. */}
-            <Toggle
-              on={isActive}
-              onChange={() => setIsActive((current) => !current)}
-              labelOn={t("artworks.live")}
-              labelOff={t("artworks.hidden")}
+          {/* Where a tap leads — `0137`. A linked picture with none of its own
+              follows its promotion's, and the hint says what that is. */}
+          <FormSection>
+            <LinkFields
+              value={link}
+              onChange={setLink}
+              disabled={pending}
+              error={errors.link}
+              hint={
+                discountId && link.kind === null
+                  ? t("artworks.followsPromotion", { destination: inherited })
+                  : undefined
+              }
             />
-          </Field>
-        </div>
+          </FormSection>
+        </aside>
       </div>
     </EditorPage>
   );
