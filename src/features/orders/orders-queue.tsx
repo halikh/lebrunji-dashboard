@@ -337,7 +337,11 @@ export function OrdersQueue() {
             <EmptyState
               titleKey={search ? "orders.noMatchTitle" : EMPTY[scope].title}
               bodyKey={search ? "orders.noMatchBody" : EMPTY[scope].body}
-              mood={scope === "live" ? "done" : "waiting"}
+              // Sitting down, as the app's own Orders tab does when nothing is
+              // in flight — the same pose for the same empty, so the two read
+              // as one product. A search that found nothing is a different
+              // empty, and gets the one every other search here does.
+              mood={search ? "lost" : "waiting"}
             />
           )}
 

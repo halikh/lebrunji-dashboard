@@ -12,7 +12,7 @@ export default function LoginPage() {
     <main className="flex min-h-full items-center justify-center p-xxl">
       <div className="flex w-full max-w-[380px] flex-col gap-xxxl">
         <div className="flex flex-col items-center gap-lg">
-          <Logo width={96} priority />
+          <Logo variant="wide" width={200} priority />
           <p className="text-[14px] text-text-soft">{t("login.subtitle")}</p>
         </div>
         {/* `useSearchParams` in the form reads `?next=`, which Next requires a
