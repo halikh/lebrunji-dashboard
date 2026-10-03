@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { EditorPage } from "@/components/ui/editor-page";
+import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Select } from "@/components/ui/select";
@@ -139,9 +140,7 @@ function Frame({
       {pending && (
         <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
       )}
-      {missing && (
-        <EmptyState titleKey="categories.notFound" mood="lost" />
-      )}
+      {missing && <EmptyState titleKey="categories.notFound" mood="lost" />}
     </EditorPage>
   );
 }
@@ -161,6 +160,8 @@ function Form({
     isActive: boolean;
     hasMenuNav: boolean;
     iconUrl: string | null;
+    /** Live shops in it — shown under the title. */
+    usedBy: number;
   } | null;
   codes: string[];
   kinds: { id: string; name: Localized }[];
@@ -261,8 +262,18 @@ function Form({
       title={initial ? pickLocalized(initial.name) : t("categories.add")}
       backHref={initial ? `${LIST_HREF}&focus=${initial.id}` : LIST_HREF}
       backLabel={t("categories.tab")}
-      /* Two columns — the words on the left, the icon on the right. See the
-         grid below. */
+      // How many shops sit in it, under its name — the same count the row
+      // shows, and the one archiving is refused on.
+      aside={
+        initial ? (
+          <span className="text-[13px] text-text-soft">
+            {initial.usedBy === 0
+              ? t("categories.unused")
+              : t("categories.usedBy", { count: initial.usedBy })}
+          </span>
+        ) : undefined
+      }
+      /* The record in a wide column, its icon beside it. See the grid below. */
       width="wide"
       footer={
         <>
@@ -276,101 +287,113 @@ function Form({
       }
     >
       {/**
-       * What it is, and what it looks like.
+       * What it is, and what it looks like — the frame `PromotionEditor` uses.
        *
-       * The left column is the category as a *record* — a name, a kind and two
-       * switches; the right is the category as something a customer sees,
-       * which is its icon. The empty-state glyph, its background, the shop
-       * page's text colour and the preview that drew them together went with
-       * their columns.
+       * The main column is the category as a *record*: its name and kind in
+       * one card, the two switches that decide where it shows paired in
+       * another. The side column is the category as something a customer sees,
+       * which is its icon, pinned on a wide screen. The empty-state glyph, its
+       * background, the shop page's text colour and the preview that drew them
+       * together went with their columns.
+       *
+       * One column below `lg`, icon last.
        */}
-      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2 lg:gap-xxl">
+      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-xxl">
         <div className="flex min-w-0 flex-col gap-lg">
-          <LocalizedField
-            label={t("categories.name")}
-            value={name}
-            onChange={setName}
-            maxLength={TEXT.name}
-            error={errors.name}
-            filter="name"
-            placeholder={{ en: "Restaurants", ar: "مطاعم" }}
-          />
-
-          <Field
-            label={t("categories.kind")}
-            hint={t("categories.kindHint")}
-            error={errors.kind}
-          >
-            <Select
-              value={kindId}
-              onChange={setKindId}
-              placeholder={t("categories.pickKind")}
-              options={kinds.map((kind) => ({
-                value: kind.id,
-                label: pickLocalized(kind.name),
-              }))}
+          <FormSection>
+            <LocalizedField
+              label={t("categories.name")}
+              value={name}
+              onChange={setName}
+              maxLength={TEXT.name}
+              error={errors.name}
+              filter="name"
+              placeholder={{ en: "Restaurants", ar: "مطاعم" }}
             />
-          </Field>
 
-          <Field
-            label={t("categories.visibility")}
-            hint={
-              isActive ? t("categories.liveHint") : t("categories.hiddenHint")
-            }
-          >
-            <Toggle
-              on={isActive}
-              onChange={() => setIsActive((current) => !current)}
-              labelOn={t("categories.live")}
-              labelOff={t("categories.hidden")}
-            />
-          </Field>
+            {/* Half the card, like every short answer here: a select stretched
+                across the page is harder to aim at, not easier. */}
+            <FieldPair>
+              <Field
+                label={t("categories.kind")}
+                hint={t("categories.kindHint")}
+                error={errors.kind}
+              >
+                <Select
+                  value={kindId}
+                  onChange={setKindId}
+                  placeholder={t("categories.pickKind")}
+                  options={kinds.map((kind) => ({
+                    value: kind.id,
+                    label: pickLocalized(kind.name),
+                  }))}
+                />
+              </Field>
+            </FieldPair>
+          </FormSection>
 
-          <Field
-            label={t("categories.menuNav")}
-            hint={t("categories.menuNavHint")}
-          >
-            <Toggle
-              on={hasMenuNav}
-              onChange={() => setHasMenuNav((current) => !current)}
-              labelOn={t("categories.menuNavOn")}
-              labelOff={t("categories.menuNavOff")}
-            />
-          </Field>
+          <FormSection title={t("categories.showSection")}>
+            <FieldPair>
+              <Field
+                label={t("categories.visibility")}
+                hint={
+                  isActive
+                    ? t("categories.liveHint")
+                    : t("categories.hiddenHint")
+                }
+              >
+                <Toggle
+                  on={isActive}
+                  onChange={() => setIsActive((current) => !current)}
+                  labelOn={t("categories.live")}
+                  labelOff={t("categories.hidden")}
+                />
+              </Field>
+
+              <Field
+                label={t("categories.menuNav")}
+                hint={t("categories.menuNavHint")}
+              >
+                <Toggle
+                  on={hasMenuNav}
+                  onChange={() => setHasMenuNav((current) => !current)}
+                  labelOn={t("categories.menuNavOn")}
+                  labelOff={t("categories.menuNavOff")}
+                />
+              </Field>
+            </FieldPair>
+          </FormSection>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-lg">
-          <div className="flex flex-col gap-xxs">
-            <h3 className="ps-md text-[17px]">
-              {t("categories.artworkSection")}
-            </h3>
-            <p className="ps-md text-[12px] text-text-faint">
+        <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
+          <FormSection title={t("categories.artworkSection")}>
+            <p className="-mt-sm text-[13px] text-text-soft">
               {t("categories.artworkSectionHint")}
             </p>
-          </div>
 
-          {/* The category's own mark — the one a customer meets, in the strip
-              across the top of Home and Search. Required: the error under it
-              is cleared as soon as something is uploaded, and comes back on
-              Save if it is removed again. */}
-          <Field
-            label={t("categories.icon")}
-            hint={t("categories.iconHint")}
-            error={errors.icon}
-          >
-            <ImageUploader
-              value={iconUrl}
-              onChange={(url) => {
-                setIconUrl(url);
-                if (hasIcon(url)) {
-                  setErrors((current) => ({ ...current, icon: undefined }));
-                }
-              }}
-              folder="category-art"
-              disabled={pending}
-            />
-          </Field>
-        </div>
+            {/* The category's own mark — the one a customer meets, in the strip
+                across the top of Home and Search. Required: the error under it
+                is cleared as soon as something is uploaded, and comes back on
+                Save if it is removed again. */}
+            <Field
+              label={t("categories.icon")}
+              hint={t("categories.iconHint")}
+              error={errors.icon}
+            >
+              <ImageUploader
+                value={iconUrl}
+                onChange={(url) => {
+                  setIconUrl(url);
+                  if (hasIcon(url)) {
+                    setErrors((current) => ({ ...current, icon: undefined }));
+                  }
+                }}
+                folder="category-art"
+                disabled={pending}
+              />
+            </Field>
+          </FormSection>
+        </aside>
       </div>
     </EditorPage>
   );

@@ -36,6 +36,10 @@ import type { DayHours } from "@/features/catalog/api/hours";
  * can compare against what the driver actually told them — and it is what
  * catches an overnight window entered the wrong way round, which the grid shows
  * as two perfectly plausible times.
+ *
+ * It is its own component, `WeekSummary`, so a page can stand it beside the
+ * grid rather than above it — the driver editor pins it in its side column,
+ * where it stays in view while the seven rows are worked through.
  */
 
 /** Monday first for reading. The stored index is untouched — see above. */
@@ -59,7 +63,6 @@ export function HoursGrid({
   week: DayHours[];
   onChange: (next: DayHours[]) => void;
 }) {
-  const clock = useClock();
   const dayOf = (index: number) =>
     week.find((one) => one.dayOfWeek === index) ?? null;
 
@@ -81,6 +84,81 @@ export function HoursGrid({
 
     onChange(next.sort((a, b) => a.dayOfWeek - b.dayOfWeek));
   }
+
+  return (
+    <div className="flex flex-col gap-sm">
+      {DISPLAY_ORDER.map((index) => {
+        const day = dayOf(index);
+        const overnight =
+          day !== null && day.closesAt <= day.opensAt && day.closesAt !== "";
+
+        return (
+          <div
+            key={index}
+            className="flex flex-wrap items-center gap-lg rounded-md border border-border bg-surface px-lg py-md"
+          >
+            <span className="w-[92px] shrink-0 text-[14px] font-semibold">
+              {t(DAY_LABELS[index])}
+            </span>
+
+            <Toggle
+              on={day !== null}
+              onChange={() => setDay(index, day ? null : {})}
+              labelOn={t("drivers.working")}
+              labelOff={t("drivers.dayOff")}
+              className="w-[104px]"
+            />
+
+            {day && (
+              <div className="flex flex-wrap items-center gap-sm">
+                <TimeField
+                  value={day.opensAt}
+                  onChange={(value) => setDay(index, { opensAt: value })}
+                />
+                <span className="text-[14px] text-text-soft">
+                  {t("hours.to")}
+                </span>
+                <TimeField
+                  value={day.closesAt}
+                  onChange={(value) => setDay(index, { closesAt: value })}
+                />
+
+                {/* Said out loud, because a closing time earlier than an
+                      opening one looks like a mistake and usually is not — it
+                      is a shift that runs past midnight. Correcting it would
+                      delete the late shift, which is the one that matters. */}
+                {overnight && (
+                  <span className="text-[12px] font-semibold text-active-ink">
+                    {t("hours.overnight")}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The week read back — on shift right now, the timetable in a few lines, and
+ * what it adds up to — with the one shortcut that acts on all of it.
+ *
+ * See the note at the top for why this, rather than the grid, is what catches
+ * a mistake. What somebody checks is the *shape* of the week — which days are
+ * off, whether the weekend differs — and seven separate rows hide exactly
+ * that. `onChange` is for "give every day the same hours", which is a change to
+ * the whole week and so belongs with the view of the whole week.
+ */
+export function WeekSummary({
+  week,
+  onChange,
+}: {
+  week: DayHours[];
+  onChange: (next: DayHours[]) => void;
+}) {
+  const clock = useClock();
 
   /**
    * Copies the first working day across every other working day.
@@ -106,129 +184,109 @@ export function HoursGrid({
   const first = week.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek)[0];
 
   return (
-    <div className="flex flex-col gap-lg">
-      {/* Read back before it is edited. What somebody checks is the *shape* of
-          the week — which days are off, whether the weekend differs — and
-          seven separate rows hide exactly that. */}
-      <div className="flex flex-col gap-xs rounded-lg border border-border bg-neutral-fill/40 p-lg">
-        <div className="flex flex-wrap items-center gap-sm">
-          <span className="text-[13px] font-semibold">
-            {t("hours.rightNow")}
-          </span>
-          <span
-            className={cx(
-              "rounded-sm px-sm py-[1px] text-[11px] font-semibold",
-              onShift
-                ? "bg-accent-wash text-text"
-                : "bg-neutral-fill text-text-faint",
-            )}
-          >
-            {onShift ? t("drivers.onShift") : t("drivers.offShift")}
-          </span>
-          <span className="text-[11px] text-text-faint">
-            {t("promotions.inZone", { zone: BUSINESS_TIMEZONE })}
-          </span>
-        </div>
-
-        {week.length === 0 ? (
-          <p className="text-[13px] text-text-soft">{t("drivers.noWeek")}</p>
-        ) : (
-          <ul className="flex flex-col gap-xxs">
-            {spans.map((span) => (
-              <li
-                key={`${span.from}-${span.to}`}
-                className="flex items-baseline justify-between gap-md text-[14px]"
-              >
-                <span className="font-semibold">
-                  {span.from === span.to
-                    ? t(DAY_LABELS[span.from])
-                    : t("hours.range", {
-                        from: t(DAY_LABELS[span.from]),
-                        to: t(DAY_LABELS[span.to]),
-                      })}
-                </span>
-                <span
-                  className={
-                    span.open
-                      ? "tabular-nums text-text-soft"
-                      : "text-[13px] text-text-faint"
-                  }
-                >
-                  {span.open
-                    ? `${clock.hhmm(span.opensAt)}–${clock.hhmm(span.closesAt)}`
-                    : t("hours.closed")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {first && week.length > 1 && (
-          <button
-            type="button"
-            onClick={applyToAll}
-            className="w-fit text-[13px] font-semibold text-primary hover:underline"
-          >
-            {t("hours.copyToAll", {
-              opens: first.opensAt,
-              closes: first.closesAt,
-            })}
-          </button>
-        )}
+    <div className="flex flex-col gap-md">
+      <div className="flex flex-wrap items-center gap-sm">
+        <span className="text-[13px] font-semibold">{t("hours.rightNow")}</span>
+        <span
+          className={cx(
+            "rounded-sm px-sm py-[1px] text-[11px] font-semibold",
+            onShift
+              ? "bg-accent-wash text-text"
+              : "bg-neutral-fill text-text-faint",
+          )}
+        >
+          {onShift ? t("drivers.onShift") : t("drivers.offShift")}
+        </span>
+        <span className="text-[11px] text-text-faint">
+          {t("promotions.inZone", { zone: BUSINESS_TIMEZONE })}
+        </span>
       </div>
 
-      <div className="flex flex-col gap-sm">
-        {DISPLAY_ORDER.map((index) => {
-          const day = dayOf(index);
-          const overnight =
-            day !== null && day.closesAt <= day.opensAt && day.closesAt !== "";
-
-          return (
-            <div
-              key={index}
-              className="flex flex-wrap items-center gap-lg rounded-md border border-border bg-surface px-lg py-md"
+      {week.length === 0 ? (
+        <p className="rounded-md bg-danger-wash/40 px-lg py-md text-[13px] text-text">
+          {t("drivers.noWeek")}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-xxs rounded-md bg-neutral-fill px-lg py-md">
+          {spans.map((span) => (
+            <li
+              key={`${span.from}-${span.to}`}
+              className="flex items-baseline justify-between gap-md text-[14px]"
             >
-              <span className="w-[92px] shrink-0 text-[14px] font-semibold">
-                {t(DAY_LABELS[index])}
+              <span className="font-semibold">
+                {span.from === span.to
+                  ? t(DAY_LABELS[span.from])
+                  : t("hours.range", {
+                      from: t(DAY_LABELS[span.from]),
+                      to: t(DAY_LABELS[span.to]),
+                    })}
               </span>
+              <span
+                className={
+                  span.open
+                    ? "tabular-nums text-text-soft"
+                    : "text-[13px] text-text-faint"
+                }
+              >
+                {span.open
+                  ? `${clock.hhmm(span.opensAt)}–${clock.hhmm(span.closesAt)}`
+                  : t("hours.closed")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
-              <Toggle
-                on={day !== null}
-                onChange={() => setDay(index, day ? null : {})}
-                labelOn={t("drivers.working")}
-                labelOff={t("drivers.dayOff")}
-                className="w-[104px]"
-              />
+      {/* The week as two numbers. A rota that adds up to four hours, or to
+          seventy, is wrong in a way the rows do not show. */}
+      {week.length > 0 && (
+        <p className="text-[13px] text-text-soft">
+          {t("drivers.weekTotals", {
+            days: week.length,
+            hours: formatHours(totalMinutes(week)),
+          })}
+        </p>
+      )}
 
-              {day && (
-                <div className="flex flex-wrap items-center gap-sm">
-                  <TimeField
-                    value={day.opensAt}
-                    onChange={(value) => setDay(index, { opensAt: value })}
-                  />
-                  <span className="text-[14px] text-text-soft">
-                    {t("hours.to")}
-                  </span>
-                  <TimeField
-                    value={day.closesAt}
-                    onChange={(value) => setDay(index, { closesAt: value })}
-                  />
-
-                  {/* Said out loud, because a closing time earlier than an
-                      opening one looks like a mistake and usually is not — it
-                      is a shift that runs past midnight. Correcting it would
-                      delete the late shift, which is the one that matters. */}
-                  {overnight && (
-                    <span className="text-[12px] font-semibold text-active-ink">
-                      {t("hours.overnight")}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {first && week.length > 1 && (
+        <button
+          type="button"
+          onClick={applyToAll}
+          className="w-fit text-start text-[13px] font-semibold text-primary hover:underline"
+        >
+          {t("hours.copyToAll", {
+            opens: first.opensAt,
+            closes: first.closesAt,
+          })}
+        </button>
+      )}
     </div>
   );
+}
+
+/**
+ * Minutes worked across the week.
+ *
+ * A closing time at or before the opening one runs past midnight — the same
+ * rule `isOpenAt` follows — so 18:00–02:00 is eight hours, not minus sixteen.
+ * A day with an unreadable time counts as nothing rather than as a guess.
+ */
+function totalMinutes(week: DayHours[]): number {
+  return week.reduce((sum, day) => {
+    const opens = toMinutes(day.opensAt);
+    const closes = toMinutes(day.closesAt);
+    if (opens === null || closes === null) return sum;
+    return sum + (closes > opens ? closes - opens : closes + 24 * 60 - opens);
+  }, 0);
+}
+
+function toMinutes(time: string): number | null {
+  const parts = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  return parts ? Number(parts[1]) * 60 + Number(parts[2]) : null;
+}
+
+/** "42" or "42.5" — hours, to the half hour a rota is actually set in. */
+function formatHours(minutes: number): string {
+  const hours = Math.round((minutes / 60) * 2) / 2;
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
 }

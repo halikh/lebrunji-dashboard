@@ -292,6 +292,9 @@ const en = {
     noWeek:
       "No working days set, so this driver is never offered for an order.",
     hoursTitle: "When they work",
+    // The editor's side column: the week read back, and what it adds up to.
+    weekTitle: "Their week",
+    weekTotals: "{days} working day(s) · {hours} hours a week",
     hoursSaved: "Hours saved",
     saveHours: "Save hours",
     discardHours: "Discard changes",
@@ -914,6 +917,9 @@ const en = {
      * database's word for something the operator has never had to think of as
      * separate, and the whole point of the block is that they do not have to.
      */
+    // The shop forms' other cards — see `StoreEditor`.
+    pricesSection: "Prices",
+    storefrontSection: "On the storefront",
     placeSection: "Where it is",
     placeSectionHint:
       "This shop trades from one address, so these are edited here. Add a second branch and each one answers for itself.",
@@ -1019,6 +1025,8 @@ const en = {
     // went with their columns.
     artworkSection: "Artwork",
     artworkSectionHint: "How this category looks in the app.",
+    // The editor's card for the two switches.
+    showSection: "Where it shows",
     icon: "Category icon",
     iconHint: "Shown beside this category's name in the app's category strip.",
     // Shown by the form and by the api, and for a refusal from the constraint
@@ -1135,6 +1143,11 @@ const en = {
     // `menu_item_tags_icon_required` — including on a legacy tag opened
     // without one, which cannot be saved until it has one.
     iconRequired: "Add an icon — every tag needs one to be saved.",
+    // The editor's preview of the chip, beside an item's name.
+    previewTitle: "How it looks",
+    previewHint:
+      "Beside an item's name, in each language. A blank language shows the English.",
+    previewEmpty: "Type a name to see the chip.",
     // A count on the row is what turns "retire this" from a guess into a
     // decision. Zero is said in words rather than as "0 dishes", because
     // "unused" is the thing the operator is scanning for.

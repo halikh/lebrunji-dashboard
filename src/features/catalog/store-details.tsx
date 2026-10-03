@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button, Input } from "@/components/ui";
 import { Field } from "@/components/ui/field";
+import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Map } from "@/components/ui/map";
@@ -572,75 +573,274 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         </p>
 
         {/**
-         * The same two halves the store and branch forms draw. On the left,
-         * **who it is**: the name, what kind of shop it is, its picture. On the
-         * right, **what it prices in**: the currency, what a change to it does,
-         * the shop's own rate, and whether it leads the home screen.
+         * The same cards the new-shop form draws (see `StoreEditor`), so adding
+         * a shop and editing one read as one form.
+         *
+         * The main column is **who it is** — name and categories — then **what
+         * it prices in**, with what a currency change would do to a real price,
+         * then, for a shop that is one place, **where an order reaches it**.
+         * The side column is how it appears: its picture, and whether it leads
+         * the home screen.
          */}
-        <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2 lg:gap-xxl">
+        <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-xxl">
           <div className="flex min-w-0 flex-col gap-lg">
-            <LocalizedField
-              label={t("store.name")}
-              value={name}
-              onChange={setName}
-              maxLength={TEXT.name}
-              hint={t("store.nameHint")}
-              error={errors.name}
-              filter="name"
-              placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارة" }}
-            />
+            <FormSection>
+              <LocalizedField
+                label={t("store.name")}
+                value={name}
+                onChange={setName}
+                maxLength={TEXT.name}
+                hint={t("store.nameHint")}
+                error={errors.name}
+                filter="name"
+                placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارة" }}
+              />
+
+              <FieldPair>
+                {/*
+                  Which kind of shop this is — and it can be changed here.
+
+                  It used to be a wizard-only answer, which made a mis-filing
+                  permanent: the category decides where the shop appears on
+                  Home and what artwork it wears, and the only way to correct it
+                  was to delete the shop and lose the menu with it.
+
+                  Nothing is denominated in a category the way prices are in a
+                  currency, so this is a plain write and needs none of the
+                  machinery the currency below does.
+                */}
+                <Field
+                  label={t("store.category")}
+                  hint={t("store.categoryHint")}
+                >
+                  <Select
+                    value={categoryId}
+                    onChange={(next) => {
+                      setCategoryId(next);
+                      // Promoted to main, so it leaves the extras — see the
+                      // new-shop form.
+                      setOtherCategoryIds((current) =>
+                        current.filter((id) => id !== next),
+                      );
+                    }}
+                    placeholder={t("store.pickCategory")}
+                    options={(categories.data ?? []).map((category) => ({
+                      value: category.id,
+                      label: pickLocalized(category.name),
+                    }))}
+                  />
+                </Field>
+
+                {/* Every other category the shop is listed under — `0136`. The
+                    main one is what the shop *is*; these are where else a
+                    customer filtering by category should find it. The main one
+                    is left out of the options, since it is always included. */}
+                <Field
+                  label={t("store.otherCategories")}
+                  hint={t("store.otherCategoriesHint")}
+                >
+                  <MultiSelect
+                    value={otherCategoryIds}
+                    onChange={setOtherCategoryIds}
+                    placeholder={t("store.otherCategoriesPlaceholder")}
+                    options={(categories.data ?? [])
+                      .filter((category) => category.id !== categoryId)
+                      .map((category) => ({
+                        value: category.id,
+                        label: pickLocalized(category.name),
+                      }))}
+                  />
+                </Field>
+              </FieldPair>
+            </FormSection>
+
+            <FormSection title={t("store.pricesSection")}>
+              <FieldPair>
+                <Field
+                  label={t("store.currency")}
+                  hint={t("store.currencyEditHint")}
+                >
+                  <Select
+                    value={currencyCode}
+                    onChange={setCurrencyCode}
+                    placeholder={t("store.pickCurrency")}
+                    options={(currencies ?? []).map((one) => ({
+                      value: one.code,
+                      label: one.code,
+                    }))}
+                  />
+                </Field>
+
+                {/*
+                  What a dollar is worth **at this shop** — `0120`.
+
+                  ## Why a shop needs its own
+
+                  `currencies.rate` is one number for the whole marketplace, and
+                  `0028` wrote down why it is set by hand: in this market a rate
+                  is a decision somebody makes in the morning rather than a
+                  quote a market gives. What it assumed is that there is *one*
+                  such decision. Two shops on the same street sell in dollars
+                  and quote different lira rates, and a customer reading one
+                  shop's menu converted at the other's number is reading a price
+                  that shop would not accept.
+
+                  ## Empty is a real answer, and the common one
+
+                  It means the platform's rate, and it stays a live reference: a
+                  shop left alone follows the number on the Pricing screen when
+                  that moves. The placeholder shows what that number currently
+                  is, so leaving the box empty is a decision somebody can see the
+                  consequence of.
+
+                  ## It changes what is shown, not what is charged
+
+                  The menu is already priced in this shop's own currency and is
+                  charged at those figures, so this cannot move a bill. It
+                  decides the second currency the app writes beside a price.
+                */}
+                <Field
+                  label={rateLabel}
+                  hint={t("store.rateHint")}
+                  error={errors.rate}
+                >
+                  <NumberInput
+                    value={rate}
+                    onChange={(event) => setRate(event.target.value)}
+                    min={0}
+                    step="any"
+                    placeholder={t("store.ratePlatform", {
+                      rate: platformRate
+                        ? platformRate.toLocaleString("en-GB")
+                        : "",
+                    })}
+                    aria-label={rateLabel}
+                  />
+                </Field>
+              </FieldPair>
+
+              {preview && (
+                <div className="flex flex-col gap-md rounded-md border border-danger-wash bg-danger-wash/40 px-lg py-lg">
+                  <p role="status" className="text-[13px] text-text">
+                    {t("store.currencyMoved", { before: preview.before })}
+                  </p>
+
+                  {/*
+                    Both answers, each showing what it does to a real price off
+                    this menu. Describing the difference does not work —
+                    "restate the digits" and "convert at the rate" are the same
+                    sentence to anybody who has not thought about minor units.
+                    "12 becomes ل.ل12" against "12 becomes ل.ل1,076,400" needs
+                    no explaining at all.
+                  */}
+                  <ChoiceOfMode
+                    checked={mode === "keep"}
+                    onSelect={() => setMode("keep")}
+                    label={t("store.currencyKeep")}
+                    result={t("store.currencyBecomes", {
+                      before: preview.before,
+                      after: preview.keep,
+                    })}
+                  />
+                  <ChoiceOfMode
+                    checked={mode === "convert"}
+                    onSelect={() => setMode("convert")}
+                    label={t("store.currencyConvert")}
+                    result={t("store.currencyBecomes", {
+                      before: preview.before,
+                      after: preview.convert,
+                    })}
+                  />
+
+                  <p className="text-[12px] text-text-faint">
+                    {t("store.currencyLossy")}
+                  </p>
+                </div>
+              )}
+            </FormSection>
 
             {/*
-              Which kind of shop this is — and it can be changed here.
+              The shopfront, for a shop that is one place — see `sole`.
 
-              It used to be a wizard-only answer, which made a mis-filing
-              permanent: the category decides where the shop appears on Home and
-              what artwork it wears, and the only way to correct it was to
-              delete the shop and lose the menu with it.
-
-              Nothing is denominated in a category the way prices are in a
-              currency, so this is a plain write and needs none of the machinery
-              on the other side of the form.
+              Its own card, after the brand, because it answers a different
+              question: everything above is *who this is*, and this is *where
+              an order reaches it*. Absent entirely on a chain, where the answer
+              is per branch and the Branches tab asks it there.
             */}
-            <Field label={t("store.category")} hint={t("store.categoryHint")}>
-              <Select
-                value={categoryId}
-                onChange={(next) => {
-                  setCategoryId(next);
-                  // Promoted to main, so it leaves the extras — see the wizard.
-                  setOtherCategoryIds((current) =>
-                    current.filter((id) => id !== next),
-                  );
-                }}
-                placeholder={t("store.pickCategory")}
-                options={(categories.data ?? []).map((category) => ({
-                  value: category.id,
-                  label: pickLocalized(category.name),
-                }))}
-              />
-            </Field>
+            {sole && (
+              <FormSection title={t("store.placeSection")}>
+                <p className="-mt-sm text-[13px] text-text-soft">
+                  {t("store.placeSectionHint")}
+                </p>
 
-            {/* Every other category the shop is listed under — `0136`. The main
-                one above is what the shop *is*; these are where else a customer
-                filtering by category should find it. The main one is left out of
-                the options, since it is always included. */}
-            <Field
-              label={t("store.otherCategories")}
-              hint={t("store.otherCategoriesHint")}
-            >
-              <MultiSelect
-                value={otherCategoryIds}
-                onChange={setOtherCategoryIds}
-                placeholder={t("store.otherCategoriesPlaceholder")}
-                options={(categories.data ?? [])
-                  .filter((category) => category.id !== categoryId)
-                  .map((category) => ({
-                    value: category.id,
-                    label: pickLocalized(category.name),
-                  }))}
-              />
-            </Field>
+                <div className="grid grid-cols-1 items-start gap-lg @[44rem]:grid-cols-2">
+                  <div className="flex min-w-0 flex-col gap-lg">
+                    <Field
+                      label={t("store.pin")}
+                      hint={t("store.pinHint")}
+                      error={errors.pin}
+                    >
+                      <Input
+                        value={pin}
+                        onChange={(event) => setPin(event.target.value)}
+                        placeholder="33.8938, 35.5018"
+                        inputMode="text"
+                      />
+                    </Field>
 
+                    <Field
+                      label={t("branches.whatsapp")}
+                      hint={t("branches.whatsappHint")}
+                      error={errors.whatsapp}
+                    >
+                      <PhoneInput value={whatsapp} onChange={setWhatsapp} />
+                    </Field>
+
+                    <Field
+                      label={t("store.prep")}
+                      hint={t("store.prepHint")}
+                      error={errors.prep}
+                    >
+                      <div className="flex flex-wrap items-center gap-sm">
+                        <NumberInput
+                          value={prepMin}
+                          onChange={(event) => setPrepMin(event.target.value)}
+                          min={0}
+                          aria-label={t("store.prepMin")}
+                          className="w-[92px]"
+                        />
+                        <span className="text-[14px] text-text-soft">
+                          {t("store.prepTo")}
+                        </span>
+                        <NumberInput
+                          value={prepMax}
+                          onChange={(event) => setPrepMax(event.target.value)}
+                          min={0}
+                          aria-label={t("store.prepMax")}
+                          className="w-[92px]"
+                        />
+                        <span className="text-[14px] text-text-soft">
+                          {t("store.minutes")}
+                        </span>
+                      </div>
+                    </Field>
+                  </div>
+
+                  {/* The pin, drawn. A pair of numbers is not something
+                      anybody can check by reading; a marker on a map is. */}
+                  <Map
+                    latitude={coordinates?.latitude ?? null}
+                    longitude={coordinates?.longitude ?? null}
+                    label={pickLocalized(name)}
+                    emptyKey="store.noPinYet"
+                    className="h-[300px] w-full rounded-md"
+                  />
+                </div>
+              </FormSection>
+            )}
+          </div>
+
+          <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
             {/*
               The shop's picture, on the shop's page — which is the whole reason
               this tab exists.
@@ -648,130 +848,32 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
               It was in the branch editor, beside a branch's own override, and
               the two were told apart by a subheading. What an operator did with
               that was change the picture under "The shop" and get a picture on
-              one branch. `0110` made the branch's optional and left this one the
-              default every branch falls back to, so this is the field that
+              one branch. `0110` made the branch's optional and left this one
+              the default every branch falls back to, so this is the field that
               changes the shop's card in the app.
             */}
-            <Field
-              label={t("images.label")}
-              hint={t("store.imageHint")}
-              error={errors.image}
-            >
-              <ImageUploader
-                value={imageUrl}
-                onChange={(url) => {
-                  setImageUrl(url);
-                  if (url?.trim()) {
-                    setErrors((current) => ({ ...current, image: undefined }));
-                  }
-                }}
-                folder="stores"
-                disabled={pending}
-              />
-            </Field>
-          </div>
-
-          <div className="flex min-w-0 flex-col gap-lg">
-            <Field
-              label={t("store.currency")}
-              hint={t("store.currencyEditHint")}
-            >
-              <Select
-                value={currencyCode}
-                onChange={setCurrencyCode}
-                placeholder={t("store.pickCurrency")}
-                options={(currencies ?? []).map((one) => ({
-                  value: one.code,
-                  label: one.code,
-                }))}
-              />
-            </Field>
-
-            {preview && (
-              <div className="flex flex-col gap-md rounded-md border border-danger-wash bg-danger-wash/40 px-lg py-lg">
-                <p role="status" className="text-[13px] text-text">
-                  {t("store.currencyMoved", { before: preview.before })}
-                </p>
-
-                {/*
-                  Both answers, each showing what it does to a real price off
-                  this menu. Describing the difference does not work — "restate
-                  the digits" and "convert at the rate" are the same sentence to
-                  anybody who has not thought about minor units. "12 becomes
-                  ل.ل12" against "12 becomes ل.ل1,076,400" needs no explaining
-                  at all.
-                */}
-                <ChoiceOfMode
-                  checked={mode === "keep"}
-                  onSelect={() => setMode("keep")}
-                  label={t("store.currencyKeep")}
-                  result={t("store.currencyBecomes", {
-                    before: preview.before,
-                    after: preview.keep,
-                  })}
+            <FormSection>
+              <Field
+                label={t("images.label")}
+                hint={t("store.imageHint")}
+                error={errors.image}
+              >
+                <ImageUploader
+                  value={imageUrl}
+                  onChange={(url) => {
+                    setImageUrl(url);
+                    if (url?.trim()) {
+                      setErrors((current) => ({
+                        ...current,
+                        image: undefined,
+                      }));
+                    }
+                  }}
+                  folder="stores"
+                  disabled={pending}
                 />
-                <ChoiceOfMode
-                  checked={mode === "convert"}
-                  onSelect={() => setMode("convert")}
-                  label={t("store.currencyConvert")}
-                  result={t("store.currencyBecomes", {
-                    before: preview.before,
-                    after: preview.convert,
-                  })}
-                />
-
-                <p className="text-[12px] text-text-faint">
-                  {t("store.currencyLossy")}
-                </p>
-              </div>
-            )}
-
-            {/*
-              What a dollar is worth **at this shop** — `0120`.
-
-              ## Why a shop needs its own
-
-              `currencies.rate` is one number for the whole marketplace, and
-              `0028` wrote down why it is set by hand: in this market a rate is
-              a decision somebody makes in the morning rather than a quote a
-              market gives. What it assumed is that there is *one* such
-              decision. Two shops on the same street sell in dollars and quote
-              different lira rates, and a customer reading one shop's menu
-              converted at the other's number is reading a price that shop would
-              not accept.
-
-              ## Empty is a real answer, and the common one
-
-              It means the platform's rate, and it stays a live reference: a
-              shop left alone follows the number on the Pricing screen when that
-              moves. The placeholder shows what that number currently is, so
-              leaving the box empty is a decision somebody can see the
-              consequence of.
-
-              ## It changes what is shown, not what is charged
-
-              The menu is already priced in this shop's own currency and is
-              charged at those figures, so this cannot move a bill. It decides
-              the second currency the app writes beside a price.
-            */}
-            <Field
-              label={rateLabel}
-              hint={t("store.rateHint")}
-              error={errors.rate}
-            >
-              <NumberInput
-                value={rate}
-                onChange={(event) => setRate(event.target.value)}
-                min={0}
-                step="any"
-                placeholder={t("store.ratePlatform", {
-                  rate: platformRate
-                    ? platformRate.toLocaleString("en-GB")
-                    : "",
-                })}
-                aria-label={rateLabel}
-              />
-            </Field>
+              </Field>
+            </FormSection>
 
             {/*
               Featuring, edited where the shop is edited.
@@ -782,112 +884,31 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
               shop to change three things about it had to save, go back and find
               the row to change a fourth.
 
-              No confirmation dialog here, unlike the list. There the switch acts
-              the instant it is flicked, on a live shop, from a column of
+              No confirmation dialog here, unlike the list. There the switch
+              acts the instant it is flicked, on a live shop, from a column of
               identical rows, which is exactly what the dialog guards. Here
               nothing happens until Save, and the row it belongs to is the page
               that is open.
             */}
-            <Field
-              label={t("store.featured")}
-              hint={
-                isFeatured
-                  ? t("store.featuredHint")
-                  : t("store.featuredHintOff")
-              }
-            >
-              <Toggle
-                on={isFeatured}
-                onChange={() => setIsFeatured((current) => !current)}
-                labelOn={t("catalogue.featured")}
-                labelOff={t("store.notFeatured")}
-              />
-            </Field>
-          </div>
+            <FormSection title={t("store.storefrontSection")}>
+              <Field
+                label={t("store.featured")}
+                hint={
+                  isFeatured
+                    ? t("store.featuredHint")
+                    : t("store.featuredHintOff")
+                }
+              >
+                <Toggle
+                  on={isFeatured}
+                  onChange={() => setIsFeatured((current) => !current)}
+                  labelOn={t("catalogue.featured")}
+                  labelOff={t("store.notFeatured")}
+                />
+              </Field>
+            </FormSection>
+          </aside>
         </div>
-
-        {/*
-          The shopfront, for a shop that is one place — see `sole`.
-
-          Below the brand rather than beside it, because it answers a different
-          question: everything above is *who this is*, and this is *where an
-          order reaches it*. Absent entirely on a chain, where the answer is
-          per branch and the Branches tab asks it there.
-        */}
-        {sole && (
-          <div className="flex flex-col gap-lg border-t border-border pt-xxl">
-            <div className="flex flex-col gap-xxs">
-              <h3 className="ps-md text-[17px]">{t("store.placeSection")}</h3>
-              <p className="ps-md text-[12px] text-text-faint">
-                {t("store.placeSectionHint")}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2 lg:gap-xxl">
-              <div className="flex min-w-0 flex-col gap-lg">
-                <Field
-                  label={t("store.pin")}
-                  hint={t("store.pinHint")}
-                  error={errors.pin}
-                >
-                  <Input
-                    value={pin}
-                    onChange={(event) => setPin(event.target.value)}
-                    placeholder="33.8938, 35.5018"
-                    inputMode="text"
-                  />
-                </Field>
-
-                <Field
-                  label={t("branches.whatsapp")}
-                  hint={t("branches.whatsappHint")}
-                  error={errors.whatsapp}
-                >
-                  <PhoneInput value={whatsapp} onChange={setWhatsapp} />
-                </Field>
-
-                <Field
-                  label={t("store.prep")}
-                  hint={t("store.prepHint")}
-                  error={errors.prep}
-                >
-                  <div className="flex flex-wrap items-center gap-sm">
-                    <NumberInput
-                      value={prepMin}
-                      onChange={(event) => setPrepMin(event.target.value)}
-                      min={0}
-                      aria-label={t("store.prepMin")}
-                      className="w-[92px]"
-                    />
-                    <span className="text-[14px] text-text-soft">
-                      {t("store.prepTo")}
-                    </span>
-                    <NumberInput
-                      value={prepMax}
-                      onChange={(event) => setPrepMax(event.target.value)}
-                      min={0}
-                      aria-label={t("store.prepMax")}
-                      className="w-[92px]"
-                    />
-                    <span className="text-[14px] text-text-soft">
-                      {t("store.minutes")}
-                    </span>
-                  </div>
-                </Field>
-              </div>
-
-              {/* The pin, drawn. A pair of numbers is not something anybody can
-                  check by reading; a marker on a map is. */}
-              <Map
-                latitude={coordinates?.latitude ?? null}
-                longitude={coordinates?.longitude ?? null}
-                label={pickLocalized(name)}
-                emptyKey="store.noPinYet"
-                className="h-[240px] w-full rounded-md"
-              />
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">

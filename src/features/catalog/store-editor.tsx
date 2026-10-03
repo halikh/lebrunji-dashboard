@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { EditorPage } from "@/components/ui/editor-page";
 import { Field } from "@/components/ui/field";
+import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Map as PinMap } from "@/components/ui/map";
@@ -322,7 +323,7 @@ export function StoreEditor() {
       title={t("store.add")}
       backHref={LIST_HREF}
       backLabel={t("catalogue.stores")}
-      /* Two columns, like the page that edits a shop — see the grid below. */
+      /* The same cards as the page that edits a shop — see the grid below. */
       width="wide"
       footer={
         <>
@@ -347,238 +348,243 @@ export function StoreEditor() {
       }
     >
       {/**
-       * The same two halves the branch editor draws, for the same reason.
+       * The shop in a wide column of cards, its picture and its storefront
+       * switches in a narrow one beside it — the frame every editor here uses
+       * (see `PromotionEditor`), and the same cards the shop's Details tab
+       * draws, so adding a shop and editing one read as one form.
        *
-       * On the left, **who it is**: the name, what kind of shop it is, what its
-       * prices are denominated in, its picture and the number an order goes to.
-       * On the right, **where it is and how it works**: the pin, the map, the
-       * prep window, and how it appears on the storefront.
+       * The main column asks, in order: **who it is** (name and categories),
+       * **what it prices in** (currency and rate), and **where an order reaches
+       * it** (pin, number, prep window — with the map beside them).
        *
-       * One column below `lg`, in that order.
+       * ## The map sits inside the card it is about, and that ended the drift
        *
-       * ## The two columns flow independently, and that is the trade
+       * Two free-flowing halves put a 260pt map against fields of ninety, so by
+       * the fourth field the columns were twenty-odd points out of step; the
+       * subgrid that aligned them left a hand's width of nothing above
+       * Category. In the place card the map is beside the three fields it
+       * illustrates, and nothing else has to line up with it.
        *
-       * Their rows do not line up: each field is as tall as its own label,
-       * control and hint, so by the fourth one the two sides are twenty-odd
-       * points out of step.
-       *
-       * This was tried the other way — `grid-rows-subgrid`, so both columns
-       * share the parent’s row tracks and every pair starts on the same
-       * line. It aligned, and it was worse: a row is as tall as the taller
-       * of its two cells, and the right column holds a 260pt map against
-       * fields of ninety. Category ended up with a hand’s width of nothing
-       * above it and Currency was pushed most of a screen down. Alignment
-       * bought with that much dead space is not a tidier form, it is a
-       * sparser one.
-       *
-       * So the columns flow. If the drift ever has to go, the fix is not a
-       * grid — it is giving the map a column of its own, or moving it off
-       * this form.
+       * One column below `lg`, the side column last.
        */}
-      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2 lg:gap-xxl">
+      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-xxl">
         <div className="flex min-w-0 flex-col gap-lg">
-          <LocalizedField
-            label={t("store.name")}
-            value={name}
-            onChange={setName}
-            maxLength={TEXT.name}
-            error={errors.name}
-            filter="name"
-            placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارا" }}
-          />
-
-          <Field
-            label={t("store.category")}
-            hint={t("store.categoryHint")}
-            error={errors.category}
-          >
-            <Select
-              value={categoryId}
-              onChange={(next) => {
-                setCategoryId(next);
-                // A category promoted to main leaves the extras — it is
-                // included as the main one, and listing it twice would offer
-                // a removal that does nothing.
-                setOtherCategoryIds((current) =>
-                  current.filter((id) => id !== next),
-                );
-              }}
-              placeholder={t("store.pickCategory")}
-              options={(categories.data ?? []).map((category) => ({
-                value: category.id,
-                label: pickLocalized(category.name),
-              }))}
+          <FormSection>
+            <LocalizedField
+              label={t("store.name")}
+              value={name}
+              onChange={setName}
+              maxLength={TEXT.name}
+              error={errors.name}
+              filter="name"
+              placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارا" }}
             />
-          </Field>
 
-          {/* Every other category the shop is listed under — `0136`. The main
-              one above is what the shop *is*; these are where else a customer
-              filtering by category should find it. The main one is left out of
-              the options, since it is always included. */}
-          <Field
-            label={t("store.otherCategories")}
-            hint={t("store.otherCategoriesHint")}
-          >
-            <MultiSelect
-              value={otherCategoryIds}
-              onChange={setOtherCategoryIds}
-              placeholder={t("store.otherCategoriesPlaceholder")}
-              options={(categories.data ?? [])
-                .filter((category) => category.id !== categoryId)
-                .map((category) => ({
-                  value: category.id,
-                  label: pickLocalized(category.name),
-                }))}
-            />
-          </Field>
+            <FieldPair>
+              <Field
+                label={t("store.category")}
+                hint={t("store.categoryHint")}
+                error={errors.category}
+              >
+                <Select
+                  value={categoryId}
+                  onChange={(next) => {
+                    setCategoryId(next);
+                    // A category promoted to main leaves the extras — it is
+                    // included as the main one, and listing it twice would
+                    // offer a removal that does nothing.
+                    setOtherCategoryIds((current) =>
+                      current.filter((id) => id !== next),
+                    );
+                  }}
+                  placeholder={t("store.pickCategory")}
+                  options={(categories.data ?? []).map((category) => ({
+                    value: category.id,
+                    label: pickLocalized(category.name),
+                  }))}
+                />
+              </Field>
 
-          <Field
-            label={t("store.currency")}
-            // Not a preference: every price on the menu is denominated in it,
-            // and changing it later reprices nothing — the numbers stay and
-            // simply mean something else.
-            hint={t("store.currencyHint")}
-            error={errors.currency}
-          >
-            <Select
-              value={currency}
-              onChange={setCurrencyCode}
-              placeholder={t("store.pickCurrency")}
-              options={(currencies ?? []).map((one) => ({
-                value: one.code,
-                label: one.code,
-              }))}
-            />
-          </Field>
+              {/* Every other category the shop is listed under — `0136`. The
+                  main one is what the shop *is*; these are where else a
+                  customer filtering by category should find it. The main one
+                  is left out of the options, since it is always included. */}
+              <Field
+                label={t("store.otherCategories")}
+                hint={t("store.otherCategoriesHint")}
+              >
+                <MultiSelect
+                  value={otherCategoryIds}
+                  onChange={setOtherCategoryIds}
+                  placeholder={t("store.otherCategoriesPlaceholder")}
+                  options={(categories.data ?? [])
+                    .filter((category) => category.id !== categoryId)
+                    .map((category) => ({
+                      value: category.id,
+                      label: pickLocalized(category.name),
+                    }))}
+                />
+              </Field>
+            </FieldPair>
+          </FormSection>
 
-          {/* Under the currency, because it is a fact *about* it: what this
-              shop's prices convert at for a customer reading the other one.
-              `0120` for why it cannot move what is charged. */}
-          <Field
-            label={rateLabel}
-            hint={t("store.rateHint")}
-            error={errors.rate}
-          >
-            <NumberInput
-              value={exchangeRate}
-              onChange={(event) => setExchangeRate(event.target.value)}
-              min={0}
-              step="any"
-              placeholder={t("store.ratePlatform", {
-                rate: platformRate ? platformRate.toLocaleString("en-GB") : "",
-              })}
-              aria-label={rateLabel}
-            />
-          </Field>
+          <FormSection title={t("store.pricesSection")}>
+            <FieldPair>
+              <Field
+                label={t("store.currency")}
+                // Not a preference: every price on the menu is denominated in
+                // it, and changing it later reprices nothing — the numbers stay
+                // and simply mean something else.
+                hint={t("store.currencyHint")}
+                error={errors.currency}
+              >
+                <Select
+                  value={currency}
+                  onChange={setCurrencyCode}
+                  placeholder={t("store.pickCurrency")}
+                  options={(currencies ?? []).map((one) => ({
+                    value: one.code,
+                    label: one.code,
+                  }))}
+                />
+              </Field>
 
-          <Field
-            label={t("images.label")}
-            hint={t("store.imageHint")}
-            error={errors.image}
-          >
-            <ImageUploader
-              value={imageUrl}
-              onChange={(url) => {
-                setImageUrl(url);
-                // Cleared as soon as there is one, rather than left standing
-                // until the next Save over a picture that is plainly there.
-                if (url?.trim()) {
-                  setErrors((current) => ({ ...current, image: undefined }));
-                }
-              }}
-              folder="stores"
-              disabled={create.isPending}
-            />
-          </Field>
+              {/* Beside the currency, because it is a fact *about* it: what
+                  this shop's prices convert at for a customer reading the other
+                  one. `0120` for why it cannot move what is charged. */}
+              <Field
+                label={rateLabel}
+                hint={t("store.rateHint")}
+                error={errors.rate}
+              >
+                <NumberInput
+                  value={exchangeRate}
+                  onChange={(event) => setExchangeRate(event.target.value)}
+                  min={0}
+                  step="any"
+                  placeholder={t("store.ratePlatform", {
+                    rate: platformRate
+                      ? platformRate.toLocaleString("en-GB")
+                      : "",
+                  })}
+                  aria-label={rateLabel}
+                />
+              </Field>
+            </FieldPair>
+          </FormSection>
 
-          {/* The number is a fact about the *shop*, so it belongs in the column
-              that says what the shop is — beside its name, its category and its
-              currency — rather than in the one about where it is and how long
-              it takes.
+          <FormSection title={t("store.placeSection")}>
+            {/* The fields and the map side by side once the card has room —
+                a pin is a pair of numbers nobody can check by reading, and the
+                marker beside it is how it gets checked. */}
+            <div className="grid grid-cols-1 items-start gap-lg @[44rem]:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-lg">
+                <Field
+                  label={t("store.pin")}
+                  hint={t("store.pinHint")}
+                  error={errors.pin}
+                >
+                  <Input
+                    value={pin}
+                    onChange={(event) => setPin(event.target.value)}
+                    placeholder="33.8938, 35.5018"
+                  />
+                </Field>
 
-              It also balances the two. The right column carries a 260pt map, so
-              the left ran out of fields halfway down and left a screen of empty
-              beside it; this is the field that fills it. */}
-          <Field
-            label={t("store.whatsapp")}
-            hint={t("store.whatsappHint")}
-            error={errors.whatsapp}
-          >
-            <PhoneInput
-              value={whatsapp}
-              onChange={setWhatsapp}
-              placeholder={t("store.whatsappPlaceholder")}
-            />
-          </Field>
+                {/* The consequence, said before it happens rather than found
+                    on a bill: an unpinned shop is charged at the top band,
+                    because `delivery_fee_for_km` treats an unknown distance
+                    that way. */}
+                {!coordinates && (
+                  <p className="rounded-md border border-border bg-danger-wash/40 px-lg py-md text-[13px]">
+                    {t("store.noPinWarning")}
+                  </p>
+                )}
+
+                <Field
+                  label={t("store.whatsapp")}
+                  hint={t("store.whatsappHint")}
+                  error={errors.whatsapp}
+                >
+                  <PhoneInput
+                    value={whatsapp}
+                    onChange={setWhatsapp}
+                    placeholder={t("store.whatsappPlaceholder")}
+                  />
+                </Field>
+
+                <Field
+                  label={t("store.prep")}
+                  hint={t("store.prepHint")}
+                  error={errors.prep}
+                >
+                  <div className="flex items-center gap-md">
+                    <span className="flex-1">
+                      <NumberInput
+                        min={0}
+                        step={1}
+                        value={prepMin}
+                        onChange={(event) => setPrepMin(event.target.value)}
+                        aria-label={t("store.prepMin")}
+                      />
+                    </span>
+                    <span className="shrink-0 text-[13px] text-text-soft">
+                      {t("store.prepTo")}
+                    </span>
+                    <span className="flex-1">
+                      <NumberInput
+                        min={0}
+                        step={1}
+                        value={prepMax}
+                        onChange={(event) => setPrepMax(event.target.value)}
+                        aria-label={t("store.prepMax")}
+                      />
+                    </span>
+                    <span className="shrink-0 text-[13px] text-text-soft">
+                      {t("store.minutes")}
+                    </span>
+                  </div>
+                </Field>
+              </div>
+
+              <PinMap
+                latitude={coordinates?.latitude ?? null}
+                longitude={coordinates?.longitude ?? null}
+                label={pickLocalized(name) || t("store.name")}
+                emptyKey="store.mapEmpty"
+                className="h-[300px] w-full rounded-md"
+              />
+            </div>
+          </FormSection>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-lg">
-          <Field
-            label={t("store.pin")}
-            hint={t("store.pinHint")}
-            error={errors.pin}
-          >
-            <Input
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-              placeholder="33.8938, 35.5018"
-            />
-          </Field>
+        <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
+          <FormSection>
+            <Field
+              label={t("images.label")}
+              hint={t("store.imageHint")}
+              error={errors.image}
+            >
+              <ImageUploader
+                value={imageUrl}
+                onChange={(url) => {
+                  setImageUrl(url);
+                  // Cleared as soon as there is one, rather than left standing
+                  // until the next Save over a picture that is plainly there.
+                  if (url?.trim()) {
+                    setErrors((current) => ({ ...current, image: undefined }));
+                  }
+                }}
+                folder="stores"
+                disabled={create.isPending}
+              />
+            </Field>
+          </FormSection>
 
-          {/* The consequence, said before it happens rather than found on a
-              bill: an unpinned shop is charged at the top band, because
-              `delivery_fee_for_km` treats an unknown distance that way. */}
-          {!coordinates && (
-            <p className="rounded-md border border-border bg-danger-wash/40 px-lg py-md text-[13px]">
-              {t("store.noPinWarning")}
-            </p>
-          )}
-
-          <PinMap
-            latitude={coordinates?.latitude ?? null}
-            longitude={coordinates?.longitude ?? null}
-            label={pickLocalized(name) || t("store.name")}
-            emptyKey="store.mapEmpty"
-            className="h-[260px] w-full rounded-md"
-          />
-
-          <Field
-            label={t("store.prep")}
-            hint={t("store.prepHint")}
-            error={errors.prep}
-          >
-            <div className="flex items-center gap-md">
-              <span className="flex-1">
-                <NumberInput
-                  min={0}
-                  step={1}
-                  value={prepMin}
-                  onChange={(event) => setPrepMin(event.target.value)}
-                  aria-label={t("store.prepMin")}
-                />
-              </span>
-              <span className="shrink-0 text-[13px] text-text-soft">
-                {t("store.prepTo")}
-              </span>
-              <span className="flex-1">
-                <NumberInput
-                  min={0}
-                  step={1}
-                  value={prepMax}
-                  onChange={(event) => setPrepMax(event.target.value)}
-                  aria-label={t("store.prepMax")}
-                />
-              </span>
-              <span className="shrink-0 text-[13px] text-text-soft">
-                {t("store.minutes")}
-              </span>
-            </div>
-          </Field>
-
-          {/* Both storefront switches in one cell: they answer the same
+          {/* Both storefront switches in one card: they answer the same
               question at two strengths — can a customer find this shop, and
               should it be the first one they see. */}
-          <div className="flex flex-col gap-lg">
+          <FormSection title={t("store.storefrontSection")}>
             <Field
               label={t("store.visibility")}
               hint={isActive ? t("store.liveHint") : t("store.hiddenHintNew")}
@@ -612,8 +618,8 @@ export function StoreEditor() {
                 labelOff={t("store.notFeatured")}
               />
             </Field>
-          </div>
-        </div>
+          </FormSection>
+        </aside>
       </div>
 
       {/* The real message, not a stand-in for it. A country that cannot be read

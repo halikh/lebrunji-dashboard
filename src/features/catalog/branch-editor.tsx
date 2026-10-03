@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Button, Field, Input } from "@/components/ui";
 import { EditorPage } from "@/components/ui/editor-page";
+import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Map } from "@/components/ui/map";
@@ -312,7 +313,7 @@ function BranchEditor({
       }
       meta={store ? <ShopLine store={store} /> : undefined}
       aside={store ? <StoreFacts store={store} /> : undefined}
-      /* Two columns' worth of room — see the grid below, and `EditorPage`. */
+      /* Cards and a side column — see the grid below, and `EditorPage`. */
       width="wide"
       footer={
         <>
@@ -326,173 +327,186 @@ function BranchEditor({
       }
     >
       {/**
-       * Two equal columns on a wide screen, one on a narrow one.
+       * The same cards as the shop's own forms — see `StoreEditor`.
        *
-       * The split is what a branch is made of. On the left, **who it is**: its
-       * name and its picture. On the right, **where it is and how it works**:
-       * the pin, the map, the prep window, the number an order goes to, the
-       * currency and whether it is live.
+       * The main column is what a branch is made of: **who it is** (its name,
+       * what it prices in, whether it is live), then **where an order reaches
+       * it** — the pin, the number, the prep window, with the map beside them
+       * in the same card. The side column is its picture.
        *
        * The map is the reason this page wanted the width in the first place —
        * the note at the top of this file records it being a postage stamp in a
-       * 420pt panel, and a 640pt column was not much better.
+       * 420pt panel. Inside the place card it gets half the card, beside the
+       * fields it illustrates, rather than a column it had to be balanced
+       * against.
+       *
+       * One column below `lg`, picture last.
        */}
-      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2 lg:gap-xxl">
+      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-xxl">
         <div className="flex min-w-0 flex-col gap-lg">
-          <LocalizedField
-            label={t("branches.name")}
-            hint={t("branches.nameHint")}
-            value={name}
-            onChange={setName}
-            placeholder={{ en: t("branches.namePlaceholder"), ar: "الحمرا" }}
-            error={errors.name}
-            maxLength={TEXT.name}
-          />
-
-          {/*
-        This branch's own picture, or the shop's.
-
-        The uploader is handed the resolved value, so the box is never empty
-        while the shop has a photograph — what an operator sees is what a
-        customer sees. Clearing it puts the branch back to following the shop
-        rather than to showing nothing, which is what `Remove` means here and
-        what the hint says.
-      */}
-          <Field
-            label={t("images.label")}
-            hint={
-              imageUrl
-                ? t("branches.imageOwnHint")
-                : t("branches.imageSharedHint")
-            }
-          >
-            <ImageUploader
-              value={imageUrl ?? store?.imageUrl ?? null}
-              onChange={setImageUrl}
-              folder="stores"
-              disabled={pending}
+          <FormSection>
+            <LocalizedField
+              label={t("branches.name")}
+              hint={t("branches.nameHint")}
+              value={name}
+              onChange={setName}
+              placeholder={{ en: t("branches.namePlaceholder"), ar: "الحمرا" }}
+              error={errors.name}
+              maxLength={TEXT.name}
             />
-          </Field>
 
-          {/*
-        And its currency, which is the same idea and is money.
+            <FieldPair>
+              {/*
+                Its currency, which is the same idea as the picture and is money.
 
-        The empty option is not a blank — it is "the same as the shop", named
-        with the shop's code in it so the consequence of leaving it alone is
-        on screen. `0110` resolves `coalesce(branch, store)` on the side that
-        quotes *and* the side that charges, so a value picked here is what the
-        customer pays in.
-      */}
-          <Field
-            label={t("branches.currency")}
-            hint={t("branches.currencyHint")}
-          >
-            <Select
-              value={currencyCode ?? ""}
-              onChange={(next) => setCurrencyCode(next || null)}
-              options={[
-                {
-                  value: "",
-                  label: t("branches.currencySame", {
-                    code: store?.currencyCode ?? "",
-                  }),
-                },
-                ...(currencies ?? []).map((one) => ({
-                  value: one.code,
-                  label: one.code,
-                })),
-              ]}
-            />
-          </Field>
-
-          {/* The number is a fact about this *place* — which kitchen an order
-              lands in — so it belongs beside the branch's own name, picture and
-              currency rather than in the column about where it is on a map.
-
-              It also balances the two. The right column carries a 260pt map, so
-              the left ran out of fields halfway down and left a screen of empty
-              beside it; this is the field that fills it. The store form makes
-              the same move for the same reason. */}
-          <Field
-            label={t("branches.whatsapp")}
-            hint={t("branches.whatsappHint")}
-            error={errors.whatsapp}
-          >
-            <PhoneInput
-              value={whatsapp}
-              onChange={setWhatsapp}
-              placeholder={t("store.whatsappPlaceholder")}
-            />
-          </Field>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-lg">
-          <Field
-            label={t("branches.pin")}
-            hint={t("branches.pinHint")}
-            error={errors.pin}
-          >
-            <Input
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-              placeholder="33.8938, 35.5018"
-              inputMode="text"
-            />
-          </Field>
-
-          <Map
-            latitude={coordinates?.latitude ?? null}
-            longitude={coordinates?.longitude ?? null}
-            label={pickLocalized(name)}
-            emptyKey="store.noPinYet"
-            className="h-[200px] w-full rounded-md"
-          />
-
-          <Field
-            label={t("branches.prep")}
-            hint={t("branches.prepHint")}
-            error={errors.prep}
-          >
-            <div className="flex items-center gap-md">
-              <span className="flex-1">
-                <NumberInput
-                  min={0}
-                  step={1}
-                  value={prepMin}
-                  onChange={(event) => setPrepMin(event.target.value)}
-                  aria-label={t("store.prepMin")}
+                The empty option is not a blank — it is "the same as the shop",
+                named with the shop's code in it so the consequence of leaving it
+                alone is on screen. `0110` resolves `coalesce(branch, store)` on
+                the side that quotes *and* the side that charges, so a value
+                picked here is what the customer pays in.
+              */}
+              <Field
+                label={t("branches.currency")}
+                hint={t("branches.currencyHint")}
+              >
+                <Select
+                  value={currencyCode ?? ""}
+                  onChange={(next) => setCurrencyCode(next || null)}
+                  options={[
+                    {
+                      value: "",
+                      label: t("branches.currencySame", {
+                        code: store?.currencyCode ?? "",
+                      }),
+                    },
+                    ...(currencies ?? []).map((one) => ({
+                      value: one.code,
+                      label: one.code,
+                    })),
+                  ]}
                 />
-              </span>
-              <span className="shrink-0 text-[13px] text-text-soft">
-                {t("store.prepTo")}
-              </span>
-              <span className="flex-1">
-                <NumberInput
-                  min={0}
-                  step={1}
-                  value={prepMax}
-                  onChange={(event) => setPrepMax(event.target.value)}
-                  aria-label={t("store.prepMax")}
+              </Field>
+
+              <Field
+                label={t("branches.visibility")}
+                hint={
+                  isActive ? t("branches.liveHint") : t("branches.hiddenHint")
+                }
+              >
+                <Toggle
+                  on={isActive}
+                  onChange={() => setIsActive((current) => !current)}
+                  labelOn={t("branches.live")}
+                  labelOff={t("branches.hidden")}
                 />
-              </span>
-              <span className="shrink-0 text-[13px] text-text-soft">
-                {t("store.minutes")}
-              </span>
+              </Field>
+            </FieldPair>
+          </FormSection>
+
+          <FormSection title={t("store.placeSection")}>
+            <div className="grid grid-cols-1 items-start gap-lg @[44rem]:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-lg">
+                <Field
+                  label={t("branches.pin")}
+                  hint={t("branches.pinHint")}
+                  error={errors.pin}
+                >
+                  <Input
+                    value={pin}
+                    onChange={(event) => setPin(event.target.value)}
+                    placeholder="33.8938, 35.5018"
+                    inputMode="text"
+                  />
+                </Field>
+
+                {/* The number is a fact about this *place* — which kitchen an
+                    order lands in — so it sits with the pin and the prep
+                    window, the other answers to where an order goes. */}
+                <Field
+                  label={t("branches.whatsapp")}
+                  hint={t("branches.whatsappHint")}
+                  error={errors.whatsapp}
+                >
+                  <PhoneInput
+                    value={whatsapp}
+                    onChange={setWhatsapp}
+                    placeholder={t("store.whatsappPlaceholder")}
+                  />
+                </Field>
+
+                <Field
+                  label={t("branches.prep")}
+                  hint={t("branches.prepHint")}
+                  error={errors.prep}
+                >
+                  <div className="flex items-center gap-md">
+                    <span className="flex-1">
+                      <NumberInput
+                        min={0}
+                        step={1}
+                        value={prepMin}
+                        onChange={(event) => setPrepMin(event.target.value)}
+                        aria-label={t("store.prepMin")}
+                      />
+                    </span>
+                    <span className="shrink-0 text-[13px] text-text-soft">
+                      {t("store.prepTo")}
+                    </span>
+                    <span className="flex-1">
+                      <NumberInput
+                        min={0}
+                        step={1}
+                        value={prepMax}
+                        onChange={(event) => setPrepMax(event.target.value)}
+                        aria-label={t("store.prepMax")}
+                      />
+                    </span>
+                    <span className="shrink-0 text-[13px] text-text-soft">
+                      {t("store.minutes")}
+                    </span>
+                  </div>
+                </Field>
+              </div>
+
+              <Map
+                latitude={coordinates?.latitude ?? null}
+                longitude={coordinates?.longitude ?? null}
+                label={pickLocalized(name)}
+                emptyKey="store.noPinYet"
+                className="h-[300px] w-full rounded-md"
+              />
             </div>
-          </Field>
-
-          <Field
-            label={t("branches.visibility")}
-            hint={isActive ? t("branches.liveHint") : t("branches.hiddenHint")}
-          >
-            <Toggle
-              on={isActive}
-              onChange={() => setIsActive((current) => !current)}
-              labelOn={t("branches.live")}
-              labelOff={t("branches.hidden")}
-            />
-          </Field>
+          </FormSection>
         </div>
+
+        <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
+          {/*
+            This branch's own picture, or the shop's.
+
+            The uploader is handed the resolved value, so the box is never empty
+            while the shop has a photograph — what an operator sees is what a
+            customer sees. Clearing it puts the branch back to following the
+            shop rather than to showing nothing, which is what `Remove` means
+            here and what the hint says.
+          */}
+          <FormSection>
+            <Field
+              label={t("images.label")}
+              hint={
+                imageUrl
+                  ? t("branches.imageOwnHint")
+                  : t("branches.imageSharedHint")
+              }
+            >
+              <ImageUploader
+                value={imageUrl ?? store?.imageUrl ?? null}
+                onChange={setImageUrl}
+                folder="stores"
+                disabled={pending}
+              />
+            </Field>
+          </FormSection>
+        </aside>
       </div>
     </EditorPage>
   );

@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Button, Field, Input } from "@/components/ui";
 import { EditorPage } from "@/components/ui/editor-page";
+import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
@@ -15,7 +16,7 @@ import { digitsOf } from "@/lib/phone";
 import { validatePhone } from "@/lib/validation";
 
 import type { Courier, CourierDraft } from "./api/couriers";
-import { HoursGrid } from "./hours-grid";
+import { HoursGrid, WeekSummary } from "./hours-grid";
 import { useCourier, useSaveCourier } from "./use-couriers";
 
 /**
@@ -43,7 +44,7 @@ import { useCourier, useSaveCourier } from "./use-couriers";
  * right shape for a shop — seven interdependent parts ending in a map pin — and
  * the wrong one here: a driver is a name, a number and a rota, and splitting
  * three answers across two screens adds a click and a decision without removing
- * anything from either. One column, in the order somebody would say it.
+ * anything from either. One page, in the order somebody would say it.
  */
 export function DriverEditor({ id }: { id: string | null }) {
   const router = useRouter();
@@ -174,7 +175,7 @@ function Form({
       title={initial ? initial.name : t("drivers.add")}
       backHref={backHref}
       backLabel={backLabel}
-      /* Two columns' worth of room — see the grid below, and `EditorPage`. */
+      /* Cards and a side column — see the grid below, and `EditorPage`. */
       width="wide"
       footer={
         <>
@@ -192,67 +193,58 @@ function Form({
       }
     >
       {/**
-       * Two columns: who they are, and when they work.
+       * Who they are and when they work in a wide column of cards, the week
+       * read back in a narrow one beside it — the frame every editor here uses
+       * (see `PromotionEditor`).
        *
        * The note above still holds — a driver is a name, a number and a rota,
-       * asked in the order somebody would say it. What changed is that "one
-       * column" was being read as "one column, 640pt wide, against whatever
-       * the monitor is", which `EditorPage` itself calls a layout that reads
-       * as failed rather than measured. The answers are short and the rota is
-       * seven rows of controls, so stacking them left two thirds of the page
-       * empty and pushed the rota below the fold on the screen it most needs
-       * to be seen on.
+       * asked in the order somebody would say it. It used to be two columns:
+       * the two short answers capped at 420pt on the left, the week on the
+       * right, which left the left column two fields tall beside a seven-row
+       * rota — a page lopsided by most of its height.
        *
-       * The split is along the seam the form already had: the two text answers
-       * are one thought, the week is another, and the divider that used to sit
-       * between them is now the gutter.
+       * Now the name and the number share a row, the seven rows get the main
+       * column below them, and the side column holds the week *read back* —
+       * on shift right now, the timetable in a line or two, what it adds up
+       * to. That is the part that catches a mistake (see `hours-grid.tsx`),
+       * and pinned beside the rows it stays in view while they are edited.
        *
-       * Not equal halves. `EditorPage` hands the measure to the editor
-       * precisely because the editor knows which of its fields are prose and
-       * which are short controls — and a name and a phone number are short
-       * answers that get no better for being 700pt wide, while the rota is
-       * seven rows of a label, a switch and two time fields and uses
-       * everything it is given. So the identity column is capped at a
-       * readable measure and the rest of the page goes to the week.
-       *
-       * `items-start` so the short column does not stretch to the rota's
-       * height and grow a tail of empty box under the phone field — the same
-       * reason `menu-item-editor` gives for its own grid. Single column below
-       * `lg`, where there is no room to divide and the original order is the
-       * right one.
+       * One column below `lg`, the summary last.
        */}
-      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:gap-xxl">
+      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-xxl">
         <div className="flex min-w-0 flex-col gap-lg">
-          <Field label={t("drivers.name")}>
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={t("drivers.namePlaceholder")}
-              maxLength={TEXT.name}
-              autoFocus
-            />
-          </Field>
+          <FormSection>
+            <FieldPair>
+              <Field label={t("drivers.name")}>
+                <Input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder={t("drivers.namePlaceholder")}
+                  maxLength={TEXT.name}
+                  autoFocus
+                />
+              </Field>
 
-          <Field label={t("drivers.phone")} hint={t("drivers.phoneHint")}>
-            <PhoneInput
-              value={phone}
-              onChange={setPhone}
-              placeholder={t("drivers.phonePlaceholder")}
-            />
-          </Field>
+              <Field label={t("drivers.phone")} hint={t("drivers.phoneHint")}>
+                <PhoneInput
+                  value={phone}
+                  onChange={setPhone}
+                  placeholder={t("drivers.phonePlaceholder")}
+                />
+              </Field>
+            </FieldPair>
+          </FormSection>
+
+          <FormSection title={t("drivers.hoursTitle")}>
+            <HoursGrid week={hours} onChange={setHours} />
+          </FormSection>
         </div>
 
-        {/* No rule above it any more: beside the other column a border would
-            be a line across the middle of the page rather than the seam
-            between two parts of one form. The heading carries it instead —
-            and below `lg`, where the columns stack, the heading is still what
-            says a new section has started. */}
-        <div className="flex min-w-0 flex-col gap-sm">
-          <h3 className="text-[15px] font-semibold">
-            {t("drivers.hoursTitle")}
-          </h3>
-          <HoursGrid week={hours} onChange={setHours} />
-        </div>
+        <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
+          <FormSection title={t("drivers.weekTitle")}>
+            <WeekSummary week={hours} onChange={setHours} />
+          </FormSection>
+        </aside>
       </div>
     </EditorPage>
   );
