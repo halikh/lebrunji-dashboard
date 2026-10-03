@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { Wordmark } from "@/components/brand/wordmark";
+import { Logo } from "@/components/brand/logo";
 import { SignOutButton } from "@/components/sign-out-button";
 import { cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
@@ -49,7 +49,7 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
       )}
     >
       <div className="hidden md:mb-xl md:flex md:justify-center">
-        <Wordmark scale={0.58} />
+        <Logo width={56} />
       </div>
 
       {SECTIONS.map((section) => {

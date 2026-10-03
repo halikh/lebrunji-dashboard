@@ -24,15 +24,23 @@ import { useTagVocabulary } from "./use-tags";
  * page the way it sits in the app. A legacy tag with no icon is just its name.
  *
  * A plain `<img>`, as `PreviewImage` uses for the same uploaded URLs.
+ *
+ * ## Two sizes
+ *
+ * `sm` is the tag as it rides beside a dish's name, where a row of them has to
+ * stay out of the dish's way. `lg` is the Tags tab, where the tag is the row's
+ * whole subject and an icon at 16px is too small to tell one from another.
  */
 export function TagChip({
   label,
   iconUrl,
+  size = "sm",
   className,
 }: {
   label: string;
   /** The tag's icon, or null for a legacy tag that has none. */
   iconUrl: string | null;
+  size?: "sm" | "lg";
   className?: string;
 }) {
   return (
@@ -40,7 +48,10 @@ export function TagChip({
       className={cx(
         // `max-w` + `truncate` because a name is merchant-written and a row of
         // them still has to fit beside a dish's own name.
-        "inline-flex max-w-[180px] items-center gap-xs font-heading text-[13px] font-semibold text-text",
+        "inline-flex items-center font-heading font-semibold text-text",
+        size === "sm"
+          ? "max-w-[180px] gap-xs text-[13px]"
+          : "max-w-[260px] gap-sm text-[15px]",
         className,
       )}
     >
@@ -50,7 +61,10 @@ export function TagChip({
           src={iconUrl}
           alt=""
           aria-hidden
-          className="size-[16px] shrink-0 object-contain"
+          className={cx(
+            "shrink-0 object-contain",
+            size === "sm" ? "size-[16px]" : "size-[36px]",
+          )}
         />
       ) : null}
       <span className="truncate">{label}</span>

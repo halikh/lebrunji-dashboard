@@ -16,7 +16,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "db:types": "tsx scripts/db-types.ts",
     "check:limits": "tsx scripts/check-limits.ts",
-    "create-admin": "tsx scripts/create-admin.ts"
+    "create-admin": "tsx scripts/create-admin.ts",
+    "import:brand-art": "tsx scripts/import-brand-art.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1123.0",

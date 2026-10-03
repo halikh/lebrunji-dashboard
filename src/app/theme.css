@@ -2,80 +2,90 @@
  * The palette, transcribed from the app.
  *
  * `lebrunji/src/theme/colors.ts` is *"the single source of truth for colour"*,
- * and this file is its web dialect — the same ramp, the same role names, the
- * same reasons. The dashboard is the tool that runs the app, and it should not
- * be the second opinion on what the brand looks like.
+ * and this file is its web dialect — the same ramp, the same reasons. The
+ * dashboard is the tool that runs the app, and it should not be the second
+ * opinion on what the brand looks like.
+ *
+ * This is the app's **second edition** (2026-10). The first — sunshine yellow,
+ * blue, tomato coral, mint and grape at full volume — shouted, and left the
+ * characters nothing to be the loud one against. The second turns the frame
+ * down so they read as the joke, and the dashboard follows it.
  *
  * ## The rule, restated because it is easy to lose
  *
  * A component never names a colour. It names a **role**: `--color-primary`,
- * not `#0055ff`. A role says what a colour is *for*, so a component styled once
- * keeps meaning the same thing when the value behind the role changes. A hex
- * literal in a component, or a bare Tailwind palette class like `bg-blue-500`,
- * is a lint error rather than a style choice.
+ * not `#de1d27`. A role says what a colour is *for*, so a component styled once
+ * keeps meaning the same thing when the value behind the role changes — which
+ * is why this edition was one file here too. A hex literal in a component, or a
+ * bare Tailwind palette class like `bg-blue-500`, is a lint error rather than a
+ * style choice.
  *
- * ## Blue acts, coral is chosen, red is the mark
+ * ## Coral presses, ink chooses, sun is an accent
  *
- * Three things that look like they compete and do not:
- *
- * - **Blue** is what can be acted on — buttons that navigate, links, prices,
- *   an order code you can open. There are many on a screen.
- * - **Coral** is what is *chosen*, or what to press next — the selected tab, the
- *   focused field's ring, the primary button. There is usually one.
- * - **Red `#e01f28`** is the mascot's cap and the wordmark's tile, and nothing
- *   else. Nothing you click is painted in it. It is not a role here for exactly
- *   that reason; it lives inside the brand components.
+ * - **Coral `#de1d27`** is the one thing to press — the primary button, a link,
+ *   an order code you can open. It is exactly the logo's red, sampled from the
+ *   art, so the controls and the characters are visibly one brand.
+ * - **Ink** is what is *chosen* — the selected tab, the focused field's ring.
+ *   Selecting is quiet; red is kept for the thing to press.
+ * - **Sun `#febd2d`** is the logo's yellow, demoted to accent: a dot, a count,
+ *   a highlight. Never a ground, never text on white — it has not the contrast.
+ * - **Green** is good news — a discount, money saved, an order delivered.
  *
  * ## One mode
  *
- * There is no dark pair, and that is a decision rather than an omission —
- * `colors.ts` explains it: *"A dark counterpart would be a second design rather
- * than a derivation of this one."* The blue/sun/mint relationships that carry
- * the meaning do not survive inversion, and there are no dark values in the
- * handoff to invert them to. The app dropped its theme column in migration
- * 0040. The dashboard follows.
- *
- * The seam is still open: everything below is a token, so a second palette
+ * There is no dark pair, and that is a decision rather than an omission: the
+ * app is one mode, and there are no dark values in the design to invert to.
+ * The seam is still open — everything below is a token, so a second palette
  * would be a second block and no component would move.
  */
 
 @theme {
   /* ---- The raw ramp ----------------------------------------------------
-   * Hexes verbatim from the app. Named in the design's own vocabulary so a
-   * token can be traced back to the spec that set it. Components do not use
-   * these; they use the roles below.
+   * Hexes verbatim from the app's `ramp`, named as it names them. Components
+   * do not use these; they use the roles below.
    */
-  --color-cream: #fff8f0;
-  --color-warm-white: #fff4e9;
-  --color-sand: #f0eae1;
-  --color-hairline: #ece4d9;
+  --color-ivory: #f5efe6;
+  --color-cream: #f8f5f0;
+  --color-cream-deep: #f1ebe2;
+  --color-line: #e4dcd1;
+  --color-line-soft: #ece6dd;
+  --color-mark: #d4cabe;
 
-  --color-ink: #1e1b18;
-  --color-ink-deep: #171310;
-  --color-muted: #5c554e;
-  --color-faint: #8a8279;
+  --color-ink: #1f1915;
+  --color-ink-soft: #4a423c;
+  --color-muted: #8a7f76;
+  --color-placeholder: #b5aaa0;
 
-  --color-blue: #0055ff;
-  --color-blue-pressed: #0044cc;
-  --color-blue-tint: #dce8ff;
+  /** The red the logo and every character pose are drawn in. */
+  --color-coral: #de1d27;
+  --color-coral-pressed: #bc1720;
+  --color-coral-deep: #9e121a;
 
-  --color-coral: #ff5a3c;
-  --color-coral-tint: #ffd9d0;
+  /** The yellow the logo and every character pose are drawn in. */
+  --color-sun: #febd2d;
+  --color-sun-light: #ffd36e;
+  --color-sun-deep: #f5ae1b;
 
-  --color-sun: #ffc634;
-  --color-sun-deep: #ffd85c;
-  --color-sun-tint: #fff0c6;
+  /** The check's green — and money saved. */
+  --color-green: #2e9e5b;
+  /**
+   * Green as *type*. The one value here that is not in the app's ramp: the app
+   * only sets green as text on large money figures, where 3.4:1 passes, and
+   * the dashboard sets it in table-sized type, where it needs 4.5. Same hue,
+   * taken down until it clears 5:1 on white.
+   */
+  --color-green-deep: #1f7a44;
 
-  --color-mint: #14b87f;
-  --color-mint-tint: #cdeee0;
-  --color-mint-deep: #0d6f4c;
+  --color-error: #9e1b14;
+  --color-error-wash: #fbf2f0;
+  --color-error-line: #ebcbc5;
 
   /**
    * WhatsApp's own green, and the one colour here that is not the app's.
    *
    * A button that opens WhatsApp is recognised by this before it is read —
    * which is worth more than palette purity on a control the operator reaches
-   * for under time pressure. It is a *brand* colour like the mark's red, so it
+   * for under time pressure. It is a *brand* colour like the logo's red, so it
    * follows the same rule: nothing else in the product is painted in it, and it
    * appears only on the controls that hand off to that application.
    */
@@ -84,97 +94,98 @@
   --color-whatsapp-wash: #dcf8e8;
   --color-on-whatsapp: #ffffff;
 
-  --color-grape: #6c4bf5;
-  --color-grape-tint: #ddd6ff;
-
-  --color-red-danger: #a5121a;
-  --color-red-danger-tint: #fdeeeb;
-  --color-red-danger-bright: #d63a26;
-
-  /** The brand mark's red. Used by the mascot and the wordmark, by nothing
-   *  else, and never by anything interactive. */
-  --color-brand-mark: #e01f28;
+  /** The logo's red. Kept for reference: the logo is an image and does not
+   *  read it, and coral is now the same value by design. */
+  --color-brand-mark: #de1d27;
 
   /* ---- Surfaces --------------------------------------------------------
-   * Warm cream ground, white cards raised on it. Every grey below carries
-   * yellow-red: a neutral grey beside this much blue and sun reads faintly
-   * blue, because the eye takes the saturated hues as its reference. The
-   * neutrals sit on the same warm hue and simply run out of saturation.
+   * The app's "page under cards" cream as the ground, white cards on it. Every
+   * neutral carries the ink's warmth: a cool grey beside the logo's red and
+   * yellow reads faintly blue.
    */
   --color-background: var(--color-cream);
   --color-surface: #ffffff;
-  --color-border: var(--color-hairline);
+  --color-border: var(--color-line-soft);
 
   /* ---- Text ---- */
   --color-text: var(--color-ink);
-  --color-text-soft: var(--color-muted);
-  --color-text-faint: var(--color-faint);
+  --color-text-soft: var(--color-ink-soft);
+  --color-text-faint: var(--color-muted);
 
   /* ---- Actions ---------------------------------------------------------
-   * `primary` and `primary-fill` hold the same hex today and are separate
-   * roles anyway. As **ink** — a link, a price — blue must read against the
-   * surface behind it. As a **fill** it carries white type, which must clear
-   * 4.5:1. On white both hold (white on blue is 5.6:1). The split costs
-   * nothing now and is the seam that stops a future lightening of the ink
-   * silently taking every filled button's label below 3:1 with it.
+   * The logo coral, flat. `primary` and `primary-fill` hold the same hex and
+   * are separate roles anyway: as **ink** (a link, a price) coral must read
+   * against the surface behind it, and as a **fill** it carries white type.
+   * Both are 4.9:1 today. The split is the seam that stops a future
+   * lightening of the ink silently taking every filled button's label below
+   * 4.5:1 with it.
    *
    * Use `--color-primary-fill` for any surface carrying `--color-on-primary`.
    */
-  --color-primary: var(--color-blue);
-  --color-primary-fill: var(--color-blue);
-  --color-primary-deep: var(--color-blue-pressed);
-  --color-primary-wash: var(--color-blue-tint);
+  --color-primary: var(--color-coral);
+  --color-primary-fill: var(--color-coral);
+  --color-primary-deep: var(--color-coral-pressed);
+  --color-primary-wash: var(--color-cream-deep);
   --color-on-primary: #ffffff;
 
   /* ---- Chosen ----------------------------------------------------------
-   * Three roles, one hex, for the same reason as above: `active-fill` is a
-   * ground, `active-ink` is type, `active` is a graphic (a ring, an icon).
-   *
-   * The measured cost, recorded here as the app records it rather than
-   * discovered later: white on coral is **3.1:1**. That is the design's call,
-   * taken with the number in hand — comfortable for a 2pt ring or an icon,
-   * where the bar is 3:1, and under the 4.5 a label would want. Deepening it
-   * was tried and stopped looking like coral.
+   * Ink, not red — the app's `active`. Three roles, one hex: `active-fill` is
+   * a ground, `active-ink` is type, `active` is a graphic (a ring, an icon).
+   * The first edition had these coral, at 3.1:1 under white; ink is 17:1.
    */
-  --color-active: var(--color-coral);
-  --color-active-fill: var(--color-coral);
-  --color-active-ink: var(--color-coral);
-  --color-active-wash: var(--color-coral-tint);
+  --color-active: var(--color-ink);
+  --color-active-fill: var(--color-ink);
+  --color-active-ink: var(--color-ink);
+  --color-active-wash: var(--color-cream-deep);
   --color-on-active: #ffffff;
 
-  /* ---- Going well ---- */
-  --color-accent: var(--color-mint);
-  --color-accent-wash: var(--color-mint-tint);
-  --color-accent-deep: var(--color-mint-deep);
+  /* ---- Going well — the app's `success` ---- */
+  --color-accent: var(--color-green);
+  --color-accent-wash: var(--color-cream-deep);
+  --color-accent-deep: var(--color-green-deep);
   --color-on-accent: #ffffff;
 
-  /* ---- Warmth. Always dark type on it, never white. ---- */
+  /* ---- Sun. An accent only: dark type on it, never white. ---- */
   --color-yellow: var(--color-sun);
-  --color-yellow-wash: var(--color-sun-tint);
+  --color-yellow-wash: var(--color-cream-deep);
   --color-on-yellow: var(--color-ink);
 
-  /* ---- Chrome ---- */
-  --color-info: var(--color-grape);
-  --color-info-wash: var(--color-grape-tint);
-  --color-on-info: #ffffff;
+  /* ---- Chrome — sun, as the app's `info` ---- */
+  --color-info: var(--color-sun);
+  --color-info-wash: var(--color-cream-deep);
+  --color-on-info: var(--color-ink);
 
-  /* A fill for inactive chips and secondary buttons. Warmer than `border`,
-   * which is a line rather than a surface. */
-  --color-neutral-fill: var(--color-sand);
-  /* What a field's ground becomes while it is being typed into: barely a
-   * change, which is the point — "this one is live", not "this one is
-   * highlighted". Paired with the coral ring. */
-  --color-field-focus: var(--color-warm-white);
+  /* A fill for inactive chips and secondary buttons. Cream-deep rather than
+   * the app's `neutralFill` cream, because here the page itself is cream and
+   * a chip that is the colour of the page is not there. */
+  --color-neutral-fill: var(--color-cream-deep);
+  /* What a field's ground becomes while it is being typed into — the app's
+   * `fieldFocus`. Paired with the ink ring. */
+  --color-field-focus: #ffffff;
 
   /* ---- Danger ----------------------------------------------------------
-   * `danger` is tuned for **text** on cream, where 7.4:1 is the point of it.
-   * Poured across a whole button it reads as near-black and lands heavier
-   * than a confirmation deserves, so filled destructive buttons use
-   * `danger-action` — one step brighter, still over 4.5:1 against white.
+   * `danger` is tuned for **text**, where 8:1 on white is the point of it.
+   * Filled destructive buttons use `danger-action`, which the app sets to the
+   * brand coral — a destructive press is still a press.
    */
-  --color-danger: var(--color-red-danger);
-  --color-danger-wash: var(--color-red-danger-tint);
-  --color-danger-action: var(--color-red-danger-bright);
+  --color-danger: var(--color-error);
+  --color-danger-wash: var(--color-error-wash);
+  --color-danger-action: var(--color-coral);
+
+  /* ---- Tile tones ------------------------------------------------------
+   * Grounds for things told apart by colour alone — an avatar's initials.
+   * The app's `tile-tones.ts` band: one saturation and lightness (62%, 94%)
+   * shared by every hue, which is what makes a wall of differently coloured
+   * monograms read as one family rather than as accidents. The hues are the
+   * logo's red and yellow, the check's green, and two from the app's
+   * category tiles. Ink on every one of them.
+   */
+  --color-tone-coral-wash: hsl(357 62% 94%);
+  --color-tone-sun-wash: hsl(41 62% 94%);
+  --color-tone-green-wash: hsl(145 62% 94%);
+  --color-tone-sky-wash: hsl(205 62% 94%);
+  --color-tone-plum-wash: hsl(290 62% 94%);
+
   /* ---- Type ------------------------------------------------------------
    * Barlow for body, Barlow Condensed for headings, Cairo for Arabic — the
    * app's three faces, all on Google Fonts.
@@ -263,9 +274,9 @@
    * They are tokens because the literals were already repeated across five
    * components, which is where the sixth copy gets a different opacity and
    * nobody can say which was intended. */
-  --shadow-card: 0 2px 0 rgba(30, 27, 24, 0.08);
-  --shadow-raised: 0 6px 16px rgba(30, 27, 24, 0.16);
-  --shadow-overlay: 0 6px 24px rgba(30, 27, 24, 0.14);
+  --shadow-card: 0 2px 0 rgba(31, 25, 21, 0.08);
+  --shadow-raised: 0 6px 16px rgba(31, 25, 21, 0.16);
+  --shadow-overlay: 0 6px 24px rgba(31, 25, 21, 0.14);
 }
 
 /**
@@ -289,60 +300,60 @@
  *
  * A single hue is enough for a dot and useless for anything else: the same
  * value that reads well as a 7px marker is unreadable as body text and
- * illegible under a white label. So each status carries the set the app's
- * palette already implies — a graphic colour, an ink that clears 4.5:1 on
- * cream, a fill with a stated label colour, and a wash.
+ * illegible under a white label. So each status carries a graphic colour, an
+ * ink that clears 4.5:1, a fill with a stated label colour, and a wash.
  *
- * Two pairings are inherited rather than chosen, and both come from
- * `colors.ts`:
+ * The second edition has fewer hues than there are statuses, so the walk
+ * along an order reads as a walk through the palette's own meanings:
  *
- * - **Sun always takes dark type, never white.** So `ordered`'s fill carries
- *   ink, unlike every other status.
- * - **Mint is a fill colour, not a text colour.** Its text pairing is
- *   `mint-deep`, which is what the app uses for the "open now" pill.
+ * - **ordered** — sun: new, and wants attention. Dark type on it, never white.
+ * - **confirmed** — coral: accepted, and the next thing to press is dispatch.
+ * - **driver sent** — ink: out of the shop's hands and on the road, the app's
+ *   dark "live order" panel.
+ * - **delivered** — green, the app's good news. Its type is `green-deep`.
+ * - **cancelled** — the error red.
  *
- * Mapped onto the existing roles rather than given values of their own, so a
- * status is the same colour in the queue, the panel and a chart — and so
- * "delivered" stays the app's "going well" rather than drifting into a
- * second green.
+ * Washes are all cream-deep, as every wash in the app is: the dot and the
+ * type carry the status, and a tinted row behind them would be the first
+ * edition's volume again.
  */
   --color-status-ordered: var(--color-sun);
   --color-status-ordered-ink: var(--color-ink);
   --color-status-ordered-fill: var(--color-sun);
   --color-status-ordered-on-fill: var(--color-ink);
-  --color-status-ordered-wash: var(--color-sun-tint);
+  --color-status-ordered-wash: var(--color-cream-deep);
 
-  --color-status-confirmed: var(--color-blue);
-  --color-status-confirmed-ink: var(--color-blue);
-  --color-status-confirmed-fill: var(--color-blue);
+  --color-status-confirmed: var(--color-coral);
+  --color-status-confirmed-ink: var(--color-coral);
+  --color-status-confirmed-fill: var(--color-coral);
   --color-status-confirmed-on-fill: #ffffff;
-  --color-status-confirmed-wash: var(--color-blue-tint);
+  --color-status-confirmed-wash: var(--color-cream-deep);
 
-  --color-status-driver-sent: var(--color-grape);
-  --color-status-driver-sent-ink: var(--color-grape);
-  --color-status-driver-sent-fill: var(--color-grape);
+  --color-status-driver-sent: var(--color-ink);
+  --color-status-driver-sent-ink: var(--color-ink);
+  --color-status-driver-sent-fill: var(--color-ink);
   --color-status-driver-sent-on-fill: #ffffff;
-  --color-status-driver-sent-wash: var(--color-grape-tint);
+  --color-status-driver-sent-wash: var(--color-cream-deep);
 
-  --color-status-delivered: var(--color-mint);
-  --color-status-delivered-ink: var(--color-mint-deep);
-  --color-status-delivered-fill: var(--color-mint);
+  --color-status-delivered: var(--color-green);
+  --color-status-delivered-ink: var(--color-green-deep);
+  --color-status-delivered-fill: var(--color-green-deep);
   --color-status-delivered-on-fill: #ffffff;
-  --color-status-delivered-wash: var(--color-mint-tint);
+  --color-status-delivered-wash: var(--color-cream-deep);
 
-  --color-status-cancelled: var(--color-red-danger);
-  --color-status-cancelled-ink: var(--color-red-danger);
-  --color-status-cancelled-fill: var(--color-red-danger-bright);
+  --color-status-cancelled: var(--color-error);
+  --color-status-cancelled-ink: var(--color-error);
+  --color-status-cancelled-fill: var(--color-error);
   --color-status-cancelled-on-fill: #ffffff;
-  --color-status-cancelled-wash: var(--color-red-danger-tint);
+  --color-status-cancelled-wash: var(--color-error-wash);
 
   /* A slug outside the hardcoded list in `src/lib/order-status.ts` should be
  * impossible — the database constrains it — but if one ever arrives it gets
  * this rather than no colour. Neutral rather than transparent: a missing dot
  * reads as a bug, a grey one reads as a step nobody has chosen a colour for. */
-  --color-status-unknown: var(--color-faint);
-  --color-status-unknown-ink: var(--color-muted);
-  --color-status-unknown-fill: var(--color-muted);
+  --color-status-unknown: var(--color-muted);
+  --color-status-unknown-ink: var(--color-ink-soft);
+  --color-status-unknown-fill: var(--color-ink-soft);
   --color-status-unknown-on-fill: #ffffff;
-  --color-status-unknown-wash: var(--color-sand);
+  --color-status-unknown-wash: var(--color-cream-deep);
 }

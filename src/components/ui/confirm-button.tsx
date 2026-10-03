@@ -71,7 +71,7 @@ export function ConfirmButton({
   /**
    * The *confirm* button's variant. The trigger keeps its own look.
    *
-   * `accent` is mint, the theme's "going well", for a question whose answer
+   * `accent` is green, the theme's "going well", for a question whose answer
    * *restores* something — bringing a shop back, lifting a withdrawal. Coral
    * would read as the ordinary go-on and red as a warning, and neither is what
    * "put this back" is.

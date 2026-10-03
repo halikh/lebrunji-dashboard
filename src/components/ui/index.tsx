@@ -17,8 +17,8 @@
  *
  * ## The rules they encode
  *
- * - **Coral is what you press next**, blue is what can be acted on. So `Button`
- *   defaults to coral and links are blue. See `theme.css`.
+ * - **Coral is what you press**, ink is what is chosen. So `Button` defaults to
+ *   coral, links are coral, and a selected tab is ink. See `theme.css`.
  * - **Every action can be in flight**, so pending is a prop on the button
  *   rather than something each screen re-invents.
  * - **No component names a colour.** Roles only.
@@ -69,14 +69,13 @@ const BUTTON_SIZES: Record<ButtonSize, string> = {
 };
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  // Coral: the one to press to go on. White on it is 3.1:1 — the design's call,
-  // recorded in `colors.ts` with the number in hand rather than around it.
-  primary: "bg-active-fill text-on-active hover:brightness-95",
+  // Coral, the logo's red: the one to press to go on. White on it is 4.9:1.
+  primary: "bg-primary-fill text-on-primary hover:bg-primary-deep",
   secondary: "bg-neutral-fill text-text hover:brightness-[0.97]",
   quiet: "bg-transparent text-primary hover:bg-primary-wash",
   // `danger-action`, not `danger`: the darker red is tuned for text on cream and
   // reads as near-black poured across a whole button.
-  danger: "bg-danger-action text-on-active hover:brightness-95",
+  danger: "bg-danger-action text-on-primary hover:brightness-95",
   /**
    * Destructive, on a wash rather than a fill — `danger`'s half of the same
    * pattern `primary-quiet` is.
@@ -101,24 +100,22 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
    * A filled ground without the weight of the primary action.
    *
    * For the second-most-likely thing to press when it needs to look pressable
-   * — beside a coral Save, a blue-on-tint button reads as a real button and
+   * — beside a coral Save, coral-on-cream reads as a real button and
    * still loses the contest for the eye, which is what a secondary action
    * should do.
    */
   "primary-quiet": "bg-primary-wash text-primary hover:brightness-95",
   /**
-   * The product's success colour — mint, the theme's "going well".
+   * The product's success colour — green, the app's good news.
    *
    * For an action that *restores* something: bringing a driver back, lifting a
    * suspension. `secondary` was wrong for those in a way worth naming — grey
    * beside a red "Deactivate" says the two are peers, when one puts somebody
    * back on the rota and the other takes them off it.
    *
-   * **`accent-deep`, not `accent`.** White on mint measures 2.5:1, under even
-   * the 3:1 a graphic wants, and this variant carries a *label*. The deep mint
-   * is 5.9:1 and still unmistakably the same green — the same reasoning the
-   * coral note above records, reaching the opposite answer because the number
-   * came out differently.
+   * **`accent-deep`, not `accent`.** White on the app's green measures 3.4:1,
+   * fine for a graphic and short of the 4.5 a *label* wants. The deep green is
+   * 5.4:1 and still unmistakably the same hue.
    */
   accent: "bg-accent-deep text-on-accent hover:brightness-110",
 };

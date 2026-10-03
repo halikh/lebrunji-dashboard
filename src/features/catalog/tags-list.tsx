@@ -189,7 +189,7 @@ function Row({
         {/* The tag itself, drawn the way a dish shows it — icon, then the name
             in plain heading type — so the row is the thing rather than a
             description of it. */}
-        <TagChip label={name} iconUrl={tag.iconUrl} />
+        <TagChip label={name} iconUrl={tag.iconUrl} size="lg" />
 
         <span className="truncate text-[12px] text-text-faint">
           {tag.usedBy === 0

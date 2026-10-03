@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { Wordmark } from "@/components/brand/wordmark";
+import { Logo } from "@/components/brand/logo";
 import { t } from "@/i18n/translations";
 
 import { LoginForm } from "./login-form";
@@ -12,7 +12,7 @@ export default function LoginPage() {
     <main className="flex min-h-full items-center justify-center p-xxl">
       <div className="flex w-full max-w-[380px] flex-col gap-xxxl">
         <div className="flex flex-col items-center gap-lg">
-          <Wordmark scale={0.9} />
+          <Logo width={96} priority />
           <p className="text-[14px] text-text-soft">{t("login.subtitle")}</p>
         </div>
         {/* `useSearchParams` in the form reads `?next=`, which Next requires a

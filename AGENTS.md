@@ -39,7 +39,7 @@ Prisma) or from any earlier `lebrunji-dashboard`. No copied components, no
 copied CRUD engine, no copied flows.
 
 The one thing this app *does* descend from is the lebrunji app itself — its
-palette, type, mascot and wordmark, and its money and localisation helpers.
+palette, type, logo and character poses, and its money and localisation helpers.
 `src/app/theme.css` is a transcription of `src/theme/colors.ts`, and the values
 in it are the design's. Do not re-pick them.
 

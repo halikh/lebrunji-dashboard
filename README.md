@@ -215,11 +215,13 @@ Run it after any migration that touches a limit.
 - **The design system is the app's.** `src/app/theme.css` transcribes
   `src/theme/colors.ts` from the app — the same ramp, the same role names, the
   same measured contrast. No component names a colour; a hex literal or a bare
-  `bg-blue-500` is a lint error. Blue is what can be acted on, coral is what to
-  press next, and the mark's red `#e01f28` is never used for anything clickable.
-- **One mode.** No dark pair, because the app has none and says why: the
-  blue/sun/mint relationships that carry the meaning do not survive inversion.
-  Everything is a token, so the seam is open.
+  `bg-blue-500` is a lint error. Coral — the logo's own red — is what you
+  press, ink is what is chosen, sun is an accent and green is good news.
+- **The brand art is the app's.** The logo and the illustrator's poses live in
+  `public/brand/`, copied from the app by `npm run import:brand-art`. Re-run
+  it when the app's art changes; never redraw them here.
+- **One mode.** No dark pair, because the app has none. Everything is a token,
+  so the seam is open.
 - **Chrome is English; content is not.** Every string in the UI goes through
   `t()` in `src/i18n/translations.ts`, enforced by `react/jsx-no-literals` — so
   adding a language is a file to fill. Content is separate: the translated

@@ -16,18 +16,18 @@ import { cx } from "./index";
  *
  * ## It looks like a button and is still a link
  *
- * It used to be styled as one — blue, 13px, underlined on hover — and read as
+ * It used to be styled as one — 13px, underlined on hover — and read as
  * incidental text above the heading rather than as the way back. So it wears a
  * button's ground and padding: a target with edges, which is what somebody
  * looking for the way out is looking for.
  *
- * ## And the ground is blue, not grey
+ * ## And the type is coral, not grey
  *
  * `primary-quiet` — the variant "Rename" wears, and every other quiet action in
- * the product. In this palette **blue is what can be acted on** and coral is
- * what to press next; grey is the ground for something with no opinion. A back
- * control has an opinion — it is the way out of the page — and on the sand fill
- * it read as chrome sitting above the heading rather than as a control.
+ * the product. In this palette **coral is what can be pressed**; grey is for
+ * something with no opinion. A back control has an opinion — it is the way out
+ * of the page — and in grey it read as chrome sitting above the heading rather
+ * than as a control.
  *
  * What it is *not* is a `<button>`. This navigates, so it stays an anchor:
  * middle-click, ctrl-click, right-click → open in a new tab, and the status bar

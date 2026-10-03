@@ -25,7 +25,7 @@ import { cx } from "./index";
  *
  * ## Why charts get the whole ramp when controls do not
  *
- * The palette reserves blue for *what you press* and red for alarm, and that
+ * The palette reserves coral for *what you press* and red for alarm, and that
  * discipline is what makes both mean something. A chart is neither: nothing on
  * it is clickable and nothing on it is a warning, so the reservation does not
  * apply — and having six charts in one coral would waste the one screen where
@@ -34,8 +34,8 @@ import { cx } from "./index";
  * ## Each is chosen for what the chart is about, not for variety
  *
  * Money uses `accent`, which is the palette's "going well". Volume uses `sun`.
- * Patterns of time use `info`, because a heat map is a shape rather than a
- * judgement. `active` is kept for the charts about *this* — the customer in
+ * Patterns of time use `info` — sun too, in the second edition, since a heat
+ * map is a shape rather than a judgement and sun is the palette's accent. `active` is kept for the charts about *this* — the customer in
  * front of you — so a profile reads as the app's accent and the business-wide
  * overview does not.
  *

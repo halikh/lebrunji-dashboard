@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Wordmark } from "@/components/brand/wordmark";
+import { Logo } from "@/components/brand/logo";
 import { SignOutButton } from "@/components/sign-out-button";
 import { LiveRail } from "@/components/shell/live-rail";
 import { ScrollCues } from "@/components/ui/scroll-cues";
@@ -75,11 +75,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         A top bar on a phone only. The rail becomes a bottom bar there and
         carries the six sections; adding sign-out as a seventh would crowd them
         and put a destructive-ish action a thumb-width from Orders. So it moves
-        up here, where the wordmark also does the job of saying which app this
+        up here, where the logo also does the job of saying which app this
         is on a screen too narrow for the rail to show it.
       */}
         <header className="flex items-center justify-between border-b border-border bg-surface px-lg py-sm md:hidden">
-          <Wordmark scale={0.5} />
+          <Logo width={24} />
           <SignOutButton />
         </header>
 

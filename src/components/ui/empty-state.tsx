@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Lebrunji, type MascotMood } from "@/components/brand/lebrunji";
+import { Lebrunji, type Pose } from "@/components/brand/lebrunji";
 import { t, type Params, type TranslationKey } from "@/i18n/translations";
 
 import { cx } from "./index";
@@ -65,7 +65,7 @@ export function EmptyState({
         className,
       )}
     >
-      <Lebrunji mood={POSE[mood]} size={MASCOT} />
+      <Lebrunji pose={POSE[mood]} size={MASCOT} />
       <div className="flex max-w-[380px] flex-col gap-xs">
         <h2 className="text-[18px]">{t(titleKey, params)}</h2>
         {bodyKey && (
@@ -78,23 +78,25 @@ export function EmptyState({
 }
 
 /**
- * The mascot, in pixels wide. Smaller than the app's 160pt: there he is the
- * whole of a phone screen, and here he often sits inside one tab of a panel.
+ * The mascot's slot, in pixels square. Smaller than the app's ~180pt: there
+ * the pose is most of a phone screen, and here it often sits inside one tab of
+ * a panel.
  */
-const MASCOT = 120;
+const MASCOT = 140;
 
 /**
- * The dashboard's three moods, as the app's poses.
+ * The dashboard's three moods, as the illustrator's poses — chosen the way the
+ * app chose them.
  *
- * - **waiting** — asleep on the delivery box. Nothing is on its way, which is
- *   the app's own reading of `sleeping` (its empty orders list).
- * - **lost** — the empty, crumpled bag and the drained bottle, blinking. A
- *   search that found nothing; the app's `empty` is its no-results pose.
- * - **done** — waving. The live queue is clear, or there is nothing left to
+ * - **waiting** — sitting down. Nothing is on its way; the app's empty orders
+ *   list uses the same pose.
+ * - **lost** — the empty bag. A search that found nothing; the app's empty
+ *   cart is this pose.
+ * - **done** — verified. The queue is clear, or there is nothing left to
  *   restore: work finished, not work missing.
  */
-const POSE: Record<"waiting" | "done" | "lost", MascotMood> = {
-  waiting: "sleeping",
-  lost: "empty",
-  done: "wave",
+const POSE: Record<"waiting" | "done" | "lost", Pose> = {
+  waiting: "sit-down",
+  lost: "empty bag",
+  done: "verified",
 };

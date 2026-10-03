@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Modal } from "@/components/ui/modal";
 import { SearchInput } from "@/components/ui/search-input";
 import { EmptyState } from "@/components/ui/empty-state";
+import { isTakingOrders } from "@/features/drivers/api/couriers";
 import {
   useCouriers,
   useRecordDispatch,
@@ -16,7 +17,6 @@ import { useMoney } from "@/features/reference/use-currencies";
 import { t } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
 import { formatPhone } from "@/lib/phone";
-import { isOpenNow } from "@/lib/week";
 
 import type { Order, OrderLine } from "./api/orders";
 import { useClock } from "@/features/settings/use-clock";
@@ -91,15 +91,14 @@ export function DispatchModal({
   const all = useCouriers();
   const couriers = useCouriers(search);
 
-  // On shift *now*, read from their hours rather than from a switch somebody
-  // had to remember to flip. A driver outside their hours is not offered: the
-  // whole point of the change in migration 0084 is that this list is right at
-  // two in the morning without anybody having maintained it.
+  // On shift *now*, by the same rule the drivers screen shows: the rota,
+  // unless tonight's override says otherwise. Reading the rota alone offered a
+  // driver who had been switched off shift on the drivers screen.
   const liveCount = (all.data ?? []).filter((one) =>
-    isOpenNow(one.hours),
+    isTakingOrders(one),
   ).length;
   const filtering = liveCount > BROWSABLE;
-  const live = (couriers.data ?? []).filter((one) => isOpenNow(one.hours));
+  const live = (couriers.data ?? []).filter((one) => isTakingOrders(one));
   const searching = search.trim().length >= SEARCH.minTerm;
 
   const message = dispatchMessage(

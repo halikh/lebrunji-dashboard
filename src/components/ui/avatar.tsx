@@ -16,9 +16,9 @@ import { cx } from "./index";
  *
  * ## Ink on a wash, on every tone
  *
- * The same rule the tag chips follow, and for the same measured reason: the
- * palette records coral on `coralTint` at 2.4:1, which fails for text this
- * small. The wash carries the identity and ink carries the letters.
+ * The washes are the app's tile band — one lightness for every hue — so ink
+ * clears 4.5:1 on all of them, and a coloured letter on its own tint would
+ * not. The wash carries the identity and ink carries the letters.
  */
 
 /**
@@ -31,11 +31,11 @@ import { cx } from "./index";
  * No `danger`: red is alarm, and a customer is not one.
  */
 const GROUNDS = [
-  "bg-accent-wash",
-  "bg-yellow-wash",
-  "bg-active-wash",
-  "bg-info-wash",
-  "bg-primary-wash",
+  "bg-tone-coral-wash",
+  "bg-tone-sun-wash",
+  "bg-tone-green-wash",
+  "bg-tone-sky-wash",
+  "bg-tone-plum-wash",
 ] as const;
 
 export function Avatar({

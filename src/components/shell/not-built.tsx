@@ -14,8 +14,9 @@ import { t, type TranslationKey } from "@/i18n/translations";
  * editor; a phase number is at least a thing that can be looked up and asked
  * about.
  *
- * The mascot is running rather than asleep: an empty list is nothing on its
- * way, and an unbuilt section is something that is.
+ * The mascot is packing rather than sitting down: an empty list is nothing on
+ * its way, and an unbuilt section is something being got ready. It is the pose
+ * the app gives its own "menu coming soon".
  */
 export function NotBuilt({
   sectionKey,
@@ -26,7 +27,7 @@ export function NotBuilt({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-sm px-xxl py-huge text-center">
-      <Lebrunji mood="running" size={120} className="mb-md" />
+      <Lebrunji pose="packing" size={140} className="mb-md" />
       <p className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
         {t(sectionKey)}
       </p>

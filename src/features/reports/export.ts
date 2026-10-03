@@ -258,12 +258,12 @@ function printPdf(tables: Sheet[], range: { from: string; to: string }) {
   win.document.write(`<!doctype html>
 <html><head><meta charset="utf-8"><title>${escape(t("reports.title"))} ${escape(range.from)} — ${escape(range.to)}</title>
 <style>
-  body { font: 13px/1.5 system-ui, sans-serif; margin: 24px; color: #1e1b18; }
+  body { font: 13px/1.5 system-ui, sans-serif; margin: 24px; color: #1f1915; }
   h1 { font-size: 20px; margin: 0 0 4px; }
   h2 { font-size: 14px; margin: 24px 0 8px; }
-  p { color: #5c554e; margin: 0 0 8px; }
+  p { color: #4a423c; margin: 0 0 8px; }
   table { border-collapse: collapse; width: 100%; }
-  th, td { border-bottom: 1px solid #ece4d9; padding: 6px 8px; text-align: start; }
+  th, td { border-bottom: 1px solid #ece6dd; padding: 6px 8px; text-align: start; }
   th { font-weight: 600; }
   /* A section is not split across a page break where it can be helped. */
   h2, table { break-inside: avoid; }
