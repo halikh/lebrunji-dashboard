@@ -724,11 +724,11 @@ function Section({
               carried && "hidden",
             )}
           >
-            {/* Blue on a blue tint, beside a filled red Archive.
+            {/* Blue on a blue tint, beside a filled Archive.
               It needs a ground of its own — two controls together where only
               one has a surface read as one button and one label — and the
               palette says which ground: **blue is what you act on**. A neutral
-              fill made it look like a label with a box round it, and coral is
+              fill made it look like a label with a box round it, and blue is
               reserved for the one primary move on a screen. */}
             <Button variant="primary-quiet" size="sm" onClick={onRename}>
               {t("menu.renameSection")}
@@ -895,7 +895,7 @@ function ItemRow({
       ROW,
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
-      !item.isActive && "border-danger-wash bg-danger-wash/30",
+      !item.isActive && "border-border bg-neutral-fill/60",
       item.isActive && "border-border",
     ),
   );
@@ -1182,7 +1182,7 @@ function SearchResult({
     <div
       className={cx(
         ROW,
-        !item.isActive && "border-danger-wash bg-danger-wash/30",
+        !item.isActive && "border-border bg-neutral-fill/60",
         item.isActive && "border-border",
       )}
     >

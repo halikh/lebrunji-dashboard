@@ -244,7 +244,7 @@ function BranchRow({
       ref={anchor}
       className={cx(
         ROW,
-        !branch.isActive && "border-danger-wash bg-danger-wash/30",
+        !branch.isActive && "border-border bg-neutral-fill/60",
         branch.isActive && "border-border",
       )}
     >
@@ -281,7 +281,7 @@ function BranchRow({
           {/* Said in words, not only in colour — the same badge the shops list
               puts on a shop that is off the storefront. */}
           {!branch.isActive && (
-            <span className="shrink-0 rounded-full bg-danger-wash px-sm text-[11px] font-bold text-danger">
+            <span className="shrink-0 rounded-full bg-neutral-fill px-sm text-[11px] font-bold text-text-soft">
               {t("branches.notTrading")}
             </span>
           )}

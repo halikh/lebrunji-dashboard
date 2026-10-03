@@ -121,7 +121,7 @@ export function OrderPanel({
               >
                 {/* A clock with its hand turned back — the icon for "what has
                     happened to this", drawn in the same 24-unit geometry as the
-                    rest of the set rather than fetched. Coral, because coral is
+                    rest of the set rather than fetched. Blue, because blue is
                     where you *are* in this palette and this link leads to
                     another face of the order already open. */}
                 <svg

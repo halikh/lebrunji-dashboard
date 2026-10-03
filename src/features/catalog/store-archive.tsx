@@ -56,7 +56,7 @@ import { useStore } from "./use-stores";
  * same place with the same keyboard behaviour — these are the same kind of
  * control, and two spellings of it would be two things to learn.
  *
- * "All" carries no tone, because it is not a kind: it keeps the app's coral,
+ * "All" carries no tone, because it is not a kind: it keeps the press blue,
  * the way every other "All" in the dashboard does.
  */
 const TABS: { key: Kind; labelKey: TranslationKey }[] = [
@@ -286,7 +286,7 @@ export function StoreArchive({ storeId }: { storeId: string }) {
                 explanation next to it still invites the press. What is needed
                 here is the next step, which is the section. */}
               {item.sectionArchived ? (
-                <span className="max-w-[260px] shrink-0 text-end text-[12px] text-danger">
+                <span className="max-w-[260px] shrink-0 text-end text-[12px] text-text-soft">
                   {t("archive.sectionGoneFirst", {
                     name: pickLocalized(item.sectionTitle),
                   })}
@@ -454,7 +454,7 @@ function Group({
  *
  * ## And why the confirm button is mint
  *
- * Coral is the ordinary go-on and red is a warning; this is neither. The dialog
+ * Blue is the ordinary go-on and red is a warning; this is neither. The dialog
  * puts something back, and the last thing read before pressing should look like
  * what it does. `body` differs per kind because what happens differs per kind:
  * a section comes back empty, a choice comes back as an answer.

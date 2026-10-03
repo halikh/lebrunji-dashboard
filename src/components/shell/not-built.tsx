@@ -1,4 +1,4 @@
-import { Lebrunji } from "@/components/brand/lebrunji";
+import { PoseStage } from "@/components/brand/pose-stage";
 import { t, type TranslationKey } from "@/i18n/translations";
 
 /**
@@ -27,7 +27,7 @@ export function NotBuilt({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-sm px-xxl py-huge text-center">
-      <Lebrunji pose="packing" size={140} className="mb-md" />
+      <PoseStage pose="packing" height={176} className="mb-md" />
       <p className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
         {t(sectionKey)}
       </p>

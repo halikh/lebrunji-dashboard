@@ -51,9 +51,9 @@ const TABS: { key: Scope; labelKey: TranslationKey; tone?: TabTone }[] = [
     key: "inactive",
     labelKey: "drivers.tabInactive",
     tone: {
-      wash: "var(--color-danger-wash)",
+      wash: "var(--color-neutral-fill)",
       ink: "var(--color-text)",
-      dot: "var(--color-danger)",
+      dot: "var(--color-text-faint)",
     },
   },
 ];
@@ -319,7 +319,7 @@ function DriverRow({
             about tonight. Stacked in the same column as the rota controls the
             two read as one setting with two states, which they are not. */}
         {!courier.isActive && (
-          <span className="w-fit rounded-sm bg-danger-wash px-sm py-[1px] text-[11px] font-semibold text-text">
+          <span className="w-fit rounded-sm bg-neutral-fill px-sm py-[1px] text-[11px] font-semibold text-text-soft">
             {t("drivers.inactive")}
           </span>
         )}

@@ -21,13 +21,14 @@ import { cx } from "./index";
  * button's ground and padding: a target with edges, which is what somebody
  * looking for the way out is looking for.
  *
- * ## And the type is coral, not grey
+ * ## And the type is ink, not grey and not blue
  *
- * `primary-quiet` — the variant "Rename" wears, and every other quiet action in
- * the product. In this palette **coral is what can be pressed**; grey is for
- * something with no opinion. A back control has an opinion — it is the way out
- * of the page — and in grey it read as chrome sitting above the heading rather
- * than as a control.
+ * Grey is for something with no opinion, and a back control has one — it is
+ * the way out of the page — so in grey it read as chrome sitting above the
+ * heading rather than as a control. But it is not the page's *action* either:
+ * blue is what moves the work on, and a blue Back at the top of every page
+ * competed with the Save at the bottom. Ink type on the quiet wash says
+ * "control" without saying "next step".
  *
  * What it is *not* is a `<button>`. This navigates, so it stays an anchor:
  * middle-click, ctrl-click, right-click → open in a new tab, and the status bar
@@ -35,8 +36,8 @@ import { cx } from "./index";
  * with an `onClick` silently takes away. "Button UI, link semantics" is the
  * combination that keeps both.
  *
- * The classes are `primary-quiet`'s, written out rather than borrowed from
- * `Button` — `Button` renders a `<button>` element, and there is no way to ask
+ * The classes are `primary-quiet`'s ground with ink type, written out rather
+ * than borrowed from `Button` — `Button` renders a `<button>` element, and there is no way to ask
  * it for an anchor without teaching it to be polymorphic for one caller.
  */
 export function BackLink({
@@ -53,10 +54,10 @@ export function BackLink({
       href={href}
       className={cx(
         "inline-flex w-fit shrink-0 items-center gap-xs whitespace-nowrap rounded-md",
-        // The `primary-quiet` recipe, written out for the same reason the
-        // sizes are: `Button` renders a `<button>`, and this has to stay an
-        // anchor. See the note above.
-        "bg-primary-wash px-md py-sm text-[14px] font-semibold text-primary",
+        // The `primary-quiet` ground in ink, written out for the same reason
+        // the sizes are: `Button` renders a `<button>`, and this has to stay
+        // an anchor. See the note above.
+        "bg-primary-wash px-md py-sm text-[14px] font-semibold text-text",
         "hover:brightness-95",
         className,
       )}

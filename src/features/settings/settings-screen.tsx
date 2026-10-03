@@ -305,7 +305,7 @@ function HelpRow({
     topic.id,
     cx(
       ROW,
-      !topic.isActive && "border-danger-wash bg-danger-wash/30",
+      !topic.isActive && "border-border bg-neutral-fill/60",
       open &&
         "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
       topic.isActive && !open && "border-border",

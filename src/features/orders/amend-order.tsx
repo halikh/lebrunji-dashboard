@@ -436,7 +436,7 @@ function AmendLine({
     <div
       className={cx(
         "flex flex-col gap-sm rounded-lg border p-lg",
-        short ? "border-danger-wash bg-danger-wash/20" : "border-border",
+        short ? "border-warning bg-warning-wash/60" : "border-border",
       )}
     >
       <div className="flex items-center gap-lg">
@@ -545,7 +545,7 @@ function AmendLine({
                 <span className="text-[13px] font-semibold">
                   {pickLocalized(group.title)}
                   {group.minSelections > 0 && (
-                    <span className="ps-sm text-[11px] font-normal text-danger">
+                    <span className="ps-sm text-[11px] font-normal text-text-faint">
                       {t("amend.optionRequired")}
                     </span>
                   )}

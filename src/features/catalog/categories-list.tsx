@@ -208,7 +208,7 @@ function Row({
       ROW,
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
-      !category.isActive && "border-danger-wash bg-danger-wash/30",
+      !category.isActive && "border-border bg-neutral-fill/60",
       category.isActive && "border-border",
       category.isActive && open && "border-active",
     ),

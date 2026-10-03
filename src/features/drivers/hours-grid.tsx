@@ -203,7 +203,7 @@ export function WeekSummary({
       </div>
 
       {week.length === 0 ? (
-        <p className="rounded-md bg-danger-wash/40 px-lg py-md text-[13px] text-text">
+        <p className="rounded-md bg-warning-wash px-lg py-md text-[13px] text-text">
           {t("drivers.noWeek")}
         </p>
       ) : (

@@ -169,7 +169,7 @@ function Row({
     ROW,
     // Marked, not dimmed — fading a row takes its controls with it, and a
     // faded button reads as a disabled one.
-    !tag.isActive && "border-danger-wash bg-danger-wash/30",
+    !tag.isActive && "border-border bg-neutral-fill/60",
     tag.isActive && "border-border",
     tag.isActive && open && "border-active",
   );

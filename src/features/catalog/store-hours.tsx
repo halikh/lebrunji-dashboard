@@ -120,9 +120,7 @@ export function StoreHours({ storeId }: { storeId: string }) {
   if (branchId === null) {
     // `0101` gives every shop a branch, so this is a schema that has not been
     // migrated rather than an empty state anybody should meet.
-    return (
-      <EmptyState titleKey="branches.noneYet" />
-    );
+    return <EmptyState titleKey="branches.noneYet" />;
   }
 
   return (
@@ -344,7 +342,7 @@ function Grid({
                     "flex flex-wrap items-center gap-lg rounded-md border bg-surface px-lg py-md",
                     day.open
                       ? "border-border"
-                      : "border-danger-wash bg-danger-wash/30",
+                      : "border-border bg-neutral-fill/60",
                   )}
                 >
                   {/* A fixed width, so the switches line up down the week and the

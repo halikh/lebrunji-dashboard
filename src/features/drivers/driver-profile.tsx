@@ -160,7 +160,7 @@ export function DriverProfile({ id }: { id: string }) {
                 />
               </div>
 
-              {/* Coral, not the quiet outline. On the list this is one of three
+              {/* Blue, not the quiet outline. On the list this is one of three
                   controls on a row and should not shout; here it is the only
                   thing on the page you can *do*, and a secondary button beside
                   nothing else reads as disabled. */}

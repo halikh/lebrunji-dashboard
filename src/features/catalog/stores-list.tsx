@@ -224,9 +224,7 @@ function StoreRow({
         //
         // So the *content* mutes and the controls stay full strength, with a
         // border and a badge carrying the state instead.
-        store.isActive
-          ? "border-border"
-          : "border-danger-wash bg-danger-wash/30",
+        store.isActive ? "border-border" : "border-border bg-neutral-fill/60",
       )}
     >
       {/* First in the row, and above the name's stretched overlay — `z-10`
@@ -286,7 +284,7 @@ function StoreRow({
           </Link>
           {!store.isActive && (
             // Said in words, not only in colour and dimness.
-            <span className="shrink-0 rounded-full bg-danger-wash px-sm text-[11px] font-bold text-danger">
+            <span className="shrink-0 rounded-full bg-neutral-fill px-sm text-[11px] font-bold text-text-soft">
               {t("catalogue.inactive")}
             </span>
           )}

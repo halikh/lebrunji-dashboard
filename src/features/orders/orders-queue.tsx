@@ -306,7 +306,7 @@ export function OrdersQueue() {
               active={statusSlug === status.slug}
               // The tab wears the status's own colour, so the queue's tabs are a
               // legend for the dots in the rows below rather than five identical
-              // coral chips.
+              // blue chips.
               tone={statusTone(status.slug)}
               onClick={() => setStatusSlug(status.slug)}
             />
@@ -451,7 +451,7 @@ function Tab({
   label: string;
   count?: number;
   active: boolean;
-  /** Absent on "All", which is not a status and keeps the app's coral. */
+  /** Absent on "All", which is not a status and keeps the press blue. */
   tone?: StatusTone;
   onClick: () => void;
 }) {

@@ -57,7 +57,7 @@ import { useCustomerCounts, useCustomers } from "./use-customers";
  * on, and the dot is what ties a tab to the chip in the rows beneath it. The
  * tabs are the legend.
  *
- * "All" has no tone, because it is not a state — it keeps the app's coral, the
+ * "All" has no tone, because it is not a state — it keeps the press blue, the
  * same way the queue's "All" does.
  */
 const TABS: {
@@ -79,9 +79,9 @@ const TABS: {
     key: "suspended",
     labelKey: "customers.tabSuspended",
     tone: {
-      wash: "var(--color-danger-wash)",
+      wash: "var(--color-warning-wash)",
       ink: "var(--color-text)",
-      dot: "var(--color-danger)",
+      dot: "var(--color-warning)",
     },
   },
   {
@@ -245,7 +245,7 @@ function Row({ customer }: { customer: Customer }) {
         // Marked rather than dimmed. A faded row reads as disabled, and these
         // are the rows most likely to be the one somebody is looking for.
         closed || !customer.isActive
-          ? "border-danger-wash bg-danger-wash/30"
+          ? "border-border bg-neutral-fill/60"
           : "border-border",
         "hover:border-active",
       )}
@@ -311,7 +311,7 @@ export function StatusChip({
           ? "bg-neutral-fill text-text-soft"
           : customer.isActive
             ? "bg-accent-wash text-text"
-            : "bg-danger-wash text-text",
+            : "bg-warning-wash text-text",
         className,
       )}
     >

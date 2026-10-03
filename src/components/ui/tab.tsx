@@ -32,7 +32,7 @@ export type TabTone = { wash: string; ink: string; dot: string };
  * Colour alone is not a distinction a colour-blind operator can rely on, and
  * the dot is what ties a tab to the chips in the rows beneath it: the strip is
  * a legend, not decoration. A tab with no tone — "All", which is not a state —
- * keeps the app's coral and has no dot to give.
+ * keeps the press blue and has no dot to give.
  *
  * ## Only the selected tab is in the tab order
  *

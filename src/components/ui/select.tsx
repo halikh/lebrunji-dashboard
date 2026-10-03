@@ -278,8 +278,8 @@ function paletteStyles<M extends boolean>(
       borderRadius: "var(--radius-sm)",
       cursor: "pointer",
       ":hover": {
-        backgroundColor: "var(--color-danger-wash)",
-        color: "var(--color-danger)",
+        backgroundColor: "var(--color-line-soft)",
+        color: "var(--color-text)",
       },
     }),
   };

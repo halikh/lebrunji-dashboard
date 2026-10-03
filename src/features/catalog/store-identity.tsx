@@ -113,7 +113,7 @@ export function StoreFacts({ store }: { store: Store }) {
           className="text-[12px]"
         />
       ) : (
-        <span className="rounded-full bg-danger-wash px-sm font-semibold text-danger">
+        <span className="rounded-full bg-warning-wash px-sm font-semibold text-text">
           {t("store.noWhatsapp")}
         </span>
       )}

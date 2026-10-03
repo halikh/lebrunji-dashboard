@@ -35,7 +35,7 @@ import { t } from "@/i18n/translations";
  */
 export function NoPinWarning() {
   return (
-    <span className="flex items-center gap-xs text-[12px] font-semibold text-danger">
+    <span className="flex w-fit items-center gap-xs rounded-sm bg-warning-wash px-sm text-[12px] font-semibold text-text">
       <svg
         width="13"
         height="13"

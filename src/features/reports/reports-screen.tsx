@@ -673,7 +673,7 @@ function Tile({
         <span
           className={cx(
             "text-[12px] font-semibold",
-            delta.up ? "text-accent-deep" : "text-danger",
+            delta.up ? "text-accent-deep" : "text-text-soft",
           )}
         >
           {delta.text}

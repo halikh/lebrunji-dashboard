@@ -392,7 +392,7 @@ function Thumbnail({ url, name }: { url: string | null; name: string }) {
  */
 function Blocked({ children }: { children: ReactNode }) {
   return (
-    <span className="max-w-[280px] shrink-0 text-end text-[12px] text-danger">
+    <span className="max-w-[280px] shrink-0 text-end text-[12px] text-text-soft">
       {children}
     </span>
   );
@@ -459,7 +459,7 @@ function Group({
  * clicked is one of a column of identical rows. The question names the thing,
  * which is what catches the case a confirmation exists for — the wrong row.
  *
- * Mint on the confirm button, because coral is the ordinary go-on and red is a
+ * Mint on the confirm button, because blue is the ordinary go-on and red is a
  * warning, and this is neither. `body` differs per kind because what happens
  * differs per kind — see the strings.
  */

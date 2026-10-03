@@ -25,10 +25,10 @@ import { cx } from "./index";
  *
  * ## Why charts get the whole ramp when controls do not
  *
- * The palette reserves coral for *what you press* and red for alarm, and that
+ * The palette reserves blue for *what you press* and red for alarm, and that
  * discipline is what makes both mean something. A chart is neither: nothing on
  * it is clickable and nothing on it is a warning, so the reservation does not
- * apply — and having six charts in one coral would waste the one screen where
+ * apply — and having six charts in one blue would waste the one screen where
  * colour is carrying information rather than decorating it.
  *
  * ## Each is chosen for what the chart is about, not for variety

@@ -72,7 +72,7 @@ export function ConfirmButton({
    * The *confirm* button's variant. The trigger keeps its own look.
    *
    * `accent` is green, the theme's "going well", for a question whose answer
-   * *restores* something — bringing a shop back, lifting a withdrawal. Coral
+   * *restores* something — bringing a shop back, lifting a withdrawal. Blue
    * would read as the ordinary go-on and red as a warning, and neither is what
    * "put this back" is.
    */
@@ -105,7 +105,7 @@ export function ConfirmButton({
    * - **`danger-quiet`** where it repeats down a list: red type says
    *   destructive without a column of filled red buttons, which stops meaning
    *   anything by the fourth row.
-   * - **`primary`** (coral) where the confirmed action is the *only* thing to
+   * - **`primary`** (blue) where the confirmed action is the *only* thing to
    *   do on the panel. A quiet trigger there is the quietest control on a
    *   screen whose whole purpose is that one button.
    */

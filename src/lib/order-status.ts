@@ -31,7 +31,7 @@
  *
  * ## The tension with the palette, and how it is resolved
  *
- * The app's rule is that **coral is what you press next**. Colouring the advance
+ * The dashboard's rule is that **blue is what you press next**. Colouring the advance
  * button by status appears to break it, and would if colour were the only thing
  * marking the primary action.
  *
@@ -39,7 +39,7 @@
  * the row. What the status colour adds is *which* step you are about to take —
  * so "Confirm" is blue, "Send driver" is grape, "Delivered" is mint, and an
  * operator working quickly learns the colour of the action rather than reading
- * every button. Coral stays what it always was on every other screen.
+ * every button. Blue stays what it always was on every other screen.
  */
 
 import { t } from "@/i18n/translations";

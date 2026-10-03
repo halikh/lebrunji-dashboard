@@ -339,11 +339,12 @@ export function OrderActions({
               bodyKey="orders.cancelBody"
               confirmKey="orders.cancelConfirm"
               variant="danger"
-              // Filled danger rather than a quiet link. It is a real action
-              // with a real cost, and a text link beside a filled button
-              // reads as a footnote — which is the wrong weight for the one
-              // thing here that cannot be undone.
-              triggerVariant="danger"
+              // A filled button rather than a quiet link — a text link beside
+              // a filled button reads as a footnote, the wrong weight for the
+              // one thing here that cannot be undone — but the muted fill, as
+              // every cancel in the dashboard is. The cost is said by the
+              // dialog it opens, not by painting the trigger like an error.
+              triggerVariant="secondary"
             >
               {t("orders.cancel")}
             </ConfirmButton>
@@ -440,7 +441,7 @@ function StoreSection({
                   </span>
                 )}
                 {changed && (
-                  <span className="text-[12px] font-semibold text-danger">
+                  <span className="w-fit rounded-sm bg-warning-wash px-sm text-[12px] font-semibold text-text">
                     {gone
                       ? t("amend.outOfStock")
                       : // The amount on a line sold by weight — "Only 1 kg

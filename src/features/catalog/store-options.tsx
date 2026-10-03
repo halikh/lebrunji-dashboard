@@ -538,9 +538,7 @@ function Question({
     <section
       className={cx(
         "flex flex-col gap-lg rounded-md border bg-surface p-lg",
-        group.isActive
-          ? "border-border"
-          : "border-danger-wash bg-danger-wash/30",
+        group.isActive ? "border-border" : "border-border bg-neutral-fill/60",
       )}
     >
       <div className="flex flex-wrap items-center gap-md">

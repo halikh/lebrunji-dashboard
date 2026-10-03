@@ -20,11 +20,17 @@
  * bare Tailwind palette class like `bg-blue-500`, is a lint error rather than a
  * style choice.
  *
- * ## Coral presses, ink chooses, sun is an accent
+ * ## Blue presses, ink chooses, sun is an accent, red is only ever an error
  *
- * - **Coral `#de1d27`** is the one thing to press — the primary button, a link,
- *   an order code you can open. It is exactly the logo's red, sampled from the
- *   art, so the controls and the characters are visibly one brand.
+ * - **Blue `#2563eb`** is the one thing to press — the primary button, a link,
+ *   an order code you can open. It is the app's own `linkBlue`. The app presses in coral; the dashboard does not, because
+ *   on a screen of operational data a red control reads as an alarm, and an
+ *   operator who sees red on every Save stops seeing it on the one error that
+ *   matters. **Red is kept for errors and for destruction** — a field that
+ *   will not save, a request that failed, and the button that archives or
+ *   deletes. Nothing else.
+ * - **Coral `#de1d27`** is the logo's and the characters' red, and the fill of
+ *   a destructive button.
  * - **Ink** is what is *chosen* — the selected tab, the focused field's ring.
  *   Selecting is quiet; red is kept for the thing to press.
  * - **Sun `#febd2d`** is the logo's yellow, demoted to accent: a dot, a count,
@@ -65,6 +71,14 @@
   --color-sun: #febd2d;
   --color-sun-light: #ffd36e;
   --color-sun-deep: #f5ae1b;
+
+  /**
+   * The app's `linkBlue` — what is pressed, here. See the note at the top.
+   * `blue-pressed` is the one step down the same hue for a pressed or hovered
+   * fill; the app has no pressed blue, because it never fills with it.
+   */
+  --color-blue: #2563eb;
+  --color-blue-pressed: #1d4ed8;
 
   /** The check's green — and money saved. */
   --color-green: #2e9e5b;
@@ -113,18 +127,18 @@
   --color-text-faint: var(--color-muted);
 
   /* ---- Actions ---------------------------------------------------------
-   * The logo coral, flat. `primary` and `primary-fill` hold the same hex and
+   * The app's link blue, flat — coral until red became errors only. `primary` and `primary-fill` hold the same hex and
    * are separate roles anyway: as **ink** (a link, a price) coral must read
    * against the surface behind it, and as a **fill** it carries white type.
-   * Both are 4.9:1 today. The split is the seam that stops a future
+   * Both are 5.2:1 today. The split is the seam that stops a future
    * lightening of the ink silently taking every filled button's label below
    * 4.5:1 with it.
    *
    * Use `--color-primary-fill` for any surface carrying `--color-on-primary`.
    */
-  --color-primary: var(--color-coral);
-  --color-primary-fill: var(--color-coral);
-  --color-primary-deep: var(--color-coral-pressed);
+  --color-primary: var(--color-blue);
+  --color-primary-fill: var(--color-blue);
+  --color-primary-deep: var(--color-blue-pressed);
   --color-primary-wash: var(--color-cream-deep);
   --color-on-primary: #ffffff;
 
@@ -164,13 +178,23 @@
   --color-field-focus: #ffffff;
 
   /* ---- Danger ----------------------------------------------------------
+   * Errors, and destruction — a field that will not save, a request that
+   * failed, and the button that archives or deletes. Nothing else is red.
    * `danger` is tuned for **text**, where 8:1 on white is the point of it.
-   * Filled destructive buttons use `danger-action`, which the app sets to the
-   * brand coral — a destructive press is still a press.
+   * Filled destructive buttons use `danger-action`, the brand coral.
    */
   --color-danger: var(--color-error);
   --color-danger-wash: var(--color-error-wash);
   --color-danger-action: var(--color-coral);
+
+  /* ---- Needs attention -------------------------------------------------
+   * Not an error, and not to be painted like one: a shop with no pin, a
+   * driver with no working days, a currency change waiting on an answer.
+   * The sun, as a wash behind ink type and as a mark — never as text, which
+   * it has not the contrast for.
+   */
+  --color-warning: var(--color-sun-deep);
+  --color-warning-wash: var(--color-tone-sun-wash);
 
   /* ---- Tile tones ------------------------------------------------------
    * Grounds for things told apart by colour alone — an avatar's initials.
@@ -307,11 +331,13 @@
  * along an order reads as a walk through the palette's own meanings:
  *
  * - **ordered** — sun: new, and wants attention. Dark type on it, never white.
- * - **confirmed** — coral: accepted, and the next thing to press is dispatch.
+ * - **confirmed** — blue: accepted, and the next thing to press is dispatch.
+ *   The press colour, so the status and the button that moves it agree.
  * - **driver sent** — ink: out of the shop's hands and on the road, the app's
  *   dark "live order" panel.
  * - **delivered** — green, the app's good news. Its type is `green-deep`.
- * - **cancelled** — the error red.
+ * - **cancelled** — muted. An order somebody called off is an ending, not an
+ *   error, and red is kept for errors; it reads as finished and set aside.
  *
  * Washes are all cream-deep, as every wash in the app is: the dot and the
  * type carry the status, and a tinted row behind them would be the first
@@ -323,9 +349,9 @@
   --color-status-ordered-on-fill: var(--color-ink);
   --color-status-ordered-wash: var(--color-cream-deep);
 
-  --color-status-confirmed: var(--color-coral);
-  --color-status-confirmed-ink: var(--color-coral);
-  --color-status-confirmed-fill: var(--color-coral);
+  --color-status-confirmed: var(--color-blue);
+  --color-status-confirmed-ink: var(--color-blue);
+  --color-status-confirmed-fill: var(--color-blue);
   --color-status-confirmed-on-fill: #ffffff;
   --color-status-confirmed-wash: var(--color-cream-deep);
 
@@ -341,11 +367,11 @@
   --color-status-delivered-on-fill: #ffffff;
   --color-status-delivered-wash: var(--color-cream-deep);
 
-  --color-status-cancelled: var(--color-error);
-  --color-status-cancelled-ink: var(--color-error);
-  --color-status-cancelled-fill: var(--color-error);
-  --color-status-cancelled-on-fill: #ffffff;
-  --color-status-cancelled-wash: var(--color-error-wash);
+  --color-status-cancelled: var(--color-muted);
+  --color-status-cancelled-ink: var(--color-ink-soft);
+  --color-status-cancelled-fill: var(--color-line);
+  --color-status-cancelled-on-fill: var(--color-ink-soft);
+  --color-status-cancelled-wash: var(--color-cream-deep);
 
   /* A slug outside the hardcoded list in `src/lib/order-status.ts` should be
  * impossible — the database constrains it — but if one ever arrives it gets

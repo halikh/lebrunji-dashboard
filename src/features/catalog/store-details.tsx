@@ -720,7 +720,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
               </FieldPair>
 
               {preview && (
-                <div className="flex flex-col gap-md rounded-md border border-danger-wash bg-danger-wash/40 px-lg py-lg">
+                <div className="flex flex-col gap-md rounded-md bg-warning-wash px-lg py-lg">
                   <p role="status" className="text-[13px] text-text">
                     {t("store.currencyMoved", { before: preview.before })}
                   </p>

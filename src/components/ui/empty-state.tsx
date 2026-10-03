@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Lebrunji, type Pose } from "@/components/brand/lebrunji";
+import { PoseStage, type StagedPose } from "@/components/brand/pose-stage";
 import { t, type Params, type TranslationKey } from "@/i18n/translations";
 
 import { cx } from "./index";
@@ -65,7 +65,7 @@ export function EmptyState({
         className,
       )}
     >
-      <Lebrunji pose={POSE[mood]} size={MASCOT} />
+      <PoseStage pose={POSE[mood]} height={STAGE} />
       <div className="flex max-w-[380px] flex-col gap-xs">
         <h2 className="text-[18px]">{t(titleKey, params)}</h2>
         {bodyKey && (
@@ -78,11 +78,13 @@ export function EmptyState({
 }
 
 /**
- * The mascot's slot, in pixels square. Smaller than the app's ~180pt: there
- * the pose is most of a phone screen, and here it often sits inside one tab of
- * a panel.
+ * The stage's height, in pixels — the pose and the app's shapes behind it (see
+ * `PoseStage`). Smaller than the app's 220pt: there the scene is most of a
+ * phone screen, and here it often sits inside one tab of a page. At this
+ * height the figure comes out close to the 140px it was drawn at before the
+ * shapes were added, so no screen grows.
  */
-const MASCOT = 140;
+const STAGE = 176;
 
 /**
  * The dashboard's three moods, as the illustrator's poses — chosen the way the
@@ -95,7 +97,7 @@ const MASCOT = 140;
  * - **done** — verified. The queue is clear, or there is nothing left to
  *   restore: work finished, not work missing.
  */
-const POSE: Record<"waiting" | "done" | "lost", Pose> = {
+const POSE: Record<"waiting" | "done" | "lost", StagedPose> = {
   waiting: "sit-down",
   lost: "empty bag",
   done: "verified",

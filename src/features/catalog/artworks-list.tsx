@@ -207,7 +207,7 @@ function Row({
     artwork.id,
     cx(
       ROW,
-      !artwork.isActive && "border-danger-wash bg-danger-wash/30",
+      !artwork.isActive && "border-border bg-neutral-fill/60",
       artwork.isActive && "border-border",
       artwork.isActive && open && "border-active",
     ),
@@ -265,7 +265,9 @@ function Row({
         <span
           className={cx(
             "truncate text-[12px]",
-            state === "promotionArchived" ? "text-danger" : "text-text-faint",
+            state === "promotionArchived"
+              ? "font-semibold text-text"
+              : "text-text-faint",
           )}
         >
           {describeWindow(artwork, state)}

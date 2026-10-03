@@ -656,7 +656,9 @@ function AddressCard({ address }: { address: CustomerAddress }) {
           `delivery_fee_for_km` treats an unknown distance that way — so it
           silently overcharges every order to it. */}
       {address.latitude === null && (
-        <p className="text-[12px] text-danger">{t("customers.noPinWarning")}</p>
+        <p className="w-fit rounded-sm bg-warning-wash px-sm text-[12px] text-text">
+          {t("customers.noPinWarning")}
+        </p>
       )}
     </li>
   );

@@ -32,8 +32,7 @@ export function railItemClass(
     // Danger is never the "active" state — there is no page to be on — so it
     // only has the two. Muted until hovered, because a permanently red item in
     // a navigation rail reads as an error rather than as an action.
-    tone === "danger" &&
-      "text-text-soft hover:bg-danger-wash hover:text-danger",
+    tone === "danger" && "text-text-soft hover:bg-neutral-fill hover:text-text",
   );
 }
 

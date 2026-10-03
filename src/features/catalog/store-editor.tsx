@@ -496,7 +496,7 @@ export function StoreEditor() {
                     because `delivery_fee_for_km` treats an unknown distance
                     that way. */}
                 {!coordinates && (
-                  <p className="rounded-md border border-border bg-danger-wash/40 px-lg py-md text-[13px]">
+                  <p className="rounded-md bg-warning-wash px-lg py-md text-[13px]">
                     {t("store.noPinWarning")}
                   </p>
                 )}

@@ -255,7 +255,7 @@ function Rate() {
               confirmKey="pricing.rateConfirmAction"
               params={{ sample }}
               variant="primary"
-              // Coral, like every other "go on" in the dashboard. A neutral
+              // Blue, like every other "go on" in the dashboard. A neutral
               // fill made it the same colour as Cancel, and the quieter of the
               // two things on screen — the wrong way round for the only action
               // on the panel.
@@ -757,7 +757,8 @@ function ExtraStoreFee() {
   const [draft, setDraft] = useState<number | null>(null);
 
   const save = useMutation({
-    mutationFn: (amount: number) => updateAppSettings({ extraStoreFee: amount }),
+    mutationFn: (amount: number) =>
+      updateAppSettings({ extraStoreFee: amount }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: appSettingsKey });
       setDraft(null);

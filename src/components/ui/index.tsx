@@ -17,8 +17,8 @@
  *
  * ## The rules they encode
  *
- * - **Coral is what you press**, ink is what is chosen. So `Button` defaults to
- *   coral, links are coral, and a selected tab is ink. See `theme.css`.
+ * - **Blue is what you press**, ink is what is chosen. So `Button` defaults to
+ *   blue, links are blue, and a selected tab is ink. See `theme.css`.
  * - **Every action can be in flight**, so pending is a prop on the button
  *   rather than something each screen re-invents.
  * - **No component names a colour.** Roles only.
@@ -69,7 +69,7 @@ const BUTTON_SIZES: Record<ButtonSize, string> = {
 };
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  // Coral, the logo's red: the one to press to go on. White on it is 4.9:1.
+  // Blue, the app's link blue: the one to press to go on. White on it is 5.2:1.
   primary: "bg-primary-fill text-on-primary hover:bg-primary-deep",
   secondary: "bg-neutral-fill text-text hover:brightness-[0.97]",
   quiet: "bg-transparent text-primary hover:bg-primary-wash",
@@ -100,7 +100,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
    * A filled ground without the weight of the primary action.
    *
    * For the second-most-likely thing to press when it needs to look pressable
-   * — beside a coral Save, coral-on-cream reads as a real button and
+   * — beside a blue Save, blue-on-cream reads as a real button and
    * still loses the contest for the eye, which is what a secondary action
    * should do.
    */

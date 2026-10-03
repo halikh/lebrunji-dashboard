@@ -217,7 +217,7 @@ function Row({
     promotion.id,
     cx(
       ROW,
-      !promotion.isActive && "border-danger-wash bg-danger-wash/30",
+      !promotion.isActive && "border-border bg-neutral-fill/60",
       promotion.isActive && "border-border",
       promotion.isActive && open && "border-active",
     ),
