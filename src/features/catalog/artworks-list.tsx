@@ -18,6 +18,7 @@ import { formatDate } from "@/lib/time";
 import {
   ARTWORK_FORMATS,
   artworkState,
+  windowOf,
   reorderUpdates,
   type Artwork,
   type ArtworkFormat,
@@ -339,18 +340,21 @@ function describeWindow(
   if (state === "off") return t("artworks.stateOff");
   if (state === "promotionArchived") return t("artworks.promotionArchived");
   if (state === "ended") return t("artworks.ended");
+  // The promotion's dates for a linked picture, which has none of its own
+  // since `0136` — see `windowOf`.
+  const { startsAt, endsAt } = windowOf(artwork);
   if (state === "scheduled") {
-    return t("artworks.startsOn", { when: formatDate(artwork.startsAt!) });
+    return t("artworks.startsOn", { when: formatDate(startsAt!) });
   }
 
-  if (artwork.startsAt && artwork.endsAt) {
+  if (startsAt && endsAt) {
     return t("artworks.between", {
-      from: formatDate(artwork.startsAt),
-      to: formatDate(artwork.endsAt),
+      from: formatDate(startsAt),
+      to: formatDate(endsAt),
     });
   }
-  if (artwork.endsAt) {
-    return t("artworks.until", { to: formatDate(artwork.endsAt) });
+  if (endsAt) {
+    return t("artworks.until", { to: formatDate(endsAt) });
   }
   return artwork.discount ? t("artworks.whilePromotion") : t("artworks.always");
 }

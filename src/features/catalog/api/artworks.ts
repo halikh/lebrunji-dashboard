@@ -3,6 +3,14 @@ import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import type { Localized } from "@/lib/validation";
 
+import {
+  LINK_COLUMNS,
+  linkColumns,
+  linkOf,
+  linkRefusal,
+  type TapLink,
+} from "./links";
+
 /**
  * Artwork — the pictures the app draws, apart from what anything costs.
  *
@@ -19,9 +27,19 @@ import type { Localized } from "@/lib/validation";
  *
  * `discount_id` set makes the picture an advert for that promotion, and the app
  * shows it only while the promotion itself is live — switched on, not archived,
- * inside its dates — *and* the artwork is inside its own. On a shop's page a
- * linked picture also respects the promotion's scopes. Null is pure artwork,
- * governed by its own switch and window alone, and on every shop's page.
+ * inside its dates. A linked picture has **no dates of its own** since `0136`
+ * (`artworks_linked_has_no_window`): it runs on the promotion's, because those
+ * are the dates that decide what is charged, and two windows that had to
+ * overlap were two places to get it wrong. On a shop's page a linked picture
+ * also respects the promotion's scopes. Null is pure artwork, governed by its
+ * own switch and window alone.
+ *
+ * ## Which shops' pages
+ *
+ * `artwork_stores` (`0136`) narrows the shop-page placement to chosen shops.
+ * No rows is every shop page, as before; rows are only those. It says *which
+ * shops*, never *which screens* — a picture also placed on Home is still on
+ * Home.
  *
  * ## Hard delete
  *
@@ -42,7 +60,23 @@ export type ArtworkFormat = (typeof ARTWORK_FORMATS)[number];
  * empty list is a draft — a picture shown nowhere, which the constraint allows
  * on purpose.
  */
-export const PLACEMENTS = ["home", "store", "cart"] as const;
+export const PLACEMENTS = [
+  "home",
+  "search",
+  "category",
+  "store",
+  "item",
+  "cart",
+  "checkout",
+  "orders",
+  "order",
+  "account",
+  "profile",
+  "profile-details",
+  "addresses",
+  "address-new",
+  "help",
+] as const;
 
 export type Placement = (typeof PLACEMENTS)[number];
 
@@ -58,19 +92,47 @@ export type Artwork = {
    * `archived` is carried because an archived promotion takes its pictures
    * down with it in the app while the rows stay here — which a list reading
    * "Live" would otherwise hide.
+   *
+   * Its dates are carried too, because a linked picture runs on them — see
+   * `windowOf`.
    */
-  discount: { id: string; slug: string; archived: boolean } | null;
+  discount: {
+    id: string;
+    slug: string;
+    archived: boolean;
+    startsAt: string | null;
+    endsAt: string | null;
+    /** The promotion's destination, which this picture follows if it has none. */
+    link: TapLink;
+  } | null;
   isActive: boolean;
-  /** ISO instants, or null for open-ended. */
+  /**
+   * ISO instants, or null for open-ended. Always both null on a linked
+   * picture — `artworks_linked_has_no_window`; read `windowOf` for the dates
+   * it actually runs on.
+   */
   startsAt: string | null;
   endsAt: string | null;
+  /**
+   * The shops whose page it is drawn on — `artwork_stores`. Empty is every
+   * shop page. Only meaningful while `placements` includes `store`.
+   */
+  storeIds: string[];
+  /**
+   * Where a tap on this picture leads — `0137`. Nowhere (`kind` null) falls
+   * back to its promotion's link, which `discount.link` carries.
+   */
+  link: TapLink;
   /** Ascending, per screen and format. */
   sortOrder: number;
 };
 
 const COLUMNS = `id, format, image_url, placements, discount_id, is_active,
    starts_at, ends_at, sort_order,
-   discount:discounts ( id, slug, deleted_at )`;
+   discount:discounts ( id, slug, deleted_at, starts_at, ends_at,
+     ${LINK_COLUMNS} ),
+   artwork_stores ( store_id ),
+   ${LINK_COLUMNS}`;
 
 /**
  * Every artwork, banners and tiles together.
@@ -110,11 +172,20 @@ export function toArtwork(row: Record<string, unknown>): Artwork {
           id: linked.id as string,
           slug: linked.slug as string,
           archived: linked.deleted_at != null,
+          startsAt: (linked.starts_at as string | null) ?? null,
+          endsAt: (linked.ends_at as string | null) ?? null,
+          link: linkOf(linked),
         }
       : null,
     isActive: Boolean(row.is_active),
     startsAt: (row.starts_at as string | null) ?? null,
     endsAt: (row.ends_at as string | null) ?? null,
+    storeIds: Array.isArray(row.artwork_stores)
+      ? (row.artwork_stores as Record<string, unknown>[]).map(
+          (link) => link.store_id as string,
+        )
+      : [],
+    link: linkOf(row),
     sortOrder: (row.sort_order as number | null) ?? 0,
   };
 }
@@ -126,8 +197,13 @@ export type ArtworkDraft = {
   /** Null for pure artwork. */
   discountId: string | null;
   isActive: boolean;
+  /** Written as null whenever `discountId` is set — see `toColumns`. */
   startsAt: string | null;
   endsAt: string | null;
+  /** The shops for the shop-page placement; empty is every shop. */
+  storeIds: string[];
+  /** Its own destination; nowhere means "follow the promotion's". */
+  link: TapLink;
 };
 
 export type ArtworkPatch = Partial<ArtworkDraft> & { sortOrder?: number };
@@ -136,10 +212,17 @@ export async function createArtwork(
   draft: ArtworkDraft,
   sortOrder: number,
 ): Promise<void> {
-  const { error } = await getClient()
+  const { data, error } = await getClient()
     .from("artworks")
-    .insert({ ...toColumns(draft), sort_order: sortOrder });
+    .insert({ ...toColumns(draft), sort_order: sortOrder })
+    // The id, because the shop links need something to point at.
+    .select("id")
+    .single();
   if (error) throw new Error(friendly(error.message));
+
+  if (draft.storeIds.length > 0) {
+    await setArtworkStores(data.id as string, draft.storeIds);
+  }
 }
 
 export async function updateArtwork(
@@ -147,10 +230,63 @@ export async function updateArtwork(
   patch: ArtworkPatch,
 ): Promise<void> {
   const row = toColumns(patch);
-  if (Object.keys(row).length === 0) return;
+  if (Object.keys(row).length > 0) {
+    const { error } = await getClient()
+      .from("artworks")
+      .update(row)
+      .eq("id", id);
+    if (error) throw new Error(friendly(error.message));
+  }
 
-  const { error } = await getClient().from("artworks").update(row).eq("id", id);
+  if (patch.storeIds !== undefined) {
+    await setArtworkStores(id, patch.storeIds);
+  }
+}
+
+/**
+ * Puts a picture's shop links exactly where the form says — `artwork_stores`.
+ *
+ * Read first and only the difference written, as `setItemTags` does and for
+ * its reasons — with one more that matters here: a failure between a delete
+ * and an insert would leave **no** rows, and no rows means *every* shop. A
+ * half-applied change must not widen a picture meant for two shops to all of
+ * them, so the adds go first.
+ */
+export async function setArtworkStores(
+  artworkId: string,
+  storeIds: readonly string[],
+): Promise<void> {
+  const client = getClient();
+
+  const { data, error } = await client
+    .from("artwork_stores")
+    .select("store_id")
+    .eq("artwork_id", artworkId);
   if (error) throw new Error(friendly(error.message));
+
+  const before = new Set((data ?? []).map((row) => row.store_id as string));
+  const after = new Set(storeIds);
+
+  const added = [...after].filter((id) => !before.has(id));
+  const removed = [...before].filter((id) => !after.has(id));
+
+  if (added.length > 0) {
+    const { error: addError } = await client
+      .from("artwork_stores")
+      .insert(
+        added.map((storeId) => ({ artwork_id: artworkId, store_id: storeId })),
+      );
+    if (addError) throw new Error(friendly(addError.message));
+  }
+
+  if (removed.length > 0) {
+    const { error: removeError } = await client
+      .from("artwork_stores")
+      .delete()
+      .eq("artwork_id", artworkId)
+      .in("store_id", removed);
+    if (removeError) throw new Error(friendly(removeError.message));
+  }
 }
 
 /** For good — see the header. The files stay in the bucket, as everywhere. */
@@ -185,6 +321,13 @@ export async function setArtworkOrder(
  * Tests the key being absent rather than the value being falsy: `null` is a
  * value here — no promotion, no start, no end — and dropping it would make
  * "unlink this picture" a save that silently did nothing.
+ *
+ * Linking a promotion writes both dates as null whatever the patch says:
+ * `artworks_linked_has_no_window` refuses a linked picture with dates of its
+ * own, and it runs on the promotion's.
+ *
+ * `storeIds` is not a column — it is written by `setArtworkStores`. `link` is
+ * four, written together — see `linkColumns`.
  */
 export function toColumns(patch: ArtworkPatch): Record<string, unknown> {
   const row: Record<string, unknown> = {};
@@ -197,7 +340,12 @@ export function toColumns(patch: ArtworkPatch): Record<string, unknown> {
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;
+  if (patch.discountId) {
+    row.starts_at = null;
+    row.ends_at = null;
+  }
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+  if (patch.link !== undefined) Object.assign(row, linkColumns(patch.link));
   return row;
 }
 
@@ -271,12 +419,25 @@ export function reorderUpdates(
 }
 
 /**
+ * The dates a picture actually runs on: its promotion's when it is linked —
+ * it has none of its own then (`artworks_linked_has_no_window`) — and its
+ * own otherwise.
+ */
+export function windowOf(
+  artwork: Pick<Artwork, "startsAt" | "endsAt" | "discount">,
+): { startsAt: string | null; endsAt: string | null } {
+  return artwork.discount
+    ? { startsAt: artwork.discount.startsAt, endsAt: artwork.discount.endsAt }
+    : { startsAt: artwork.startsAt, endsAt: artwork.endsAt };
+}
+
+/**
  * The window in one word, for the row.
  *
- * `live` needs the switch on and today inside the dates — and, for a linked
- * picture, the promotion not archived. The promotion's own switch and window
- * are not read here: the list does not load them, and the row names the
- * promotion so the operator can look.
+ * `live` needs the switch on and today inside the dates — the promotion's,
+ * for a linked picture — and, for a linked picture, the promotion not
+ * archived. The promotion's own switch is not read here: the list does not
+ * load it, and the row names the promotion so the operator can look.
  */
 export function artworkState(
   artwork: Pick<Artwork, "isActive" | "startsAt" | "endsAt" | "discount">,
@@ -284,10 +445,11 @@ export function artworkState(
 ): "off" | "scheduled" | "ended" | "promotionArchived" | "live" {
   if (!artwork.isActive) return "off";
   if (artwork.discount?.archived) return "promotionArchived";
-  if (artwork.endsAt && new Date(artwork.endsAt).getTime() < now) {
+  const { startsAt, endsAt } = windowOf(artwork);
+  if (endsAt && new Date(endsAt).getTime() < now) {
     return "ended";
   }
-  if (artwork.startsAt && new Date(artwork.startsAt).getTime() > now) {
+  if (startsAt && new Date(startsAt).getTime() > now) {
     return "scheduled";
   }
   return "live";
@@ -305,8 +467,13 @@ function firstOf(value: unknown): Record<string, unknown> | null {
 
 /** A constraint name, to a sentence. */
 export function friendly(message: string): string {
+  const link = linkRefusal(message);
+  if (link) return link;
   if (message.includes("artworks_window_ordered")) {
     return t("artworks.windowBackwards");
+  }
+  if (message.includes("artworks_linked_has_no_window")) {
+    return t("artworks.linkedHasNoWindow");
   }
   if (message.includes("artworks_image_url_locales")) {
     return t("artworks.imageNeedsEnglish");

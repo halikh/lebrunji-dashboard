@@ -30,7 +30,7 @@ import { useArchiveTag, useTags, useUpdateTag } from "./use-tags";
  * work whose only effect was which of two chips came first.
  *
  * Newest first instead. The reason to open this screen is almost always a tag
- * just added — to check it, rename it, fix its tone — so the row wanted is the
+ * just added — to check it, rename it, fix its icon — so the row wanted is the
  * one at the top rather than one to be found. See `fetchTags`.
  *
  * ## Retiring one is safe, and the count is what makes that clear
@@ -186,10 +186,10 @@ function Row({
           "flex min-w-0 flex-grow items-center gap-md text-left",
         )}
       >
-        {/* The chip itself, at the size a phone draws it. The row shows the
-            thing rather than describing it — a tone named in words would ask
-            the operator to picture the result of their own setting. */}
-        <TagChip label={name} tone={tag.tone} ink={tag.ink} color={tag.color} />
+        {/* The tag itself, drawn the way a dish shows it — icon, then the name
+            in plain heading type — so the row is the thing rather than a
+            description of it. */}
+        <TagChip label={name} iconUrl={tag.iconUrl} />
 
         <span className="truncate text-[12px] text-text-faint">
           {tag.usedBy === 0

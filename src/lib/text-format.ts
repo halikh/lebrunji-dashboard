@@ -1,57 +1,17 @@
 /**
- * The house style for catalogue text, applied as it is typed.
+ * What a catalogue name may contain — and, deliberately, nothing about case.
  *
- * ## Why the dashboard decides and not the person typing
+ * ## Case is the operator's
  *
- * A marketplace's lists are read by scanning, and a column where one shop
- * shouts, the next whispers and the third is Title Case reads as three
- * different products. That inconsistency does not come from carelessness — it
- * comes from six people entering data over two years, each of them internally
- * consistent. No amount of hinting fixes it, because the hint is read once and
- * the field is filled a thousand times.
+ * This file used to hold a house style: shops, sections and dishes shouted,
+ * categories, tags and descriptions in sentence case, applied as the operator
+ * typed and again on save. It is gone. A name is stored exactly as it was
+ * written — "McDonald's", "USD", "iPhone" — because a rule that rewrites letters
+ * cannot tell an acronym from a typo, and the person typing can.
  *
- * So the format is not advice here. The field applies it while the operator
- * types, which is also the only version that is honest: a value normalised
- * silently on save shows one thing in the box and stores another.
- *
- * ## English is what these rules are about
- *
- * Case is a property of a handful of scripts and Arabic is not one of them, so
- * every function here is identity on Arabic text. That is why they can be
- * applied to a whole `Localized` object without asking which language a value
- * is in. `"en"` is passed to the case operations explicitly rather than using
- * the machine's locale, which decides things like whether a dotted i keeps its
- * dot — a value should not depend on where the laptop is.
+ * What is left is about *which characters* a name may hold, never about how
+ * its letters are cased.
  */
-
-/** SHOUTED. Shops, menu sections and dish names. */
-export function upperCase(value: string): string {
-  return value.toLocaleUpperCase("en");
-}
-
-/**
- * Sentence case: the first letter capital, everything after it lower.
- *
- * **Not** Title Case, which is the thing this exists to remove — "Coffee Shops"
- * and "Phone Stores" beside "Bakery" is exactly the drift described above.
- *
- * The consequence worth stating plainly: an acronym typed into one of these
- * fields comes back lowercased, because a rule that says "only the first word
- * is capitalised" cannot also make an exception for the ones that should not
- * be. The fields this is applied to are names of categories, tags and dish
- * descriptions, where that trade is the right way round.
- *
- * `\p{L}` rather than index zero, so a value that opens with a digit or a
- * quotation mark still capitalises its first *letter* — `"3 cheese pizza"`
- * becomes `"3 Cheese pizza"`… which it does not, and should not: the first
- * letter is the `c`, and this capitalises it. The point is that a leading
- * character which cannot carry a case does not silently swallow the rule.
- */
-export function sentenceCase(value: string): string {
-  return value
-    .toLocaleLowerCase("en")
-    .replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase("en"));
-}
 
 /**
  * The characters a catalogue name may not contain.
@@ -104,50 +64,81 @@ export function withoutRejected(value: string): string {
   return value.replace(REJECTED, "");
 }
 
-/** The formats a field can be held to. */
-export type TextFormat = "upper" | "sentence";
-
-/** One value, filtered and cased. */
-export function formatText(value: string, format: TextFormat): string {
-  const kept = withoutRejected(value);
-  return format === "upper" ? upperCase(kept) : sentenceCase(kept);
-}
-
 /**
- * The same rules over a whole translated column.
+ * The rejected characters over a whole translated column.
  *
- * Every locale gets the same treatment, which is safe because the case
- * operations are identity on a script without case — see the note at the top.
- * A null or absent column comes back untouched: an absent description is a
- * legitimate value and formatting it into `{}` would turn it into a constraint
- * violation.
+ * The second layer under the field's live filter — bulk paste and any screen
+ * written next arrive at the api without passing through `LocalizedField`. It
+ * removes characters only; case is left exactly as typed. A null or absent
+ * column comes back untouched: an absent description is a legitimate value and
+ * cleaning it into `{}` would turn it into a constraint violation.
  */
-export function formatLocalized<T extends Record<string, string> | null>(
+export function cleanLocalized<T extends Record<string, string> | null>(
   value: T,
-  format: TextFormat,
 ): T {
   if (!value) return value;
   return Object.fromEntries(
-    Object.entries(value).map(([code, text]) => [
-      code,
-      formatText(text, format),
-    ]),
+    Object.entries(value).map(([code, text]) => [code, withoutRejected(text)]),
   ) as T;
 }
 
 /**
- * Whether a value carries at least one emoji.
- *
- * `Extended_Pictographic` rather than a hand-written range: it is the Unicode
- * property that means "this is a pictograph", so it covers the ones added in
- * every release since without this file being edited. A range list would be a
- * rule that slowly stops recognising new emoji, and the failure — a tag refused
- * for having the wrong emoji — is one nobody would guess at.
- *
- * Note what it does *not* do: check that the emoji is at the start, or that
- * there is only one. Both would be rules about taste rather than about the
- * thing being asked for, which is that a chip has a picture on it.
+ * One word of a tag name: letters only, Latin (with its accented ranges) or
+ * Arabic. **Must match `menu_item_tags_name_letters`** character for
+ * character — the dashboard and the database have to agree on what a letter
+ * is, or a name passes here and is refused there.
  */
-export function hasEmoji(value: string): boolean {
-  return /\p{Extended_Pictographic}/u.test(value);
+const TAG_WORD = "[A-Za-zÀ-ÖØ-öø-ɏء-غف-يً-ْٰٱ-ۓ]+";
+
+/** A whole tag name: words of letters, one space between each. */
+const TAG_NAME = new RegExp(`^${TAG_WORD}( ${TAG_WORD})*$`, "u");
+
+/** One character a tag name may hold, other than the space between words. */
+const TAG_LETTER = new RegExp(`^${TAG_WORD}$`, "u");
+
+/**
+ * Whether a tag name is letters and single spaces and nothing else.
+ *
+ * Tested on the value trimmed and with runs of whitespace collapsed — the same
+ * shape `tagName` below writes — so stray spaces at the edges are not what
+ * refuses a name. An empty value is not this function's business: whether a
+ * language may be blank is `validateLocalizedText`'s.
+ */
+export function isTagName(value: string): boolean {
+  return TAG_NAME.test(tagName(value));
+}
+
+/** A tag name as it is stored: trimmed, with single spaces between words. */
+export function tagName(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+/**
+ * A tag name as it is being typed: everything that is not a letter or a space
+ * removed, and runs of spaces kept to one.
+ *
+ * A trailing space survives — it is somebody about to type the next word — and
+ * a leading one does not, since no word can start before it. Returns what was
+ * dropped as well, de-duplicated and in order, so the field can name the keys
+ * that did nothing rather than eat them silently.
+ */
+export function lettersOnly(value: string): {
+  kept: string;
+  dropped: string[];
+} {
+  const dropped: string[] = [];
+  let kept = "";
+  for (const char of value) {
+    if (/\s/u.test(char)) {
+      if (kept !== "" && !kept.endsWith(" ")) kept += " ";
+    } else if (TAG_LETTER.test(char)) {
+      kept += char;
+    } else if (!/[\p{Mn}\p{Cf}]/u.test(char) && !dropped.includes(char)) {
+      // Invisible joiners and variation selectors are dropped without being
+      // named — a message listing a character nobody can see would
+      // point at nothing.
+      dropped.push(char);
+    }
+  }
+  return { kept, dropped };
 }

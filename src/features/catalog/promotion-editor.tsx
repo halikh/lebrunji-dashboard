@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PreviewImage } from "@/components/ui/image-preview";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
@@ -33,6 +34,9 @@ import {
   type Scope,
   type ScopeType,
 } from "./api/promotions";
+import { NO_LINK, missingTarget, type TapLink } from "./api/links";
+import { LinkFields } from "./link-fields";
+import { useArtworks } from "./use-artworks";
 import { useCategories } from "./use-categories";
 import {
   useCreatePromotion,
@@ -232,6 +236,22 @@ function Form({
 
   const stores = useStores("");
   const categories = useCategories("");
+
+  /**
+   * The pictures already linked to this promotion.
+   *
+   * Read from the Artwork tab's own query — one capped read of every artwork,
+   * shared with that tab through react-query — rather than a second request
+   * for the same rows filtered. Empty for a new promotion, which has no id for
+   * a picture to point at yet.
+   */
+  const artworks = useArtworks();
+  const linked = initial
+    ? (artworks.data ?? []).filter(
+        (artwork) => artwork.discount?.id === initial.id,
+      )
+    : [];
+
   const [name, setName] = useState(initial?.slug ?? "");
   const [startsAt, setStartsAt] = useState<string | null>(
     initial?.startsAt ?? null,
@@ -271,6 +291,8 @@ function Form({
       : [],
   );
   const [dishes, setDishes] = useState<SelectOption[]>(initialDishes);
+  /** Where a tap on its pictures leads — `0137`. */
+  const [link, setLink] = useState<TapLink>(initial?.link ?? NO_LINK);
 
   /**
    * Which shop's menu the dish picker is searching.
@@ -316,6 +338,7 @@ function Form({
         storeIds,
         categoryIds,
         dishIds: dishes.map((dish) => dish.value),
+        link,
       },
       {
         name: initial?.slug ?? "",
@@ -339,6 +362,7 @@ function Form({
             ? shape.targetIds
             : [],
         dishIds: initialDishes.map((dish) => dish.value),
+        link: initial?.link ?? NO_LINK,
       },
     ),
   );
@@ -348,6 +372,7 @@ function Form({
     value?: string;
     window?: string;
     targets?: string;
+    link?: string;
   }>({});
 
   /** `freeDelivery` takes the delivery fee, so there is no amount to set. */
@@ -389,10 +414,22 @@ function Form({
         scopeType !== "order" && targets.length === 0
           ? t("promotions.targetsRequired")
           : undefined,
+
+      // A kind chosen with nothing under it — written as Nowhere otherwise,
+      // which is not what somebody who picked "A shop" meant.
+      link: missingTarget(link) ? t("links.targetRequired") : undefined,
     };
 
     setErrors(found);
-    if (found.name || found.value || found.window || found.targets) return;
+    if (
+      found.name ||
+      found.value ||
+      found.window ||
+      found.targets ||
+      found.link
+    ) {
+      return;
+    }
 
     onSave({
       name: name.trim(),
@@ -413,6 +450,7 @@ function Form({
           : scopeType === "order"
             ? []
             : targets.map((targetId) => ({ scopeType, targetId })),
+      link,
     });
   }
 
@@ -462,8 +500,10 @@ function Form({
 
           {/* The pictures are managed where the other artwork is — `0129`
             gave them a table of their own, and one promotion may have a banner
-            and a tile, or none. A pointer rather than a field, so the operator
-            is not left looking for a card box that is no longer here. */}
+            and a tile, or none. So this shows what is linked, each with a
+            Change that opens that artwork's own editor, and offers Add only
+            when there is genuinely nothing — an Add beside a picture that is
+            already there reads as though the picture were missing. */}
           <div className="flex flex-col gap-xs rounded-md bg-neutral-fill px-lg py-md">
             <span className="text-[14px] font-semibold text-text">
               {t("promotions.artworkTitle")}
@@ -471,19 +511,59 @@ function Form({
             <p className="text-[13px] text-text-soft">
               {t("promotions.artworkBody")}
             </p>
-            <Link
-              href={
-                initial
-                  ? `/catalogue/artworks/new?discount=${initial.id}`
-                  : "/catalogue?tab=artworks"
-              }
-              className="self-start text-[13px] font-semibold text-primary underline-offset-2 hover:underline"
-            >
-              {initial
-                ? t("promotions.artworkAdd")
-                : t("promotions.artworkOpen")}
-            </Link>
+            {linked.length > 0 ? (
+              <ul className="flex flex-col gap-sm">
+                {linked.map((artwork) => {
+                  const src = pickLocalized(artwork.imageUrl);
+                  return (
+                    <li key={artwork.id} className="flex items-center gap-md">
+                      {src ? (
+                        <PreviewImage
+                          src={src}
+                          name={initial?.slug}
+                          className="h-[56px] w-[96px] shrink-0 rounded-md object-cover"
+                        />
+                      ) : null}
+                      <span className="flex min-w-0 flex-col gap-xxs">
+                        <span className="text-[12px] text-text-soft">
+                          {t(`artworks.formats.${artwork.format}`)}
+                        </span>
+                        <Link
+                          href={`/catalogue/artworks/${artwork.id}`}
+                          className="self-start text-[13px] font-semibold text-primary underline-offset-2 hover:underline"
+                        >
+                          {t("promotions.artworkChange")}
+                        </Link>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <Link
+                href={
+                  initial
+                    ? `/catalogue/artworks/new?discount=${initial.id}`
+                    : "/catalogue?tab=artworks"
+                }
+                className="self-start text-[13px] font-semibold text-primary underline-offset-2 hover:underline"
+              >
+                {initial
+                  ? t("promotions.artworkAdd")
+                  : t("promotions.artworkOpen")}
+              </Link>
+            )}
           </div>
+
+          {/* Where a tap on any of its pictures leads — `0137`. Set once here
+              for the whole campaign; a picture can still override it on its
+              own editor. */}
+          <LinkFields
+            value={link}
+            onChange={setLink}
+            disabled={pending}
+            error={errors.link}
+          />
         </div>
 
         <div className="flex min-w-0 flex-col gap-lg">

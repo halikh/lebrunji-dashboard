@@ -9,7 +9,7 @@ import { LocalizedField } from "@/components/ui/localized-field";
 import { Map } from "@/components/ui/map";
 import { NumberInput } from "@/components/ui/number-input";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { Select } from "@/components/ui/select";
+import { MultiSelect, Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -164,6 +164,7 @@ function signature(store: Store, sole: Branch | null): string {
     store.name,
     store.imageUrl,
     store.categoryId,
+    store.categoryIds,
     store.currencyCode,
     store.isFeatured,
     store.exchangeRate,
@@ -196,6 +197,12 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
   const [name, setName] = useState<Localized>(store.name);
   const [imageUrl, setImageUrl] = useState<string | null>(store.imageUrl);
   const [categoryId, setCategoryId] = useState(store.categoryId);
+  /** Every category besides the main one — `0136`. */
+  const initialOthers = store.categoryIds.filter(
+    (id) => id !== store.categoryId,
+  );
+  const [otherCategoryIds, setOtherCategoryIds] =
+    useState<string[]>(initialOthers);
   const [currencyCode, setCurrencyCode] = useState(store.currencyCode);
   const [isFeatured, setIsFeatured] = useState(store.isFeatured);
   /**
@@ -235,13 +242,22 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
   const located = parseLocation(pin);
   const coordinates = located.ok ? located : null;
 
+  /**
+   * Seeded with the image's error for a shop that has none.
+   *
+   * `stores_image_required` refuses every update to a live shop without a
+   * picture — a rename, a category move, a switch on the list — so a legacy
+   * shop opened here says so up front rather than on Save. Archiving is the
+   * exception, and does not come through this form.
+   */
   const [errors, setErrors] = useState<{
     name?: string;
+    image?: string;
     rate?: string;
     pin?: string;
     prep?: string;
     whatsapp?: string;
-  }>({});
+  }>(() => (store.imageUrl?.trim() ? {} : { image: t("store.imageRequired") }));
 
   // `mode` is left out on purpose: it is a question *about* a currency change
   // rather than a value of its own, and it cannot be reached without moving
@@ -252,6 +268,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         name,
         imageUrl,
         categoryId,
+        otherCategoryIds,
         currencyCode,
         isFeatured,
         rate,
@@ -264,6 +281,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         name: store.name,
         imageUrl: store.imageUrl,
         categoryId: store.categoryId,
+        otherCategoryIds: initialOthers,
         currencyCode: store.currencyCode,
         isFeatured: store.isFeatured,
         rate: store.exchangeRate == null ? "" : String(store.exchangeRate),
@@ -381,11 +399,13 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     const prepCheck = sole
       ? validatePrepWindow(Number(prepMin), Number(prepMax))
       : null;
-    const phoneCheck =
-      sole && whatsapp.trim() !== "" ? validatePhone(digitsOf(whatsapp)) : null;
+    const phoneCheck = sole ? validatePhone(digitsOf(whatsapp)) : null;
 
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
+      // Required — `stores_image_required`. Checked even when only the branch
+      // fields moved: a shop without a picture is not one this form saves.
+      image: imageUrl?.trim() ? undefined : t("store.imageRequired"),
       rate:
         rateTyped && (!Number.isFinite(rateValue) || rateValue <= 0)
           ? t("store.ratePositive")
@@ -398,10 +418,14 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         prepCheck && !prepCheck.ok
           ? t(prepCheck.key, prepCheck.params)
           : undefined,
+      // Required, as it is when the shop is added: clearing it here would
+      // leave a shop that takes orders and has nowhere to send them.
       whatsapp:
-        phoneCheck && !phoneCheck.ok
-          ? t(phoneCheck.key, phoneCheck.params)
-          : undefined,
+        sole && whatsapp.trim() === ""
+          ? t("branches.whatsappRequired")
+          : phoneCheck && !phoneCheck.ok
+            ? t(phoneCheck.key, phoneCheck.params)
+            : undefined,
     };
 
     setErrors(found);
@@ -430,6 +454,14 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     const imageMoved = imageUrl !== store.imageUrl;
     const categoryMoved = categoryId !== "" && categoryId !== store.categoryId;
     const featureMoved = isFeatured !== store.isFeatured;
+    // As a set: the order chips were picked in is not something saved.
+    const nextCategoryIds = [
+      categoryId || store.categoryId,
+      ...otherCategoryIds,
+    ];
+    const categoriesMoved =
+      [...nextCategoryIds].sort().join() !==
+      [...store.categoryIds].sort().join();
     // Null is a value, so this compares rather than checking for truthiness —
     // clearing the box is how a shop goes back to the platform's rate, and a
     // falsy check would refuse to write that.
@@ -440,7 +472,12 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     // separate requests would mean a shop that got renamed and stayed mis-filed
     // when the second failed.
     const storeMoved =
-      nameMoved || imageMoved || categoryMoved || featureMoved || rateMoved;
+      nameMoved ||
+      imageMoved ||
+      categoryMoved ||
+      categoriesMoved ||
+      featureMoved ||
+      rateMoved;
 
     if (storeMoved) {
       update.mutate({
@@ -449,6 +486,8 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
           ...(nameMoved && { name }),
           ...(imageMoved && { imageUrl }),
           ...(categoryMoved && { categoryId }),
+          // After the row, inside `updateStore` — see `setStoreCategories`.
+          ...(categoriesMoved && { categoryIds: nextCategoryIds }),
           ...(featureMoved && { isFeatured }),
           ...(rateMoved && { exchangeRate: nextRate }),
         },
@@ -547,8 +586,8 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
               maxLength={TEXT.name}
               hint={t("store.nameHint")}
               error={errors.name}
-              format="upper"
-              placeholder={{ en: "NARA KITCHEN", ar: "مطبخ نارة" }}
+              filter="name"
+              placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارة" }}
             />
 
             {/*
@@ -566,12 +605,39 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
             <Field label={t("store.category")} hint={t("store.categoryHint")}>
               <Select
                 value={categoryId}
-                onChange={setCategoryId}
+                onChange={(next) => {
+                  setCategoryId(next);
+                  // Promoted to main, so it leaves the extras — see the wizard.
+                  setOtherCategoryIds((current) =>
+                    current.filter((id) => id !== next),
+                  );
+                }}
                 placeholder={t("store.pickCategory")}
                 options={(categories.data ?? []).map((category) => ({
                   value: category.id,
                   label: pickLocalized(category.name),
                 }))}
+              />
+            </Field>
+
+            {/* Every other category the shop is listed under — `0136`. The main
+                one above is what the shop *is*; these are where else a customer
+                filtering by category should find it. The main one is left out of
+                the options, since it is always included. */}
+            <Field
+              label={t("store.otherCategories")}
+              hint={t("store.otherCategoriesHint")}
+            >
+              <MultiSelect
+                value={otherCategoryIds}
+                onChange={setOtherCategoryIds}
+                placeholder={t("store.otherCategoriesPlaceholder")}
+                options={(categories.data ?? [])
+                  .filter((category) => category.id !== categoryId)
+                  .map((category) => ({
+                    value: category.id,
+                    label: pickLocalized(category.name),
+                  }))}
               />
             </Field>
 
@@ -586,10 +652,19 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
               default every branch falls back to, so this is the field that
               changes the shop's card in the app.
             */}
-            <Field label={t("images.label")} hint={t("store.imageHint")}>
+            <Field
+              label={t("images.label")}
+              hint={t("store.imageHint")}
+              error={errors.image}
+            >
               <ImageUploader
                 value={imageUrl}
-                onChange={setImageUrl}
+                onChange={(url) => {
+                  setImageUrl(url);
+                  if (url?.trim()) {
+                    setErrors((current) => ({ ...current, image: undefined }));
+                  }
+                }}
                 folder="stores"
                 disabled={pending}
               />

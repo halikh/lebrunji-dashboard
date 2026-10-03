@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button, cx } from "@/components/ui";
-import { ColorPicker, isHex } from "@/components/ui/color-picker";
-import { IconPicker } from "@/components/ui/icon-picker";
+import { Button } from "@/components/ui";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { EditorPage } from "@/components/ui/editor-page";
 import { Field } from "@/components/ui/field";
@@ -18,7 +16,6 @@ import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { TEXT } from "@/lib/limits";
-import { contrastRatio } from "@/lib/contrast";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import type { CategoryDraft } from "./api/categories";
@@ -163,10 +160,7 @@ function Form({
     kindId: string;
     isActive: boolean;
     hasMenuNav: boolean;
-    emptyIcon: string | null;
     iconUrl: string | null;
-    emptyBackgroundColor: string | null;
-    storeTextColor: string | null;
   } | null;
   codes: string[];
   kinds: { id: string; name: Localized }[];
@@ -180,40 +174,33 @@ function Form({
   const [hasMenuNav, setHasMenuNav] = useState(initial?.hasMenuNav ?? true);
 
   /**
-   * The category's own artwork — see `0117`.
+   * The category's own icon — required, see `Category.iconUrl`.
    *
-   * Null on all three, and null is the answer for almost every category: it
-   * means "whatever the app's own table says", which is a live reference rather
-   * than a missing value. Nothing here is seeded with a colour, because seeding
-   * one would quietly turn a category that follows the palette into one that
-   * has an opinion.
+   * Null only for a new category, or for a legacy row from before
+   * `categories_icon_required`; the database refuses to save either until one
+   * is added.
    */
-  const [emptyIcon, setEmptyIcon] = useState<string | null>(
-    initial?.emptyIcon ?? null,
-  );
   const [iconUrl, setIconUrl] = useState<string | null>(
     initial?.iconUrl ?? null,
   );
-  const [emptyBackground, setEmptyBackground] = useState<string | null>(
-    initial?.emptyBackgroundColor ?? null,
-  );
-  const [storeText, setStoreText] = useState<string | null>(
-    initial?.storeTextColor ?? null,
-  );
 
+  /**
+   * Seeded with the icon's error for a legacy row that has none.
+   *
+   * The constraint refuses *every* update to a live category without an icon
+   * — a rename, a kind change, a switch — so opening one should say so up
+   * front rather than letting the operator fill the form in and find out on
+   * Save. Archiving is the exception and does not come through this form.
+   */
   const [errors, setErrors] = useState<{
     name?: string;
     kind?: string;
     icon?: string;
-  }>({});
-
-  // The pair the preview below draws, measured live. `0114`'s rule: the shape
-  // is the database's business and the legibility is this screen's.
-  const ratio = contrastRatio(
-    emptyBackground ?? "#f0eae1",
-    storeText ?? "#1e1b18",
+  }>(() =>
+    initial && !hasIcon(initial.iconUrl)
+      ? { icon: t("categories.iconRequired") }
+      : {},
   );
-  const readable = ratio >= 4.5;
 
   /**
    * The guard that used to belong to the panel.
@@ -230,20 +217,14 @@ function Form({
         kindId,
         isActive,
         hasMenuNav,
-        emptyIcon,
         iconUrl,
-        emptyBackground,
-        storeText,
       },
       {
         name: initial?.name ?? {},
         kindId: initial?.kindId ?? "",
         isActive: initial?.isActive ?? true,
         hasMenuNav: initial?.hasMenuNav ?? true,
-        emptyIcon: initial?.emptyIcon ?? null,
         iconUrl: initial?.iconUrl ?? null,
-        emptyBackground: initial?.emptyBackgroundColor ?? null,
-        storeText: initial?.storeTextColor ?? null,
       },
     ),
   );
@@ -256,10 +237,11 @@ function Form({
       // refusal from Postgres rather than a message about the field it came
       // from. Caught here so it reads as a form.
       kind: kindId ? undefined : t("categories.kindRequired"),
-      // Every category carries its own icon. The strip across Home and Search
-      // is all of them side by side, and one drawn with the app's glyph among
-      // uploaded pictures reads as the one that is broken.
-      icon: iconUrl ? undefined : t("categories.iconRequired"),
+      // Every category carries its own icon — `categories_icon_required`. The
+      // strip across Home and Search is all of them side by side, and a gap
+      // among uploaded pictures reads as the one that is broken. Checked here
+      // so it lands under the uploader rather than as a refusal from Postgres.
+      icon: hasIcon(iconUrl) ? undefined : t("categories.iconRequired"),
     };
 
     setErrors(found);
@@ -270,13 +252,7 @@ function Form({
       kindId,
       isActive,
       hasMenuNav,
-      // Half-typed hex is not a colour and not an error either — it is somebody
-      // mid-word. Anything that is not six digits is saved as "not set", which
-      // is what the database's own shape check would otherwise refuse.
-      emptyIcon,
       iconUrl,
-      emptyBackgroundColor: isHex(emptyBackground) ? emptyBackground : null,
-      storeTextColor: isHex(storeText) ? storeText : null,
     });
   }
 
@@ -285,8 +261,8 @@ function Form({
       title={initial ? pickLocalized(initial.name) : t("categories.add")}
       backHref={initial ? `${LIST_HREF}&focus=${initial.id}` : LIST_HREF}
       backLabel={t("categories.tab")}
-      /* Two columns — the words on the left, what it looks like on the right.
-         See the grid below. */
+      /* Two columns — the words on the left, the icon on the right. See the
+         grid below. */
       width="wide"
       footer={
         <>
@@ -302,11 +278,11 @@ function Form({
       {/**
        * What it is, and what it looks like.
        *
-       * The form was four short controls in a 640pt column on a page with room
-       * for twice that — a name, a select and two switches, then a screen of
-       * nothing. The artwork it now carries is the natural other half: the left
-       * column is the category as a *record*, the right is the category as
-       * something a customer sees.
+       * The left column is the category as a *record* — a name, a kind and two
+       * switches; the right is the category as something a customer sees,
+       * which is its icon. The empty-state glyph, its background, the shop
+       * page's text colour and the preview that drew them together went with
+       * their columns.
        */}
       <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-2 lg:gap-xxl">
         <div className="flex min-w-0 flex-col gap-lg">
@@ -316,7 +292,7 @@ function Form({
             onChange={setName}
             maxLength={TEXT.name}
             error={errors.name}
-            format="sentence"
+            filter="name"
             placeholder={{ en: "Restaurants", ar: "مطاعم" }}
           />
 
@@ -364,9 +340,6 @@ function Form({
         </div>
 
         <div className="flex min-w-0 flex-col gap-lg">
-          {/* Says whose answers these are and which of them may be left alone:
-              the icon is required, and the rest follow the app's own table
-              when they are null. */}
           <div className="flex flex-col gap-xxs">
             <h3 className="ps-md text-[17px]">
               {t("categories.artworkSection")}
@@ -376,10 +349,10 @@ function Form({
             </p>
           </div>
 
-          {/* The category's own mark, first — it is the one a customer meets,
-              in the strip across the top of Home and Search. The two below it
-              are about how a *shop* in this category is drawn when it has sent
-              nothing of its own, which is a narrower question. */}
+          {/* The category's own mark — the one a customer meets, in the strip
+              across the top of Home and Search. Required: the error under it
+              is cleared as soon as something is uploaded, and comes back on
+              Save if it is removed again. */}
           <Field
             label={t("categories.icon")}
             hint={t("categories.iconHint")}
@@ -387,86 +360,23 @@ function Form({
           >
             <ImageUploader
               value={iconUrl}
-              onChange={setIconUrl}
+              onChange={(url) => {
+                setIconUrl(url);
+                if (hasIcon(url)) {
+                  setErrors((current) => ({ ...current, icon: undefined }));
+                }
+              }}
               folder="category-art"
               disabled={pending}
             />
-          </Field>
-
-          <Field
-            label={t("categories.emptyIcon")}
-            hint={t("categories.emptyIconHint")}
-          >
-            <IconPicker
-              value={emptyIcon}
-              onChange={setEmptyIcon}
-              disabled={pending}
-            />
-          </Field>
-
-          <Field
-            label={t("categories.emptyBackground")}
-            hint={t("categories.emptyBackgroundHint")}
-          >
-            <ColorPicker
-              value={emptyBackground}
-              onChange={setEmptyBackground}
-              // Sand, which is what an empty well is drawn as today when the
-              // app has no tint for a slug. So the swatch shows what will
-              // actually be used while nothing is picked.
-              fallback="#f0eae1"
-            />
-          </Field>
-
-          <Field
-            label={t("categories.storeText")}
-            hint={t("categories.storeTextHint")}
-          >
-            <ColorPicker
-              value={storeText}
-              onChange={setStoreText}
-              fallback="#1e1b18"
-              /* The pair, measured. Not a refusal: `0114` settled that the
-                 database checks shape and the dashboard reports legibility,
-                 because contrast is a property of two colours and only one of
-                 them is on this field. */
-              trailing={
-                isHex(storeText) ? (
-                  <span
-                    className={cx(
-                      "text-[12px]",
-                      readable
-                        ? "text-text-faint"
-                        : "font-semibold text-danger",
-                    )}
-                  >
-                    {readable
-                      ? t("categories.contrast", { ratio: ratio.toFixed(1) })
-                      : t("categories.contrastPoor")}
-                  </span>
-                ) : null
-              }
-            />
-          </Field>
-
-          {/* The two colours together, at the size they are actually read: the
-              category's name over a ground, which is what a shop's page shows
-              above its own name. A swatch pair says nothing about type. */}
-          <Field label={t("categories.artworkPreview")}>
-            <div
-              className="flex items-center justify-center rounded-md px-lg py-xxl"
-              style={{ background: emptyBackground ?? "#f0eae1" }}
-            >
-              <span
-                className="text-[11px] font-bold uppercase tracking-wide"
-                style={{ color: storeText ?? "#1e1b18" }}
-              >
-                {pickLocalized(name) || t("categories.name")}
-              </span>
-            </div>
           </Field>
         </div>
       </div>
     </EditorPage>
   );
+}
+
+/** Whether a URL counts as an icon — blank does not, as the constraint trims. */
+function hasIcon(url: string | null | undefined): boolean {
+  return Boolean(url && url.trim() !== "");
 }

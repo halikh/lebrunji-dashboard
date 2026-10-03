@@ -229,6 +229,11 @@ export function MenuItemEditor({
    * Every field is checked, not just up to the first failure. Reporting one
    * problem at a time turns a form into a queue of round trips, and the
    * operator fixes a name only to be told about a price.
+   *
+   * Seeded with the picture's error when an existing dish has none: the
+   * database (`menu_items_image_required`) refuses every update to a live item
+   * without one, so a legacy dish opened here says so up front rather than on
+   * Save. Archiving is the exception and does not come through this form.
    */
   const [errors, setErrors] = useState<{
     name?: string;
@@ -236,7 +241,12 @@ export function MenuItemEditor({
     price?: string;
     unit?: string;
     step?: string;
-  }>({});
+    image?: string;
+  }>(() =>
+    itemId !== null && !hasImage(initial?.imageUrl)
+      ? { image: t("menu.imageRequired") }
+      : {},
+  );
 
   const codes = languages.data?.map((language) => language.code) ?? [];
 
@@ -372,6 +382,9 @@ export function MenuItemEditor({
       price: messageOf(validatePrice(Number.isFinite(parsed) ? parsed : NaN)),
       unit: unitProblem,
       step: stepProblem,
+      // Required — `menu_items_image_required`. Checked here so it lands under
+      // the uploader rather than as a refusal from Postgres.
+      image: hasImage(imageUrl) ? undefined : t("menu.imageRequired"),
     };
 
     setErrors(found);
@@ -385,7 +398,8 @@ export function MenuItemEditor({
       found.description ||
       found.price ||
       found.unit ||
-      found.step
+      found.step ||
+      found.image
     ) {
       return null;
     }
@@ -431,9 +445,10 @@ export function MenuItemEditor({
          one is being edited. */
       meta={shopLine}
       /* Which section this dish lands in. The title cannot say it — a name
-         on its own reads the same wherever it sits in the menu. */
+         on its own reads the same wherever it sits in the menu. Not
+         uppercased: it is the operator's own section title, shown as written. */
       aside={
-        <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
+        <span className="text-[11px] font-bold tracking-wide text-text-faint">
           {overline}
         </span>
       }
@@ -512,7 +527,7 @@ export function MenuItemEditor({
             hint={t("menu.nameHint")}
             error={errors.name}
             maxLength={TEXT.name}
-            format="upper"
+            filter="name"
           />
           <LocalizedField
             label={t("menu.description")}
@@ -527,7 +542,7 @@ export function MenuItemEditor({
             hint={t("menu.descriptionHint")}
             error={errors.description}
             maxLength={TEXT.description}
-            format="sentence"
+            filter="name"
           />
 
           {/* The way through to the Options page, and nothing else.
@@ -686,30 +701,41 @@ export function MenuItemEditor({
               options={(tags.data ?? []).map((tag) => ({
                 value: tag.id,
                 // The label is what typing filters on and what a screen reader
-                // reads; the chip is what the eye picks out of a list of five.
+                // reads; the rendered tag is what the eye picks out of a list
+                // of five, drawn exactly as it sits on a dish.
                 label: pickLocalized(tag.name),
                 render: (
                   <TagChip
-                    tone={tag.tone}
-                    ink={tag.ink}
-                    color={tag.color}
                     label={pickLocalized(tag.name)}
+                    iconUrl={tag.iconUrl}
                   />
                 ),
               }))}
             />
           </Field>
 
-          {/* Last, and deliberately.
+          {/* Last, and deliberately — though no longer optional.
             The name and the price are what an item *is*; a picture is how it
-            is sold. Putting it first makes the form open on the slowest,
-            most optional thing in it — and an operator adding forty items in
-            an afternoon would meet the upload box forty times before the
-            field they came to fill in. */}
-          <Field label={t("images.label")} hint={t("images.hint")}>
+            is sold. Putting it first makes the form open on the slowest
+            thing in it, and an operator adding forty items in an afternoon
+            would meet the upload box forty times before the field they came
+            to fill in. Required since `menu_items_image_required`, so a Save
+            without one is stopped here with the error under the uploader. */}
+          <Field
+            label={t("images.label")}
+            hint={t("images.hint")}
+            error={errors.image}
+          >
             <ImageUploader
               value={imageUrl}
-              onChange={setImageUrl}
+              onChange={(url) => {
+                setImageUrl(url);
+                // Cleared as soon as there is one, rather than left standing
+                // until the next Save over a picture that is plainly there.
+                if (hasImage(url)) {
+                  setErrors((current) => ({ ...current, image: undefined }));
+                }
+              }}
               folder="menu-items"
               disabled={pending}
             />
@@ -738,6 +764,11 @@ export function MenuItemEditor({
       )}
     </EditorPage>
   );
+}
+
+/** Whether a URL counts as a picture — blank does not, as the constraint trims. */
+function hasImage(url: string | null | undefined): boolean {
+  return Boolean(url && url.trim() !== "");
 }
 
 /**

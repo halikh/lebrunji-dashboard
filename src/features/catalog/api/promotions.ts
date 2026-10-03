@@ -5,6 +5,15 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import type { Localized } from "@/lib/validation";
 
+import { coverOf } from "./archive";
+import {
+  LINK_COLUMNS,
+  linkColumns,
+  linkOf,
+  linkRefusal,
+  type TapLink,
+} from "./links";
+
 /**
  * Promotions — what comes off a bill.
  *
@@ -87,6 +96,19 @@ export type Promotion = {
   scopes: Scope[];
 
   /**
+   * Where a tap on any of its pictures leads, unless the picture has its own
+   * — `0137`. See `api/links.ts`.
+   */
+  link: TapLink;
+
+  /**
+   * The picture it is recognised by — its first banner, else its first tile —
+   * or null when it has none. For the list's thumbnail; the pictures
+   * themselves are managed on the Artwork tab.
+   */
+  pictureUrl: string | null;
+
+  /**
    * How many times it has actually been given.
    *
    * Read with the row because it is the only thing on the screen that says
@@ -101,7 +123,9 @@ const COLUMNS = `id, slug, starts_at, ends_at, is_active, priority,
    kind, value, min_subtotal, max_discount,
    max_redemptions_per_user, max_redemptions_total, is_first_order_only,
    discount_scopes ( scope_type, target_id ),
-   discount_redemptions ( count )`;
+   discount_redemptions ( count ),
+   artworks ( format, image_url, sort_order ),
+   ${LINK_COLUMNS}`;
 
 /**
  * Every promotion, or the ones matching a term.
@@ -162,6 +186,9 @@ export async function fetchPromotions(
       targetId: (scope.target_id as string | null) ?? null,
     })),
 
+    link: linkOf(row),
+    pictureUrl: coverOf(row.artworks),
+
     redeemed: countOf(row.discount_redemptions),
   }));
 }
@@ -191,6 +218,9 @@ export type PromotionDraft = {
    * no-op.
    */
   scopes: Scope[] | null;
+
+  /** Where a tap on its pictures leads — `0137`. */
+  link: TapLink;
 };
 
 /**
@@ -216,6 +246,7 @@ export async function createPromotion(
       is_active: draft.isActive,
       priority,
       ...moneyColumns(draft),
+      ...linkColumns(draft.link),
     })
     .select("id")
     .single();
@@ -257,6 +288,8 @@ export async function updatePromotion(
   if (patch.isFirstOrderOnly !== undefined) {
     row.is_first_order_only = patch.isFirstOrderOnly;
   }
+  // All four columns together — `_link_shape` refuses a half-moved link.
+  if (patch.link !== undefined) Object.assign(row, linkColumns(patch.link));
 
   // A patch may be scopes only, or a reorder with nothing else — an empty row
   // is a valid update with nothing to write rather than a bug.
@@ -558,6 +591,8 @@ function slugify(text: string): string {
 }
 
 function friendly(message: string): string {
+  const link = linkRefusal(message);
+  if (link) return link;
   if (message.includes("window_ordered"))
     return t("promotions.windowBackwards");
   if (message.includes("value_sane")) return t("promotions.valueOutOfRange");

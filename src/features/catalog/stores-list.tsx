@@ -292,7 +292,7 @@ function StoreRow({
           )}
         </div>
         <span className="truncate text-[12px] text-text-faint">
-          {store.categoryName} ·{" "}
+          {store.categoryNames.join(", ")} ·{" "}
           {t("catalogue.prep", {
             min: store.prepMinMinutes,
             max: store.prepMaxMinutes,

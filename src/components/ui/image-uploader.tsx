@@ -54,7 +54,13 @@ export function ImageUploader({
   /** The URL currently saved on the row, or chosen in this session. */
   value: string | null;
   onChange: (url: string | null) => void;
-  folder: "menu-items" | "stores" | "promotions" | "artwork" | "category-art";
+  folder:
+    | "menu-items"
+    | "stores"
+    | "promotions"
+    | "artwork"
+    | "category-art"
+    | "tag-art";
   disabled?: boolean;
 }) {
   const field = useFieldWiring();
@@ -187,6 +193,9 @@ export function ImageUploader({
       <div
         id={field?.id}
         aria-describedby={field?.describedBy}
+        // So a form that scrolls to its first `[aria-invalid="true"]` after a
+        // failed Save finds a required picture too, not only the text fields.
+        aria-invalid={field?.invalid || undefined}
         onPaste={(event) => {
           const file = Array.from(event.clipboardData.files)[0];
           if (file) void accept(file);

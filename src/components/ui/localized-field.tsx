@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 
 import { useLanguages } from "@/features/reference/use-languages";
 import { t } from "@/i18n/translations";
-import { formatText, rejectedIn, type TextFormat } from "@/lib/text-format";
+import { lettersOnly, rejectedIn, withoutRejected } from "@/lib/text-format";
 import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
 import { cx, Input } from "./index";
@@ -42,23 +42,20 @@ import { cx, Input } from "./index";
  * in Phase 7, and is deliberately **not** stubbed here: an unused `variant`
  * prop is a promise the component does not keep.
  *
- * ## `format` holds a field to the house style, live
+ * ## `filter` holds a name to its characters, live — never to a case
  *
- * Opt-in per call site rather than on by default, and the line it draws is
- * catalogue **names** against long-form **content**. A shop, a category, a tag,
- * a section, a dish and its description are read by scanning a list, and a list
- * where the casing drifts reads as three products — see `lib/text-format.ts`.
- * A help answer or a privacy section is prose: forcing its case would be
- * vandalism, and the characters it bans are ones prose legitimately contains.
+ * Opt-in per call site, and the line it draws is catalogue **names** against
+ * long-form **content**. A help answer or a privacy section is prose, and the
+ * characters a name may not hold are ones prose legitimately contains.
  *
- * It applies as the operator types, not on save. A value normalised on the way
- * to the database shows one thing in the box and stores another, and the first
- * time anybody notices is when the list disagrees with the form they just
- * submitted.
+ * - `"name"` drops the machine punctuation `lib/text-format.ts` lists.
+ * - `"letters"` keeps letters and single spaces only — a tag's name, held to
+ *   the same set `menu_item_tags_name_letters` checks.
  *
- * The same prop turns on the character filter, because the two rules answer one
- * question — what may a name look like — and a field that shouted but still
- * accepted `<b>` would be half a rule.
+ * It applies as the operator types, not on save, so the box always shows what
+ * will be stored. **It never changes case**: what is typed is what is kept.
+ * The dashboard used to shout some names and sentence-case others here; that
+ * was removed so the inputs write what the operator writes.
  */
 export function LocalizedField({
   label,
@@ -70,7 +67,7 @@ export function LocalizedField({
   hint,
   error,
   optional = false,
-  format,
+  filter,
 }: {
   label: string;
   value: Localized;
@@ -102,12 +99,12 @@ export function LocalizedField({
   error?: string | null;
   optional?: boolean;
   /**
-   * The house style this field is held to. See the note on the component.
+   * Which characters this field keeps. See the note on the component.
    *
-   * Unset means the value is stored exactly as typed, which is what every
+   * Unset means the value is kept exactly as typed, which is what every
    * long-form field wants.
    */
-  format?: TextFormat;
+  filter?: "name" | "letters";
 }) {
   const id = useId();
   const languages = useLanguages();
@@ -126,18 +123,23 @@ export function LocalizedField({
   /**
    * One language's value, on its way in.
    *
-   * Formatting here rather than in `onChange` at each call site: there are
+   * Filtered here rather than in `onChange` at each call site: there are
    * seven of those and there will be more, and the one that forgot would be a
    * field that quietly kept its own rules.
    */
   function change(code: string, next: string) {
-    if (!format) {
-      onChange({ ...value, [code]: next });
+    if (filter === "letters") {
+      const { kept, dropped: lost } = lettersOnly(next);
+      setDropped(lost);
+      onChange({ ...value, [code]: kept });
       return;
     }
-
-    setDropped(rejectedIn(next));
-    onChange({ ...value, [code]: formatText(next, format) });
+    if (filter === "name") {
+      setDropped(rejectedIn(next));
+      onChange({ ...value, [code]: withoutRejected(next) });
+      return;
+    }
+    onChange({ ...value, [code]: next });
   }
 
   if (!languages.data) {

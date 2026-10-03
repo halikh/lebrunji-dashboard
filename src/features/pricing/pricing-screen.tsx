@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { Button, cx } from "@/components/ui";
@@ -17,7 +18,13 @@ import {
 } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 import { convertMoney, formatMoney } from "@/lib/money";
-import { useClock } from "@/features/settings/use-clock";
+import { useToasts } from "@/components/ui/toast";
+import { updateAppSettings } from "@/features/settings/api/app-settings";
+import {
+  appSettingsKey,
+  useAppSettings,
+  useClock,
+} from "@/features/settings/use-clock";
 
 import type { Band } from "./api/pricing";
 import { useLadder, useRates, useSaveLadder, useSetRate } from "./use-pricing";
@@ -528,6 +535,8 @@ function Ladder() {
           )}
         </div>
 
+        <ExtraStoreFee />
+
         {ladder.isPending && (
           <div aria-hidden className="h-[180px] rounded-md bg-neutral-fill" />
         )}
@@ -721,6 +730,89 @@ function Ladder() {
             {t("pricing.ladderSave")}
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What each shop past the first adds to the delivery fee.
+ *
+ * On this tab rather than under Settings because it is part of the same
+ * charge: an order from three shops pays the farthest leg's band *plus* this
+ * twice, so the two numbers are set against each other. Priced in the base
+ * currency like the bands, and converted the same way (0133).
+ *
+ * Its own Save, not the ladder's. It is a different row in a different table
+ * (`app_settings.extra_store_fee`), and folding it into "Save the ladder" would
+ * make a ladder that fails half-way also leave this unsaved without saying so.
+ */
+function ExtraStoreFee() {
+  const settings = useAppSettings();
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+  const { convertTo, secondaryCode, baseCode, baseDecimals } = useMoney();
+
+  // Null means untouched, so a fee merely looked at is not unsaved work.
+  const [draft, setDraft] = useState<number | null>(null);
+
+  const save = useMutation({
+    mutationFn: (amount: number) => updateAppSettings({ extraStoreFee: amount }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: appSettingsKey });
+      setDraft(null);
+      toast.success(t("pricing.extraSaved"));
+    },
+    onError: (error) =>
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      ),
+  });
+
+  const saved = settings.data?.extraStoreFee ?? null;
+  const amount = draft ?? saved ?? 0;
+  const dirty = draft !== null && draft !== saved;
+
+  useUnsavedChanges(dirty);
+
+  const to = baseCode ? secondaryCode(baseCode) : null;
+  const other = to && baseCode ? convertTo(amount, baseCode, to) : null;
+
+  return (
+    <div className="flex flex-wrap items-start gap-lg rounded-md border border-border bg-surface px-lg py-md">
+      <div className="flex min-w-[220px] flex-1 flex-col gap-xxs">
+        <span className="text-[14px] font-semibold">
+          {t("pricing.extraTitle")}
+        </span>
+        <span className="text-[13px] text-text-soft">
+          {t("pricing.extraBody")}
+        </span>
+      </div>
+
+      <Field label={t("pricing.extraLabel")} hint={other ?? undefined}>
+        <MoneyInput
+          value={amount}
+          onChange={(next) => setDraft(next ?? 0)}
+          // Disabled until the stored figure is in, so a save cannot write the
+          // placeholder zero over a real amount.
+          decimalDigits={saved === null ? null : baseDecimals}
+          aria-label={t("pricing.extraLabel")}
+        />
+      </Field>
+
+      <div className="flex items-center gap-sm pt-lg">
+        {dirty && (
+          <Button variant="secondary" onClick={() => setDraft(null)}>
+            {t("pricing.discard")}
+          </Button>
+        )}
+        <Button
+          disabled={!dirty || amount < 0}
+          pending={save.isPending}
+          onClick={() => save.mutate(amount)}
+        >
+          {t("pricing.extraSave")}
+        </Button>
       </div>
     </div>
   );

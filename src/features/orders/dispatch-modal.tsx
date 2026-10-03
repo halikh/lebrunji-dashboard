@@ -233,14 +233,25 @@ export function DispatchModal({
             // Not a broken control and not an empty list — a sentence with the
             // next step in it. A button that opened an empty chat would be
             // worse than one that is absent.
+            // Two different empties. Drivers on the books who are all off shift
+            // is not "no driver yet" — said that way, it sends the operator to
+            // add somebody who is already there.
             <EmptyState
-              titleKey="dispatch.noDrivers"
+              titleKey={
+                (all.data?.length ?? 0) > 0
+                  ? "dispatch.noDriversOnShift"
+                  : "dispatch.noDrivers"
+              }
               action={
                 <Link
                   href="/drivers"
                   className="font-semibold text-primary hover:underline"
                 >
-                  {t("dispatch.addDriver")}
+                  {t(
+                    (all.data?.length ?? 0) > 0
+                      ? "dispatch.seeDrivers"
+                      : "dispatch.addDriver",
+                  )}
                 </Link>
               }
             />

@@ -1106,8 +1106,8 @@ function SectionForm({
       maxLength={TEXT.title}
       hint={t("menu.sectionTitleHint")}
       error={error}
-      format="upper"
-      placeholder={{ en: "STARTERS", ar: "المقبلات" }}
+      filter="name"
+      placeholder={{ en: "Starters", ar: "المقبلات" }}
     />
   );
 

@@ -223,6 +223,9 @@ const en = {
       "Opens in WhatsApp. Nothing is sent until you press send there.",
     noDrivers: "No driver on the books yet.",
     addDriver: "Add one",
+    // Drivers exist, but none is inside their working hours right now.
+    noDriversOnShift: "No driver is on shift right now.",
+    seeDrivers: "See their hours",
 
     heading: "New delivery — {code}",
     placed: "Ordered {when}",
@@ -733,10 +736,20 @@ const en = {
     create: "Create the store",
     created: "{name} added — set up its menu next",
 
-    category: "Category",
-    categoryHint: "The tile customers find it under on the home screen.",
+    category: "Main category",
+    categoryHint:
+      "What kind of shop this is. It is always one of the categories the shop is listed under.",
     pickCategory: "Choose a category",
     categoryRequired: "Every shop belongs to a category.",
+    // The rest of `store_categories` (0136): where else the shop is listed.
+    otherCategories: "Also listed under",
+    otherCategoriesHint:
+      "Other categories customers can find this shop under. Optional.",
+    otherCategoriesPlaceholder: "Add a category",
+    // The trigger refusing to unlink the main category. Reached only by a
+    // stale tab; says what to do first.
+    mainCategoryKept:
+      "A shop's main category cannot be removed. Choose a different main category first.",
 
     currency: "Currency",
     // Not a preference: changing it later reprices nothing — the numbers stay
@@ -873,6 +886,10 @@ const en = {
     name: "Shop name",
     nameHint: "What customers see at the top of the shop.",
     imageHint: "The picture on the shop's card in the app.",
+    // Shown by the form, by the api, and for a refusal from
+    // `stores_image_required` — including on a legacy shop opened without one,
+    // which cannot be saved until it has one.
+    imageRequired: "Add an image — every shop needs one to be saved.",
     prepTitle: "Preparation time",
     whatsapp: "WhatsApp number",
     // Says what its absence costs, which is the part somebody skipping the
@@ -986,18 +1003,6 @@ const en = {
    * short, seen by everyone, and ordered by hand — which is why the order is
    * the thing this screen is really about.
    */
-  /**
-   * The colour picker's own words, shared by every form that has one.
-   *
-   * `ColorPicker` is one component now — the tag editor's, lifted — so the two
-   * strings it needs are here rather than under whichever feature happened to
-   * grow it first.
-   */
-  color: {
-    custom: "Pick a colour",
-    hex: "Colour, as a hex code",
-  },
-
   categories: {
     tab: "Categories",
     add: "New category",
@@ -1007,37 +1012,19 @@ const en = {
     pickKind: "Choose a kind",
     kindRequired: "Every category belongs to a kind.",
 
-    // ---- the artwork (0117) -------------------------------------------------
+    // ---- the artwork ---------------------------------------------------------
     //
-    // Four overrides on what the app draws a category as. Each says what it is
-    // *for* rather than naming a column, and each says what leaving it empty
-    // does — because empty is a real answer here and the common one.
+    // Only the icon is left, and it is required (`categories_icon_required`).
+    // The empty-state glyph, its background and the shop page's text colour
+    // went with their columns.
     artworkSection: "Artwork",
-    artworkSectionHint:
-      "How this category looks in the app. The icon is required; leave any of the others empty and the app's own answer is used.",
-    // The category's own mark. Named for where it appears, because the field
-    // under it is also an icon and the difference between them is *what they
-    // stand for* — this one the category, that one a shop inside it.
+    artworkSectionHint: "How this category looks in the app.",
     icon: "Category icon",
     iconHint: "Shown beside this category's name in the app's category strip.",
+    // Shown by the form and by the api, and for a refusal from the constraint
+    // — so it says what to do, which is the same in all three cases. It reads
+    // right on a legacy category opened without one, too.
     iconRequired: "Add an icon — every category needs one to be saved.",
-    emptyIcon: "Empty-state icon",
-    emptyIconHint:
-      "Drawn on any dish in this category that has no picture of its own. It takes the category's colour, so pick the shape rather than the shade.",
-    // The cell that clears the choice. "None" would read as "draw nothing",
-    // which is the one thing it does not mean — the app still draws its own.
-    iconNone: "Use the app's own icon",
-    iconNoneShort: "Auto",
-    emptyBackground: "Empty-state background",
-    emptyBackgroundHint: "The colour behind that icon.",
-    storeText: "Text on a shop's page",
-    storeTextHint:
-      "The category's name above a shop's own, on its page. It sits on the background above, so the two are read together.",
-    // Said with the numbers in front of the operator rather than refused: the
-    // pair is theirs to choose and this is what it measures.
-    contrast: "{ratio}:1 against the background",
-    contrastPoor: "Hard to read — 4.5:1 is the readable minimum.",
-    artworkPreview: "How it reads",
     // Reached by a link to a category that has since been archived, or a
     // mistyped id. Says what happened rather than showing an empty form that
     // would create a *new* one on save.
@@ -1112,17 +1099,6 @@ const en = {
     add: "New tag",
     name: "Name",
     nameHint: "Short. It sits beside an item's name, not under it.",
-    toneLabel: "Colour",
-    toneHint:
-      "Pick the chip, not the colour — each option shows what the tag will look like in the app.",
-    tones: {
-      neutral: "Plain",
-      accent: "Green",
-      yellow: "Yellow",
-      active: "Coral",
-      info: "Purple",
-    },
-    previewPlaceholder: "Your tag",
     visibility: "Visibility",
     live: "Live",
     hidden: "Hidden",
@@ -1138,50 +1114,29 @@ const en = {
     archiveBody:
       "The chip disappears from {count} item(s) immediately. Nothing else changes — the items keep the tag, so bringing it back restores it to all of them.",
     archiveConfirm: "Archive",
-    // A count on the row is what turns "retire this" from a guess into a
-    // decision. Zero is said in words rather than as "0 dishes", because
-    /**
-     * The ink — the other half of a chip, chosen by looking at it.
-     *
-     * The ratio is shown rather than the choice being refused: a merchant is
-     * allowed the quieter pairing, and the honest way to offer it is with the
-     * measurement beside it. 4.5:1 is the bar for a 12px label.
-     */
-    /**
-     * The ground, which stopped being one of five in `0114`.
-     *
-     * The roles are still offered first, as presets — they are the colours that
-     * already agree with the rest of a phone screen — and the picker is the
-     * escape hatch for a brand colour the palette does not have.
-     */
-    colorLabel: "Colour",
-    colorHint:
-      "The five are the app's own, and a tag on one of them follows the palette if it ever changes. Pick your own for a brand colour.",
-    colorCustom: "Pick a colour",
-    colorHex: "Colour, as a hex code",
-    // The shape check refusing a value. Reached by pasting something that is
-    // not a colour, so it says what one looks like.
-    badColor: "A colour has to be six hex digits, like #14b87f.",
-
-    inkLabel: "Words",
-    inkHint: "Which reads better on the colour you picked.",
-    inkRatio: "{ratio}:1 contrast",
-    inkTooLow: "{ratio}:1 — hard to read",
-    inks: {
-      dark: "Black",
-      light: "White",
-    },
-    // A value the check constraint refuses. Reached only by a stale tab or a
-    // hand-made request, and it says which column rather than echoing Postgres.
-    unknownInk: "That is not a colour a tag's words can be.",
     // A link to a tag that has since been retired, or a mistyped id.
     notFound: "That tag is not here any more.",
 
-    // The emoji rule. Said as what a tag *is* rather than as a refusal — the
-    // hint carries it before the error has to.
-    needsEmoji: "Every tag carries an emoji. Add one to the {language} name.",
-    emojiHint:
-      "Include an emoji — it is what a chip is recognised by on a phone, ahead of the word.",
+    // The letters rule (`menu_item_tags_name_letters`). Said as what a name
+    // *is* rather than as a refusal — the hint carries it before the error has
+    // to. `lettersOnly` names the language; `lettersOnlyAny` is the database's
+    // refusal, which cannot say which one.
+    lettersHint:
+      "Letters only, one space between words — the icon is the picture.",
+    lettersOnly:
+      "Use letters and single spaces only in the {language} name — no emoji, numbers or punctuation.",
+    lettersOnlyAny:
+      "A tag name can only hold letters and single spaces — no emoji, numbers or punctuation.",
+    // The icon (`menu_item_tags.icon_url`), drawn small before the name.
+    icon: "Tag icon",
+    iconHint:
+      "Shown just before the tag's name, on every item that carries it.",
+    // Shown by the form, by the api and for a refusal from
+    // `menu_item_tags_icon_required` — including on a legacy tag opened
+    // without one, which cannot be saved until it has one.
+    iconRequired: "Add an icon — every tag needs one to be saved.",
+    // A count on the row is what turns "retire this" from a guess into a
+    // decision. Zero is said in words rather than as "0 dishes", because
     // "unused" is the thing the operator is scanning for.
     unused: "Not on any item yet",
     usedBy: "On {count} item(s)",
@@ -1204,7 +1159,6 @@ const en = {
       "The chips shown on this item. Their order comes from the Tags tab, so it is the same on every item.",
     itemPlaceholder: "Add a tag",
     itemNone: "No tags have been set up yet. Add some on the Tags tab.",
-    unknownTone: "That is not a colour a tag can be drawn in.",
     alreadyOnDish: "This item already carries that tag.",
   },
 
@@ -1681,6 +1635,15 @@ const en = {
       "It is the largest, so it is also the delivery radius. Removing it means you no longer deliver past {next} km, and anything further is out of range.",
     ladderSave: "Save the ladder",
     ladderSaved: "Delivery ladder saved",
+
+    // The surcharge for a multi-shop order (0133). Said as the sum it is part
+    // of, because on its own "per extra shop" does not say what it is added to.
+    extraTitle: "Each extra shop",
+    extraBody:
+      "An order from several shops pays the band for the farthest one, plus this for every shop after the first.",
+    extraLabel: "Per extra shop",
+    extraSave: "Save",
+    extraSaved: "Extra shop fee saved",
     discard: "Discard changes",
     bandDistancePositive: "Every band needs a distance greater than zero.",
     bandAmountNegative: "A fee cannot be negative.",
@@ -1732,6 +1695,9 @@ const en = {
     artworkBody:
       "The banners and tiles that advertise a promotion are managed on the Artwork tab. A linked picture is shown only while this promotion is live.",
     artworkAdd: "Add a picture for this promotion",
+    // Beside a picture already linked, in place of Add — it opens that
+    // picture's own editor on the Artwork tab.
+    artworkChange: "Change",
     artworkOpen: "Open the Artwork tab",
 
     search: "Search promotions",
@@ -1882,6 +1848,49 @@ const en = {
     formLabel: "Promotion details",
   },
 
+  /**
+   * "When tapped, go to" — where a promotion's or an artwork's pictures lead
+   * (0137). Shared by both editors, so it lives on its own.
+   */
+  links: {
+    label: "When tapped, go to",
+    hint: "Where a customer lands when they tap the picture.",
+    kinds: {
+      none: "Nowhere",
+      store: "A shop",
+      category: "A category",
+      tab: "A tab-bar page",
+      page: "Another page",
+    },
+    store: "Shop",
+    pickStore: "Choose a shop",
+    category: "Category",
+    pickCategory: "Choose a category",
+    page: "Page",
+    pickPage: "Choose a page",
+    pages: {
+      home: "Home",
+      search: "Search",
+      cart: "Basket",
+      orders: "Orders",
+      account: "Account",
+      checkout: "Checkout",
+      addresses: "Addresses",
+      "address-new": "New address",
+      profile: "Profile",
+      "profile-details": "Profile details",
+      help: "Help",
+    },
+    // For the "follows its promotion" hint.
+    toStore: "{name}'s page",
+    toCategory: "the {name} category",
+    // A kind chosen with nothing picked under it.
+    targetRequired: "Choose where it goes, or set it to Nowhere.",
+    // `_link_shape` refusing a row — reached only by a stale tab.
+    badShape:
+      "That destination is not complete. Choose it again, or set it to Nowhere.",
+  },
+
   artworks: {
     tab: "Artwork",
     add: "New artwork",
@@ -1953,17 +1962,48 @@ const en = {
       "Where customers see the picture. Turn every screen off to keep it as a draft, shown nowhere.",
     placementOn: "Shown",
     placementOff: "Hidden",
+    // The screens `artworks_placements_known` allows since 0136, in the
+    // app's own order. Named for what the customer sees, not the route.
     placements: {
       home: "Home",
-      store: "The shop's page",
-      cart: "The basket",
+      search: "Search",
+      category: "Category page",
+      store: "Shop page",
+      item: "Dish page",
+      cart: "Basket",
+      checkout: "Checkout",
+      orders: "Orders list",
+      order: "Order page",
+      account: "Account",
+      profile: "Profile",
+      "profile-details": "Profile details",
+      addresses: "Addresses",
+      "address-new": "New address",
+      help: "Help",
     },
     placementsHint: {
       home: "Near the top, to everyone.",
+      search: "On the search screen, before and while a customer searches.",
+      category: "On a category's page, above its shops.",
       store:
-        "On shop pages — only the shops its promotion covers, or every shop for artwork only.",
+        "On shop pages — the shops chosen below, or every shop when none are. A linked picture also only where its promotion applies.",
+      item: "On a dish's own page.",
       cart: "Above the basket, where a minimum spend is a number the customer can act on.",
+      checkout: "On the checkout screen, just before the order is placed.",
+      orders: "Above the customer's list of orders.",
+      order: "On a single order's page.",
+      account: "On the account screen.",
+      profile: "On the profile screen.",
+      "profile-details": "On the screen where a customer edits their details.",
+      addresses: "On the customer's list of saved addresses.",
+      "address-new": "On the screen for adding an address.",
+      help: "On the help screen.",
     },
+    // `artwork_stores` (0136): which shops' pages, for the Shop page placement.
+    storesLabel: "Which shops",
+    storesHint:
+      "Leave empty to show it on every shop page. Pick shops to show it on theirs only.",
+    storesPlaceholder: "All shops",
     placementsUnknown: "One of those screens is not one the app knows.",
     shownOn: "On {screens}",
     draft: "Draft — shown on no screen",
@@ -1974,6 +2014,15 @@ const en = {
     endsAt: "Ends",
     endsHint: "Leave empty to run until you switch it off.",
     windowBackwards: "The end has to come after the start.",
+    // A linked picture has no dates of its own since 0136
+    // (`artworks_linked_has_no_window`) — it runs on its promotion's.
+    runsOnPromotion: "Runs on its promotion's dates: {window}.",
+    runsOnPromotionOpen: "Runs on its promotion's dates — no dates set there.",
+    linkedHasNoWindow:
+      "A picture linked to a promotion runs on the promotion's dates and cannot have its own.",
+    // The link hint when the picture has no destination of its own (0137).
+    followsPromotion:
+      "Leave on Nowhere to follow its promotion: a tap goes to {destination}. Choose a destination to override it.",
     visibility: "Visibility",
     visibilityHint:
       "Shown only when it is on and inside its dates — and, if linked, while its promotion is live.",
@@ -1986,6 +2035,7 @@ const en = {
     whilePromotion: "Runs while its promotion is live",
     between: "{from} to {to}",
     until: "Until {to}",
+    startsFrom: "From {from}",
     startsOn: "Switched on, but does not start until {when}",
     ended: "Switched on, but its dates have passed",
     stateOff: "Switched off",
@@ -2216,6 +2266,13 @@ const en = {
     title: "Menu",
     back: "All shops",
     itemNotFound: "That item is not here any more.",
+    // `menu_items_image_required`: the form, the api and the constraint all
+    // say this one, so it says what to do rather than what went wrong.
+    imageRequired: "Add an image — every item needs one to be saved.",
+    // The same rule meeting a pasted list, which has no image field to point
+    // at — so it says why the paste was refused and what to do instead.
+    bulkImageRequired:
+      "Every item needs an image now, and pasted items have none. Add these one at a time.",
     sectionNotFound: "That section is not here any more.",
     addItem: "Add an item to {section}",
     name: "Name",

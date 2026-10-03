@@ -8,10 +8,12 @@ import { DateField } from "@/components/ui/date-field";
 import { EditorPage } from "@/components/ui/editor-page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LocalizedImageField } from "@/components/ui/localized-image-field";
-import { Select } from "@/components/ui/select";
+import { MultiSelect, Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
+import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { formatDate } from "@/lib/time";
 import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
 import {
@@ -24,12 +26,15 @@ import {
   type ArtworkFormat,
   type Placement,
 } from "./api/artworks";
+import { NO_LINK, missingTarget, type TapLink } from "./api/links";
+import { LinkFields, useLinkDescription } from "./link-fields";
 import {
   useArtworks,
   useCreateArtwork,
   useUpdateArtwork,
 } from "./use-artworks";
 import { usePromotions } from "./use-promotions";
+import { useStores } from "./use-stores";
 
 const LIST_HREF = "/catalogue?tab=artworks";
 
@@ -134,6 +139,7 @@ function Form({
   onCancel: () => void;
 }) {
   const promotions = usePromotions("");
+  const stores = useStores("");
 
   const start = {
     format: initial?.format ?? ("banner" as ArtworkFormat),
@@ -145,6 +151,8 @@ function Form({
     startsAt: initial?.startsAt ?? null,
     endsAt: initial?.endsAt ?? null,
     isActive: initial?.isActive ?? true,
+    storeIds: initial?.storeIds ?? [],
+    link: initial?.link ?? NO_LINK,
   };
 
   const [format, setFormat] = useState<ArtworkFormat>(start.format);
@@ -154,15 +162,43 @@ function Form({
   const [startsAt, setStartsAt] = useState<string | null>(start.startsAt);
   const [endsAt, setEndsAt] = useState<string | null>(start.endsAt);
   const [isActive, setIsActive] = useState(start.isActive);
+  const [storeIds, setStoreIds] = useState<string[]>(start.storeIds);
+  const [link, setLink] = useState<TapLink>(start.link);
 
   useUnsavedChanges(
     changed(
-      { format, imageUrl, placements, discountId, startsAt, endsAt, isActive },
+      {
+        format,
+        imageUrl,
+        placements,
+        discountId,
+        startsAt,
+        endsAt,
+        isActive,
+        storeIds,
+        link,
+      },
       start,
     ),
   );
 
-  const [errors, setErrors] = useState<{ image?: string; window?: string }>({});
+  const [errors, setErrors] = useState<{
+    image?: string;
+    window?: string;
+    link?: string;
+  }>({});
+
+  /**
+   * The promotion this picture advertises, as the promotions list has it —
+   * for its dates and its destination, both of which a linked picture runs
+   * on. Null while unlinked, or for an archived promotion the list omits.
+   */
+  const promotion = discountId
+    ? ((promotions.data ?? []).find((one) => one.id === discountId) ?? null)
+    : null;
+
+  // Called unconditionally — it is a hook — and only shown when linked.
+  const inherited = useLinkDescription(promotion?.link ?? NO_LINK);
 
   /**
    * The promotions it can advertise: the live list, plus the one it already
@@ -198,23 +234,35 @@ function Form({
         : !(imageUrl[FALLBACK_LANGUAGE] ?? "").trim()
           ? t("artworks.imageNeedsEnglish")
           : undefined,
+      // Only for a picture with dates of its own — a linked one has none.
       window:
-        startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)
+        !discountId &&
+        startsAt &&
+        endsAt &&
+        new Date(endsAt) <= new Date(startsAt)
           ? t("artworks.windowBackwards")
           : undefined,
+      link: missingTarget(link) ? t("links.targetRequired") : undefined,
     };
 
     setErrors(found);
-    if (found.image || found.window || !imageUrl) return;
+    if (found.image || found.window || found.link || !imageUrl) return;
 
     onSave({
       format,
       imageUrl,
       placements,
       discountId,
-      startsAt,
-      endsAt,
+      // Null whenever linked — `artworks_linked_has_no_window`. The form keeps
+      // what was typed while the operator tries a link on and off, but a
+      // linked picture is never saved with dates.
+      startsAt: discountId ? null : startsAt,
+      endsAt: discountId ? null : endsAt,
       isActive,
+      // Only meaningful with the shop page on; cleared without it, so turning
+      // the placement back on later does not resurrect a forgotten choice.
+      storeIds: placements.includes("store") ? storeIds : [],
+      link,
     });
   }
 
@@ -316,26 +364,85 @@ function Form({
             </div>
           </Field>
 
-          {/* Side by side, as in `PromotionEditor` — see the note there on why
-              it is a container query and why 32rem. */}
-          <div className="@container">
-            <div className="grid grid-cols-1 items-start gap-lg @[32rem]:grid-cols-2">
-              <Field
-                label={t("artworks.startsAt")}
-                hint={t("artworks.startsHint")}
-              >
-                <DateField value={startsAt} onChange={setStartsAt} />
-              </Field>
+          {/* Which shops' pages — `artwork_stores`. Only while the shop page
+              is one of the screens; empty is every shop, which is what the
+              placeholder says rather than leaving a blank box to interpret. */}
+          {placements.includes("store") && (
+            <Field
+              label={t("artworks.storesLabel")}
+              hint={t("artworks.storesHint")}
+            >
+              <MultiSelect
+                value={storeIds}
+                onChange={setStoreIds}
+                placeholder={t("artworks.storesPlaceholder")}
+                options={(stores.data?.stores ?? []).map((store) => ({
+                  value: store.id,
+                  label: pickLocalized(store.name),
+                }))}
+                disabled={pending || !stores.isSuccess}
+              />
+            </Field>
+          )}
 
-              <Field
-                label={t("artworks.endsAt")}
-                hint={t("artworks.endsHint")}
-                error={errors.window}
-              >
-                <DateField value={endsAt} onChange={setEndsAt} />
-              </Field>
+          {/* Where a tap leads — `0137`. A linked picture with none of its own
+              follows its promotion's, and the hint says what that is. */}
+          <LinkFields
+            value={link}
+            onChange={setLink}
+            disabled={pending}
+            error={errors.link}
+            hint={
+              discountId && link.kind === null
+                ? t("artworks.followsPromotion", { destination: inherited })
+                : undefined
+            }
+          />
+
+          {/* A linked picture has no dates of its own (`0136`) — it runs on
+              its promotion's, said here in place of the two fields. */}
+          {discountId ? (
+            <p className="rounded-md bg-neutral-fill px-lg py-md text-[13px] text-text-soft">
+              {promotion && (promotion.startsAt || promotion.endsAt)
+                ? t("artworks.runsOnPromotion", {
+                    window:
+                      promotion.startsAt && promotion.endsAt
+                        ? t("artworks.between", {
+                            from: formatDate(promotion.startsAt),
+                            to: formatDate(promotion.endsAt),
+                          })
+                        : promotion.endsAt
+                          ? t("artworks.until", {
+                              to: formatDate(promotion.endsAt),
+                            })
+                          : t("artworks.startsFrom", {
+                              from: formatDate(promotion.startsAt!),
+                            }),
+                  })
+                : t("artworks.runsOnPromotionOpen")}
+            </p>
+          ) : (
+            /* Side by side, as in `PromotionEditor` — see the note there on
+               why it is a container query and why 32rem. */
+            <div className="@container">
+              <div className="grid grid-cols-1 items-start gap-lg @[32rem]:grid-cols-2">
+                <Field
+                  label={t("artworks.startsAt")}
+                  hint={t("artworks.startsHint")}
+                >
+                  <DateField value={startsAt} onChange={setStartsAt} />
+                </Field>
+
+                <Field
+                  label={t("artworks.endsAt")}
+                  hint={t("artworks.endsHint")}
+                  error={errors.window}
+                >
+                  <DateField value={endsAt} onChange={setEndsAt} />
+                </Field>
+              </div>
             </div>
-          </div>
+          )}
 
           <Field
             label={t("artworks.visibility")}

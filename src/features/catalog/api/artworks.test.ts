@@ -12,6 +12,7 @@ import {
   togglePlacement,
   type Artwork,
 } from "./artworks";
+import { NO_LINK } from "./links";
 
 /**
  * The artwork screen's pure half — migration 0129.
@@ -33,6 +34,8 @@ function artwork(overrides: Partial<Artwork> = {}): Artwork {
     startsAt: null,
     endsAt: null,
     sortOrder: 0,
+    storeIds: [],
+    link: NO_LINK,
     ...overrides,
   };
 }
@@ -55,7 +58,7 @@ describe("placements", () => {
   });
 
   it("drops screens this build does not know, and duplicates", () => {
-    expect(knownPlacements(["cart", "checkout", "home", "cart"])).toEqual([
+    expect(knownPlacements(["cart", "lobby", "home", "cart"])).toEqual([
       "home",
       "cart",
     ]);
@@ -81,22 +84,35 @@ describe("toColumns", () => {
         format: "tile",
         imageUrl: { en: "e", ar: "a" },
         placements: ["cart", "store"],
-        discountId: "d1",
+        discountId: null,
         isActive: false,
         startsAt: "2026-01-01T00:00:00Z",
         endsAt: "2026-02-01T00:00:00Z",
         sortOrder: 3,
+        storeIds: ["s1"],
       }),
     ).toEqual({
       format: "tile",
       image_url: { en: "e", ar: "a" },
       placements: ["store", "cart"],
-      discount_id: "d1",
+      discount_id: null,
       is_active: false,
       starts_at: "2026-01-01T00:00:00Z",
       ends_at: "2026-02-01T00:00:00Z",
       sort_order: 3,
     });
+  });
+
+  // `artworks_linked_has_no_window`: a linked picture runs on its promotion's
+  // dates, so whatever dates the patch carries are written as null.
+  it("clears the dates when a promotion is linked", () => {
+    expect(
+      toColumns({
+        discountId: "d1",
+        startsAt: "2026-01-01T00:00:00Z",
+        endsAt: "2026-02-01T00:00:00Z",
+      }),
+    ).toEqual({ discount_id: "d1", starts_at: null, ends_at: null });
   });
 });
 
@@ -117,13 +133,35 @@ describe("toArtwork", () => {
         ...base,
         discount: { id: "d", slug: "eid", deleted_at: null },
       }).discount,
-    ).toEqual({ id: "d", slug: "eid", archived: false });
+    ).toEqual({
+      id: "d",
+      slug: "eid",
+      archived: false,
+      startsAt: null,
+      endsAt: null,
+      link: NO_LINK,
+    });
     expect(
       toArtwork({
         ...base,
-        discount: [{ id: "d", slug: "eid", deleted_at: "2026-01-01" }],
+        discount: [
+          {
+            id: "d",
+            slug: "eid",
+            deleted_at: "2026-01-01",
+            starts_at: "2026-01-01T00:00:00Z",
+            ends_at: null,
+          },
+        ],
       }).discount,
-    ).toEqual({ id: "d", slug: "eid", archived: true });
+    ).toEqual({
+      id: "d",
+      slug: "eid",
+      archived: true,
+      startsAt: "2026-01-01T00:00:00Z",
+      endsAt: null,
+      link: NO_LINK,
+    });
     expect(toArtwork({ ...base, discount: null }).discount).toBeNull();
     expect(toArtwork({ ...base, discount: null }).format).toBe("tile");
   });
@@ -168,7 +206,16 @@ describe("artworkState", () => {
     expect(artworkState(artwork({ isActive: false }), now)).toBe("off");
     expect(
       artworkState(
-        artwork({ discount: { id: "d", slug: "s", archived: true } }),
+        artwork({
+          discount: {
+            id: "d",
+            slug: "s",
+            archived: true,
+            startsAt: null,
+            endsAt: null,
+            link: NO_LINK,
+          },
+        }),
         now,
       ),
     ).toBe("promotionArchived");

@@ -2,7 +2,7 @@ import { PAGE } from "@/lib/limits";
 import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
-import { formatLocalized } from "@/lib/text-format";
+import { cleanLocalized } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -50,37 +50,17 @@ export type Category = {
   hasMenuNav: boolean;
   sortOrder: number;
   /**
-   * The category's own artwork, or null for the app's.
-   *
-   * `0117`. The app keeps a table of a tint, an ink and a glyph per slug, and
-   * these three override it — a category added in the database used to render
-   * in a derived colour with a generic glyph until the next app release, and an
-   * app release goes through a store review.
-   *
-   * Null is a **live reference** to the app's own table rather than a missing
-   * value, which is why nothing here is defaulted: a category left alone still
-   * follows the palette if the palette moves.
-   */
-  /**
-   * The glyph a dish with no photograph falls back to — `0124`.
-   *
-   * A name out of the shared vocabulary, not a URL: this is drawn at 22pt in
-   * one colour beside type, which is a glyph rather than a picture. See
-   * `lib/category-icons.ts`.
-   *
-   * Null means the app's own table decides, which is what every category did
-   * before the column existed.
-   */
-  emptyIcon: string | null;
-  emptyBackgroundColor: string | null;
-  storeTextColor: string | null;
-  /**
    * The category's own mark, in the app's category strip — `0123`.
    *
-   * A real picture, shown at 36pt as itself — unlike `emptyIcon`, which is a
-   * glyph the app strokes in the category's accent. The two are different kinds
-   * of answer to different questions, which is why `0124` made one a name and
-   * left this one a file.
+   * A real picture, shown at 36pt as itself. **Required** since the migration
+   * that added `categories_icon_required`: a live category without one is
+   * refused on every insert and update, so the strip never draws a gap. Typed
+   * as nullable only because that check is `not valid` — a legacy row may still
+   * arrive without one, and the editor has to be able to open it to add one.
+   *
+   * The empty-state glyph, its background and the shop page's text colour
+   * that used to sit beside this (`0117`, `0124`) are gone — their columns
+   * were dropped, so none of them is a per-category setting any more.
    */
   iconUrl: string | null;
   /**
@@ -105,10 +85,15 @@ export type Category = {
 // the *stores* before they are counted, which is what keeps archived shops out
 // of the total without dropping empty categories from the list (an inner join
 // would have done exactly that).
+//
+// `!category_id` because `0136` gave PostgREST a second way from a category to
+// its shops — through `store_categories` — and an embed with two candidate
+// relationships is refused as ambiguous. This counts shops whose *main*
+// category this is, which is what `archiveCategory` refuses on.
 const COLUMNS = `id, slug, category_kind_id, name,
    is_active, has_menu_nav, sort_order,
-   empty_icon, empty_background_color, store_text_color, icon_url,
-   stores ( count )`;
+   icon_url,
+   stores!category_id ( count )`;
 
 /**
  * There is no picture, deliberately.
@@ -166,10 +151,7 @@ export async function fetchCategories(
     isActive: row.is_active as boolean,
     hasMenuNav: row.has_menu_nav as boolean,
     sortOrder: row.sort_order as number,
-    emptyIcon: (row.empty_icon as string | null) ?? null,
     iconUrl: (row.icon_url as string | null) ?? null,
-    emptyBackgroundColor: (row.empty_background_color as string | null) ?? null,
-    storeTextColor: (row.store_text_color as string | null) ?? null,
     usedBy: countOf(row.stores),
   }));
 }
@@ -211,55 +193,42 @@ export async function fetchCategoryKinds(): Promise<CategoryKind[]> {
 }
 
 /*
- * The house style, applied here as well as in the field.
+ * The character rule, applied here as well as in the field — and never case.
  *
  * Not a duplicate of the form's rule — a second layer under it. `LocalizedField`
- * formats as somebody types, which is the half that makes the rule *visible*;
- * this is the half that makes it *true*. Bulk paste, the wizard, a future
- * import and any screen written next all arrive here, and a rule enforced only
- * by a component is a rule the next component does not have.
+ * filters as somebody types, which is the half that makes the rule *visible*;
+ * `cleanLocalized` is the half that makes it *true*. Bulk paste, the wizard, a
+ * future import and any screen written next all arrive here, and a rule
+ * enforced only by a component is a rule the next component does not have.
  *
- * See `lib/text-format.ts` for what the formats are and why.
+ * Letters are stored exactly as typed. There used to be a house style here that
+ * re-cased names on save; it was removed so the inputs write what the operator
+ * writes. See `lib/text-format.ts`.
  */
-const NAME_FORMAT = "sentence" as const;
 
 export type CategoryDraft = {
   kindId: string;
   name: Localized;
   isActive: boolean;
   hasMenuNav: boolean;
-  /** See `Category` — null means the app's own table decides. */
-  /**
-   * The glyph a dish with no photograph falls back to — `0124`.
-   *
-   * A name out of the shared vocabulary, not a URL: this is drawn at 22pt in
-   * one colour beside type, which is a glyph rather than a picture. See
-   * `lib/category-icons.ts`.
-   *
-   * Null means the app's own table decides, which is what every category did
-   * before the column existed.
-   */
-  emptyIcon: string | null;
+  /** Required — see `Category.iconUrl` and `requireIcon` below. */
   iconUrl: string | null;
-  emptyBackgroundColor: string | null;
-  storeTextColor: string | null;
 };
 
 export async function createCategory(
   draft: CategoryDraft,
   sortOrder: number,
 ): Promise<void> {
+  requireIcon(draft.iconUrl);
+
   const { error } = await getClient()
     .from("categories")
     .insert({
       category_kind_id: draft.kindId,
-      name: formatLocalized(draft.name, NAME_FORMAT),
+      name: cleanLocalized(draft.name),
       is_active: draft.isActive,
       has_menu_nav: draft.hasMenuNav,
-      empty_icon: draft.emptyIcon,
       icon_url: draft.iconUrl,
-      empty_background_color: draft.emptyBackgroundColor,
-      store_text_color: draft.storeTextColor,
       sort_order: sortOrder,
       // No `slug`: the trigger from migration 0071 derives one from the English
       // name and makes it unique, which a client cannot do without racing.
@@ -276,18 +245,17 @@ export async function updateCategory(
 ): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.kindId !== undefined) row.category_kind_id = patch.kindId;
-  if (patch.name !== undefined)
-    row.name = formatLocalized(patch.name, NAME_FORMAT);
+  if (patch.name !== undefined) row.name = cleanLocalized(patch.name);
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.hasMenuNav !== undefined) row.has_menu_nav = patch.hasMenuNav;
-  // Written when present, `null` included — clearing one is how a category is
-  // put back to following the app's own table.
-  if (patch.emptyIcon !== undefined) row.empty_icon = patch.emptyIcon;
-  if (patch.iconUrl !== undefined) row.icon_url = patch.iconUrl;
-  if (patch.emptyBackgroundColor !== undefined)
-    row.empty_background_color = patch.emptyBackgroundColor;
-  if (patch.storeTextColor !== undefined)
-    row.store_text_color = patch.storeTextColor;
+  // Present means "set it to this", so a present-but-empty icon is a request
+  // to clear a required field and is refused before it is sent. Absent means
+  // "leave it" — and a legacy row that has none will still be refused by the
+  // database on any update, which `friendly` turns into the same sentence.
+  if (patch.iconUrl !== undefined) {
+    requireIcon(patch.iconUrl);
+    row.icon_url = patch.iconUrl;
+  }
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 
   const { error } = await getClient()
@@ -353,8 +321,29 @@ export async function setCategoryOrder(
   if (failure?.error) throw new Error(friendly(failure.error.message));
 }
 
+/**
+ * Refuses a category with no icon, before the database has to.
+ *
+ * `categories_icon_required` is the rule; this is the same rule said early, in
+ * the operator's language rather than as a constraint name. Blank counts as
+ * missing because the check trims — a URL of spaces is not a picture.
+ *
+ * Archiving does not come through here and must not: the constraint lets any
+ * row be archived, image or not, so a legacy category without one can still be
+ * retired.
+ */
+function requireIcon(iconUrl: string | null | undefined): void {
+  if (!iconUrl || iconUrl.trim() === "") {
+    throw new Error(t("categories.iconRequired"));
+  }
+}
+
 /** Turns a constraint violation into a sentence the operator can act on. */
 function friendly(message: string): string {
+  // Before `slug` and friends, since the name is specific and those are not.
+  if (message.includes("categories_icon_required")) {
+    return t("categories.iconRequired");
+  }
   if (message.includes("slug")) return t("dbError.duplicateSlug");
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("_len")) return t("dbError.tooLong");

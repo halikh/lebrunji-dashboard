@@ -38,8 +38,9 @@ import { deleteObject, imageUrlFor, presignUpload } from "@/lib/storage/bucket";
  * key — is identical for a chime and a photograph, and a second copy of that
  * would be a second place for the operator check to drift.
  *
- * `category-art` is where a category's empty-state icon goes (`0117`). The
- * hyphen is not decoration: `categories` is the *old* name of the promotions
+ * `category-art` is where a category's icon goes (`categories.icon_url`), and
+ * `tag-art` is where a tag's goes (`menu_item_tags.icon_url`). The hyphen is
+ * not decoration: `categories` is the *old* name of the promotions
  * folder and live `artworks.image_url` rows (on `discounts` before `0129`)
  * still point into it, so a new writer under that prefix would mix this year's
  * uploads in with objects nobody can tell apart from them.
@@ -63,6 +64,7 @@ const FOLDERS = [
   "promotions",
   "artwork",
   "category-art",
+  "tag-art",
   "sounds",
 ] as const;
 type Folder = (typeof FOLDERS)[number];
@@ -88,6 +90,7 @@ const ALLOWED: Record<Folder, { types: readonly string[]; maxBytes: number }> =
     promotions: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     artwork: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     "category-art": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
+    "tag-art": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     sounds: { types: SOUND.types, maxBytes: SOUND.maxBytes },
   };
 
@@ -171,7 +174,7 @@ export async function DELETE(request: NextRequest) {
   // makes; refusing the old prefix would only mean the orphans it leaves can
   // never be swept up.
   const shape =
-    /^(menu-items|stores|promotions|artwork|categories|category-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
+    /^(menu-items|stores|promotions|artwork|categories|category-art|tag-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
   if (!shape.test(key)) {
     return NextResponse.json({ error: "key" }, { status: 400 });
   }

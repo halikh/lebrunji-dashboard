@@ -5,8 +5,6 @@ import { likeAny } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import type { Localized } from "@/lib/validation";
 
-import type { TagInk, TagTone } from "./tags";
-
 /**
  * What the catalogue as a whole has put away.
  *
@@ -78,12 +76,8 @@ export type ArchivedCategory = {
 export type ArchivedTag = {
   id: string;
   name: Localized;
-  /** The palette role, so an archived tag is drawn as the chip it was. */
-  tone: TagTone;
-  /** Null for the tone's own — see `Tag.ink`. */
-  ink: TagInk | null;
-  /** Null for the tone's own colour — see `Tag.color`. */
-  color: string | null;
+  /** Null for a legacy tag from before the icon was required. */
+  iconUrl: string | null;
   archivedAt: string;
 };
 
@@ -180,7 +174,7 @@ export async function fetchArchivedStores(
   let query = getClient()
     .from("stores")
     .select(
-      "id, name, image_url, deleted_at, categories!inner ( name, deleted_at )",
+      "id, name, image_url, deleted_at, categories!category_id!inner ( name, deleted_at )",
     )
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false })
@@ -250,7 +244,7 @@ export async function fetchArchivedTags(
 
   let query = getClient()
     .from("menu_item_tags")
-    .select("id, name, tone, ink, color, deleted_at")
+    .select("id, name, icon_url, deleted_at")
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false })
     .order("id", { ascending: false })
@@ -265,9 +259,7 @@ export async function fetchArchivedTags(
   const rows = (data ?? []).map((row) => ({
     id: row.id as string,
     name: (row.name as Localized) ?? {},
-    tone: (row.tone as TagTone) ?? "neutral",
-    ink: (row.ink as TagInk | null) ?? null,
-    color: (row.color as string | null) ?? null,
+    iconUrl: (row.icon_url as string | null) ?? null,
     archivedAt: row.deleted_at as string,
   }));
 
@@ -306,8 +298,13 @@ export async function fetchArchivedPromotions(
   return { rows, cursor: cursorOf(rows, limit) };
 }
 
-/** The picture a promotion is recognised by: first banner, else first tile. */
-function coverOf(value: unknown): string | null {
+/**
+ * The picture a promotion is recognised by: first banner, else first tile.
+ *
+ * Exported for the promotions list, which shows the same thumbnail a live
+ * promotion is recognised by.
+ */
+export function coverOf(value: unknown): string | null {
   if (!Array.isArray(value) || value.length === 0) return null;
   const pictures = [...(value as Record<string, unknown>[])].sort(
     (a, b) =>
@@ -384,7 +381,7 @@ export async function restoreStore(id: string): Promise<void> {
 
   const { data, error: lookup } = await client
     .from("stores")
-    .select("categories!inner ( name, deleted_at )")
+    .select("categories!category_id!inner ( name, deleted_at )")
     .eq("id", id)
     .single();
 
@@ -444,7 +441,30 @@ async function clearDeletedAt(table: string, id: string): Promise<void> {
     .update({ deleted_at: null })
     .eq("id", id);
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(restoreRefusal(error.message));
+}
+
+/**
+ * The picture rules, said in words when they refuse a restore.
+ *
+ * `categories_icon_required`, `stores_image_required` and
+ * `menu_item_tags_icon_required` let a row be archived
+ * without a picture but not brought back without one: clearing `deleted_at` is
+ * an update like any other, and the row is live again the moment it lands. So a
+ * legacy row archived before the rule existed comes back refused, and this
+ * turns the constraint name into the same sentence the editors use.
+ */
+function restoreRefusal(message: string): string {
+  if (message.includes("categories_icon_required")) {
+    return t("categories.iconRequired");
+  }
+  if (message.includes("stores_image_required")) {
+    return t("store.imageRequired");
+  }
+  if (message.includes("menu_item_tags_icon_required")) {
+    return t("tags.iconRequired");
+  }
+  return message;
 }
 
 /**

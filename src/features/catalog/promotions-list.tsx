@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button, cx } from "@/components/ui";
+import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { ListHeader } from "@/components/ui/list-header";
 import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -227,6 +228,21 @@ function Row({
       <button {...handleProps(promotion.id)}>
         <GripIcon />
       </button>
+
+      {/* The picture it is recognised by — its first banner, else its first
+          tile — so the row shows the campaign rather than only its reference.
+          The same 46pt square, and the same empty well, as the shops list. */}
+      {promotion.pictureUrl ? (
+        <PreviewImage
+          src={promotion.pictureUrl}
+          name={promotion.slug}
+          // Above the row's stretched button, so a click opens the picture
+          // rather than the promotion — see `ROW_ABOVE`.
+          className={cx(ROW_ABOVE, "size-[46px] shrink-0 rounded-md")}
+        />
+      ) : (
+        <ImagePlaceholder className="size-[46px] shrink-0 rounded-md" />
+      )}
 
       <button
         type="button"

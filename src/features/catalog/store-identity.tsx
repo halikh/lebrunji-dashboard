@@ -99,7 +99,7 @@ export function StoreFacts({ store }: { store: Store }) {
   return (
     <span className="flex flex-wrap items-center gap-sm text-[12px] text-text-faint">
       <span className="truncate">
-        {store.categoryName} ·{" "}
+        {store.categoryNames.join(", ")} ·{" "}
         {t("catalogue.prep", {
           min: store.prepMinMinutes,
           max: store.prepMaxMinutes,

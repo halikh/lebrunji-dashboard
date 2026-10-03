@@ -291,23 +291,21 @@ export function CatalogueArchive() {
             .flatMap((page) => page.rows)
             .map((tag) => (
               <div key={tag.id} className={ROW_STATIC}>
-                {/* The chip, not the bare name. A tag *is* its colour on a
-                    dish, and an archived one should be recognisable as the
-                    thing that was taken off forty menu rows. */}
-                <span className="shrink-0">
+                {/* The tag as a dish shows it — icon, then name — in place of
+                    `Identity`'s plain name, so an archived one is recognisable
+                    as the thing that was taken off forty menu rows. */}
+                <span className="flex min-w-0 flex-grow flex-col gap-xxs">
                   <TagChip
-                    tone={tag.tone}
-                    ink={tag.ink}
-                    color={tag.color}
                     label={pickLocalized(tag.name)}
+                    iconUrl={tag.iconUrl}
+                    className="text-[15px]"
                   />
+                  <span className="truncate text-[12px] text-text-faint">
+                    {t("archive.archivedOn", {
+                      when: formatDate(tag.archivedAt),
+                    })}
+                  </span>
                 </span>
-                <Identity
-                  name={pickLocalized(tag.name)}
-                  detail={t("archive.archivedOn", {
-                    when: formatDate(tag.archivedAt),
-                  })}
-                />
                 <Restore
                   name={pickLocalized(tag.name)}
                   body="archive.restoreTag"

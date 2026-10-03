@@ -2,7 +2,7 @@ import { PAGE } from "@/lib/limits";
 import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
-import { formatLocalized, hasEmoji } from "@/lib/text-format";
+import { isTagName, tagName } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -29,65 +29,30 @@ import type { Localized } from "@/lib/validation";
  * ends up carrying "Spicy", "spicy" and "SPICY" with no way to find them
  * together.
  *
- * ## `tone` is a role, not a colour
+ * ## An icon and a word, and no colour
  *
- * The column holds a palette role and the screen decides what it looks like.
- * The app does the same, from its own tokens, so one tag reads as the product
- * in both places and re-tuning the palette needs no data migration. There is no
- * colour picker here for the same reason there is no hex literal in a
- * component.
+ * A tag used to carry a palette role, then an ink, then any colour at all
+ * (`0077`, `0112`, `0114`), and for a while its name had to open with an emoji.
+ * All of that is gone. A tag is now an uploaded icon (`icon_url`, required)
+ * followed by its name in plain heading type — see `tag-chip.tsx` — and the
+ * name is letters and single spaces only (`menu_item_tags_name_letters`): the
+ * picture is the icon's job, so the words carry no pictures, digits or
+ * punctuation of their own.
  */
-
-/** The palette roles a tag may be drawn in. Mirrors `menu_item_tags_tone_known`. */
-export const TAG_TONES = [
-  "neutral",
-  "accent",
-  "yellow",
-  "active",
-  "info",
-] as const;
-
-export type TagTone = (typeof TAG_TONES)[number];
-
-/**
- * Which ink a chip's words take. Mirrors `menu_item_tags_ink_known`.
- *
- * A role, not a colour — `dark` is the theme's ink and `light` is white, so
- * re-tuning the palette moves every chip without a data migration. The same
- * reasoning `tone` was named for.
- */
-export const TAG_INKS = ["dark", "light"] as const;
-
-export type TagInk = (typeof TAG_INKS)[number];
 
 export type Tag = {
   id: string;
   slug: string;
   name: Localized;
-  tone: TagTone;
   /**
-   * The ink, or null for whatever the tone measures well against.
+   * The tag's icon, drawn small before its name.
    *
-   * Null is a live reference rather than a default — `0112` chose it over
-   * backfilling a copy for the reason `0110` did: a copy is the answer *as of
-   * today*, so a later change to what a tone looks like would leave every old
-   * row holding a choice nobody made.
-   *
-   * A tag saved through this screen never keeps it: the editor shows the
-   * resolved value and writes it back explicitly, which is the point at which a
-   * merchant has actually looked at the thing.
+   * Required by `menu_item_tags_icon_required` on every insert and update of a
+   * live tag. Nullable here only because that check is `not valid`: a tag made
+   * before it may still arrive without one, and the editor has to be able to
+   * open it to add one. Such a tag is drawn as its name alone.
    */
-  ink: TagInk | null;
-  /**
-   * The chip's ground as `#rrggbb`, or null for whatever this palette calls
-   * the tag's tone.
-   *
-   * `0114`. The same live-reference rule as `ink` above, and it is what keeps
-   * the five roles worth having: picking a preset writes **null** rather than
-   * its hex, so a tag left on "accent" still moves if the app's mint ever does.
-   * Only a colour the palette does not have is stored as one.
-   */
-  color: string | null;
+  iconUrl: string | null;
   isActive: boolean;
   /**
    * How many live dishes carry it.
@@ -100,7 +65,7 @@ export type Tag = {
   usedBy: number;
 };
 
-const COLUMNS = `id, slug, name, tone, ink, color, is_active,
+const COLUMNS = `id, slug, name, icon_url, is_active,
    menu_item_tag_links ( count )`;
 
 /**
@@ -119,7 +84,7 @@ const COLUMNS = `id, slug, name, tone, ink, color, is_active,
  *
  * `created_at desc` rather than alphabetical, because of why this screen gets
  * opened. It is almost always a tag just added — to check how the chip reads,
- * fix its tone, correct the Arabic — and that row is then the first one rather
+ * check its icon, correct the Arabic — and that row is then the first one rather
  * than one to go looking for. A vocabulary is also searched more than it is
  * browsed, and the box above handles that.
  *
@@ -151,9 +116,7 @@ export async function fetchTags(search?: string | null): Promise<Tag[]> {
     id: row.id as string,
     slug: row.slug as string,
     name: (row.name as Localized) ?? {},
-    tone: (row.tone as TagTone) ?? "neutral",
-    ink: (row.ink as TagInk | null) ?? null,
-    color: (row.color as string | null) ?? null,
+    iconUrl: (row.icon_url as string | null) ?? null,
     isActive: row.is_active as boolean,
     usedBy: countOf(row.menu_item_tag_links),
   }));
@@ -178,59 +141,69 @@ function countOf(value: unknown): number {
 }
 
 /*
- * The house style and the emoji rule, applied here as well as in the form.
+ * The two rules on a tag, applied here as well as in the form.
  *
- * The form's copy of both is what makes them visible while somebody types;
- * this copy is what makes them true. A rule enforced only by one editor is a
- * rule the next screen written does not have — see `lib/text-format.ts`.
+ * The form's copy is what makes them visible while somebody types; this copy
+ * is what makes them true. A rule enforced only by one editor is a rule the
+ * next screen written does not have.
  */
-const NAME_FORMAT = "sentence" as const;
 
 /**
- * Refuses a tag whose name carries no emoji, naming the language that is short
- * of one.
+ * Refuses a tag name that is anything but letters and single spaces, naming
+ * the language that breaks the rule.
  *
- * ## Why it is a hard rule rather than a suggestion
- *
- * A tag is drawn as a chip a few millimetres tall, in a row beside two others,
- * on a phone held at arm's length. At that size the picture is what is
- * recognised and the word is what confirms it — so a chip without one is a
- * grey rectangle that has to be *read* in a place nobody is reading. The
- * vocabulary only works if it is uniform: one wordless chip in a row of six
- * looks like a rendering fault rather than like a plainer tag.
- *
- * Every language separately, because the chip is drawn from whichever one the
- * customer is using. An English name with an emoji and an Arabic one without
- * is a tag that works on half the phones.
+ * The same set `menu_item_tags_name_letters` checks — see `TAG_WORD` in
+ * `lib/text-format.ts`, which has to match it character for character. Every
+ * language separately; a blank optional language is not this function's
+ * business (the `_locales` check and `validateLocalizedText` own that).
  */
-function requireEmoji(name: Localized): void {
-  const short = Object.entries(name)
-    .filter(([, text]) => text.trim().length > 0 && !hasEmoji(text))
+function requireLetters(name: Localized): void {
+  const bad = Object.entries(name)
+    .filter(([, text]) => text.trim().length > 0 && !isTagName(text))
     .map(([code]) => code);
 
-  if (short.length > 0) {
-    throw new Error(t("tags.needsEmoji", { language: short.join(", ") }));
+  if (bad.length > 0) {
+    throw new Error(t("tags.lettersOnly", { language: bad.join(", ") }));
   }
+}
+
+/**
+ * Refuses a tag with no icon, before `menu_item_tags_icon_required` has to.
+ *
+ * Blank counts as missing because the check trims. Archiving never comes
+ * through here, and the constraint lets any tag be archived, icon or not.
+ */
+function requireIcon(iconUrl: string | null | undefined): void {
+  if (!iconUrl || iconUrl.trim() === "") {
+    throw new Error(t("tags.iconRequired"));
+  }
+}
+
+/**
+ * A name as it is stored: each language trimmed, with single spaces between
+ * words. Case is left exactly as typed.
+ */
+function tidy(name: Localized): Localized {
+  return Object.fromEntries(
+    Object.entries(name).map(([code, text]) => [code, tagName(text)]),
+  );
 }
 
 export type TagDraft = {
   name: Localized;
-  tone: TagTone;
-  ink: TagInk;
-  /** Null for the tone's own colour — see `Tag.color`. */
-  color: string | null;
+  /** Required — see `Tag.iconUrl`. */
+  iconUrl: string | null;
   isActive: boolean;
 };
 
 export async function createTag(draft: TagDraft): Promise<void> {
-  const name = formatLocalized(draft.name, NAME_FORMAT);
-  requireEmoji(name);
+  const name = tidy(draft.name);
+  requireLetters(name);
+  requireIcon(draft.iconUrl);
 
   const { error } = await getClient().from("menu_item_tags").insert({
     name,
-    tone: draft.tone,
-    ink: draft.ink,
-    color: draft.color,
+    icon_url: draft.iconUrl,
     is_active: draft.isActive,
     // No `slug`: `0071`'s trigger derives one from the English name
     // inside the insert's own transaction, which is the only way to make it
@@ -245,15 +218,18 @@ export type TagPatch = Partial<TagDraft>;
 export async function updateTag(id: string, patch: TagPatch): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) {
-    const name = formatLocalized(patch.name, NAME_FORMAT);
-    requireEmoji(name);
+    const name = tidy(patch.name);
+    requireLetters(name);
     row.name = name;
   }
-  if (patch.tone !== undefined) row.tone = patch.tone;
-  if (patch.ink !== undefined) row.ink = patch.ink;
-  // `null` is a value here — it is how a tag is put back to following its
-  // tone — so what is tested is the key being absent, not the value.
-  if (patch.color !== undefined) row.color = patch.color;
+  // Present means "set it to this", so an empty one is a request to clear a
+  // required field. Absent means "leave it" — and a legacy tag with no icon is
+  // still refused by the database on any update (a switch on the list
+  // included), which `friendly` turns into the same sentence.
+  if (patch.iconUrl !== undefined) {
+    requireIcon(patch.iconUrl);
+    row.icon_url = patch.iconUrl;
+  }
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
 
   const { error } = await getClient()
@@ -348,12 +324,16 @@ export async function setItemTags(
 }
 
 function friendly(message: string): string {
+  // First: the names are specific, and `slug` and `_len` are loose substrings.
+  if (message.includes("menu_item_tags_icon_required")) {
+    return t("tags.iconRequired");
+  }
+  if (message.includes("menu_item_tags_name_letters")) {
+    return t("tags.lettersOnlyAny");
+  }
   if (message.includes("slug")) return t("dbError.duplicateSlug");
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("_len")) return t("dbError.tooLong");
-  if (message.includes("tone_known")) return t("tags.unknownTone");
-  if (message.includes("ink_known")) return t("tags.unknownInk");
-  if (message.includes("color_shape")) return t("tags.badColor");
   // A dish already carrying the tag. Reached only by two tabs saving the same
   // item at once, and the right answer is that the intended state is the state:
   // the link exists, which is what was asked for.

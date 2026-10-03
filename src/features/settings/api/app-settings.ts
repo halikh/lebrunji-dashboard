@@ -33,10 +33,19 @@ export type AppSettings = {
   closeHour: number;
   /** The new-order sound, or null for the built-in one. */
   notificationSoundUrl: string | null;
+  /**
+   * What each shop past the first adds to an order's delivery fee.
+   *
+   * Minor units of the **base currency**, like a band on the delivery ladder,
+   * and converted the same way for a shop pricing in something else — it is
+   * part of the delivery fee. `cart_price` reads it on every basket (0133), so
+   * a change applies to the next checkout, not to orders already placed.
+   */
+  extraStoreFee: number;
 };
 
 const COLUMNS =
-  "clock_24h, orders_open_hour, orders_close_hour, notification_sound_url";
+  "clock_24h, orders_open_hour, orders_close_hour, notification_sound_url, extra_store_fee";
 
 export async function fetchAppSettings(): Promise<AppSettings> {
   const { data, error } = await getClient()
@@ -52,6 +61,9 @@ export async function fetchAppSettings(): Promise<AppSettings> {
     openHour: row.orders_open_hour as number,
     closeHour: row.orders_close_hour as number,
     notificationSoundUrl: (row.notification_sound_url as string | null) ?? null,
+    // `bigint` can arrive as a string over the wire; a string here would make
+    // `60 !== "60"` and the field look edited the moment it loaded.
+    extraStoreFee: Number(row.extra_store_fee ?? 0),
   };
 }
 
@@ -75,6 +87,9 @@ export async function updateAppSettings(
   if (patch.closeHour !== undefined) row.orders_close_hour = patch.closeHour;
   if (patch.notificationSoundUrl !== undefined) {
     row.notification_sound_url = patch.notificationSoundUrl;
+  }
+  if (patch.extraStoreFee !== undefined) {
+    row.extra_store_fee = patch.extraStoreFee;
   }
 
   if (Object.keys(row).length === 0) return;

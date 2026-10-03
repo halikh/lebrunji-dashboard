@@ -1,6 +1,6 @@
 import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
-import { formatLocalized } from "@/lib/text-format";
+import { cleanLocalized } from "@/lib/text-format";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
@@ -274,17 +274,18 @@ async function searchMenuItems(
 }
 
 /*
- * The house style, applied here as well as in the fields that write it.
+ * The character rule, applied here as well as in the field — and never case.
  *
- * Two layers rather than one duplicated. `LocalizedField` formats as somebody
- * types, which is what makes the rule visible; these are what make it true —
- * bulk paste never opens a field at all, and a rule enforced only by a
- * component is one the next component does not have.
+ * Not a duplicate of the form's rule — a second layer under it. `LocalizedField`
+ * filters as somebody types, which is the half that makes the rule *visible*;
+ * `cleanLocalized` is the half that makes it *true*. Bulk paste, the wizard, a
+ * future import and any screen written next all arrive here, and a rule
+ * enforced only by a component is a rule the next component does not have.
  *
- * See `lib/text-format.ts` for the formats and the reasoning.
+ * Letters are stored exactly as typed. There used to be a house style here that
+ * re-cased names on save; it was removed so the inputs write what the operator
+ * writes. See `lib/text-format.ts`.
  */
-const NAME_FORMAT = "upper" as const;
-const DESCRIPTION_FORMAT = "sentence" as const;
 
 export type MenuItemDraft = {
   storeId: string;
@@ -304,6 +305,22 @@ export type MenuItemDraft = {
 };
 
 /**
+ * Refuses an item with no picture, before the database has to.
+ *
+ * `menu_items_image_required` is the rule — `deleted_at is not null or
+ * nullif(btrim(image_url), '') is not null` — and this is the same rule said
+ * early, in words. Blank counts as missing because the check trims.
+ *
+ * Archiving never comes through here, and the constraint lets any row be
+ * archived, picture or not, so a legacy item without one can still be retired.
+ */
+function requireImage(imageUrl: string | null | undefined): void {
+  if (!imageUrl || imageUrl.trim() === "") {
+    throw new Error(t("menu.imageRequired"));
+  }
+}
+
+/**
  * Adds an item.
  *
  * `sort_order` is computed here rather than defaulted, because the column has
@@ -315,6 +332,8 @@ export async function createMenuItem(
   draft: MenuItemDraft,
   sortOrder: number,
 ): Promise<void> {
+  requireImage(draft.imageUrl);
+
   const { data, error } = await getClient()
     .from("menu_items")
     .insert({
@@ -323,16 +342,11 @@ export async function createMenuItem(
       // No `slug`. The trigger from migration 0070 derives it from the English
       // name and makes it unique inside the shop — which a client cannot do
       // without racing another tab.
-      // Shouted, and the description in sentence case — the house style, see
-      // the note by `NAME_FORMAT`.
-      name: formatLocalized(draft.name, NAME_FORMAT),
+      name: cleanLocalized(draft.name),
       // Null when blank, never `{}` — see `localizedOrNull`. A description
       // is optional and the constraint accepts an absent one; it does not
       // accept an object with a locale missing.
-      description: formatLocalized(
-        localizedOrNull(draft.description),
-        DESCRIPTION_FORMAT,
-      ),
+      description: cleanLocalized(localizedOrNull(draft.description)),
       price: draft.price,
       is_active: draft.isActive,
       image_url: draft.imageUrl,
@@ -365,8 +379,14 @@ export async function createMenuItem(
  *
  * No description, no picture, no tags. Those are per-item judgements made while
  * looking at the item, and asking for them in a pasted list would make the
- * format wide enough that nobody would use it. The names and the prices are
- * what a menu *is*; the rest is editing afterwards.
+ * format wide enough that nobody would use it.
+ *
+ * **Which `menu_items_image_required` now refuses outright.** Every live item
+ * must carry a picture, and a pasted list has none, so this insert cannot
+ * succeed as long as it writes live rows with `image_url` null. It is left in
+ * place rather than quietly removed — what bulk entry should become (hidden
+ * rows to finish one by one, or no bulk entry for items at all) is a product
+ * decision — and the refusal is turned into a sentence that says why.
  *
  * `sortOrder` is where the first one lands and the rest follow it, in the order
  * they were typed — which is what keeps a pasted menu in menu order rather than
@@ -387,9 +407,9 @@ export async function createMenuItems(
         store_id: storeId,
         menu_section_id: sectionId,
         // Bulk paste never touches a `LocalizedField`, so this line is the
-        // only thing holding a pasted menu to the same house style as one
+        // only thing holding a pasted menu to the same character rule as one
         // typed a dish at a time. It is the reason the rule lives here too.
-        name: formatLocalized(item.name, NAME_FORMAT),
+        name: cleanLocalized(item.name),
         // Absent, not empty. `localizedOrNull`'s rule: the constraint accepts a
         // missing description and refuses an object with a locale missing.
         description: null,
@@ -404,7 +424,14 @@ export async function createMenuItems(
       })),
     );
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) {
+    // Said for a pasted list rather than with the single-item sentence, which
+    // would point at an image field this form does not have.
+    if (error.message.includes("menu_items_image_required")) {
+      throw new Error(t("menu.bulkImageRequired"));
+    }
+    throw new Error(friendly(error.message));
+  }
 }
 
 export type MenuItemPatch = Partial<
@@ -417,21 +444,23 @@ export async function updateMenuItem(
   id: string,
   patch: MenuItemPatch,
 ): Promise<void> {
+  // Present means "set it to this", so an empty one is a request to clear a
+  // required field. Absent means "leave it" — and a legacy item with no
+  // picture is still refused by the database on any update, which `friendly`
+  // turns into the same sentence.
+  if (patch.imageUrl !== undefined) requireImage(patch.imageUrl);
+
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined)
-    row.name = formatLocalized(patch.name, NAME_FORMAT);
+    row.name = cleanLocalized(patch.name);
   if (patch.description !== undefined) {
-    row.description = formatLocalized(
-      localizedOrNull(patch.description),
-      DESCRIPTION_FORMAT,
-    );
+    row.description = cleanLocalized(localizedOrNull(patch.description));
   }
   if (patch.price !== undefined) row.price = patch.price;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
-  // `null` is a value here — it is how a picture is removed — so the check is
-  // for the key being absent, not for the value being falsy.
+  // Checked by `requireImage` above, so only a real picture reaches here.
   if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
-  // `null` is a value here too — it is how a unit is cleared — so the check is
+  // `null` is a value here — it is how a unit is cleared — so the check is
   // for the key being absent, not for the value being falsy.
   if (patch.priceUnit !== undefined) row.price_unit = patch.priceUnit;
   if (patch.unitQuantity !== undefined) {
@@ -494,7 +523,7 @@ export async function createMenuSection(
     .from("menu_sections")
     .insert({
       store_id: draft.storeId,
-      title: formatLocalized(draft.title, NAME_FORMAT),
+      title: cleanLocalized(draft.title),
       sort_order: sortOrder,
     });
 
@@ -514,7 +543,7 @@ export async function updateMenuSection(
       title:
         patch.title === undefined
           ? undefined
-          : formatLocalized(patch.title, NAME_FORMAT),
+          : cleanLocalized(patch.title),
     })
     .eq("id", id);
 
@@ -541,7 +570,7 @@ export async function createMenuSections(
     .insert(
       titles.map((title, index) => ({
         store_id: storeId,
-        title: formatLocalized(title, NAME_FORMAT),
+        title: cleanLocalized(title),
         sort_order: sortOrder + index,
       })),
     );
@@ -700,6 +729,11 @@ export async function setSortOrder(
  * not to a wrong explanation.
  */
 function friendly(message: string): string {
+  // From the migration that made a picture required. Also what a restore of a
+  // legacy item without one runs into — see `restoreMenuItem`.
+  if (message.includes("menu_items_image_required")) {
+    return t("menu.imageRequired");
+  }
   if (message.includes("slug_live_idx") || message.includes("store_id_slug")) {
     return t("dbError.duplicateSlug");
   }

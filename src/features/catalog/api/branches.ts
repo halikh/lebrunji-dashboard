@@ -359,7 +359,10 @@ export async function updateBranch(
     row.prep_max_minutes = patch.prepMaxMinutes;
   if (patch.whatsappPhone !== undefined) {
     const digits = patch.whatsappPhone ? digitsOf(patch.whatsappPhone) : "";
-    row.whatsapp_phone = digits || null;
+    // The same refusal `createBranch` makes: a number can be changed, never
+    // taken away.
+    if (!digits) throw new Error(t("branches.whatsappRequired"));
+    row.whatsapp_phone = digits;
   }
   // `null` is a value for both — it is how a branch is put back to following
   // the shop — so what is tested is the key being absent, not the value.

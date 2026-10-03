@@ -2,7 +2,7 @@ import { PAGE } from "@/lib/limits";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { digitsOf } from "@/lib/phone";
-import { formatLocalized } from "@/lib/text-format";
+import { cleanLocalized } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
 import { createBranch } from "./branches";
@@ -19,8 +19,19 @@ export type Store = {
   slug: string;
   name: Localized;
   imageUrl: string | null;
+  /** The **main** category — `stores.category_id`, still required. */
   categoryId: string;
   categoryName: string;
+  /**
+   * Every category the shop is listed under, the main one first — `0136`.
+   *
+   * Read from `store_categories`, which a trigger keeps the main one in, so
+   * this is never empty for a shop saved since. The app's category filters
+   * read the same table, so the shop appears under each of these.
+   */
+  categoryIds: string[];
+  /** The names of `categoryIds`, in the same order. */
+  categoryNames: string[];
   currencyCode: string;
   isActive: boolean;
   isFeatured: boolean;
@@ -121,6 +132,13 @@ export type StorePage = {
   truncated: boolean;
 };
 
+/*
+ * `categories!category_id` in the selects below names the main category's
+ * foreign key. Since `0136` a shop reaches `categories` two ways — that column
+ * and the `store_categories` link table — and PostgREST refuses an embed with
+ * two candidate relationships rather than guessing.
+ */
+
 export async function fetchStores(
   options: { search?: string | null } = {},
 ): Promise<StorePage> {
@@ -136,7 +154,8 @@ export async function fetchStores(
        sort_order, admin_sort_order, exchange_rate,
        latitude, longitude, prep_min_minutes, prep_max_minutes,
        whatsapp_phone,
-       categories ( name ),
+       categories!category_id ( name ),
+       store_categories ( category_id, categories ( name ) ),
        branches ( whatsapp_phone, sort_order, created_at, deleted_at )`,
     )
     .is("deleted_at", null)
@@ -179,7 +198,8 @@ export async function fetchStore(id: string): Promise<Store> {
        sort_order, admin_sort_order, exchange_rate,
        latitude, longitude, prep_min_minutes, prep_max_minutes,
        whatsapp_phone,
-       categories ( name ),
+       categories!category_id ( name ),
+       store_categories ( category_id, categories ( name ) ),
        branches ( whatsapp_phone, sort_order, created_at, deleted_at )`,
     )
     .eq("id", id)
@@ -190,17 +210,18 @@ export async function fetchStore(id: string): Promise<Store> {
 }
 
 /*
- * The house style, applied here as well as in the field.
+ * The character rule, applied here as well as in the field — and never case.
  *
  * Not a duplicate of the form's rule — a second layer under it. `LocalizedField`
- * formats as somebody types, which is the half that makes the rule *visible*;
- * this is the half that makes it *true*. Bulk paste, the wizard, a future
- * import and any screen written next all arrive here, and a rule enforced only
- * by a component is a rule the next component does not have.
+ * filters as somebody types, which is the half that makes the rule *visible*;
+ * `cleanLocalized` is the half that makes it *true*. Bulk paste, the wizard, a
+ * future import and any screen written next all arrive here, and a rule
+ * enforced only by a component is a rule the next component does not have.
  *
- * See `lib/text-format.ts` for what the formats are and why.
+ * Letters are stored exactly as typed. There used to be a house style here that
+ * re-cased names on save; it was removed so the inputs write what the operator
+ * writes. See `lib/text-format.ts`.
  */
-const NAME_FORMAT = "upper" as const;
 
 /**
  * The two answers a shop cannot trade without — the same pair, and the same
@@ -231,9 +252,31 @@ function requireTradeable(draft: {
   }
 }
 
+/**
+ * Refuses a shop with no picture, before the database has to.
+ *
+ * `stores_image_required` is the rule — `deleted_at is not null or
+ * nullif(btrim(image_url), '') is not null` — and this is the same rule said
+ * early, in words. Blank counts as missing because the check trims.
+ *
+ * Archiving never comes through here, and the constraint lets any row be
+ * archived, picture or not, so a legacy shop without one can still be retired.
+ */
+function requireImage(imageUrl: string | null | undefined): void {
+  if (!imageUrl || imageUrl.trim() === "") {
+    throw new Error(t("store.imageRequired"));
+  }
+}
+
 export type StoreDraft = {
   name: Localized;
+  /** The main category. */
   categoryId: string;
+  /**
+   * Every category to list the shop under — `0136`. The main one is added if
+   * it is missing, so a caller may pass only the extras.
+   */
+  categoryIds: string[];
   currencyCode: string;
   imageUrl: string | null;
   latitude: number | null;
@@ -341,12 +384,12 @@ export async function createStore(
   sortOrder: number,
 ): Promise<string> {
   requireTradeable(draft);
+  requireImage(draft.imageUrl);
 
   const { data, error } = await getClient()
     .from("stores")
     .insert({
-      // Shops are shouted. See `NAME_FORMAT` below.
-      name: formatLocalized(draft.name, NAME_FORMAT),
+      name: cleanLocalized(draft.name),
       category_id: draft.categoryId,
       country_id: countryId,
       currency_code: draft.currencyCode,
@@ -372,6 +415,17 @@ export async function createStore(
 
   const id = data.id as string;
   await ensureFirstBranch(id, draft);
+
+  // The extras, after the row: the trigger has already linked the main one,
+  // and a link needs a shop to point at. Not a failure of the create if it
+  // fails, for the reason `ensureFirstBranch` gives — the shop exists, and a
+  // thrown error here invites a second one. The categories can be set again
+  // on the details tab, where they are on screen.
+  try {
+    await setStoreCategories(id, draft.categoryId, draft.categoryIds);
+  } catch {
+    // Deliberately swallowed — see above.
+  }
   return id;
 }
 
@@ -460,6 +514,12 @@ export type StorePatch = {
    * column write like the name.
    */
   categoryId?: string;
+  /**
+   * Every category to list the shop under — `0136`. Written after the row, so
+   * a new main category is already in place before the old one's link is
+   * removed (the database refuses removing the main one's).
+   */
+  categoryIds?: string[];
   /*
    * No `currencyCode`, and that is the point.
    *
@@ -513,10 +573,15 @@ export async function updateStore(
   patch: StorePatch,
 ): Promise<void> {
   requireTradeable(patch);
+  // Present means "set it to this", so an empty one is a request to clear a
+  // required field. Absent means "leave it" — and a legacy shop with no
+  // picture is still refused by the database on any update, which `friendly`
+  // turns into the same sentence.
+  if (patch.imageUrl !== undefined) requireImage(patch.imageUrl);
 
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined)
-    row.name = formatLocalized(patch.name, NAME_FORMAT);
+    row.name = cleanLocalized(patch.name);
   if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
@@ -524,8 +589,9 @@ export async function updateStore(
     row.exchange_rate = patch.exchangeRate;
   }
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
-  // `null` is a value for these three — it is how a picture or a pin is
-  // removed — so what is tested is the key being absent, not the value.
+  // `null` is a value for the pin — it is how one is removed — so what is
+  // tested is the key being absent, not the value. Not for the picture any
+  // more: `requireImage` above has already refused an empty one.
   if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
   if (patch.latitude !== undefined) row.latitude = patch.latitude;
   if (patch.longitude !== undefined) row.longitude = patch.longitude;
@@ -543,8 +609,86 @@ export async function updateStore(
     row.prep_max_minutes = patch.prepMaxMinutes;
   }
 
-  const { error } = await getClient().from("stores").update(row).eq("id", id);
-  if (error) throw new Error(error.message);
+  // A patch may be categories only, which is no column on this row.
+  if (Object.keys(row).length > 0) {
+    const { error } = await getClient()
+      .from("stores")
+      .update(row)
+      .eq("id", id);
+    // Through `friendly` so a refusal from `stores_image_required` — a legacy
+    // shop with no picture, edited from anywhere — reads as a sentence.
+    if (error) throw new Error(friendly(error.message));
+  }
+
+  if (patch.categoryIds !== undefined) {
+    // The main one this shop will have once the row above has landed: the
+    // patch's if it moved, otherwise whatever it already was — which is read,
+    // since the caller may not have sent it.
+    let main = patch.categoryId;
+    if (main === undefined) {
+      const { data, error: lookup } = await getClient()
+        .from("stores")
+        .select("category_id")
+        .eq("id", id)
+        .single();
+      if (lookup) throw new Error(lookup.message);
+      main = data.category_id as string;
+    }
+    await setStoreCategories(id, main, patch.categoryIds);
+  }
+}
+
+/**
+ * Puts a shop's category links exactly where the form says — `0136`.
+ *
+ * Read first, then only the difference written, for the reasons `setItemTags`
+ * in `api/tags.ts` gives: a failure between a delete and an insert must not
+ * leave the shop in no category at all, and saving twice must change nothing.
+ * Adds before removes, for the same reason.
+ *
+ * The main category is always kept, whether or not the caller listed it. The
+ * trigger refuses removing its link anyway (`store_categories_main_category`),
+ * so leaving it out of the deletes is the rule said first rather than a
+ * refusal waited for. Which is also why `updateStore` writes the row first: a
+ * shop's old main category can only be unlinked once it is no longer main.
+ */
+export async function setStoreCategories(
+  storeId: string,
+  mainId: string,
+  categoryIds: readonly string[],
+): Promise<void> {
+  const client = getClient();
+
+  const { data, error } = await client
+    .from("store_categories")
+    .select("category_id")
+    .eq("store_id", storeId);
+  if (error) throw new Error(friendly(error.message));
+
+  const before = new Set((data ?? []).map((row) => row.category_id as string));
+  const after = new Set([mainId, ...categoryIds]);
+
+  const removed = [...before].filter((id) => !after.has(id));
+  const added = [...after].filter((id) => !before.has(id));
+
+  if (added.length > 0) {
+    const { error: addError } = await client.from("store_categories").insert(
+      added.map((categoryId) => ({
+        store_id: storeId,
+        category_id: categoryId,
+      })),
+    );
+    if (addError) throw new Error(friendly(addError.message));
+  }
+
+  if (removed.length > 0) {
+    const { error: removeError } = await client
+      .from("store_categories")
+      .delete()
+      .eq("store_id", storeId)
+      .in("category_id", removed);
+    if (removeError) throw new Error(friendly(removeError.message));
+  }
 }
 
 /** What restating a shop's prices is *for* — see {@link setStoreCurrency}. */
@@ -618,14 +762,21 @@ function toStore(row: Record<string, unknown>): Store {
   const category = Array.isArray(row.categories)
     ? row.categories[0]
     : row.categories;
+  const categoryId = row.category_id as string;
+  const categoryName = pick(
+    (category as Record<string, unknown> | null)?.name,
+  );
+  const listed = listedCategories(row, categoryId, categoryName);
 
   return {
     id: row.id as string,
     slug: row.slug as string,
     name: (row.name as Localized) ?? {},
     imageUrl: (row.image_url as string | null) ?? null,
-    categoryId: row.category_id as string,
-    categoryName: pick((category as Record<string, unknown> | null)?.name),
+    categoryId,
+    categoryName,
+    categoryIds: listed.map((one) => one.id),
+    categoryNames: listed.map((one) => one.name),
     currencyCode: row.currency_code as string,
     isActive: row.is_active as boolean,
     isFeatured: row.is_featured as boolean,
@@ -642,6 +793,36 @@ function toStore(row: Record<string, unknown>): Store {
     prepMinMinutes: row.prep_min_minutes as number,
     prepMaxMinutes: row.prep_max_minutes as number,
   };
+}
+
+/**
+ * Every category a shop is listed under, the main one first.
+ *
+ * The main one is put first — and put in at all, if the embed somehow lacks
+ * it — because it is the answer to "what kind of shop is this" and the others
+ * are additions to it. The rest keep the order the embed gave, which is good
+ * enough for a list of two or three.
+ */
+function listedCategories(
+  row: Record<string, unknown>,
+  mainId: string,
+  mainName: string,
+): { id: string; name: string }[] {
+  const links = Array.isArray(row.store_categories)
+    ? (row.store_categories as Record<string, unknown>[])
+    : [];
+  const others = links
+    .map((link) => {
+      const category = Array.isArray(link.categories)
+        ? link.categories[0]
+        : link.categories;
+      return {
+        id: link.category_id as string,
+        name: pick((category as Record<string, unknown> | null)?.name),
+      };
+    })
+    .filter((one) => one.id !== mainId);
+  return [{ id: mainId, name: mainName }, ...others];
 }
 
 /**
@@ -757,6 +938,13 @@ export async function setStoreOrder(
 
 /** Turns a constraint violation into a sentence the operator can act on. */
 function friendly(message: string): string {
+  // First: the name is specific, and `slug` and `prep` are loose substrings.
+  if (message.includes("stores_image_required")) {
+    return t("store.imageRequired");
+  }
+  if (message.includes("store_categories_main_category")) {
+    return t("store.mainCategoryKept");
+  }
   if (message.includes("slug")) return t("dbError.duplicateSlug");
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("_len")) return t("dbError.tooLong");

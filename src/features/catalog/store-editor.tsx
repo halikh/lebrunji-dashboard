@@ -12,7 +12,7 @@ import { LocalizedField } from "@/components/ui/localized-field";
 import { Map as PinMap } from "@/components/ui/map";
 import { NumberInput } from "@/components/ui/number-input";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { Select } from "@/components/ui/select";
+import { MultiSelect, Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import {
   changed,
@@ -120,6 +120,8 @@ export function StoreEditor() {
   const [name, setName] = useState<Localized>({});
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [categoryId, setCategoryId] = useState("");
+  /** Every category besides the main one — `0136`. */
+  const [otherCategoryIds, setOtherCategoryIds] = useState<string[]>([]);
   const [currencyCode, setCurrencyCode] = useState("");
   const [pin, setPin] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -159,6 +161,7 @@ export function StoreEditor() {
     name?: string;
     category?: string;
     currency?: string;
+    image?: string;
     pin?: string;
     prep?: string;
     whatsapp?: string;
@@ -178,6 +181,7 @@ export function StoreEditor() {
         name,
         imageUrl,
         categoryId,
+        otherCategoryIds,
         currencyCode,
         pin,
         whatsapp,
@@ -191,6 +195,7 @@ export function StoreEditor() {
         name: {},
         imageUrl: null,
         categoryId: "",
+        otherCategoryIds: [],
         currencyCode: "",
         pin: "",
         whatsapp: "",
@@ -245,6 +250,9 @@ export function StoreEditor() {
       // reads as a form.
       category: categoryId ? undefined : t("store.categoryRequired"),
       currency: currency ? undefined : t("store.currencyRequired"),
+      // `stores_image_required`: a live shop without a picture is refused on
+      // insert. Blank counts as missing, because the check trims.
+      image: imageUrl?.trim() ? undefined : t("store.imageRequired"),
       // The three failures are told apart because two have an obvious next
       // step: an empty box needs an answer, and a shortened link needs opening
       // once — and saying so beats "that is not a coordinate pair" about
@@ -279,6 +287,7 @@ export function StoreEditor() {
     const draft: StoreDraft = {
       name,
       categoryId,
+      categoryIds: [categoryId, ...otherCategoryIds],
       currencyCode: currency,
       imageUrl,
       latitude: coordinates?.latitude ?? null,
@@ -374,8 +383,8 @@ export function StoreEditor() {
             onChange={setName}
             maxLength={TEXT.name}
             error={errors.name}
-            format="upper"
-            placeholder={{ en: "NARA KITCHEN", ar: "مطبخ نارا" }}
+            filter="name"
+            placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارا" }}
           />
 
           <Field
@@ -385,12 +394,41 @@ export function StoreEditor() {
           >
             <Select
               value={categoryId}
-              onChange={setCategoryId}
+              onChange={(next) => {
+                setCategoryId(next);
+                // A category promoted to main leaves the extras — it is
+                // included as the main one, and listing it twice would offer
+                // a removal that does nothing.
+                setOtherCategoryIds((current) =>
+                  current.filter((id) => id !== next),
+                );
+              }}
               placeholder={t("store.pickCategory")}
               options={(categories.data ?? []).map((category) => ({
                 value: category.id,
                 label: pickLocalized(category.name),
               }))}
+            />
+          </Field>
+
+          {/* Every other category the shop is listed under — `0136`. The main
+              one above is what the shop *is*; these are where else a customer
+              filtering by category should find it. The main one is left out of
+              the options, since it is always included. */}
+          <Field
+            label={t("store.otherCategories")}
+            hint={t("store.otherCategoriesHint")}
+          >
+            <MultiSelect
+              value={otherCategoryIds}
+              onChange={setOtherCategoryIds}
+              placeholder={t("store.otherCategoriesPlaceholder")}
+              options={(categories.data ?? [])
+                .filter((category) => category.id !== categoryId)
+                .map((category) => ({
+                  value: category.id,
+                  label: pickLocalized(category.name),
+                }))}
             />
           </Field>
 
@@ -433,10 +471,21 @@ export function StoreEditor() {
             />
           </Field>
 
-          <Field label={t("images.label")} hint={t("store.imageHint")}>
+          <Field
+            label={t("images.label")}
+            hint={t("store.imageHint")}
+            error={errors.image}
+          >
             <ImageUploader
               value={imageUrl}
-              onChange={setImageUrl}
+              onChange={(url) => {
+                setImageUrl(url);
+                // Cleared as soon as there is one, rather than left standing
+                // until the next Save over a picture that is plainly there.
+                if (url?.trim()) {
+                  setErrors((current) => ({ ...current, image: undefined }));
+                }
+              }}
               folder="stores"
               disabled={create.isPending}
             />
