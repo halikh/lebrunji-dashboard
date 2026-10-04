@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 
 import { useGuardedAction } from "@/components/unsaved-changes";
 
@@ -64,6 +64,40 @@ import { useStore } from "./use-stores";
  * It also means one shell pattern: detail opens beside the list here exactly as
  * an order's receipt does.
  */
+/**
+ * How each shop's menu was left: which sections were open, and how far down
+ * the list had been scrolled.
+ *
+ * Editing a dish is a page of its own, so going to it unmounts this screen and
+ * coming back mounts a fresh one — every section closed and the list at the
+ * top, which on a long menu is the operator's place thrown away by a Save.
+ * `?focus=` brings back the one row; this brings back the rest of the view.
+ *
+ * Per shop, so arriving at a *different* shop's menu does not open sections
+ * somebody chose on another one. Module state rather than storage: it is for
+ * the round trip to an editor and back, and a reload starting fresh is fine.
+ */
+const menuViews = new Map<string, { open: Set<string>; scrollTop: number }>();
+
+function menuView(storeId: string) {
+  let view = menuViews.get(storeId);
+  if (!view) {
+    view = { open: new Set(), scrollTop: 0 };
+    menuViews.set(storeId, view);
+  }
+  return view;
+}
+
+function rememberScroll(storeId: string, scrollTop: number) {
+  menuView(storeId).scrollTop = scrollTop;
+}
+
+function rememberOpen(storeId: string, sectionId: string, open: boolean) {
+  const { open: opened } = menuView(storeId);
+  if (open) opened.add(sectionId);
+  else opened.delete(sectionId);
+}
+
 export function StoreMenu({ storeId }: { storeId: string }) {
   const router = useRouter();
   const store = useStore(storeId);
@@ -178,6 +212,25 @@ export function StoreMenu({ storeId }: { storeId: string }) {
    */
   const matches = useMenuSearch(storeId, search);
 
+  /**
+   * Put the list back where it was left — once, as soon as the rows it was
+   * scrolled through exist. Before paint, so the top of the menu never shows.
+   *
+   * `instant`, because the scrollers ease (see `globals.css`) and this is not
+   * a jump the operator should watch: it is the page they left, unchanged.
+   */
+  const scroller = useRef<HTMLDivElement>(null);
+  const restored = useRef(false);
+  useLayoutEffect(() => {
+    if (restored.current || !menu.isSuccess || !scroller.current) return;
+    restored.current = true;
+    // Nothing remembered is left alone rather than pinned to the top, so a
+    // cold arrival's `?focus=` can still scroll its row into view.
+    const { scrollTop } = menuView(storeId);
+    if (scrollTop === 0) return;
+    scroller.current.scrollTo({ top: scrollTop, behavior: "instant" });
+  }, [menu.isSuccess, storeId]);
+
   return (
     // The shop's name and its tabs belong to `StoreScreen`, which draws them
     // once for every tab. This is the menu itself.
@@ -250,7 +303,17 @@ export function StoreMenu({ storeId }: { storeId: string }) {
             {t("menu.searchHint")}
           </span>
         </div>
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
+        <div
+          ref={scroller}
+          onScroll={(event) => {
+            // Only once restored, or the scroll the restore itself causes —
+            // and anything before it — would overwrite the place it restores.
+            if (restored.current) {
+              rememberScroll(storeId, event.currentTarget.scrollTop);
+            }
+          }}
+          className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl"
+        >
           {menu.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (
@@ -388,6 +451,10 @@ export function StoreMenu({ storeId }: { storeId: string }) {
                   currencyCode={store.data?.currencyCode ?? ""}
                   shopRate={store.data?.exchangeRate ?? null}
                   focus={focus}
+                  initiallyOpen={menuView(storeId).open.has(section.id)}
+                  onOpenChange={(open) =>
+                    rememberOpen(storeId, section.id, open)
+                  }
                   carried={sectionOrder.movingId === section.id}
                   rowProps={sectionOrder.rowProps}
                   handleProps={sectionOrder.handleProps}
@@ -515,6 +582,8 @@ function Section({
   currencyCode,
   shopRate,
   focus,
+  initiallyOpen,
+  onOpenChange,
   rowProps,
   handleProps,
   carried,
@@ -538,6 +607,10 @@ function Section({
   shopRate: number | null;
   /** Which row was just returned from, and how to scroll it back into view. */
   focus: ReturnType<typeof useRowFocus>;
+  /** Open when the menu was last left — see `menuViews`. */
+  initiallyOpen: boolean;
+  /** Told of every open and close, so the menu can remember them. */
+  onOpenChange: (open: boolean) => void;
   /** This section's name is being edited, in place of its heading. */
   renaming: boolean;
   renamePending: boolean;
@@ -583,16 +656,28 @@ function Section({
    * It is also what makes dragging sections usable, which is the one control
    * on this screen that decides what a customer sees first.
    *
-   * ## Why the state is here and not lifted
+   * ## And as it was left, after an edit
    *
-   * A section is keyed by its id in the list above, so this survives every
-   * re-render, reorder and refetch for as long as the row exists. Lifting it
-   * would buy persistence across navigations, which is not obviously wanted:
-   * coming back to a menu you were editing and finding it as you left it is
-   * nice, and coming back to a *different* shop's menu with someone else's
-   * sections open is not.
+   * Editing a dish is a page of its own, so coming back remounts this — and
+   * an operator who opened three sections, edited a dish and saved found all
+   * of them shut again. The menu remembers which were open, per shop (see
+   * `menuViews`), and this starts from that.
+   *
+   * A section returned to through `?focus=` starts open too. It used to be
+   * opened by the adjustment below, which compares against the *previous*
+   * render — and on a fresh mount there is none, so the section holding the
+   * edited dish stayed closed and its row could not be scrolled to.
    */
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(
+    () =>
+      initiallyOpen ||
+      focus.isFocused(section.id) ||
+      section.items.some((item) => focus.isFocused(item.id)),
+  );
+  function setOpen(next: boolean) {
+    setOpenState(next);
+    onOpenChange(next);
+  }
 
   /**
    * Opened by the row focus, so returning from an item's page shows it.
@@ -609,7 +694,7 @@ function Section({
   const [wasFocused, setWasFocused] = useState(focused);
   if (focused !== wasFocused) {
     setWasFocused(focused);
-    if (focused) setOpen(true);
+    if (focused) setOpenState(true);
   }
 
   const itemOrder = useReorder({
