@@ -305,22 +305,6 @@ export type MenuItemDraft = {
 };
 
 /**
- * Refuses an item with no picture, before the database has to.
- *
- * `menu_items_image_required` is the rule — `deleted_at is not null or
- * nullif(btrim(image_url), '') is not null` — and this is the same rule said
- * early, in words. Blank counts as missing because the check trims.
- *
- * Archiving never comes through here, and the constraint lets any row be
- * archived, picture or not, so a legacy item without one can still be retired.
- */
-function requireImage(imageUrl: string | null | undefined): void {
-  if (!imageUrl || imageUrl.trim() === "") {
-    throw new Error(t("menu.imageRequired"));
-  }
-}
-
-/**
  * Adds an item.
  *
  * `sort_order` is computed here rather than defaulted, because the column has
@@ -332,8 +316,6 @@ export async function createMenuItem(
   draft: MenuItemDraft,
   sortOrder: number,
 ): Promise<void> {
-  requireImage(draft.imageUrl);
-
   const { data, error } = await getClient()
     .from("menu_items")
     .insert({
@@ -349,7 +331,7 @@ export async function createMenuItem(
       description: cleanLocalized(localizedOrNull(draft.description)),
       price: draft.price,
       is_active: draft.isActive,
-      image_url: draft.imageUrl,
+      image_url: draft.imageUrl?.trim() || null,
       price_unit: draft.priceUnit,
       unit_quantity: draft.unitQuantity,
       unit_step: draft.unitStep,
@@ -379,14 +361,8 @@ export async function createMenuItem(
  *
  * No description, no picture, no tags. Those are per-item judgements made while
  * looking at the item, and asking for them in a pasted list would make the
- * format wide enough that nobody would use it.
- *
- * **Which `menu_items_image_required` now refuses outright.** Every live item
- * must carry a picture, and a pasted list has none, so this insert cannot
- * succeed as long as it writes live rows with `image_url` null. It is left in
- * place rather than quietly removed — what bulk entry should become (hidden
- * rows to finish one by one, or no bulk entry for items at all) is a product
- * decision — and the refusal is turned into a sentence that says why.
+ * format wide enough that nobody would use it. A picture is optional since
+ * migration 0153, so the pasted rows go in without one.
  *
  * `sortOrder` is where the first one lands and the rest follow it, in the order
  * they were typed — which is what keeps a pasted menu in menu order rather than
@@ -424,14 +400,7 @@ export async function createMenuItems(
       })),
     );
 
-  if (error) {
-    // Said for a pasted list rather than with the single-item sentence, which
-    // would point at an image field this form does not have.
-    if (error.message.includes("menu_items_image_required")) {
-      throw new Error(t("menu.bulkImageRequired"));
-    }
-    throw new Error(friendly(error.message));
-  }
+  if (error) throw new Error(friendly(error.message));
 }
 
 export type MenuItemPatch = Partial<
@@ -444,12 +413,6 @@ export async function updateMenuItem(
   id: string,
   patch: MenuItemPatch,
 ): Promise<void> {
-  // Present means "set it to this", so an empty one is a request to clear a
-  // required field. Absent means "leave it" — and a legacy item with no
-  // picture is still refused by the database on any update, which `friendly`
-  // turns into the same sentence.
-  if (patch.imageUrl !== undefined) requireImage(patch.imageUrl);
-
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined)
     row.name = cleanLocalized(patch.name);
@@ -458,8 +421,10 @@ export async function updateMenuItem(
   }
   if (patch.price !== undefined) row.price = patch.price;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
-  // Checked by `requireImage` above, so only a real picture reaches here.
-  if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
+  // Optional since migration 0153: null clears it, and blank is stored as null.
+  if (patch.imageUrl !== undefined) {
+    row.image_url = patch.imageUrl?.trim() || null;
+  }
   // `null` is a value here — it is how a unit is cleared — so the check is
   // for the key being absent, not for the value being falsy.
   if (patch.priceUnit !== undefined) row.price_unit = patch.priceUnit;
@@ -729,11 +694,6 @@ export async function setSortOrder(
  * not to a wrong explanation.
  */
 function friendly(message: string): string {
-  // From the migration that made a picture required. Also what a restore of a
-  // legacy item without one runs into — see `restoreMenuItem`.
-  if (message.includes("menu_items_image_required")) {
-    return t("menu.imageRequired");
-  }
   if (message.includes("slug_live_idx") || message.includes("store_id_slug")) {
     return t("dbError.duplicateSlug");
   }

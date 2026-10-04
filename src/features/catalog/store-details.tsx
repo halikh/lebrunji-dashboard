@@ -243,22 +243,13 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
   const located = parseLocation(pin);
   const coordinates = located.ok ? located : null;
 
-  /**
-   * Seeded with the image's error for a shop that has none.
-   *
-   * `stores_image_required` refuses every update to a live shop without a
-   * picture — a rename, a category move, a switch on the list — so a legacy
-   * shop opened here says so up front rather than on Save. Archiving is the
-   * exception, and does not come through this form.
-   */
   const [errors, setErrors] = useState<{
     name?: string;
-    image?: string;
     rate?: string;
     pin?: string;
     prep?: string;
     whatsapp?: string;
-  }>(() => (store.imageUrl?.trim() ? {} : { image: t("store.imageRequired") }));
+  }>({});
 
   // `mode` is left out on purpose: it is a question *about* a currency change
   // rather than a value of its own, and it cannot be reached without moving
@@ -404,9 +395,6 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
 
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
-      // Required — `stores_image_required`. Checked even when only the branch
-      // fields moved: a shop without a picture is not one this form saves.
-      image: imageUrl?.trim() ? undefined : t("store.imageRequired"),
       rate:
         rateTyped && (!Number.isFinite(rateValue) || rateValue <= 0)
           ? t("store.ratePositive")
@@ -853,22 +841,10 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
               changes the shop's card in the app.
             */}
             <FormSection>
-              <Field
-                label={t("images.label")}
-                hint={t("store.imageHint")}
-                error={errors.image}
-              >
+              <Field label={t("images.label")} hint={t("store.imageHint")}>
                 <ImageUploader
                   value={imageUrl}
-                  onChange={(url) => {
-                    setImageUrl(url);
-                    if (url?.trim()) {
-                      setErrors((current) => ({
-                        ...current,
-                        image: undefined,
-                      }));
-                    }
-                  }}
+                  onChange={setImageUrl}
                   folder="stores"
                   disabled={pending}
                 />

@@ -162,7 +162,6 @@ export function StoreEditor() {
     name?: string;
     category?: string;
     currency?: string;
-    image?: string;
     pin?: string;
     prep?: string;
     whatsapp?: string;
@@ -251,9 +250,6 @@ export function StoreEditor() {
       // reads as a form.
       category: categoryId ? undefined : t("store.categoryRequired"),
       currency: currency ? undefined : t("store.currencyRequired"),
-      // `stores_image_required`: a live shop without a picture is refused on
-      // insert. Blank counts as missing, because the check trims.
-      image: imageUrl?.trim() ? undefined : t("store.imageRequired"),
       // The three failures are told apart because two have an obvious next
       // step: an empty box needs an answer, and a shortened link needs opening
       // once — and saying so beats "that is not a coordinate pair" about
@@ -560,21 +556,10 @@ export function StoreEditor() {
 
         <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
           <FormSection>
-            <Field
-              label={t("images.label")}
-              hint={t("store.imageHint")}
-              error={errors.image}
-            >
+            <Field label={t("images.label")} hint={t("store.imageHint")}>
               <ImageUploader
                 value={imageUrl}
-                onChange={(url) => {
-                  setImageUrl(url);
-                  // Cleared as soon as there is one, rather than left standing
-                  // until the next Save over a picture that is plainly there.
-                  if (url?.trim()) {
-                    setErrors((current) => ({ ...current, image: undefined }));
-                  }
-                }}
+                onChange={setImageUrl}
                 folder="stores"
                 disabled={create.isPending}
               />

@@ -252,22 +252,6 @@ function requireTradeable(draft: {
   }
 }
 
-/**
- * Refuses a shop with no picture, before the database has to.
- *
- * `stores_image_required` is the rule — `deleted_at is not null or
- * nullif(btrim(image_url), '') is not null` — and this is the same rule said
- * early, in words. Blank counts as missing because the check trims.
- *
- * Archiving never comes through here, and the constraint lets any row be
- * archived, picture or not, so a legacy shop without one can still be retired.
- */
-function requireImage(imageUrl: string | null | undefined): void {
-  if (!imageUrl || imageUrl.trim() === "") {
-    throw new Error(t("store.imageRequired"));
-  }
-}
-
 export type StoreDraft = {
   name: Localized;
   /** The main category. */
@@ -384,7 +368,6 @@ export async function createStore(
   sortOrder: number,
 ): Promise<string> {
   requireTradeable(draft);
-  requireImage(draft.imageUrl);
 
   const { data, error } = await getClient()
     .from("stores")
@@ -393,7 +376,7 @@ export async function createStore(
       category_id: draft.categoryId,
       country_id: countryId,
       currency_code: draft.currencyCode,
-      image_url: draft.imageUrl,
+      image_url: draft.imageUrl?.trim() || null,
       // Both or neither. Half a pin is a row that passes every constraint and
       // means nothing.
       latitude: draft.latitude,
@@ -573,11 +556,6 @@ export async function updateStore(
   patch: StorePatch,
 ): Promise<void> {
   requireTradeable(patch);
-  // Present means "set it to this", so an empty one is a request to clear a
-  // required field. Absent means "leave it" — and a legacy shop with no
-  // picture is still refused by the database on any update, which `friendly`
-  // turns into the same sentence.
-  if (patch.imageUrl !== undefined) requireImage(patch.imageUrl);
 
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined)
@@ -589,10 +567,12 @@ export async function updateStore(
     row.exchange_rate = patch.exchangeRate;
   }
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
-  // `null` is a value for the pin — it is how one is removed — so what is
-  // tested is the key being absent, not the value. Not for the picture any
-  // more: `requireImage` above has already refused an empty one.
-  if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
+  // `null` is a value for the pin and the picture — it is how one is removed —
+  // so what is tested is the key being absent, not the value. The picture is
+  // optional since migration 0153; blank is stored as null.
+  if (patch.imageUrl !== undefined) {
+    row.image_url = patch.imageUrl?.trim() || null;
+  }
   if (patch.latitude !== undefined) row.latitude = patch.latitude;
   if (patch.longitude !== undefined) row.longitude = patch.longitude;
   if (patch.whatsappPhone !== undefined) {
@@ -615,8 +595,6 @@ export async function updateStore(
       .from("stores")
       .update(row)
       .eq("id", id);
-    // Through `friendly` so a refusal from `stores_image_required` — a legacy
-    // shop with no picture, edited from anywhere — reads as a sentence.
     if (error) throw new Error(friendly(error.message));
   }
 
@@ -939,9 +917,6 @@ export async function setStoreOrder(
 /** Turns a constraint violation into a sentence the operator can act on. */
 function friendly(message: string): string {
   // First: the name is specific, and `slug` and `prep` are loose substrings.
-  if (message.includes("stores_image_required")) {
-    return t("store.imageRequired");
-  }
   if (message.includes("store_categories_main_category")) {
     return t("store.mainCategoryKept");
   }

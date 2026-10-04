@@ -703,7 +703,7 @@ const en = {
    */
   images: {
     label: "Image",
-    hint: "Shown in the app beside the name. JPEG, PNG or WebP.",
+    hint: "Shown in the app beside the name. JPEG, PNG or WebP. Optional.",
     choose: "Choose an image",
     drop: "Drop an image here, or",
     browse: "browse",
@@ -888,11 +888,7 @@ const en = {
     detailsFailed: "Could not load the shop",
     name: "Shop name",
     nameHint: "What customers see at the top of the shop.",
-    imageHint: "The picture on the shop's card in the app.",
-    // Shown by the form, by the api, and for a refusal from
-    // `stores_image_required` — including on a legacy shop opened without one,
-    // which cannot be saved until it has one.
-    imageRequired: "Add an image — every shop needs one to be saved.",
+    imageHint: "The picture on the shop's card in the app. Optional.",
     prepTitle: "Preparation time",
     whatsapp: "WhatsApp number",
     // Says what its absence costs, which is the part somebody skipping the
@@ -2287,13 +2283,6 @@ const en = {
     title: "Menu",
     back: "All shops",
     itemNotFound: "That item is not here any more.",
-    // `menu_items_image_required`: the form, the api and the constraint all
-    // say this one, so it says what to do rather than what went wrong.
-    imageRequired: "Add an image — every item needs one to be saved.",
-    // The same rule meeting a pasted list, which has no image field to point
-    // at — so it says why the paste was refused and what to do instead.
-    bulkImageRequired:
-      "Every item needs an image now, and pasted items have none. Add these one at a time.",
     sectionNotFound: "That section is not here any more.",
     addItem: "Add an item to {section}",
     name: "Name",

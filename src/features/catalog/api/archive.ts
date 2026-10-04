@@ -447,19 +447,16 @@ async function clearDeletedAt(table: string, id: string): Promise<void> {
 /**
  * The picture rules, said in words when they refuse a restore.
  *
- * `categories_icon_required`, `stores_image_required` and
- * `menu_item_tags_icon_required` let a row be archived
- * without a picture but not brought back without one: clearing `deleted_at` is
- * an update like any other, and the row is live again the moment it lands. So a
- * legacy row archived before the rule existed comes back refused, and this
- * turns the constraint name into the same sentence the editors use.
+ * `categories_icon_required` and `menu_item_tags_icon_required` let a row be
+ * archived without a picture but not brought back without one: clearing
+ * `deleted_at` is an update like any other, and the row is live again the
+ * moment it lands. So a legacy row archived before the rule existed comes back
+ * refused, and this turns the constraint name into the same sentence the
+ * editors use.
  */
 function restoreRefusal(message: string): string {
   if (message.includes("categories_icon_required")) {
     return t("categories.iconRequired");
-  }
-  if (message.includes("stores_image_required")) {
-    return t("store.imageRequired");
   }
   if (message.includes("menu_item_tags_icon_required")) {
     return t("tags.iconRequired");
