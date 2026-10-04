@@ -104,7 +104,7 @@ export function Panel({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md px-md py-xs text-[14px] font-semibold text-primary"
+          className="rounded-md px-md py-xs text-[14px] font-semibold text-text"
         >
           {t("common.close")}
         </button>

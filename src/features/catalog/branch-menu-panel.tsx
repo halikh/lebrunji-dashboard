@@ -330,7 +330,7 @@ function BranchMenuPanel({
                   <button
                     type="button"
                     onClick={() => setOpenOptions(expanded ? null : item.id)}
-                    className="self-start ps-md text-[13px] font-semibold text-primary"
+                    className="self-start ps-md text-[13px] font-semibold text-text"
                   >
                     {t("branchMenu.options")}
                   </button>

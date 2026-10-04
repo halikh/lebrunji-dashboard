@@ -72,7 +72,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // Blue, the app's link blue: the one to press to go on. White on it is 5.2:1.
   primary: "bg-primary-fill text-on-primary hover:bg-primary-deep",
   secondary: "bg-neutral-fill text-text hover:brightness-[0.97]",
-  quiet: "bg-transparent text-primary hover:bg-primary-wash",
+  quiet: "bg-transparent text-text hover:bg-primary-wash",
   // `danger-action`, not `danger`: the darker red is tuned for text on cream and
   // reads as near-black poured across a whole button.
   danger: "bg-danger-action text-on-primary hover:brightness-95",
@@ -100,11 +100,11 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
    * A filled ground without the weight of the primary action.
    *
    * For the second-most-likely thing to press when it needs to look pressable
-   * — beside a blue Save, blue-on-cream reads as a real button and
+   * — beside a blue Save, ink on the blue wash reads as a real button and
    * still loses the contest for the eye, which is what a secondary action
    * should do.
    */
-  "primary-quiet": "bg-primary-wash text-primary hover:brightness-95",
+  "primary-quiet": "bg-primary-wash text-text hover:brightness-95",
   /**
    * The product's success colour — green, the app's good news.
    *

@@ -88,7 +88,7 @@ export function InfiniteSentinel({
         <button
           type="button"
           onClick={onLoadMore}
-          className="rounded-md px-lg py-sm text-[13px] font-semibold text-primary hover:bg-primary-wash"
+          className="rounded-md px-lg py-sm text-[13px] font-semibold text-text hover:bg-primary-wash"
         >
           {t("orders.loadMore")}
         </button>

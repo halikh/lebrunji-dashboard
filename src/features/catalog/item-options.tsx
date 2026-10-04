@@ -58,7 +58,7 @@ export function ItemOptions({
         a navigation row and not as a stretched button: the arrow marks where the
         row ends, which is what says it leads off this page.
       */
-      className="flex w-full items-center justify-between gap-sm rounded-md border border-border bg-surface px-lg py-md text-[14px] font-semibold text-primary hover:border-primary"
+      className="flex w-full items-center justify-between gap-sm rounded-md border border-border bg-surface px-lg py-md text-[14px] font-semibold text-text hover:border-primary"
     >
       {t("options.openFor")}
       <svg
