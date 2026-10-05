@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button, Card, Field, FormError, Input } from "@/components/ui";
 import { t, type TranslationKey } from "@/i18n/translations";
+import { unlock } from "@/lib/chime";
 import { forgetAccessToken } from "@/lib/supabase/client";
 
 export function LoginForm() {
@@ -57,8 +58,10 @@ export function LoginForm() {
     // The chime on a new order is Web Audio, and a browser will not let a page
     // make a sound until it has been interacted with. This click is the first
     // interaction there is, so it is where the context gets unlocked — do it
-    // any later and the first order of the day arrives silently.
-    unlockAudio();
+    // any later and the first order of the day arrives silently. It has to be
+    // chime's own context: a fresh one resumed here unlocks nothing the chime
+    // will ever play through.
+    unlock();
 
     const next = params.get("next");
     // Only a path, never an absolute URL: `?next=https://elsewhere` on a login
@@ -146,25 +149,4 @@ export function LoginForm() {
  */
 function messageFor(status: number): TranslationKey {
   return status === 429 ? "login.tooManyAttempts" : "login.failed";
-}
-
-/**
- * Wakes the audio context on the first real click.
- *
- * Browsers block audio until a page has been interacted with, and the whole
- * point of the queue's chime is that it fires when nobody is looking at the
- * screen. Failing quietly is correct: a dashboard that would not load because
- * a sound would not play is a worse dashboard.
- */
-function unlockAudio() {
-  try {
-    const Ctor =
-      window.AudioContext ??
-      (window as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!Ctor) return;
-    void new Ctor().resume();
-  } catch {
-    // No audio. The toast and the badge still work.
-  }
 }

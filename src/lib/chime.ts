@@ -14,7 +14,11 @@
  * The whole point of this chime is that it fires when nobody is looking at the
  * screen, so waiting for an interaction would mean the first order of the day
  * arrives silently. The sign-in click is the first interaction there is, and
- * `unlock()` is called there.
+ * `unlock()` is called there — and again on any click or key in the shell (see
+ * `useOrderRealtime`), for the visits that never pass through sign-in.
+ *
+ * It must be *this* module's context that is unlocked. Autoplay permission is
+ * per context, so resuming some other `AudioContext` leaves this one silent.
  *
  * Everything here fails quietly. A dashboard that would not load because a
  * sound would not play is a worse dashboard, and the toast and the badge carry
@@ -43,7 +47,8 @@ function audioContext(): AudioContext | null {
 /**
  * Wakes the audio context on a real interaction.
  *
- * Called from the sign-in click. Safe to call more than once — a context that
+ * Called from the sign-in click and from any interaction in the shell. Safe to
+ * call more than once — a context that
  * is already running resolves immediately.
  */
 export function unlock() {

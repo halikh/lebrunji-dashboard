@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { useToasts } from "@/components/ui/toast";
 import { fetchAppSettings } from "@/features/settings/api/app-settings";
-import { chime } from "@/lib/chime";
+import { chime, unlock } from "@/lib/chime";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 
@@ -71,6 +71,26 @@ export function useOrderRealtime() {
   useEffect(() => {
     soundRef.current = settings.data?.notificationSoundUrl ?? null;
   }, [settings.data]);
+
+  /**
+   * Keeps the chime unlockable after the sign-in click is long gone.
+   *
+   * Sign-in is not the only way onto this screen: a reload, or coming back
+   * with a session that is still live, lands here with no gesture at all, and
+   * the context the chime plays through stays suspended. Any click or key from
+   * then on wakes it. Listening for the whole session rather than once,
+   * because a browser can suspend the context again after the tab has been in
+   * the background, and `unlock()` on a running context costs nothing.
+   */
+  useEffect(() => {
+    const wake = () => unlock();
+    window.addEventListener("pointerdown", wake, { capture: true });
+    window.addEventListener("keydown", wake, { capture: true });
+    return () => {
+      window.removeEventListener("pointerdown", wake, { capture: true });
+      window.removeEventListener("keydown", wake, { capture: true });
+    };
+  }, []);
 
   useEffect(() => {
     const supabase = getClient();
