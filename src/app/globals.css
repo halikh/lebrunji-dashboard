@@ -10,6 +10,16 @@
  * This file holds only what has to be a rule rather than a token.
  */
 
+/**
+ * `short:` — the rail's layout (`md` and up) on a window too short for it.
+ *
+ * The rail stacks a logo and nine items, about 730px at full spacing. A laptop
+ * at 125% zoom, with a taskbar and the staging strip, has less than that, and
+ * the bottom of the rail — account and sign-out — was cut off. Under this
+ * height the rail tightens its spacing instead; below even that it scrolls.
+ */
+@custom-variant short (@media (min-width: 48rem) and (max-height: 860px));
+
 html,
 body {
   height: 100%;

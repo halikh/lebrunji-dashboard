@@ -46,9 +46,15 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
         // two would be two things to keep in step.
         "order-last w-full flex-row justify-around border-t px-sm py-xs",
         "md:order-first md:h-full md:w-[124px] md:flex-col md:justify-start md:border-r md:border-t-0 md:px-sm md:py-lg",
+        // Never cut off. On a short window the spacing tightens (`short:`, in
+        // the items too); on one shorter still the rail scrolls rather than
+        // clipping account and sign-out. No visible scrollbar: in a 124px
+        // rail it would take a tenth of the width, and the last item sitting
+        // half under the edge already says there is more.
+        "md:min-h-0 md:overflow-y-auto md:[scrollbar-width:none] short:gap-0 short:py-sm",
       )}
     >
-      <div className="hidden md:mb-xl md:flex md:justify-center">
+      <div className="hidden md:mb-xl md:flex md:shrink-0 md:justify-center short:mb-sm">
         <Logo width={56} />
       </div>
 
