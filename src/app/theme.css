@@ -159,6 +159,16 @@
   --color-accent-deep: var(--color-green-deep);
   --color-on-accent: #ffffff;
 
+  /**
+   * Which deployment a sign-in page belongs to (`components/auth-frame.tsx`).
+   * Production has no role here: it keeps the ordinary background. Staging is
+   * coral on purpose — the one place red is not an error, because signing in to
+   * the wrong environment is the mistake it exists to stop.
+   */
+  --color-env-staging: var(--color-coral);
+  --color-env-development: var(--color-blue);
+  --color-on-env: #ffffff;
+
   /* ---- Sun. An accent only: dark type on it, never white. ---- */
   --color-yellow: var(--color-sun);
   --color-yellow-wash: var(--color-cream-deep);

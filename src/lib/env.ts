@@ -12,7 +12,7 @@
  * being signed in as a real Supabase user whose id is in `operators` — every one
  * of them is an RLS policy or an `is_admin()`-gated RPC (migrations 0062–0068).
  *
- * So there is no service-role key here, on Vercel, or in any environment file
+ * So there is no service-role key here, on Railway, or in any environment file
  * this app reads. A service-role key bypasses RLS entirely, which would make
  * every authorisation decision in the database irrelevant and move it into
  * whatever this app remembered to check. The one place it is used is
@@ -61,4 +61,20 @@ export function readEnv(): Env {
     supabaseUrl: raw.supabaseUrl as string,
     supabaseAnonKey: raw.supabaseAnonKey as string,
   };
+}
+
+/** Which deployment this is. Matches the app repo's `EXPO_PUBLIC_ENVIRONMENT`. */
+export type AppEnvironment = "development" | "staging" | "production";
+
+/**
+ * `NEXT_PUBLIC_ENVIRONMENT`, read on its own and never required.
+ *
+ * Unset — or anything unrecognised — is **development**, the same direction the
+ * app repo takes: a deployment that forgot the variable then looks like a test
+ * one, which somebody notices and fixes, rather than like the live one, which
+ * nobody would question.
+ */
+export function appEnvironment(): AppEnvironment {
+  const value = process.env.NEXT_PUBLIC_ENVIRONMENT;
+  return value === "staging" || value === "production" ? value : "development";
 }

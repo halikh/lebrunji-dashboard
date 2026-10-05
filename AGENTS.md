@@ -22,7 +22,7 @@ role is a migration there, not a change here.
 
 ## No service-role key. Ever.
 
-Not in `.env`, not on Vercel, not in a server component, not "just for this one
+Not in `.env`, not on Railway, not in a server component, not "just for this one
 thing". It bypasses RLS completely, and RLS is the whole of the authorisation
 model — see the README.
 

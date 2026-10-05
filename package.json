@@ -10,6 +10,7 @@
     "env:dev": "node scripts/use-env.mjs dev",
     "env:staging": "node scripts/use-env.mjs staging",
     "env:prod": "node scripts/use-env.mjs prod",
+    "ship": "node scripts/ship.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

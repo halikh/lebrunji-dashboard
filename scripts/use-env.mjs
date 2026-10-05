@@ -26,13 +26,13 @@
  *
  * ## The checks
  *
- * Each file must say which environment it is (`DASHBOARD_ENVIRONMENT`), and it
+ * Each file must say which environment it is (`NEXT_PUBLIC_ENVIRONMENT`), and it
  * must match the name — a `.env.prod` that quietly holds the dev project's URL
  * is how somebody "tests" a price change on the live menu. A file still holding
  * the template's placeholders is refused too.
  *
- * Vercel does not read any of this: a deployment's variables are set in the
- * Vercel project. This switches a laptop only.
+ * Railway does not read any of this: each Railway environment's variables are
+ * set in Railway. This switches a laptop only.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
@@ -48,7 +48,7 @@ const choice = process.argv[2];
 
 if (!choice) {
   const current = existsSync(TARGET) ? readFileSync(TARGET, 'utf8') : '';
-  const environment = value(current, 'DASHBOARD_ENVIRONMENT') ?? 'none';
+  const environment = value(current, 'NEXT_PUBLIC_ENVIRONMENT') ?? 'none';
   console.log(`Active: ${environment}  (${host(value(current, 'NEXT_PUBLIC_SUPABASE_URL'))})`);
   process.exit(0);
 }
@@ -63,13 +63,13 @@ if (!existsSync(target.file)) {
 }
 
 const contents = readFileSync(target.file, 'utf8');
-const declared = value(contents, 'DASHBOARD_ENVIRONMENT');
+const declared = value(contents, 'NEXT_PUBLIC_ENVIRONMENT');
 const url = value(contents, 'NEXT_PUBLIC_SUPABASE_URL');
 const anonKey = value(contents, 'NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
 if (declared !== target.environment) {
   fail(
-    `${target.file} says DASHBOARD_ENVIRONMENT=${declared ?? '(unset)'}, ` +
+    `${target.file} says NEXT_PUBLIC_ENVIRONMENT=${declared ?? '(unset)'}, ` +
       `but it must say ${target.environment}.`,
   );
 }

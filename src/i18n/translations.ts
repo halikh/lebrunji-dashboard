@@ -2585,6 +2585,11 @@ const en = {
   },
 
   login: {
+    // The banner over a non-production sign-in page. Production has none.
+    environment: {
+      staging: "Staging",
+      development: "Development",
+    },
     title: "Sign in",
     subtitle: "Operations for Lebrunji.",
     email: "Email",

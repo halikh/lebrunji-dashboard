@@ -21,15 +21,15 @@ components, flows or conventions are carried over from any other dashboard.
    copy of `.env.example`, all gitignored:
 
    ```bash
-   cp .env.example .env.dev       # DASHBOARD_ENVIRONMENT=development
-   cp .env.example .env.staging   # DASHBOARD_ENVIRONMENT=staging
-   cp .env.example .env.prod      # DASHBOARD_ENVIRONMENT=production
+   cp .env.example .env.dev       # NEXT_PUBLIC_ENVIRONMENT=development
+   cp .env.example .env.staging   # NEXT_PUBLIC_ENVIRONMENT=staging
+   cp .env.example .env.prod      # NEXT_PUBLIC_ENVIRONMENT=production
    ```
 
    `npm run env:dev` / `env:staging` / `env:prod` copies one of them to
    `.env.local`, which is what Next and the scripts below actually read — so
    edit the three files, never `.env.local`. `npm run env` says which project is
-   active. `scripts/use-env.mjs` refuses a file whose `DASHBOARD_ENVIRONMENT`
+   active. `scripts/use-env.mjs` refuses a file whose `NEXT_PUBLIC_ENVIRONMENT`
    does not match its name, or one still holding the template's placeholders.
 
    `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are all the
@@ -75,8 +75,30 @@ components, flows or conventions are carried over from any other dashboard.
    npm run prod      # switch to the live project and start — with a warning
    ```
 
-   Vercel reads none of these files: a deployment's variables are set in the
-   Vercel project.
+   Railway reads none of these files: each Railway environment has its own
+   variables, set in Railway — and never `SUPABASE_SERVICE_ROLE_KEY` or
+   `SUPABASE_DB_URL`, which only the scripts on your machine use.
+
+5. Ship
+
+   ```bash
+   npm run ship                           # asks: commit message, then which environment
+   npm run ship -- staging -m "message"   # commit and push to staging
+   npm run ship -- none -m "message"      # commit only
+   ```
+
+   Each Railway environment deploys from its own branch — set once per
+   environment under the service's Settings → Source → Branch:
+
+   | Railway environment | Branch |
+   | --- | --- |
+   | development | `development` |
+   | staging | `staging` |
+   | production | `main` |
+
+   `scripts/ship.mjs` pushes the commit you are on to the chosen branch
+   (`git push origin HEAD:<branch>`) after `npm run verify` passes. Production
+   asks you to type its name first, and nothing is ever force-pushed.
 
 ## How permission works, in one page
 
@@ -91,7 +113,7 @@ granted by this codebase.
 That has three consequences worth knowing before changing anything here:
 
 - **There is no service-role key in this app**, in its environment, or on
-  Vercel. A service-role key bypasses RLS completely, which would make every
+  Railway. A service-role key bypasses RLS completely, which would make every
   policy in those migrations irrelevant and move the decision into whatever this
   app remembered to check. It is used once, locally, by `scripts/create-admin.ts`.
 - **There is no privileged API route to protect.** Reads, writes, Realtime and
@@ -251,6 +273,11 @@ Run it after any migration that touches a limit.
 
 ## Deploying
 
-Vercel. Two environment variables, both `NEXT_PUBLIC_`. Add the deployed URL to
-the Supabase Auth redirect allowlist — the password-reset link needs it. The app
+Railway, three environments — development, staging, production — each deploying
+from its own branch (`npm run ship`, above) with its own variables: the two
+`NEXT_PUBLIC_SUPABASE_*`, the five `S3_*`, `APP_PUBLIC_URL`, and
+`NEXT_PUBLIC_ENVIRONMENT` (`development` / `staging` / `production`, which
+colours the sign-in pages). Add each
+deployed URL to its Supabase project's Auth redirect allowlist — the
+password-reset link needs it. The app
 repo's `ENVIRONMENTS.md` defines three Supabase projects; staging first.

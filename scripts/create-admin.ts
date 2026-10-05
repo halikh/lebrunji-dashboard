@@ -21,7 +21,7 @@
  * ## The one place the service-role key is used
  *
  * It bypasses RLS completely, which is exactly why it lives here and nowhere
- * else — not in `.env`, not on Vercel, not in any file the app reads.
+ * else — not in `.env`, not on Railway, not in any file the app reads.
  * `.env.local` is gitignored. If this key is ever pasted into the dashboard's
  * environment, every policy in migrations 0062–0068 becomes decorative.
  */
@@ -87,7 +87,7 @@ async function main() {
         'Supabase dashboard → Project Settings → API → service_role.\n\n' +
         'It carries no NEXT_PUBLIC_ prefix on purpose: that prefix means\n' +
         '"inlined into the browser bundle and readable by anyone with the URL".\n' +
-        'This key bypasses RLS entirely. Local only. Never on Vercel.',
+        'This key bypasses RLS entirely. Local only. Never on Railway.',
     );
     process.exit(2);
   }
