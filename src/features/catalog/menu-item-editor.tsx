@@ -513,7 +513,7 @@ export function MenuItemEditor({
             hint={t("menu.nameHint")}
             error={errors.name}
             maxLength={TEXT.name}
-            filter="name"
+            filter="title"
           />
           <LocalizedField
             label={t("menu.description")}

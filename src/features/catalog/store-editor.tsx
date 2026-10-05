@@ -372,7 +372,7 @@ export function StoreEditor() {
               onChange={setName}
               maxLength={TEXT.name}
               error={errors.name}
-              filter="name"
+              filter="title"
               placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارا" }}
             />
 

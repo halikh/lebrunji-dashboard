@@ -580,7 +580,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
                 maxLength={TEXT.name}
                 hint={t("store.nameHint")}
                 error={errors.name}
-                filter="name"
+                filter="title"
                 placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارة" }}
               />
 

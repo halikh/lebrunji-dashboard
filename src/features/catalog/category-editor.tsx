@@ -307,7 +307,7 @@ function Form({
               onChange={setName}
               maxLength={TEXT.name}
               error={errors.name}
-              filter="name"
+              filter="title"
               placeholder={{ en: "Restaurants", ar: "مطاعم" }}
             />
 

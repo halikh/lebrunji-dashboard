@@ -2,7 +2,7 @@ import { PAGE } from "@/lib/limits";
 import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
-import { cleanLocalized } from "@/lib/text-format";
+import { titleLocalized } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
 /**
@@ -201,9 +201,10 @@ export async function fetchCategoryKinds(): Promise<CategoryKind[]> {
  * future import and any screen written next all arrive here, and a rule
  * enforced only by a component is a rule the next component does not have.
  *
- * Letters are stored exactly as typed. There used to be a house style here that
- * re-cased names on save; it was removed so the inputs write what the operator
- * writes. See `lib/text-format.ts`.
+ * Names are stored in Title Case — "MILK BASED" is saved as "Milk Based" —
+ * through `titleLocalized`, for the same reason: the field applies it as the
+ * operator types, and this is what makes it hold for every other way in. See
+ * `lib/text-format.ts`.
  */
 
 export type CategoryDraft = {
@@ -225,7 +226,7 @@ export async function createCategory(
     .from("categories")
     .insert({
       category_kind_id: draft.kindId,
-      name: cleanLocalized(draft.name),
+      name: titleLocalized(draft.name),
       is_active: draft.isActive,
       has_menu_nav: draft.hasMenuNav,
       icon_url: draft.iconUrl,
@@ -245,7 +246,7 @@ export async function updateCategory(
 ): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.kindId !== undefined) row.category_kind_id = patch.kindId;
-  if (patch.name !== undefined) row.name = cleanLocalized(patch.name);
+  if (patch.name !== undefined) row.name = titleLocalized(patch.name);
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.hasMenuNav !== undefined) row.has_menu_nav = patch.hasMenuNav;
   // Present means "set it to this", so a present-but-empty icon is a request

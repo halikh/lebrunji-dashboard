@@ -1,6 +1,6 @@
 import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
-import { cleanLocalized } from "@/lib/text-format";
+import { cleanLocalized, titleLocalized } from "@/lib/text-format";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
@@ -282,9 +282,10 @@ async function searchMenuItems(
  * future import and any screen written next all arrive here, and a rule
  * enforced only by a component is a rule the next component does not have.
  *
- * Letters are stored exactly as typed. There used to be a house style here that
- * re-cased names on save; it was removed so the inputs write what the operator
- * writes. See `lib/text-format.ts`.
+ * Names are stored in Title Case — "MILK BASED" is saved as "Milk Based" —
+ * through `titleLocalized`, for the same reason: the field applies it as the
+ * operator types, and this is what makes it hold for every other way in. See
+ * `lib/text-format.ts`.
  */
 
 export type MenuItemDraft = {
@@ -324,7 +325,7 @@ export async function createMenuItem(
       // No `slug`. The trigger from migration 0070 derives it from the English
       // name and makes it unique inside the shop — which a client cannot do
       // without racing another tab.
-      name: cleanLocalized(draft.name),
+      name: titleLocalized(draft.name),
       // Null when blank, never `{}` — see `localizedOrNull`. A description
       // is optional and the constraint accepts an absent one; it does not
       // accept an object with a locale missing.
@@ -385,7 +386,7 @@ export async function createMenuItems(
         // Bulk paste never touches a `LocalizedField`, so this line is the
         // only thing holding a pasted menu to the same character rule as one
         // typed a dish at a time. It is the reason the rule lives here too.
-        name: cleanLocalized(item.name),
+        name: titleLocalized(item.name),
         // Absent, not empty. `localizedOrNull`'s rule: the constraint accepts a
         // missing description and refuses an object with a locale missing.
         description: null,
@@ -415,7 +416,7 @@ export async function updateMenuItem(
 ): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined)
-    row.name = cleanLocalized(patch.name);
+    row.name = titleLocalized(patch.name);
   if (patch.description !== undefined) {
     row.description = cleanLocalized(localizedOrNull(patch.description));
   }
@@ -488,7 +489,7 @@ export async function createMenuSection(
     .from("menu_sections")
     .insert({
       store_id: draft.storeId,
-      title: cleanLocalized(draft.title),
+      title: titleLocalized(draft.title),
       sort_order: sortOrder,
     });
 
@@ -508,7 +509,7 @@ export async function updateMenuSection(
       title:
         patch.title === undefined
           ? undefined
-          : cleanLocalized(patch.title),
+          : titleLocalized(patch.title),
     })
     .eq("id", id);
 
@@ -535,7 +536,7 @@ export async function createMenuSections(
     .insert(
       titles.map((title, index) => ({
         store_id: storeId,
-        title: cleanLocalized(title),
+        title: titleLocalized(title),
         sort_order: sortOrder + index,
       })),
     );

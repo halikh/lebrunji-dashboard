@@ -4,7 +4,12 @@ import { useId, useState } from "react";
 
 import { useLanguages } from "@/features/reference/use-languages";
 import { t } from "@/i18n/translations";
-import { lettersOnly, rejectedIn, withoutRejected } from "@/lib/text-format";
+import {
+  lettersOnly,
+  rejectedIn,
+  titleCase,
+  withoutRejected,
+} from "@/lib/text-format";
 import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
 import { cx, Input } from "./index";
@@ -42,20 +47,21 @@ import { cx, Input } from "./index";
  * in Phase 7, and is deliberately **not** stubbed here: an unused `variant`
  * prop is a promise the component does not keep.
  *
- * ## `filter` holds a name to its characters, live — never to a case
+ * ## `filter` holds a name to its characters, live — and a title to its case
  *
  * Opt-in per call site, and the line it draws is catalogue **names** against
  * long-form **content**. A help answer or a privacy section is prose, and the
  * characters a name may not hold are ones prose legitimately contains.
  *
  * - `"name"` drops the machine punctuation `lib/text-format.ts` lists.
+ * - `"title"` does the same and also puts the name in Title Case — "MILK
+ *   BASED" becomes "Milk Based". Shop, category, section and dish names.
  * - `"letters"` keeps letters and single spaces only — a tag's name, held to
  *   the same set `menu_item_tags_name_letters` checks.
  *
  * It applies as the operator types, not on save, so the box always shows what
- * will be stored. **It never changes case**: what is typed is what is kept.
- * The dashboard used to shout some names and sentence-case others here; that
- * was removed so the inputs write what the operator writes.
+ * will be stored. Only `"title"` changes case; the api applies the same rule
+ * again on save (`titleLocalized`).
  */
 export function LocalizedField({
   label,
@@ -104,7 +110,7 @@ export function LocalizedField({
    * Unset means the value is kept exactly as typed, which is what every
    * long-form field wants.
    */
-  filter?: "name" | "letters";
+  filter?: "name" | "title" | "letters";
 }) {
   const id = useId();
   const languages = useLanguages();
@@ -127,7 +133,11 @@ export function LocalizedField({
    * seven of those and there will be more, and the one that forgot would be a
    * field that quietly kept its own rules.
    */
-  function change(code: string, next: string) {
+  function change(
+    code: string,
+    next: string,
+    input: HTMLInputElement | HTMLTextAreaElement,
+  ) {
     if (filter === "letters") {
       const { kept, dropped: lost } = lettersOnly(next);
       setDropped(lost);
@@ -137,6 +147,23 @@ export function LocalizedField({
     if (filter === "name") {
       setDropped(rejectedIn(next));
       onChange({ ...value, [code]: withoutRejected(next) });
+      return;
+    }
+    if (filter === "title") {
+      setDropped(rejectedIn(next));
+      const kept = withoutRejected(next);
+      const cased = titleCase(kept);
+      onChange({ ...value, [code]: cased });
+      // Re-casing keeps the length but still replaces the input's value, which
+      // sends the caret to the end. Put it back where it was, so typing a space
+      // in the middle of a word does not throw the cursor away.
+      if (cased !== kept) {
+        const { selectionStart, selectionEnd } = input;
+        requestAnimationFrame(() => {
+          if (document.activeElement === input)
+            input.setSelectionRange(selectionStart, selectionEnd);
+        });
+      }
       return;
     }
     onChange({ ...value, [code]: next });
@@ -233,7 +260,7 @@ export function LocalizedField({
                   placeholder={placeholder?.[language.code]}
                   value={text}
                   onChange={(event) =>
-                    change(language.code, event.target.value)
+                    change(language.code, event.target.value, event.target)
                   }
                   aria-invalid={isMissing || undefined}
                   className={cx(
@@ -251,7 +278,7 @@ export function LocalizedField({
                   placeholder={placeholder?.[language.code]}
                   value={text}
                   onChange={(event) =>
-                    change(language.code, event.target.value)
+                    change(language.code, event.target.value, event.target)
                   }
                   invalid={isMissing || Boolean(error)}
                   padding="ps-[42px] pe-md"

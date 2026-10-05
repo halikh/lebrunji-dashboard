@@ -2385,7 +2385,7 @@ const en = {
     newItem: "New item",
     // Placeholders are examples, never labels. Each shows what a good answer
     // looks like for a field whose name is already above it.
-    namePlaceholder: "Kibbeh plate",
+    namePlaceholder: "Kibbeh Plate",
     namePlaceholderAr: "صحن كبة",
     descriptionPlaceholder: "Baked lamb kibbeh, tahini, pickles",
     descriptionPlaceholderAr: "كبة لحم مشوية، طحينة، كبيس",

@@ -2,7 +2,7 @@ import { PAGE } from "@/lib/limits";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { digitsOf } from "@/lib/phone";
-import { cleanLocalized } from "@/lib/text-format";
+import { titleLocalized } from "@/lib/text-format";
 import type { Localized } from "@/lib/validation";
 
 import { createBranch } from "./branches";
@@ -218,9 +218,10 @@ export async function fetchStore(id: string): Promise<Store> {
  * future import and any screen written next all arrive here, and a rule
  * enforced only by a component is a rule the next component does not have.
  *
- * Letters are stored exactly as typed. There used to be a house style here that
- * re-cased names on save; it was removed so the inputs write what the operator
- * writes. See `lib/text-format.ts`.
+ * Names are stored in Title Case — "MILK BASED" is saved as "Milk Based" —
+ * through `titleLocalized`, for the same reason: the field applies it as the
+ * operator types, and this is what makes it hold for every other way in. See
+ * `lib/text-format.ts`.
  */
 
 /**
@@ -372,7 +373,7 @@ export async function createStore(
   const { data, error } = await getClient()
     .from("stores")
     .insert({
-      name: cleanLocalized(draft.name),
+      name: titleLocalized(draft.name),
       category_id: draft.categoryId,
       country_id: countryId,
       currency_code: draft.currencyCode,
@@ -462,7 +463,7 @@ async function ensureFirstBranch(
         // The shop's own name, as `0101` and `0121` both copy it. Renaming it
         // to "Hamra" is the operator's first job on a shop that turns out to be
         // a chain.
-        name: draft.name,
+        name: titleLocalized(draft.name),
         latitude: draft.latitude,
         longitude: draft.longitude,
         prepMinMinutes: draft.prepMinMinutes,
@@ -559,7 +560,7 @@ export async function updateStore(
 
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined)
-    row.name = cleanLocalized(patch.name);
+    row.name = titleLocalized(patch.name);
   if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;

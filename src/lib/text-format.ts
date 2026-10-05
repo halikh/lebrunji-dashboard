@@ -1,16 +1,21 @@
 /**
- * What a catalogue name may contain — and, deliberately, nothing about case.
+ * What a catalogue name may contain, and how its letters are cased.
  *
- * ## Case is the operator's
+ * ## Names are Title Case
  *
- * This file used to hold a house style: shops, sections and dishes shouted,
- * categories, tags and descriptions in sentence case, applied as the operator
- * typed and again on save. It is gone. A name is stored exactly as it was
- * written — "McDonald's", "USD", "iPhone" — because a rule that rewrites letters
- * cannot tell an acronym from a typo, and the person typing can.
+ * Shop, category, menu-section and dish names are stored with the first letter
+ * of every word capitalised and the rest lower-case — "MILK BASED", "milk
+ * based" and "mILk Based" all become "Milk Based". One rule, so a menu reads as
+ * one menu whoever typed it.
  *
- * What is left is about *which characters* a name may hold, never about how
- * its letters are cased.
+ * The cost is known and accepted: an acronym or a brand's own casing is
+ * flattened too ("USD" becomes "Usd", "McDonald's" becomes "Mcdonald's").
+ *
+ * It applies in two places for the same reason the character filter does: as
+ * the operator types (`LocalizedField`'s `"title"` filter) so the box shows what
+ * will be stored, and on save (`titleLocalized`) so bulk paste and any screen
+ * written next obey it too. Descriptions, options and long-form content are
+ * left exactly as typed.
  */
 
 /**
@@ -69,7 +74,8 @@ export function withoutRejected(value: string): string {
  *
  * The second layer under the field's live filter — bulk paste and any screen
  * written next arrive at the api without passing through `LocalizedField`. It
- * removes characters only; case is left exactly as typed. A null or absent
+ * removes characters only; case is left exactly as typed — names go through
+ * `titleLocalized` below, which adds the casing. A null or absent
  * column comes back untouched: an absent description is a legitimate value and
  * cleaning it into `{}` would turn it into a constraint violation.
  */
@@ -79,6 +85,55 @@ export function cleanLocalized<T extends Record<string, string> | null>(
   if (!value) return value;
   return Object.fromEntries(
     Object.entries(value).map(([code, text]) => [code, withoutRejected(text)]),
+  ) as T;
+}
+
+/**
+ * Title Case: the first letter of every word upper-case, every other letter
+ * lower-case.
+ *
+ * A word is a run of non-space characters, and its first *letter* is the one
+ * raised — so "(large)" becomes "(Large)" — while letters after punctuation
+ * or a digit inside a word are not: "joe's" is "Joe's", "2ND" is "2nd". Scripts without case,
+ * Arabic among them, pass through unchanged.
+ *
+ * A letter whose upper-case form is longer than one character (German "ß") is
+ * left as it is, so the value keeps its length and the caret in the field it
+ * is typed into does not move.
+ */
+export function titleCase(value: string): string {
+  let out = "";
+  let atWordStart = true;
+  for (const char of value) {
+    if (/\s/u.test(char)) {
+      out += char;
+      atWordStart = true;
+    } else if (atWordStart && /\p{L}/u.test(char)) {
+      const upper = char.toUpperCase();
+      out += upper.length === char.length ? upper : char;
+      atWordStart = false;
+    } else {
+      const lower = char.toLowerCase();
+      out += lower.length === char.length ? lower : char;
+      // A digit starts the word too: "2nd", not "2Nd".
+      if (/\p{N}/u.test(char)) atWordStart = false;
+    }
+  }
+  return out;
+}
+
+/**
+ * A translated name as it is stored: the rejected characters removed and
+ * every language in Title Case. The save-side half of the rule at the top of
+ * this file; `cleanLocalized` is the same without the casing, for descriptions.
+ */
+export function titleLocalized<T extends Record<string, string> | null>(
+  value: T,
+): T {
+  const cleaned = cleanLocalized(value);
+  if (!cleaned) return cleaned;
+  return Object.fromEntries(
+    Object.entries(cleaned).map(([code, text]) => [code, titleCase(text)]),
   ) as T;
 }
 

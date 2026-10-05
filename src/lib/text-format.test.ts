@@ -6,6 +6,8 @@ import {
   lettersOnly,
   rejectedIn,
   tagName,
+  titleCase,
+  titleLocalized,
   withoutRejected,
 } from "./text-format";
 
@@ -40,6 +42,50 @@ describe("cleanLocalized", () => {
 
   it("leaves null alone", () => {
     expect(cleanLocalized(null)).toBe(null);
+  });
+});
+
+describe("titleCase", () => {
+  it("capitalises every word whatever case it was typed in", () => {
+    expect(titleCase("MILK BASED")).toBe("Milk Based");
+    expect(titleCase("milk based")).toBe("Milk Based");
+    expect(titleCase("mILk Based")).toBe("Milk Based");
+  });
+
+  it("keeps spacing, including a trailing space mid-typing", () => {
+    expect(titleCase("milk ")).toBe("Milk ");
+    expect(titleCase("  fish   chips")).toBe("  Fish   Chips");
+  });
+
+  it("raises the first letter, not the first character", () => {
+    expect(titleCase("kibbeh (4 PCS)")).toBe("Kibbeh (4 Pcs)");
+    expect(titleCase("(large)")).toBe("(Large)");
+  });
+
+  it("does not raise letters after punctuation or a digit inside a word", () => {
+    expect(titleCase("JOE'S wood-fired")).toBe("Joe's Wood-fired");
+    expect(titleCase("2ND floor")).toBe("2nd Floor");
+  });
+
+  it("leaves scripts without case alone", () => {
+    expect(titleCase("مطبخ نارا")).toBe("مطبخ نارا");
+  });
+
+  it("keeps the length when a letter has no single-character upper case", () => {
+    expect(titleCase("ßtraße")).toHaveLength("ßtraße".length);
+  });
+});
+
+describe("titleLocalized", () => {
+  it("cleans and title-cases every language", () => {
+    expect(titleLocalized({ en: "MILK #BASED", ar: "حليب" })).toEqual({
+      en: "Milk Based",
+      ar: "حليب",
+    });
+  });
+
+  it("leaves null alone", () => {
+    expect(titleLocalized(null)).toBe(null);
   });
 });
 
