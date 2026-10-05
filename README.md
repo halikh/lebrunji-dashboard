@@ -17,9 +17,20 @@ components, flows or conventions are carried over from any other dashboard.
 
 2. Configure
 
+   One file per Supabase project — the same three the app repo uses — each a
+   copy of `.env.example`, all gitignored:
+
    ```bash
-   cp .env.example .env.local
+   cp .env.example .env.dev       # DASHBOARD_ENVIRONMENT=development
+   cp .env.example .env.staging   # DASHBOARD_ENVIRONMENT=staging
+   cp .env.example .env.prod      # DASHBOARD_ENVIRONMENT=production
    ```
+
+   `npm run env:dev` / `env:staging` / `env:prod` copies one of them to
+   `.env.local`, which is what Next and the scripts below actually read — so
+   edit the three files, never `.env.local`. `npm run env` says which project is
+   active. `scripts/use-env.mjs` refuses a file whose `DASHBOARD_ENVIRONMENT`
+   does not match its name, or one still holding the template's placeholders.
 
    `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are all the
    app needs; `src/lib/env.ts` validates them at startup and reports everything
@@ -48,7 +59,8 @@ components, flows or conventions are carried over from any other dashboard.
    ```
 
    This is the only thing that ever uses the service-role key, and it reads it
-   from `.env.local` on your machine. See below.
+   from `.env.local` on your machine — so against whichever project is switched
+   to. See below.
 
    The scripts are plain Node, not Next, so they load `.env.local` themselves —
    `scripts/load-env.ts`. Worth knowing, because it is easy to assume Node reads
@@ -58,8 +70,13 @@ components, flows or conventions are carried over from any other dashboard.
 4. Run
 
    ```bash
-   npm run dev
+   npm run dev       # switch to dev and start
+   npm run staging   # switch to staging and start
+   npm run prod      # switch to the live project and start — with a warning
    ```
+
+   Vercel reads none of these files: a deployment's variables are set in the
+   Vercel project.
 
 ## How permission works, in one page
 
