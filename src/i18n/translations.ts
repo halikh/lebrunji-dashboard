@@ -2584,12 +2584,16 @@ const en = {
       "This section is on the plan, in phase {phase}, and has not been built.",
   },
 
+  // Which deployment this is, on the sign-in pages and the strip across the top
+  // of the dashboard. Production shows neither.
+  environment: {
+    staging: "Staging",
+    development: "Development",
+    stagingNote: "Test data. Nothing here reaches customers.",
+    developmentNote: "Developer data. Nothing here reaches customers.",
+  },
+
   login: {
-    // The banner over a non-production sign-in page. Production has none.
-    environment: {
-      staging: "Staging",
-      development: "Development",
-    },
     title: "Sign in",
     subtitle: "Operations for Lebrunji.",
     email: "Email",

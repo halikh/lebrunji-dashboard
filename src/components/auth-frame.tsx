@@ -39,7 +39,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
       }
     >
       <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-on-env">
-        {t(`login.environment.${environment}`)}
+        {t(`environment.${environment}`)}
       </p>
       <div className="flex w-full max-w-[428px] flex-col gap-xxxl rounded-lg bg-surface p-xxl">
         {children}

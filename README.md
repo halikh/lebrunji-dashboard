@@ -277,7 +277,8 @@ Railway, three environments — development, staging, production — each deploy
 from its own branch (`npm run ship`, above) with its own variables: the two
 `NEXT_PUBLIC_SUPABASE_*`, the five `S3_*`, `APP_PUBLIC_URL`, and
 `NEXT_PUBLIC_ENVIRONMENT` (`development` / `staging` / `production`, which
-colours the sign-in pages). Add each
+colours the sign-in pages and puts a strip across the dashboard on
+staging and development). Add each
 deployed URL to its Supabase project's Auth redirect allowlist — the
 password-reset link needs it. The app
 repo's `ENVIRONMENTS.md` defines three Supabase projects; staging first.

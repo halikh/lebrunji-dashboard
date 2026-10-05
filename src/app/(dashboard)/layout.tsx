@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { Logo } from "@/components/brand/logo";
 import { SignOutButton } from "@/components/sign-out-button";
+import { EnvBanner } from "@/components/shell/env-banner";
 import { LiveRail } from "@/components/shell/live-rail";
 import { ScrollCues } from "@/components/ui/scroll-cues";
 import { Providers } from "@/app/providers";
@@ -54,38 +55,40 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         gutter, so the document went a scrollbar's width wider than the viewport
         and picked up a *horizontal* scroll that slid the rail off the left.
       */}
-      <div
-        data-app-shell
-        className="flex h-dvh flex-col overflow-hidden md:flex-row"
-      >
-        {/*
+      <div data-app-shell className="flex h-dvh flex-col overflow-hidden">
+        {/* Staging and development only — see `EnvBanner`. Outside the row
+            below so it spans the rail as well as the content. */}
+        <EnvBanner />
+
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          {/*
         First in the DOM and visually hidden until focused. Without it, reaching
         the content from the keyboard means tabbing through every section link
         on every page load — which is exactly the operator this dashboard is
         supposed to be fast for.
       */}
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:m-sm focus:rounded-md focus:bg-surface focus:px-lg focus:py-md focus:font-semibold"
-        >
-          {t("nav.skipToContent")}
-        </a>
+          <a
+            href="#main"
+            className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:m-sm focus:rounded-md focus:bg-surface focus:px-lg focus:py-md focus:font-semibold"
+          >
+            {t("nav.skipToContent")}
+          </a>
 
-        {/*
+          {/*
         A top bar on a phone only. The rail becomes a bottom bar there and
         carries the six sections; adding sign-out as a seventh would crowd them
         and put a destructive-ish action a thumb-width from Orders. So it moves
         up here, where the logo also does the job of saying which app this
         is on a screen too narrow for the rail to show it.
       */}
-        <header className="flex items-center justify-between border-b border-border bg-surface px-lg py-sm md:hidden">
-          <Logo width={24} />
-          <SignOutButton />
-        </header>
+          <header className="flex items-center justify-between border-b border-border bg-surface px-lg py-sm md:hidden">
+            <Logo width={24} />
+            <SignOutButton />
+          </header>
 
-        <LiveRail />
+          <LiveRail />
 
-        {/*
+          {/*
           `min-h-0` is what makes the inner scroll areas work.
 
           A flex item's `min-height` defaults to `auto`, which means "never
@@ -104,14 +107,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           `overflow-y-auto` of its own. That is one line in the screen that
           wants it, rather than a shell that half-scrolls for everybody.
         */}
-        <main id="main" className="min-h-0 flex-1 overflow-hidden">
-          {children}
-        </main>
+          <main id="main" className="min-h-0 flex-1 overflow-hidden">
+            {children}
+          </main>
 
-        {/* Mounted once for the whole dashboard rather than per screen: it
+          {/* Mounted once for the whole dashboard rather than per screen: it
             finds the panes by the class they already carry. See `ScrollCues`
             for why it is one component and not thirty. */}
-        <ScrollCues />
+          <ScrollCues />
+        </div>
       </div>
     </Providers>
   );
