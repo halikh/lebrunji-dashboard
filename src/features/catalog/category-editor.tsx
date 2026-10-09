@@ -20,6 +20,12 @@ import { TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import type { CategoryDraft } from "./api/categories";
+import { categoryArt } from "./category-art";
+import {
+  CategoryArtPreview,
+  PresetChoice,
+  TintChoice,
+} from "./category-card-art";
 import {
   useCategories,
   useCategoryKinds,
@@ -160,6 +166,8 @@ function Form({
     isActive: boolean;
     hasMenuNav: boolean;
     iconUrl: string | null;
+    tint: string | null;
+    artPreset: number | null;
     /** Live shops in it — shown under the title. */
     usedBy: number;
   } | null;
@@ -183,6 +191,15 @@ function Form({
    */
   const [iconUrl, setIconUrl] = useState<string | null>(
     initial?.iconUrl ?? null,
+  );
+
+  /**
+   * The app card's look — `0164`. Filled from the row, so a category opened
+   * for editing shows what it was saved with; null is "Automatic".
+   */
+  const [tint, setTint] = useState<string | null>(initial?.tint ?? null);
+  const [artPreset, setArtPreset] = useState<number | null>(
+    initial?.artPreset ?? null,
   );
 
   /**
@@ -219,6 +236,8 @@ function Form({
         isActive,
         hasMenuNav,
         iconUrl,
+        tint,
+        artPreset,
       },
       {
         name: initial?.name ?? {},
@@ -226,6 +245,8 @@ function Form({
         isActive: initial?.isActive ?? true,
         hasMenuNav: initial?.hasMenuNav ?? true,
         iconUrl: initial?.iconUrl ?? null,
+        tint: initial?.tint ?? null,
+        artPreset: initial?.artPreset ?? null,
       },
     ),
   );
@@ -254,6 +275,8 @@ function Form({
       isActive,
       hasMenuNav,
       iconUrl,
+      tint,
+      artPreset,
     });
   }
 
@@ -391,6 +414,46 @@ function Form({
                 folder="category-art"
                 disabled={pending}
               />
+            </Field>
+          </FormSection>
+
+          {/* The card behind the icon — what the app draws on Search and in
+              the strip. Previewed live from the same rules the app uses. */}
+          <FormSection title={t("categories.cardSection")}>
+            <p className="-mt-sm ps-md text-[13px] text-text-soft">
+              {t("categories.cardSectionHint")}
+            </p>
+
+            <div className="ps-md">
+              <CategoryArtPreview
+                art={categoryArt(initial?.id ?? "new", {
+                  tint,
+                  preset: artPreset,
+                })}
+                name={pickLocalized(name) || t("categories.add")}
+                iconUrl={hasIcon(iconUrl) ? iconUrl : null}
+              />
+            </div>
+
+            <Field
+              label={t("categories.preset")}
+              hint={
+                initial
+                  ? t("categories.presetHint")
+                  : t("categories.presetHintNew")
+              }
+            >
+              <PresetChoice
+                id={initial?.id ?? null}
+                tint={tint}
+                value={artPreset}
+                onChange={setArtPreset}
+                disabled={pending}
+              />
+            </Field>
+
+            <Field label={t("categories.tint")} hint={t("categories.tintHint")}>
+              <TintChoice value={tint} onChange={setTint} disabled={pending} />
             </Field>
           </FormSection>
         </aside>

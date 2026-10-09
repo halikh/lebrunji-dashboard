@@ -626,7 +626,7 @@ function AddressCard({ address }: { address: CustomerAddress }) {
         <span className="min-w-0 flex-grow truncate text-[13px] font-semibold">
           {address.label ?? t("customers.unlabelled")}
         </span>
-        {address.isDefault && (
+        {address.isSelected && (
           <span className="shrink-0 rounded-sm bg-accent-wash px-sm text-[11px] font-semibold">
             {t("customers.defaultAddress")}
           </span>
@@ -634,6 +634,12 @@ function AddressCard({ address }: { address: CustomerAddress }) {
       </div>
 
       <p className="text-[13px] text-text-soft">{address.line}</p>
+      {/* Who answers at this door, when it is not the account's own phone. */}
+      {address.phone && (
+        <p className="text-[13px] text-text-soft">
+          {t("customers.addressPhone")}: <span dir="ltr">+{address.phone}</span>
+        </p>
+      )}
 
       {/* The map is why the addresses are in the wide column. A line of text is
           an address somebody typed; the pin is where a courier is actually

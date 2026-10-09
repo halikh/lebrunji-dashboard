@@ -234,6 +234,7 @@ export async function fetchOrders(options: {
       `id, code, placed_at, address_line, courier_note, currency_code,
        subtotal, delivery_fee, discount, total, amended_at,
        user_id,
+       contact_phone,
        users:user_id ( name, phone ),
        ${embed}`,
     )
@@ -286,6 +287,7 @@ export async function fetchOrder(
       `id, code, placed_at, address_line, courier_note, currency_code,
        subtotal, delivery_fee, discount, total, amended_at,
        user_id,
+       contact_phone,
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal, status,
@@ -487,7 +489,10 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     // the app routes on. Rendering it blank would read as a data fault.
     customerId: row.user_id as string,
     customerName: ((user?.name as string) ?? "").trim(),
-    customerPhone: (user?.phone as string) ?? "",
+    // The number for the door the order went to — the address's own, copied
+    // onto the order when it was placed (app migration 0156) — and the
+    // account's only for an order placed before addresses had one.
+    customerPhone: ((row.contact_phone as string | null) || (user?.phone as string)) ?? "",
     addressLine: row.address_line as string,
     courierNote: (row.courier_note as string | null) ?? null,
     latitude: (address?.latitude as number | null) ?? null,

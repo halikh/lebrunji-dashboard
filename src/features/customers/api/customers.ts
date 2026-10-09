@@ -213,7 +213,14 @@ export type CustomerAddress = {
   id: string;
   label: string | null;
   line: string;
-  isDefault: boolean;
+  /**
+   * The address the customer has selected in the app — where their orders go.
+   * `user_preferences.selected_address_id`, or the oldest when none is set
+   * (0157); there is no default flag any more.
+   */
+  isSelected: boolean;
+  /** The address's own contact number (0156), or null for the account's. */
+  phone: string | null;
   latitude: number | null;
   longitude: number | null;
 };
@@ -267,6 +274,12 @@ export type CustomerDetail = Customer & {
  * like a customer with none, and there is no way to tell that from the shape.
  * The menu had exactly this bug. Separate reads each say what they filter.
  */
+/** The app's rule (0157): the chosen address while it is live, else the oldest. */
+function selectedId(rows: { id: unknown }[], chosen: unknown): string | null {
+  const live = rows.find((row) => row.id === chosen);
+  return ((live ?? rows[0])?.id as string | undefined) ?? null;
+}
+
 export async function fetchCustomer(id: string): Promise<CustomerDetail> {
   const client = getClient();
 
@@ -275,15 +288,14 @@ export async function fetchCustomer(id: string): Promise<CustomerDetail> {
 
     client
       .from("addresses")
-      .select("id, label, line, is_default, latitude, longitude")
+      .select("id, label, line, phone, latitude, longitude")
       .eq("user_id", id)
       .is("deleted_at", null)
-      .order("is_default", { ascending: false })
       .order("created_at", { ascending: true }),
 
     client
       .from("user_preferences")
-      .select("locale, currency_code")
+      .select("locale, currency_code, selected_address_id")
       .eq("user_id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -294,6 +306,8 @@ export async function fetchCustomer(id: string): Promise<CustomerDetail> {
   }
   if (addresses.error) throw new Error(addresses.error.message);
   if (preferences.error) throw new Error(preferences.error.message);
+
+  const selected = selectedId(addresses.data ?? [], preferences.data?.selected_address_id);
 
   return {
     id: profile.data.id as string,
@@ -308,7 +322,8 @@ export async function fetchCustomer(id: string): Promise<CustomerDetail> {
       id: row.id as string,
       label: (row.label as string | null) ?? null,
       line: row.line as string,
-      isDefault: Boolean(row.is_default),
+      isSelected: row.id === selected,
+      phone: (row.phone as string | null) ?? null,
       latitude: (row.latitude as number | null) ?? null,
       longitude: (row.longitude as number | null) ?? null,
     })),

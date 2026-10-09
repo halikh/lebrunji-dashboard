@@ -64,6 +64,13 @@ export type Category = {
    */
   iconUrl: string | null;
   /**
+   * The app card's colour, as `#RRGGBB` — `0164`. Only its hue is used, in
+   * the app's pastel band. Null lets the app pick from the id.
+   */
+  tint: string | null;
+  /** The app card's background, 0–5 (`CATEGORY_PRESETS`). Null lets the id pick. */
+  artPreset: number | null;
+  /**
    * How many live shops are in this category.
    *
    * Read with the row rather than on demand, for the reason `archiveCategory`
@@ -92,7 +99,7 @@ export type Category = {
 // category this is, which is what `archiveCategory` refuses on.
 const COLUMNS = `id, slug, category_kind_id, name,
    is_active, has_menu_nav, sort_order,
-   icon_url,
+   icon_url, tint, art_preset,
    stores!category_id ( count )`;
 
 /**
@@ -152,6 +159,8 @@ export async function fetchCategories(
     hasMenuNav: row.has_menu_nav as boolean,
     sortOrder: row.sort_order as number,
     iconUrl: (row.icon_url as string | null) ?? null,
+    tint: (row.tint as string | null) ?? null,
+    artPreset: (row.art_preset as number | null) ?? null,
     usedBy: countOf(row.stores),
   }));
 }
@@ -214,6 +223,9 @@ export type CategoryDraft = {
   hasMenuNav: boolean;
   /** Required — see `Category.iconUrl` and `requireIcon` below. */
   iconUrl: string | null;
+  /** Null means "let the app choose" — see `Category.tint`. */
+  tint: string | null;
+  artPreset: number | null;
 };
 
 export async function createCategory(
@@ -230,6 +242,8 @@ export async function createCategory(
       is_active: draft.isActive,
       has_menu_nav: draft.hasMenuNav,
       icon_url: draft.iconUrl,
+      tint: draft.tint,
+      art_preset: draft.artPreset,
       sort_order: sortOrder,
       // No `slug`: the trigger from migration 0071 derives one from the English
       // name and makes it unique, which a client cannot do without racing.
@@ -257,6 +271,8 @@ export async function updateCategory(
     requireIcon(patch.iconUrl);
     row.icon_url = patch.iconUrl;
   }
+  if (patch.tint !== undefined) row.tint = patch.tint;
+  if (patch.artPreset !== undefined) row.art_preset = patch.artPreset;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 
   const { error } = await getClient()
@@ -344,6 +360,9 @@ function friendly(message: string): string {
   // Before `slug` and friends, since the name is specific and those are not.
   if (message.includes("categories_icon_required")) {
     return t("categories.iconRequired");
+  }
+  if (message.includes("categories_tint_shape")) {
+    return t("categories.tintInvalid");
   }
   if (message.includes("slug")) return t("dbError.duplicateSlug");
   if (message.includes("_locales")) return t("dbError.missingLanguage");
