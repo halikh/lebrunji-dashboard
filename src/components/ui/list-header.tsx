@@ -95,7 +95,7 @@ export function ListHeader({
         things sharing row one, and setting it on the container would also
         apply to the hint, which has no one to be centred against.
       */}
-      <h1 className="col-start-1 row-start-1 self-center text-[24px]">
+      <h1 className="col-start-1 row-start-1 self-center text-[30px]">
         {title}
       </h1>
 

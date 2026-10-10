@@ -78,7 +78,7 @@ export function ConfirmButton({
    */
   variant?: "danger" | "primary" | "accent";
   children: ReactNode;
-  size?: "md" | "sm";
+  size?: "lg" | "md" | "sm";
   fullWidth?: boolean;
   className?: string;
   /**
@@ -110,7 +110,13 @@ export function ConfirmButton({
    *   screen whose whole purpose is that one button.
    */
   triggerVariant?:
-    "quiet" | "secondary" | "primary" | "danger" | "danger-quiet" | "accent";
+    | "quiet"
+    | "secondary"
+    | "primary"
+    | "danger"
+    | "danger-quiet"
+    | "danger-soft"
+    | "accent";
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);

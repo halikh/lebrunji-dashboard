@@ -119,7 +119,7 @@ export function StoresList() {
             {[0, 1, 2, 3].map((row) => (
               <div
                 key={row}
-                className="h-[74px] rounded-md border border-border bg-surface opacity-60"
+                className="h-[74px] rounded-lg bg-line-soft"
               />
             ))}
           </div>
@@ -128,7 +128,7 @@ export function StoresList() {
         {stores.isError && (
           <div className="flex flex-col items-center gap-lg py-huge text-center">
             <div className="flex flex-col gap-xs">
-              <h2 className="text-[18px]">{t("catalogue.failedTitle")}</h2>
+              <h2 className="text-[19px]">{t("catalogue.failedTitle")}</h2>
               <p className="text-[14px] text-text-soft">
                 {t("catalogue.failedBody")}
               </p>
@@ -224,7 +224,7 @@ function StoreRow({
         //
         // So the *content* mutes and the controls stay full strength, with a
         // border and a badge carrying the state instead.
-        store.isActive ? "border-border" : "border-border bg-neutral-fill/60",
+        store.isActive ? "border-transparent" : "border-transparent bg-neutral-fill/60 shadow-none",
       )}
     >
       {/* First in the row, and above the name's stretched overlay — `z-10`

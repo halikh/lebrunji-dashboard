@@ -67,7 +67,7 @@ export function EmptyState({
     >
       <PoseStage pose={POSE[mood]} height={STAGE} />
       <div className="flex max-w-[380px] flex-col gap-xs">
-        <h2 className="text-[18px]">{t(titleKey, params)}</h2>
+        <h2 className="text-[22px]">{t(titleKey, params)}</h2>
         {bodyKey && (
           <p className="text-[14px] text-text-soft">{t(bodyKey, params)}</p>
         )}

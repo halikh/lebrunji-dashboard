@@ -335,7 +335,7 @@ export function CustomerProfile({ id }: { id: string }) {
         // The customer's own name, not a generic "tabs": a screen reader
         // announcing "Rami Haddad, tab list" says which record these belong to.
         aria-label={name}
-        className="-mb-px flex shrink-0 gap-lg overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
+        className="-mb-px flex shrink-0 gap-lg border-b border-border bg-surface px-xxl"
       >
         {TABS.map(({ key, labelKey }) => (
           <SectionTab
@@ -522,7 +522,7 @@ export function CustomerProfile({ id }: { id: string }) {
                 {[0, 1, 2, 3].map((one) => (
                   <div
                     key={one}
-                    className="h-[62px] rounded-md border border-border bg-surface opacity-60"
+                    className="h-[62px] rounded-lg bg-line-soft"
                   />
                 ))}
               </div>
@@ -621,7 +621,7 @@ export function CustomerProfile({ id }: { id: string }) {
 
 function AddressCard({ address }: { address: CustomerAddress }) {
   return (
-    <li className="flex flex-col gap-md rounded-md border border-border bg-surface p-lg">
+    <li className="flex flex-col gap-md rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
       <div className="flex items-center gap-sm">
         <span className="min-w-0 flex-grow truncate text-[13px] font-semibold">
           {address.label ?? t("customers.unlabelled")}
@@ -678,7 +678,7 @@ function OrderRow({
   onOpen: (id: string) => void;
 }) {
   return (
-    <li className={cx(ROW, "border-border")}>
+    <li className={cx(ROW, "border-transparent")}>
       <span className="flex min-w-0 flex-grow flex-col gap-xxs">
         {/* Opens the receipt **over this page**, rather than sending the
             operator to the queue. They are already looking at this customer's
@@ -763,7 +763,7 @@ function RedemptionRow({
   onOpen: (id: string) => void;
 }) {
   return (
-    <li className={cx(ROW, "border-border")}>
+    <li className={cx(ROW, "border-transparent")}>
       <span className="flex min-w-0 flex-grow flex-col gap-xxs">
         {/* The label is the promotion's name **as it was at the time** —
             `0016` calls a redemption a receipt line, history rather than
@@ -812,7 +812,7 @@ function Block({
   return (
     <section className="flex flex-col gap-md">
       <div className="flex items-baseline justify-between gap-md">
-        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+        <h2 className="text-[19px]">
           {title}
         </h2>
         {aside}
@@ -824,7 +824,7 @@ function Block({
 
 function Tile({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex flex-col gap-xxs rounded-md border border-border bg-surface px-lg py-md">
+    <div className="flex flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
       <span className="text-[12px] text-text-faint">{label}</span>
       <span className="text-[20px] font-semibold tabular-nums">{value}</span>
     </div>

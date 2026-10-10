@@ -432,7 +432,7 @@ function Group({
 
   return (
     <section className="flex flex-col gap-sm">
-      <h2 className="ps-md text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+      <h2 className="ps-md text-[19px]">
         {title}
       </h2>
       {children}

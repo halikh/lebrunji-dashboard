@@ -537,8 +537,8 @@ function Question({
   return (
     <section
       className={cx(
-        "flex flex-col gap-lg rounded-md border bg-surface p-lg",
-        group.isActive ? "border-border" : "border-border bg-neutral-fill/60",
+        "flex flex-col gap-lg rounded-lg border-2 bg-surface p-lg shadow-card",
+        group.isActive ? "border-transparent" : "border-transparent bg-neutral-fill/60 shadow-none",
       )}
     >
       <div className="flex flex-wrap items-center gap-md">
@@ -1427,10 +1427,10 @@ export function ChoiceForm({
     <div
       ref={form}
       className={cx(
-        "flex flex-col gap-lg rounded-md border bg-surface p-lg",
+        "flex flex-col gap-lg rounded-lg border-2 bg-surface p-lg",
         // Dashed while it is a gap waiting to be filled, solid and marked once
         // it is standing in for a row that already exists.
-        initial ? "border-active" : "border-dashed border-border",
+        initial ? "border-active" : "border-dashed border-line",
       )}
     >
       <LocalizedField

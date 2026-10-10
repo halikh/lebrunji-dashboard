@@ -818,7 +818,7 @@ function Form({
             ground with no border says "this is the answer, not another
             question", and the label says whose answer it is. */}
           <div className="flex flex-col gap-xxs rounded-md bg-accent-wash px-lg py-md">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-text-faint">
+            <span className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
               {t("promotions.previewLabel")}
             </span>
             <p className="text-[14px] font-semibold text-text">

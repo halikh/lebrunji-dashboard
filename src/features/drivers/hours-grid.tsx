@@ -95,7 +95,7 @@ export function HoursGrid({
         return (
           <div
             key={index}
-            className="flex flex-wrap items-center gap-lg rounded-md border border-border bg-surface px-lg py-md"
+            className="flex flex-wrap items-center gap-lg rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card"
           >
             <span className="w-[92px] shrink-0 text-[14px] font-semibold">
               {t(DAY_LABELS[index])}

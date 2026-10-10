@@ -104,7 +104,7 @@ export function EditorPage({
 
           <div className="flex min-w-0 flex-col gap-xxs">
             {meta}
-            <h1 className="truncate text-[22px]">{title}</h1>
+            <h1 className="truncate text-[26px]">{title}</h1>
             {aside}
           </div>
         </div>

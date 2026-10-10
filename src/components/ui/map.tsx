@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { t, type TranslationKey } from "@/i18n/translations";
 
 import { cx } from "./index";
@@ -65,6 +67,9 @@ export function Map({
   className?: string;
 }) {
   const hasPin = typeof latitude === "number" && typeof longitude === "number";
+  const [engaged, setEngaged] = useState(false);
+  // Bumped to send the map back to the pin — see the button below.
+  const [view, setView] = useState(0);
 
   if (!hasPin) {
     return (
@@ -97,28 +102,94 @@ export function Map({
 
   return (
     <div className={cx("flex flex-col gap-xs", className)}>
-      <iframe
-        // Named, because an unlabelled frame is announced as "frame" and
-        // nothing else.
-        title={label}
-        src={source.toString()}
-        loading="lazy"
-        // The embed needs scripts to draw itself and its own origin to fetch
-        // tiles as itself; navigating the page it sits in, forms and plugins
-        // stay denied. `allow-same-origin` hands the frame *its* origin, not
-        // ours — which is safe precisely because the frame is cross-origin —
-        // and the popup permissions are what make OpenStreetMap's attribution
-        // links clickable, which the tile licence asks for.
-        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-        // OpenStreetMap's volunteer tile servers refuse traffic they cannot
-        // attribute to an app, and answer with an "Access blocked" tile rather
-        // than a map. Traffic from an opaque sandbox origin, or with its
-        // referrer stripped, is exactly that unattributable traffic. So the
-        // frame sends our origin — scheme and host, never the path a customer
-        // is looking at and never a query string with an order id in it.
-        referrerPolicy="origin"
-        className="h-[200px] w-full rounded-md border border-border bg-neutral-fill"
-      />
+      {/* `flex-1` with a floor, so the frame fills whatever height the caller
+          gives the map — a 300px box used to hold a 200px map and a gap — and
+          is still 200 tall where nobody says. */}
+      <div
+        className="relative flex min-h-[200px] flex-1"
+        onMouseLeave={() => setEngaged(false)}
+      >
+        <iframe
+          // Keyed on `view`: a new key is a new frame, loaded fresh at the pin.
+          key={view}
+          // Named, because an unlabelled frame is announced as "frame" and
+          // nothing else.
+          title={label}
+          src={source.toString()}
+          loading="lazy"
+          // The embed needs scripts to draw itself and its own origin to fetch
+          // tiles as itself; navigating the page it sits in, forms and plugins
+          // stay denied. `allow-same-origin` hands the frame *its* origin, not
+          // ours — which is safe precisely because the frame is cross-origin —
+          // and the popup permissions are what make OpenStreetMap's attribution
+          // links clickable, which the tile licence asks for.
+          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          // OpenStreetMap's volunteer tile servers refuse traffic they cannot
+          // attribute to an app, and answer with an "Access blocked" tile rather
+          // than a map. Traffic from an opaque sandbox origin, or with its
+          // referrer stripped, is exactly that unattributable traffic. So the
+          // frame sends our origin — scheme and host, never the path a customer
+          // is looking at and never a query string with an order id in it.
+          referrerPolicy="origin"
+          className="h-full min-h-[200px] w-full rounded-md border border-border bg-neutral-fill"
+        />
+        {/* A shield over the frame until it is clicked.
+
+          The map sits inside things that scroll — the order panel above all —
+          and a wheel over a live map zooms it instead of scrolling the page, so
+          reading down a receipt kept zooming the map out from under the pin.
+          The embed is cross-origin, so its wheel handling cannot be switched
+          off from here; covering it is the only lever. A click hands the map
+          the pointer (pan, zoom, the attribution links), and leaving it puts
+          the shield back. */}
+        {!engaged && (
+          <button
+            type="button"
+            onClick={() => setEngaged(true)}
+            aria-label={t("map.engage")}
+            className="group absolute inset-0 flex items-end justify-center rounded-md p-sm"
+          >
+            <span className="rounded-full bg-surface px-md py-xxs text-[12px] font-semibold text-text-soft opacity-0 shadow-card transition-opacity group-hover:opacity-100">
+              {t("map.engage")}
+            </span>
+          </button>
+        )}
+
+        {/* Back to the pin, after panning off it or zooming far in or out.
+
+          The embed is cross-origin, so its view cannot be set from here —
+          reloading it is the lever, and a reload starts exactly where the map
+          first opened: centred on the pin at the original zoom. Above the
+          shield, so it works whether or not the map has been clicked into,
+          and it hands the pointer back to the page as it resets. */}
+        <button
+          type="button"
+          onClick={() => {
+            setView((current) => current + 1);
+            setEngaged(false);
+          }}
+          aria-label={t("map.recenter")}
+          title={t("map.recenter")}
+          className="absolute end-sm top-sm z-10 flex size-[36px] items-center justify-center rounded-full bg-surface text-text shadow-[0_2px_8px_rgba(31,25,21,0.19)] hover:bg-neutral-fill"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            {/* A crosshair — the conventional "my location / centre" mark. */}
+            <circle cx="12" cy="12" r="6.5" />
+            <circle cx="12" cy="12" r="2" fill="currentColor" />
+            <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+          </svg>
+        </button>
+      </div>
       <a
         // Google Maps, by coordinates rather than by address text: the pin
         // lands exactly where the customer put it, with no geocoder in between

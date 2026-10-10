@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
@@ -100,18 +101,23 @@ type Draft = { open: boolean; opensAt: string; closesAt: string };
 export function StoreHours({ storeId }: { storeId: string }) {
   const branches = useBranches(storeId);
   const rows = branches.data ?? [];
+  // `?branch=` picks one to start on — the to-do page links a chain's
+  // branch that has no hours straight here. Only honoured when it names one
+  // of this shop's branches; anything else falls back to the first.
+  const linked = useSearchParams().get("branch");
   const [chosen, setChosen] = useState<string | null>(null);
 
-  const branchId = chosen ?? rows[0]?.id ?? null;
+  const branchId =
+    chosen ??
+    (rows.some((row) => row.id === linked) ? linked : null) ??
+    rows[0]?.id ??
+    null;
 
   if (branches.isPending) {
     return (
       <div aria-hidden className="flex flex-col gap-sm p-xxl">
         {WEEK.map((day) => (
-          <div
-            key={day}
-            className="h-[52px] rounded-md border border-border bg-surface opacity-60"
-          />
+          <div key={day} className="h-[52px] rounded-lg bg-line-soft" />
         ))}
       </div>
     );
@@ -197,10 +203,7 @@ function BranchHours({ branchId }: { branchId: string }) {
     return (
       <div aria-hidden className="flex flex-col gap-sm p-xxl">
         {WEEK.map((day) => (
-          <div
-            key={day}
-            className="h-[52px] rounded-md border border-border bg-surface opacity-60"
-          />
+          <div key={day} className="h-[52px] rounded-lg bg-line-soft" />
         ))}
       </div>
     );
@@ -209,7 +212,7 @@ function BranchHours({ branchId }: { branchId: string }) {
   if (hours.isError) {
     return (
       <div className="flex flex-col items-center gap-lg py-huge text-center">
-        <h2 className="text-[18px]">{t("hours.failedTitle")}</h2>
+        <h2 className="text-[19px]">{t("hours.failedTitle")}</h2>
         <Button variant="secondary" onClick={() => void hours.refetch()}>
           {t("common.retry")}
         </Button>
@@ -238,19 +241,7 @@ function Grid({
   pending: boolean;
   onSave: (week: DayHours[]) => void;
 }) {
-  const clock = useClock();
-  const [week, setWeek] = useState<Draft[]>(() =>
-    WEEK.map((day) => {
-      const row = saved.find((one) => one.dayOfWeek === day);
-      return row
-        ? { open: true, opensAt: row.opensAt, closesAt: row.closesAt }
-        : // A day that has never been set opens with the hours a shop most
-          // often keeps, so filling the week is a switch rather than a switch
-          // and two pickers.
-          { open: false, opensAt: "09:00", closesAt: "22:00" };
-    }),
-  );
-
+  const [week, setWeek] = useState<Draft[]>(() => draftWeek(saved));
   const [error, setError] = useState<string | null>(null);
 
   /**
@@ -266,11 +257,105 @@ function Grid({
   // walked away from without reading them.
   useUnsavedChanges(dirty);
 
+  function submit() {
+    const problem = checkWeek(week);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    onSave(weekToHours(week));
+  }
+
+  return (
+    /*
+      `flex-1`, not `h-full` — and it is the opposite of what the wrapper above
+      needs, which is the whole point.
+     *
+     * That one meets a block parent and has to claim its height. This one is a
+     * child of *it*, a flex column that may also be carrying a branch picker
+     * above — so `h-full` would be 100% of a box this element does not have to
+     * itself, and the Save bar would hang exactly the picker's height below the
+     * bottom of the screen. `flex-1` takes what is left instead.
+     */
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-grow flex-col overflow-y-auto scroll-hint p-xxl">
+        <WeekEditor
+          week={week}
+          onChange={(next) => {
+            setWeek(next);
+            setError(null);
+          }}
+          error={error}
+          dirty={dirty}
+        />
+      </div>
+
+      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
+        <Button onClick={submit} pending={pending}>
+          {t("hours.save")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** The week being edited, indexed by the *stored* day, 0 = Sunday. */
+export type WeekDraft = Draft[];
+
+/**
+ * A week to start editing from: the saved rows, and every other day closed
+ * with the hours a shop most often keeps, so opening a day is a switch rather
+ * than a switch and two pickers.
+ */
+export function draftWeek(saved: DayHours[] = []): WeekDraft {
+  return WEEK.map((day) => {
+    const row = saved.find((one) => one.dayOfWeek === day);
+    return row
+      ? { open: true, opensAt: row.opensAt, closesAt: row.closesAt }
+      : { open: false, opensAt: "09:00", closesAt: "22:00" };
+  });
+}
+
+/** The rows to write: one per open day. */
+export function weekToHours(week: WeekDraft): DayHours[] {
+  return week.flatMap((day, index) =>
+    day.open
+      ? [{ dayOfWeek: index, opensAt: day.opensAt, closesAt: day.closesAt }]
+      : [],
+  );
+}
+
+/** What is wrong with a week, if anything — an open day missing a time. */
+export function checkWeek(week: WeekDraft): string | null {
+  return week.some((day) => day.open && (!day.opensAt || !day.closesAt))
+    ? t("hours.incomplete")
+    : null;
+}
+
+/**
+ * The week, as rows of switches and pickers, with the read-back beside it.
+ *
+ * Controlled, and with no Save of its own, so it can be the Hours tab (which
+ * saves it to a branch that exists) and the second step of adding a shop
+ * (which saves it once the shop does).
+ */
+export function WeekEditor({
+  week,
+  onChange,
+  error,
+  dirty = false,
+}: {
+  week: WeekDraft;
+  onChange: (week: WeekDraft) => void;
+  error?: string | null;
+  /** Whether to tell the read-back panel the week has unsaved changes. */
+  dirty?: boolean;
+}) {
+
   function update(day: number, patch: Partial<Draft>) {
-    setWeek((current) =>
-      current.map((one, index) => (index === day ? { ...one, ...patch } : one)),
+    onChange(
+      week.map((one, index) => (index === day ? { ...one, ...patch } : one)),
     );
-    setError(null);
   }
 
   /**
@@ -286,8 +371,8 @@ function Grid({
 
   function copyDown() {
     if (!template) return;
-    setWeek((current) =>
-      current.map((day) =>
+    onChange(
+      week.map((day) =>
         day.open
           ? { ...day, opensAt: template.opensAt, closesAt: template.closesAt }
           : day,
@@ -295,140 +380,92 @@ function Grid({
     );
   }
 
-  function submit() {
-    const incomplete = week.some(
-      (day) => day.open && (!day.opensAt || !day.closesAt),
-    );
-    if (incomplete) {
-      setError(t("hours.incomplete"));
-      return;
-    }
-
-    onSave(
-      week.flatMap((day, index) =>
-        day.open
-          ? [{ dayOfWeek: index, opensAt: day.opensAt, closesAt: day.closesAt }]
-          : [],
-      ),
-    );
-  }
-
   return (
-    /*
-      `flex-1`, not `h-full` — and it is the opposite of what the wrapper above
-      needs, which is the whole point.
-     *
-     * That one meets a block parent and has to claim its height. This one is a
-     * child of *it*, a flex column that may also be carrying a branch picker
-     * above — so `h-full` would be 100% of a box this element does not have to
-     * itself, and the Save bar would hang exactly the picker's height below the
-     * bottom of the screen. `flex-1` takes what is left instead.
-     */
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* The grid sets the hours; the panel beside it reads them back.
-          Seven rows of switches and pickers is the right shape for *setting* a
-          week and the wrong one for *checking* it — "Mon–Fri 11:00–23:00,
-          closed Sunday" is the same information in the form a person actually
-          holds it in, and it is what catches the day left shut by accident. */}
-      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl lg:flex-row lg:items-start">
-        <div className="flex flex-1 flex-col gap-lg">
-          <div className="flex flex-col gap-sm">
-            {DISPLAY_ORDER.map((index) => {
-              const day = week[index];
-              return (
-                <div
-                  key={index}
-                  className={cx(
-                    "flex flex-wrap items-center gap-lg rounded-md border bg-surface px-lg py-md",
-                    day.open
-                      ? "border-border"
-                      : "border-border bg-neutral-fill/60",
-                  )}
-                >
-                  {/* A fixed width, so the switches line up down the week and the
-                  shape of it can be read without reading any of the words. */}
-                  <span className="w-[104px] shrink-0 text-[15px] font-semibold">
-                    {t(DAY_KEYS[index])}
-                  </span>
+    /* The grid sets the hours; the panel beside it reads them back.
+       Seven rows of switches and pickers is the right shape for *setting* a
+       week and the wrong one for *checking* it — "Mon–Fri 11:00–23:00,
+       closed Sunday" is the same information in the form a person actually
+       holds it in, and it is what catches the day left shut by accident. */
+    <div className="flex flex-col gap-xxl lg:flex-row lg:items-start">
+      <div className="flex flex-1 flex-col gap-lg">
+        <div className="flex flex-col gap-sm">
+          {DISPLAY_ORDER.map((index) => {
+            const day = week[index];
+            return (
+              <div
+                key={index}
+                className={cx(
+                  "flex flex-wrap items-center gap-lg rounded-lg bg-surface px-lg py-md",
+                  day.open ? "shadow-card" : "bg-neutral-fill/60",
+                )}
+              >
+                {/* A fixed width, so the switches line up down the week and
+                    the shape of it can be read without reading any of the
+                    words. */}
+                <span className="w-[104px] shrink-0 text-[15px] font-semibold">
+                  {t(DAY_KEYS[index])}
+                </span>
 
-                  <Toggle
-                    on={day.open}
-                    onChange={() => update(index, { open: !day.open })}
-                    labelOn={t("hours.open")}
-                    labelOff={t("hours.closed")}
-                    className="w-[92px]"
-                  />
+                <Toggle
+                  on={day.open}
+                  onChange={() => update(index, { open: !day.open })}
+                  labelOn={t("hours.open")}
+                  labelOff={t("hours.closed")}
+                  className="w-[92px]"
+                />
 
-                  {day.open ? (
-                    <div className="flex items-center gap-sm">
-                      <TimeField
-                        value={day.opensAt}
-                        onChange={(value) => update(index, { opensAt: value })}
-                      />
-                      <span className="text-[14px] text-text-soft">
-                        {t("hours.to")}
-                      </span>
-                      <TimeField
-                        value={day.closesAt}
-                        onChange={(value) => update(index, { closesAt: value })}
-                      />
-
-                      {/* Said out loud, because a closing time earlier than an
-                      opening one looks like a mistake and is not — a kitchen
-                      open until two in the morning is ordinary, and without
-                      this the operator would "fix" it. */}
-                      {crossesMidnight(day) && (
-                        <span className="text-[12px] text-text-faint">
-                          {t("hours.overnight")}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-[13px] text-text-faint">
-                      {t("hours.closedAllDay")}
+                {day.open ? (
+                  <div className="flex items-center gap-sm">
+                    <TimeField
+                      value={day.opensAt}
+                      onChange={(value) => update(index, { opensAt: value })}
+                    />
+                    <span className="text-[14px] text-text-soft">
+                      {t("hours.to")}
                     </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    <TimeField
+                      value={day.closesAt}
+                      onChange={(value) => update(index, { closesAt: value })}
+                    />
 
-          {error && (
-            <p role="alert" className="text-[13px] font-medium text-danger">
-              {error}
-            </p>
-          )}
+                    {/* Said out loud, because a closing time earlier than an
+                        opening one looks like a mistake and is not — a
+                        kitchen open until two in the morning is ordinary, and
+                        without this the operator would "fix" it. */}
+                    {crossesMidnight(day) && (
+                      <span className="text-[12px] text-text-faint">
+                        {t("hours.overnight")}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-[13px] text-text-faint">
+                    {t("hours.closedAllDay")}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <Summary week={week} dirty={dirty}>
-          {/* Beside the week it rewrites, not under the grid it reads from.
-              The summary is where an operator *notices* that six days should
-              match Monday — that is the whole reason the panel exists — so the
-              control that acts on the noticing belongs next to it. */}
-          {template && (
-            // Blue, which the palette reserves for what you act on. Grey read
-            // as one more line of the summary it sits under — and this is the
-            // only thing in that panel that does anything.
-            <Button
-              variant="primary-quiet"
-              size="sm"
-              onClick={copyDown}
-              fullWidth
-            >
-              {t("hours.copyToAll", {
-                opens: clock.hhmm(template.opensAt),
-                closes: clock.hhmm(template.closesAt),
-              })}
-            </Button>
-          )}
-        </Summary>
+        {error && (
+          <p role="alert" className="text-[13px] font-medium text-danger">
+            {error}
+          </p>
+        )}
       </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
-        <Button onClick={submit} pending={pending}>
-          {t("hours.save")}
-        </Button>
-      </div>
+      <Summary week={week} dirty={dirty}>
+        {/* Beside the week it rewrites, not under the grid it reads from.
+            The summary is where an operator *notices* that six days should
+            match Monday — that is the whole reason the panel exists — so the
+            control that acts on the noticing belongs next to it. */}
+        {template && (
+          <Button variant="secondary" size="sm" onClick={copyDown} fullWidth>
+            {t("hours.copyToAll")}
+          </Button>
+        )}
+      </Summary>
     </div>
   );
 }
@@ -491,9 +528,9 @@ function Summary({
   const spans = summarise(windows, DISPLAY_ORDER);
 
   return (
-    <aside className="flex w-full flex-col gap-lg rounded-md border border-border bg-surface p-lg lg:w-[300px] lg:shrink-0">
+    <aside className="flex w-full flex-col gap-lg rounded-lg border-2 border-transparent bg-surface p-lg shadow-card lg:w-[300px] lg:shrink-0">
       <div className="flex flex-col gap-xs">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
+        <span className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
           {t("hours.rightNow")}
         </span>
         <span
@@ -523,7 +560,7 @@ function Summary({
       </div>
 
       <div className="flex flex-col gap-xs border-t border-border pt-lg">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
+        <span className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
           {t("hours.theWeek")}
         </span>
         <ul className="flex flex-col gap-xxs">

@@ -140,7 +140,7 @@ export function OrderHistory({ order }: { order: Order }) {
       {entries.map((entry) => (
         <div
           key={entry.id}
-          className="flex flex-col gap-xs rounded-lg border border-border bg-surface p-lg"
+          className="flex flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card"
         >
           <span className="text-[12px] text-text-faint">
             {clock.dayAndTime(entry.at)}

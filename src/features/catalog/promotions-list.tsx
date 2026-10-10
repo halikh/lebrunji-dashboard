@@ -130,7 +130,7 @@ export function PromotionsList() {
               {[0, 1].map((row) => (
                 <div
                   key={row}
-                  className="h-[90px] rounded-md border border-border bg-surface opacity-60"
+                  className="h-[90px] rounded-lg bg-line-soft"
                 />
               ))}
             </div>
@@ -217,8 +217,8 @@ function Row({
     promotion.id,
     cx(
       ROW,
-      !promotion.isActive && "border-border bg-neutral-fill/60",
-      promotion.isActive && "border-border",
+      !promotion.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
+      promotion.isActive && "border-transparent",
       promotion.isActive && open && "border-active",
     ),
   );

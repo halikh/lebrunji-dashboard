@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { cx } from "./index";
 
@@ -31,6 +31,16 @@ import { cx } from "./index";
  *
  * `prefers-reduced-motion` is honoured by the global rule in `globals.css`,
  * which zeroes transition durations rather than removing this one by hand.
+ *
+ * ## It only clips while it moves
+ *
+ * The clip is what makes the fold work, and once the content is fully open it
+ * is only harm: it cut the soft shadow off every card at the fold's edges, and
+ * it stops a `sticky` heading inside from sticking, since sticky positions
+ * against the nearest clipping box and this one never scrolls. So the clip is
+ * lifted when the opening transition ends, and put back the moment it starts
+ * to close. (`globals.css` shortens reduced-motion transitions to 0.01ms
+ * rather than none, so `transitionend` still fires there.)
  */
 export function Collapse({
   open,
@@ -41,17 +51,31 @@ export function Collapse({
   children: ReactNode;
   className?: string;
 }) {
+  // Open and finished opening. Reset during render when `open` changes, so
+  // the clip is back on the very frame a close starts.
+  const [settled, setSettled] = useState(open);
+  const [was, setWas] = useState(open);
+  if (was !== open) {
+    setWas(open);
+    setSettled(false);
+  }
+
   return (
     <div
       inert={!open}
       aria-hidden={!open}
+      onTransitionEnd={(event) => {
+        if (event.target === event.currentTarget && open) setSettled(true);
+      }}
       className={cx(
         "grid transition-[grid-template-rows] duration-[var(--duration-expand)] ease-[var(--ease-arrive)]",
         open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         className,
       )}
     >
-      <div className="overflow-hidden">{children}</div>
+      <div className={cx("min-h-0", !(open && settled) && "overflow-hidden")}>
+        {children}
+      </div>
     </div>
   );
 }

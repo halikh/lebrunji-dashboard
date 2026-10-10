@@ -180,14 +180,16 @@ function paletteStyles<M extends boolean>(
       // sit in one bar and invisible everywhere else.
       padding: "0 var(--spacing-xs)",
       borderRadius: "var(--radius-md)",
-      backgroundColor: "var(--color-surface)",
-      borderColor: isInvalid ? "var(--color-danger)" : "var(--color-border)",
+      backgroundColor: state.isFocused
+        ? "var(--color-field-focus)"
+        : "var(--color-cream)",
+      borderColor: isInvalid ? "var(--color-danger)" : "var(--color-line)",
       // The focus ring is the app's — a box-shadow that follows the radius,
       // the same one `globals.css` puts on every other control.
       boxShadow: state.isFocused
         ? "0 0 0 1px var(--color-active), 0 0 0 4px var(--color-active-wash)"
         : "none",
-      "&:hover": { borderColor: "var(--color-border)" },
+      "&:hover": { borderColor: "var(--color-line)" },
       fontSize: 15,
     }),
     valueContainer: (base) => ({
@@ -235,7 +237,7 @@ function paletteStyles<M extends boolean>(
     menu: (base) => ({
       ...base,
       borderRadius: "var(--radius-md)",
-      border: "1px solid var(--color-border)",
+      border: "none",
       backgroundColor: "var(--color-surface)",
       boxShadow: "var(--shadow-overlay)",
       overflow: "hidden",

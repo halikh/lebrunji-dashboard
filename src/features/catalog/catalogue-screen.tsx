@@ -91,7 +91,7 @@ export function CatalogueScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-lg">
-        <h1 className="text-[24px]">{t("catalogue.title")}</h1>
+        <h1 className="text-[30px]">{t("catalogue.title")}</h1>
 
         {/*
           `SectionTab`, not a hand-rolled button.

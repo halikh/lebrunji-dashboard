@@ -133,7 +133,7 @@ export function DriverProfile({ id }: { id: string }) {
               <Avatar id={driver.id} name={driver.name} size={48} />
 
               <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-                <h1 className="truncate text-[24px]">{driver.name}</h1>
+                <h1 className="truncate text-[30px]">{driver.name}</h1>
                 {/* Copy, not dial. This number's job is to be pasted into
                     WhatsApp, and a `tel:` link on a desktop hands it to
                     whatever the machine thinks handles calls — usually
@@ -209,7 +209,7 @@ export function DriverProfile({ id }: { id: string }) {
                 const tone = statusTone(row.statusSlug);
 
                 return (
-                  <div key={row.id} className={cx(ROW, "border-border")}>
+                  <div key={row.id} className={cx(ROW, "border-transparent")}>
                     <div className="flex min-w-0 flex-grow flex-col gap-xxs">
                       <Link
                         href={`/orders/${row.orderId}`}
@@ -318,7 +318,7 @@ function Stat({
   note?: string;
 }) {
   return (
-    <div className="flex min-w-[140px] flex-col gap-xxs rounded-lg border border-border bg-surface px-lg py-md">
+    <div className="flex min-w-[140px] flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
       <span className="text-[24px] font-bold tabular-nums">{value}</span>
       <span className="text-[12px] text-text-faint">{label}</span>
       {/* What the average is over. An average with no denominator on screen is

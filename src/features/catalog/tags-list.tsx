@@ -99,7 +99,7 @@ export function TagsList() {
               {[0, 1, 2].map((row) => (
                 <div
                   key={row}
-                  className="h-[58px] rounded-md border border-border bg-surface opacity-60"
+                  className="h-[58px] rounded-lg bg-line-soft"
                 />
               ))}
             </div>
@@ -107,7 +107,7 @@ export function TagsList() {
 
           {tags.isError && (
             <div className="flex flex-col items-center gap-lg py-huge text-center">
-              <h2 className="text-[18px]">{t("tags.failedTitle")}</h2>
+              <h2 className="text-[19px]">{t("tags.failedTitle")}</h2>
               <Button variant="secondary" onClick={() => void tags.refetch()}>
                 {t("common.retry")}
               </Button>
@@ -169,8 +169,8 @@ function Row({
     ROW,
     // Marked, not dimmed — fading a row takes its controls with it, and a
     // faded button reads as a disabled one.
-    !tag.isActive && "border-border bg-neutral-fill/60",
-    tag.isActive && "border-border",
+    !tag.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
+    tag.isActive && "border-transparent",
     tag.isActive && open && "border-active",
   );
 

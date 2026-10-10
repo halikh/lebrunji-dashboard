@@ -351,7 +351,7 @@ function Form({
                 {PLACEMENTS.map((option) => (
                   <div
                     key={option}
-                    className="flex items-start justify-between gap-lg rounded-md border border-border bg-surface px-lg py-md"
+                    className="flex items-start justify-between gap-lg rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card"
                   >
                     <span className="flex min-w-0 flex-col gap-xxs">
                       <span className="text-[14px] font-semibold text-text">

@@ -20,9 +20,9 @@ export function FormSection({
   children: ReactNode;
 }) {
   return (
-    <section className="@container flex min-w-0 flex-col gap-lg rounded-md border border-border bg-surface p-lg">
+    <section className="@container flex min-w-0 flex-col gap-lg rounded-lg bg-surface p-lg shadow-card">
       {title && (
-        <h3 className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+        <h3 className="text-[19px]">
           {title}
         </h3>
       )}

@@ -22,6 +22,7 @@ export type IconName =
   | "customers"
   | "drivers"
   | "reports"
+  | "todo"
   | "settings"
   | "sign-out";
 
@@ -49,6 +50,7 @@ export const SECTIONS: readonly Section[] = [
   // worth reading.
   { href: "/drivers", labelKey: "nav.drivers", phase: null, icon: "drivers" },
   { href: "/reports", labelKey: "nav.reports", phase: 6, icon: "reports" },
+  { href: "/todo", labelKey: "nav.todo", phase: null, icon: "todo" },
   { href: "/settings", labelKey: "nav.settings", phase: 7, icon: "settings" },
 ];
 

@@ -73,7 +73,7 @@ export function PricingScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-lg">
-        <h1 className="text-[24px]">{t("pricing.title")}</h1>
+        <h1 className="text-[30px]">{t("pricing.title")}</h1>
 
         <div role="tablist" className="-mb-px flex gap-lg">
           {TABS.map(({ key, labelKey }) => {
@@ -165,7 +165,7 @@ function Rate() {
   if (rates.isError || !other || !base) {
     return (
       <section className="flex flex-col gap-sm">
-        <h2 className="ps-md text-[18px]">{t("pricing.rateTitle")}</h2>
+        <h2 className="ps-md text-[19px]">{t("pricing.rateTitle")}</h2>
         <p role="alert" className="text-[13px] font-medium text-danger">
           {rates.error instanceof Error
             ? rates.error.message
@@ -186,7 +186,7 @@ function Rate() {
     <div className="flex h-full min-h-0 flex-col overflow-y-auto scroll-hint lg:flex-row lg:overflow-hidden">
       <section className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto scroll-hint">
         <div className="flex flex-col gap-xs">
-          <h2 className="ps-md text-[18px]">{t("pricing.rateTitle")}</h2>
+          <h2 className="ps-md text-[19px]">{t("pricing.rateTitle")}</h2>
           <p className="ps-md text-[14px] text-text-soft">
             {t("pricing.rateBody")}
           </p>
@@ -196,7 +196,7 @@ function Rate() {
           The screen is the only place `is_base` surfaces on its own, and an
           operator who has just given one shop its own currency has no other
           way to find out what the rest of them fall back to. */}
-        <div className="flex flex-col gap-xxs rounded-md border border-border bg-surface p-lg">
+        <div className="flex flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
           <span className="text-[14px] font-semibold">
             {t("pricing.baseTitle", { code: base.code })}
           </span>
@@ -205,8 +205,8 @@ function Rate() {
           </span>
         </div>
 
-        <div className="flex flex-col gap-xs rounded-md border border-border bg-surface p-lg">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
+        <div className="flex flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
+          <span className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
             {t("pricing.rateNow")}
           </span>
           <span className="text-[20px] font-semibold tabular-nums">
@@ -350,8 +350,8 @@ function Conversions({
         </p>
       </div>
 
-      <div className="flex max-w-[520px] flex-col gap-xs rounded-md border border-border bg-surface p-lg">
-        <div className="flex items-baseline gap-md border-b border-border pb-sm text-[12px] font-bold uppercase tracking-wide text-text-faint">
+      <div className="flex max-w-[520px] flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
+        <div className="flex items-baseline gap-md border-b border-line pb-sm text-[12px] font-medium tracking-[0.05em] text-text-faint">
           <span className="flex-grow">{t("pricing.amount")}</span>
           <span className="w-[140px] text-end">{t("pricing.atCurrent")}</span>
           {changed && (
@@ -519,7 +519,7 @@ function Ladder() {
     <div className="flex h-full min-h-0 flex-col">
       <section className="flex min-h-0 flex-1 flex-col gap-lg overflow-y-auto scroll-hint p-xxl">
         <div className="flex flex-col gap-xs">
-          <h2 className="ps-md text-[18px]">{t("pricing.ladderTitle")}</h2>
+          <h2 className="ps-md text-[19px]">{t("pricing.ladderTitle")}</h2>
           <p className="ps-md text-[14px] text-text-soft">
             {t("pricing.ladderBody")}
           </p>
@@ -780,7 +780,7 @@ function ExtraStoreFee() {
   const other = to && baseCode ? convertTo(amount, baseCode, to) : null;
 
   return (
-    <div className="flex flex-wrap items-start gap-lg rounded-md border border-border bg-surface px-lg py-md">
+    <div className="flex flex-wrap items-start gap-lg rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
       <div className="flex min-w-[220px] flex-1 flex-col gap-xxs">
         <span className="text-[14px] font-semibold">
           {t("pricing.extraTitle")}

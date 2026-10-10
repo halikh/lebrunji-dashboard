@@ -9,7 +9,8 @@ import { t } from "@/i18n/translations";
 import { useClock } from "@/features/settings/use-clock";
 
 import { OrderActions, OrderBody, PanelSkeleton } from "./order-detail";
-import { useOrder, useOrderStatuses } from "./use-orders";
+import { StatusPill } from "./status-pill";
+import { orderStatus, useOrder, useOrderStatuses } from "./use-orders";
 
 /**
  * The receipt, opened beside the queue.
@@ -34,22 +35,47 @@ import { useOrder, useOrderStatuses } from "./use-orders";
  */
 export function OrderPanel({
   orderId,
+  docked = false,
+  opened = orderId !== null,
   onClose,
 }: {
+  /** The order to show — on the queue, the selected one or the first. */
   orderId: string | null;
+  /**
+   * The queue's mode: on a wide screen the panel is always there and has no
+   * close. Elsewhere (a customer's profile) it is opened over the screen and
+   * closed again, as before.
+   */
+  docked?: boolean;
+  /**
+   * Whether the operator picked it. When docked this only decides the phone
+   * overlay, which has to be dismissable or the queue underneath could never
+   * be reached.
+   */
+  opened?: boolean;
   onClose: () => void;
 }) {
   const clock = useClock();
   const statuses = useOrderStatuses();
   const order = useOrder(orderId);
+  const status = order.data ? orderStatus(order.data, statuses) : null;
 
   return (
     <Panel
-      open={orderId !== null}
+      docked={docked}
+      open={opened}
       onClose={onClose}
       label={t("orders.panelLabel")}
     >
-      {order.isPending && <PanelSkeleton />}
+      {/* Nothing in the queue, so nothing to show. Said, rather than left as a
+          skeleton that never resolves — a disabled query reads as pending. */}
+      {orderId === null && (
+        <p className="p-xxl text-[14px] text-text-faint">
+          {t("orders.panelEmpty")}
+        </p>
+      )}
+
+      {orderId !== null && order.isPending && <PanelSkeleton />}
 
       {order.isError && (
         <div className="flex flex-col gap-lg p-xxl">
@@ -64,28 +90,51 @@ export function OrderPanel({
 
       {order.isSuccess && (
         <>
-          <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
-            <div className="flex flex-grow flex-col gap-xxs">
-              {/* Copy only: there is nowhere for a code to go, and it is pasted
-                  into messages constantly. Reading sixteen characters back off
-                  a screen by hand is where mistakes come from. */}
-              <h2 className="flex items-center gap-sm text-[20px]">
-                <Copyable
-                  value={order.data.code}
-                  label={t("orders.copyCode")}
-                />
-              </h2>
-              <span className="text-[13px] text-text-faint">
-                {t("orders.placed")} {clock.dayAndTime(order.data.placedAt)}
-              </span>
+          <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pb-md pt-lg">
+            <div className="flex items-start gap-md">
+              <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+                {/* Copy only: there is nowhere for a code to go, and it is
+                    pasted into messages constantly. Reading sixteen characters
+                    back off a screen by hand is where mistakes come from. */}
+                <h2 className="flex items-center gap-sm text-[22px]">
+                  <Copyable
+                    value={order.data.code}
+                    label={t("orders.copyCode")}
+                  />
+                </h2>
+                <span className="text-[13px] text-text-faint">
+                  {t("orders.placed")} {clock.dayAndTime(order.data.placedAt)}
+                </span>
+              </div>
+              {status && <StatusPill slug={status.slug} name={status.name} />}
+              {!docked && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label={t("common.close")}
+                  className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft lg:flex"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    aria-hidden
+                  >
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              )}
+            </div>
 
-              {/* The way out to the full page. Quiet and small: it leaves the
-                  screen the operator is working on, which is almost never what
-                  they want next — but when it is, hunting for it is worse. */}
-              <Link
-                href={`/orders/${order.data.id}`}
-                className="flex w-fit items-center gap-xs text-[13px] font-semibold text-primary hover:underline"
-              >
+            {/* The ways out, as two quiet chips on one line. They leave the
+                screen the operator is working on, which is almost never what
+                they want next — but when it is, hunting for it is worse. */}
+            <div className="flex flex-wrap items-center gap-sm">
+              <Link href={`/orders/${order.data.id}`} className={CHIP}>
                 <svg
                   width="13"
                   height="13"
@@ -97,9 +146,8 @@ export function OrderPanel({
                   strokeLinejoin="round"
                   aria-hidden
                 >
-                  {/* A box with an arrow leaving it — the conventional mark for
-                      "this goes somewhere else", which is precisely what
-                      distinguishes it from every other link on the panel. */}
+                  {/* A box with an arrow leaving it — "this goes somewhere
+                      else". */}
                   <path d="M14 4h6v6" />
                   <path d="M20 4l-8 8" />
                   <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
@@ -110,20 +158,13 @@ export function OrderPanel({
               {/* Straight to the history rather than to the page's first tab.
                   Somebody following this link has a question about what
                   happened — landing them on the receipt they were already
-                  reading would cost a second click for nothing.
-
-                  Quieter than the link above it: opening the full page is the
-                  ordinary next step, and this is the one you take when
-                  something has gone wrong. */}
+                  reading would cost a second click for nothing. */}
               <Link
                 href={`/orders/${order.data.id}?tab=history`}
-                className="flex items-center gap-xs text-[12px] font-semibold text-active-ink hover:underline"
+                className={CHIP}
               >
-                {/* A clock with its hand turned back — the icon for "what has
-                    happened to this", drawn in the same 24-unit geometry as the
-                    rest of the set rather than fetched. Blue, because blue is
-                    where you *are* in this palette and this link leads to
-                    another face of the order already open. */}
+                {/* A clock with its hand turned back — "what has happened to
+                    this". */}
                 <svg
                   width="13"
                   height="13"
@@ -142,25 +183,6 @@ export function OrderPanel({
                 {t("history.open")}
               </Link>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t("common.close")}
-              className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft lg:flex"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                aria-hidden
-              >
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
           </div>
 
           <OrderBody order={order.data} from={"panel"} />
@@ -170,3 +192,7 @@ export function OrderPanel({
     </Panel>
   );
 }
+
+/** The app's `outline` pill: cream, hairline, soft ink type. */
+const CHIP =
+  "flex h-[28px] items-center gap-xs rounded-full border border-line bg-cream px-md text-[13px] font-medium text-text-soft hover:bg-neutral-fill hover:text-text";

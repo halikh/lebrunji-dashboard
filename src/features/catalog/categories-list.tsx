@@ -119,7 +119,7 @@ export function CategoriesList() {
               {[0, 1, 2].map((row) => (
                 <div
                   key={row}
-                  className="h-[66px] rounded-md border border-border bg-surface opacity-60"
+                  className="h-[66px] rounded-lg bg-line-soft"
                 />
               ))}
             </div>
@@ -127,7 +127,7 @@ export function CategoriesList() {
 
           {categories.isError && (
             <div className="flex flex-col items-center gap-lg py-huge text-center">
-              <h2 className="text-[18px]">{t("categories.failedTitle")}</h2>
+              <h2 className="text-[19px]">{t("categories.failedTitle")}</h2>
               <Button
                 variant="secondary"
                 onClick={() => void categories.refetch()}
@@ -208,8 +208,8 @@ function Row({
       ROW,
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
-      !category.isActive && "border-border bg-neutral-fill/60",
-      category.isActive && "border-border",
+      !category.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
+      category.isActive && "border-transparent",
       category.isActive && open && "border-active",
     ),
   );

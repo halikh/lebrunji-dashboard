@@ -41,7 +41,7 @@ export function PanelHeader({
     <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
       <div className="flex min-w-0 flex-grow flex-col gap-xxs">
         {typeof title === "string" ? (
-          <h2 className="truncate text-[20px]">{title}</h2>
+          <h2 className="truncate text-[22px]">{title}</h2>
         ) : (
           title
         )}

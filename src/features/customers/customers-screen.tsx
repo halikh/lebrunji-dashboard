@@ -156,7 +156,7 @@ export function CustomersScreen() {
       <div
         role="tablist"
         aria-label={t("customers.title")}
-        className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
+        className="flex shrink-0 gap-xxs border-b border-border bg-surface px-xxl"
       >
         {TABS.map(({ key, labelKey, tone }) => (
           <FilterTab
@@ -181,7 +181,7 @@ export function CustomersScreen() {
             {[0, 1, 2, 3].map((row) => (
               <div
                 key={row}
-                className="h-[58px] rounded-md border border-border bg-surface opacity-60"
+                className="h-[58px] rounded-lg bg-line-soft"
               />
             ))}
           </div>
@@ -189,7 +189,7 @@ export function CustomersScreen() {
 
         {customers.isError && (
           <div className="flex flex-col items-center gap-lg py-huge text-center">
-            <h2 className="text-[18px]">{t("customers.failedTitle")}</h2>
+            <h2 className="text-[19px]">{t("customers.failedTitle")}</h2>
             <Button
               variant="secondary"
               onClick={() => void customers.refetch()}
@@ -245,9 +245,8 @@ function Row({ customer }: { customer: Customer }) {
         // Marked rather than dimmed. A faded row reads as disabled, and these
         // are the rows most likely to be the one somebody is looking for.
         closed || !customer.isActive
-          ? "border-border bg-neutral-fill/60"
-          : "border-border",
-        "hover:border-active",
+          ? "border-transparent bg-neutral-fill/60 shadow-none"
+          : "border-transparent",
       )}
     >
       <Avatar id={customer.id} name={customer.name} />

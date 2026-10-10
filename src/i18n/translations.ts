@@ -70,10 +70,39 @@ const en = {
     customers: "Customers",
     drivers: "Drivers",
     reports: "Reports",
+    todo: "To do",
     settings: "Settings",
     account: "Your account",
     liveOrders: "orders needing attention",
     skipToContent: "Skip to content",
+  },
+
+  todo: {
+    title: "To do",
+    blurb:
+      "What the catalogue is still missing. Each row opens the place where it is fixed.",
+    hoursTitle: "Shops without opening hours",
+    hoursBody:
+      "A shop with no hours is closed every day in the app, so nobody can order from it.",
+    hoursNone: "No hours set",
+    hoursBranches: "{count} of {total} branches have no hours: {names}",
+    hoursDone: "Every shop has its opening hours.",
+    setHours: "Set hours",
+    storeImagesTitle: "Shops without a picture",
+    storeImagesBody: "The picture is the shop's card in the app.",
+    storeImagesDone: "Every shop has a picture.",
+    itemImagesTitle: "Dishes without a picture",
+    itemImagesBody: "Grouped by shop, so a whole menu can be done in one go.",
+    itemImagesDone: "Every dish has a picture.",
+    addPicture: "Add picture",
+    items: "{count} dishes",
+    itemsOne: "1 dish",
+    hidden: "Hidden",
+    search: "Search shops, dishes or branches",
+    noMatch: "Nothing here matches the search.",
+    failed: "Could not load this list.",
+    truncated:
+      "Only the first part of this list is shown. Fix these and the rest will appear.",
   },
 
   customers: {
@@ -263,6 +292,24 @@ const en = {
     kitchenNoNumber: "No WhatsApp number for this shop.",
     kitchenAddNumber: "Add one",
     kitchenTab: "Shops",
+    kitchenAll: "Notify all shops ({count})",
+    kitchenRest: "Notify the other {count}",
+    kitchenBlocked:
+      "Your browser blocked the other chats as pop-ups. Click the blocked pop-up icon at the right of the address bar, choose “Always allow pop-ups”, then press the button again. You only do this once.",
+    kitchenAllDone: "All chats opened",
+    popupHelpTitle: "How to open all chats in one click",
+    popupStep1: "In a new Chrome tab, navigate to",
+    popupStep2:
+      "Under “Allowed to send pop-ups and use redirects”, click Add.",
+    popupStep3: "Enter this dashboard’s address and click Add:",
+    popupStep4: "Come back to this tab and refresh the page.",
+    popupNote:
+      "Once per computer, for each dashboard address. Nothing is sent until you press Send in each chat.",
+    // Chrome will not let a web page open a chrome:// address, so the link
+    // copies it instead, and says where to put it.
+    popupCopied: "Copied — paste it into a new tab’s address bar",
+    popupCopyAddress: "Copy this dashboard’s address",
+    kitchenSent: "Opened",
     driverTab: "Driver",
   },
 
@@ -531,9 +578,17 @@ const en = {
     openPage: "Open the full page",
     backToQueue: "All orders",
     panelLabel: "Order detail",
+    panelEmpty: "No orders here — the receipt shows once one arrives.",
     placed: "Placed",
     customer: "Customer",
     address: "Address",
+    // The app's own eyebrow over the address on its order page.
+    deliveringTo: "Delivering to",
+    itemCount: "{count} items",
+    itemCountOne: "1 item",
+    fromShops: "from {count} shops",
+    nextStep: "Next step",
+    otherActions: "Other actions",
     courierNote: "Note for the courier: ",
     items: "Items",
     subtotal: "Subtotal",
@@ -554,7 +609,7 @@ const en = {
     // A multiplication sign, not the letter x — and a translated string rather
     // than a literal, because where the number sits relative to it is not
     // universal.
-    quantity: "{count}×",
+    quantity: "×{count}",
     locationLabel: "Where {name} is",
   },
 
@@ -738,6 +793,18 @@ const en = {
     // ---- adding one -------------------------------------------------------
     add: "New store",
     create: "Create the store",
+    stepDetails: "Shop details",
+    stepPlace: "Where it is",
+    stepHours: "Opening hours",
+    nextPlace: "Next: where it is",
+    nextHours: "Next: opening hours",
+    back: "Back",
+    hoursBlurb:
+      "When the shop takes orders. A day left closed is closed in the app — open at least one.",
+    hoursRequired:
+      "Open at least one day. A shop with no hours is closed every day in the app.",
+    hoursNotSaved:
+      "The shop was created, but its hours could not be saved. Set them here.",
     created: "{name} added — set up its menu next",
 
     category: "Main category",
@@ -889,7 +956,7 @@ const en = {
     detailsFailed: "Could not load the shop",
     name: "Shop name",
     nameHint: "What customers see at the top of the shop.",
-    imageHint: "The picture on the shop's card in the app. Optional.",
+    imageHint: "The picture on the shop's card in the app.",
     prepTitle: "Preparation time",
     whatsapp: "WhatsApp number",
     // Says what its absence costs, which is the part somebody skipping the
@@ -966,7 +1033,9 @@ const en = {
     // Named, because a closing time earlier than an opening one looks like a
     // mistake and is not — a kitchen open until two in the morning is ordinary.
     overnight: "Closes after midnight",
-    copyToAll: "Give every open day {opens}–{closes}",
+    // Short enough for the 300px read-back panel it sits in — a button never
+    // wraps. The hours it copies are listed in "The week" right under it.
+    copyToAll: "Apply to all open days",
     incomplete: "Every open day needs an opening and a closing time.",
     save: "Save hours",
     saved: "Hours saved",
@@ -2420,6 +2489,8 @@ const en = {
   map: {
     noPin: "No location saved for this address.",
     openLarger: "Open in Google Maps",
+    engage: "Click to move the map",
+    recenter: "Back to the pin",
   },
 
   /**

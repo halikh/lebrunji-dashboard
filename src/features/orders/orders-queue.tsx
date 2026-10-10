@@ -47,15 +47,19 @@ import {
  */
 const SCOPES: Scope[] = ["live", "today", "all"];
 
+/** The tab the queue opens on — see `statusSlug`. */
+const DEFAULT_STATUS = "ordered";
+/** The "All" tab, in the URL. */
+const ALL_STATUSES = "all";
+
 export function OrdersQueue() {
   const [search, setSearch] = useState("");
   const [focused, setFocused] = useState(0);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // The open order lives in the URL, so a view can be reloaded, bookmarked or
-  // sent to somebody — and so the browser's back button closes the panel,
-  // which is what everyone tries first.
+  // The selected order lives in the URL, so a view can be reloaded, bookmarked
+  // or sent to somebody with the same receipt open beside it.
   //
   // `replace`, not `push`: opening four orders in a row should not mean four
   // presses of Back to get out of the queue.
@@ -85,7 +89,13 @@ export function OrdersQueue() {
   const scope: Scope = SCOPES.includes(params.get("scope") as Scope)
     ? (params.get("scope") as Scope)
     : "live";
-  const statusSlug = params.get("status");
+  // Placed by default: the queue opens on the orders waiting for somebody to
+  // confirm them, which is what an operator sits down to do. "All" is then a
+  // value of its own in the URL (`?status=all`) rather than the absence of
+  // one, and `null` below still means "no filter" to the fetch.
+  const rawStatus = params.get("status");
+  const statusSlug =
+    rawStatus === ALL_STATUSES ? null : (rawStatus ?? DEFAULT_STATUS);
 
   /** One writer for both, so the two can never disagree about the query. */
   const setParam = useCallback(
@@ -106,9 +116,22 @@ export function OrdersQueue() {
     [setParam],
   );
 
+  // Switching tab also lets go of the open order. It is usually not in the new
+  // tab, and the receipt should follow the list the operator just chose — its
+  // first row — rather than keep showing an order they can no longer see.
   const setStatusSlug = useCallback(
-    (next: string | null) => setParam("status", next, null),
-    [setParam],
+    (next: string | null) => {
+      const query = new URLSearchParams(params);
+      const value = next ?? ALL_STATUSES;
+      if (value === DEFAULT_STATUS) query.delete("status");
+      else query.set("status", value);
+      query.delete("order");
+      const text = query.toString();
+      router.replace(text ? `${pathname}?${text}` : pathname, {
+        scroll: false,
+      });
+    },
+    [params, pathname, router],
   );
 
   const setOpenOrderId = useCallback(
@@ -153,7 +176,31 @@ export function OrdersQueue() {
   //
   // Clamping rather than resetting keeps the operator roughly where they were,
   // instead of throwing them to the top each time an order arrives.
-  const active = Math.min(focused, Math.max(rows.length - 1, 0));
+  //
+  // The selected order wins when it is in the list, so the highlight and the
+  // receipt beside it never disagree — including after a reload, when only the
+  // URL knows which order it was.
+  const selectedIndex = rows.findIndex((order) => order.id === openOrderId);
+  const active =
+    selectedIndex >= 0
+      ? selectedIndex
+      : Math.min(focused, Math.max(rows.length - 1, 0));
+
+  // The receipt always shows something. Nothing picked yet means the row under
+  // the highlight; a picked order that has since left the list (delivered off
+  // the Live tab) stays up, because the operator was in the middle of it.
+  const shownOrderId = openOrderId ?? rows[active]?.id ?? null;
+
+  /** Move the highlight, and the receipt with it. */
+  const select = useCallback(
+    (index: number) => {
+      const order = rows[index];
+      if (!order) return;
+      setFocused(index);
+      setOpenOrderId(order.id);
+    },
+    [rows, setOpenOrderId],
+  );
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -202,12 +249,12 @@ export function OrdersQueue() {
       }
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault();
-        setFocused((current) => Math.min(current + 1, rows.length - 1));
+        select(Math.min(active + 1, rows.length - 1));
         return;
       }
       if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault();
-        setFocused((current) => Math.max(current - 1, 0));
+        select(Math.max(active - 1, 0));
         return;
       }
       if (event.key === "Enter") {
@@ -232,7 +279,16 @@ export function OrdersQueue() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [rows, active, statuses, advance, openOrderId, setOpenOrderId, undoLast]);
+  }, [
+    rows,
+    active,
+    select,
+    statuses,
+    advance,
+    openOrderId,
+    setOpenOrderId,
+    undoLast,
+  ]);
 
   return (
     // The queue and the panel side by side. `relative` so the panel can cover
@@ -249,8 +305,8 @@ export function OrdersQueue() {
         that should absorb the overflow; it already says so with `flex-grow`
         and `overflow-y-auto`, and this is the other half of that statement.
       */}
-        <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <h1 className="text-[24px]">{t("orders.title")}</h1>
+        <div className="flex shrink-0 items-center gap-lg bg-surface px-xxl pb-md pt-lg">
+          <h1 className="text-[30px] tracking-[-0.01em]">{t("orders.title")}</h1>
 
           {/* The scope switch sits beside the title rather than among the status
             tabs, because it is a different question: the tabs ask "at which
@@ -258,7 +314,7 @@ export function OrdersQueue() {
           <div
             role="group"
             aria-label={t("orders.title")}
-            className="flex shrink-0 items-center gap-xxs rounded-md bg-neutral-fill p-xxs"
+            className="flex h-[40px] shrink-0 items-center gap-xxs rounded-md bg-neutral-fill p-xxs"
           >
             <ScopeButton
               label={t("orders.scopeLive")}
@@ -291,7 +347,9 @@ export function OrdersQueue() {
         <div
           role="tablist"
           aria-label={t("orders.title")}
-          className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
+          // No scroll: six tabs fit any screen the queue is used on, and a
+          // scrollbar under them was chrome with nothing to reveal.
+          className="flex shrink-0 gap-xs border-b border-border bg-surface px-xxl"
         >
           <Tab
             label={t("orders.all")}
@@ -316,13 +374,13 @@ export function OrdersQueue() {
         {/* The one part that scrolls. `min-h-0` for the same reason as the
           layout's main — without it this grows to its content and the header
           and tabs get squeezed instead. */}
-        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-md overflow-y-auto scroll-hint bg-background px-xxl py-lg">
           {orders.isPending && <Skeleton />}
 
           {orders.isError && (
             <div className="flex flex-col items-center gap-lg py-huge text-center">
               <div className="flex flex-col gap-xs">
-                <h2 className="text-[18px]">{t("orders.failedTitle")}</h2>
+                <h2 className="text-[19px]">{t("orders.failedTitle")}</h2>
                 <p className="text-[14px] text-text-soft">
                   {t("orders.failedBody")}
                 </p>
@@ -351,10 +409,8 @@ export function OrdersQueue() {
               order={order}
               statuses={statuses}
               focused={index === active}
-              onOpen={() => {
-                setFocused(index);
-                setOpenOrderId(order.id);
-              }}
+              selected={order.id === shownOrderId}
+              onOpen={() => select(index)}
               money={format}
               onAdvance={(to) => {
                 const status = orderStatus(order, statuses);
@@ -403,7 +459,12 @@ export function OrdersQueue() {
         </div>
       </div>
 
-      <OrderPanel orderId={openOrderId} onClose={() => setOpenOrderId(null)} />
+      <OrderPanel
+        orderId={shownOrderId}
+        docked
+        opened={openOrderId !== null}
+        onClose={() => setOpenOrderId(null)}
+      />
     </div>
   );
 }
@@ -436,8 +497,8 @@ function ScopeButton({
       aria-pressed={active}
       onClick={onClick}
       className={cx(
-        "rounded-sm px-md py-xs text-[13px] font-semibold whitespace-nowrap",
-        active ? "bg-surface text-text shadow-card" : "text-text-soft",
+        "flex h-full items-center rounded-sm px-md text-[14px] font-medium whitespace-nowrap",
+        active ? "bg-surface text-text shadow-selected" : "text-text-soft hover:text-text",
       )}
     >
       {label}
@@ -468,13 +529,14 @@ function Tab({
       // A dot on every tab, active or not. Colour alone is not a distinction a
       // colour-blind operator can rely on, and the dot is what ties a tab to
       // the rows beneath it — the tabs are the legend.
-      style={
-        active && tone ? { background: tone.wash, color: tone.ink } : undefined
-      }
+      //
+      // Chosen is an ink underline and ink type, as a chosen thing is in the
+      // app; the count beside it turns to an ink badge with it.
       className={cx(
-        "flex shrink-0 items-center gap-sm whitespace-nowrap rounded-t-md px-lg py-sm text-[14px] font-semibold",
-        active && !tone && "bg-active-wash text-active-ink",
-        !active && "text-text-soft hover:bg-neutral-fill",
+        "-mb-px flex h-[44px] shrink-0 items-center gap-sm whitespace-nowrap border-b-2 px-md text-[14px] font-medium",
+        active
+          ? "border-active text-text"
+          : "border-transparent text-text-soft hover:text-text",
       )}
     >
       {tone && (
@@ -487,7 +549,10 @@ function Tab({
       {label}
       {count !== undefined && count > 0 && (
         <span
-          className={cx("tabular-nums", active ? "font-bold" : "font-medium")}
+          className={cx(
+            "flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-[6px] text-[12px] tabular-nums",
+            active ? "bg-active-fill text-on-active" : "bg-neutral-fill text-text",
+          )}
         >
           {count}
         </span>
@@ -517,7 +582,7 @@ function Skeleton() {
       {[0, 1, 2, 3, 4].map((row) => (
         <div
           key={row}
-          className="h-[66px] rounded-md border border-border bg-surface opacity-60"
+          className="h-[72px] rounded-lg bg-line-soft"
         />
       ))}
     </div>

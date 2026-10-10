@@ -89,7 +89,7 @@ export function Modal({
         // `globals.css`, on `dialog` — so every overlay added later gets them
         // without having to remember, and there is one place they are tuned.
         // `relative`, so the close button above can sit in its corner.
-        "relative m-auto w-[min(420px,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-xxl",
+        "relative m-auto w-[min(420px,calc(100vw-2rem))] rounded-xxl bg-surface p-xxl shadow-overlay",
         "text-text",
         className,
       )}

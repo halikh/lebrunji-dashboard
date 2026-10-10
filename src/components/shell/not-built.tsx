@@ -28,10 +28,10 @@ export function NotBuilt({
   return (
     <div className="flex h-full flex-col items-center justify-center gap-sm px-xxl py-huge text-center">
       <PoseStage pose="packing" height={176} className="mb-md" />
-      <p className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+      <p className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
         {t(sectionKey)}
       </p>
-      <h2 className="text-[18px]">{t("shell.notBuiltTitle")}</h2>
+      <h2 className="text-[19px]">{t("shell.notBuiltTitle")}</h2>
       <p className="max-w-[380px] text-[14px] text-text-soft">
         {/* The phase number goes *through* the string rather than being
             appended to it. Appending reads fine in English and is unbuildable

@@ -264,9 +264,9 @@ export function LocalizedField({
                   }
                   aria-invalid={isMissing || undefined}
                   className={cx(
-                    "w-full rounded-md border bg-surface py-md pe-md ps-[42px] text-[15px] text-text",
+                    "w-full rounded-md border bg-cream py-md pe-md ps-[42px] text-[15px] text-text",
                     "placeholder:text-text-faint focus:bg-field-focus",
-                    isMissing || error ? "border-danger" : "border-border",
+                    isMissing || error ? "border-danger" : "border-line",
                   )}
                 />
               ) : (

@@ -86,6 +86,18 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M17 20v-9" data-anim="bar" data-anim-order="3" />
     </>
   ),
+  // A checklist: two ticked lines and one still open. The ticks draw in, as
+  // the receipt's lines do — the motion of a thing being done.
+  todo: (
+    <>
+      <path d="M4 6.5l1.5 1.5L8 5.5" data-anim="line" data-anim-order="1" />
+      <path d="M11 7h9" />
+      <path d="M4 12.5l1.5 1.5L8 11.5" data-anim="line" data-anim-order="2" />
+      <path d="M11 13h9" />
+      <circle cx="6" cy="18.5" r="1.5" />
+      <path d="M11 19h9" />
+    </>
+  ),
   // Sliders, not a cog.
   //
   // The first attempt was a circle with eight radiating spokes, which at 22px

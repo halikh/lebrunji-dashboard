@@ -97,7 +97,7 @@ export function BranchesTab({ storeId }: { storeId: string }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-        <h2 className="shrink-0 text-[18px]">{t("branches.tab")}</h2>
+        <h2 className="shrink-0 text-[19px]">{t("branches.tab")}</h2>
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -244,8 +244,8 @@ function BranchRow({
       ref={anchor}
       className={cx(
         ROW,
-        !branch.isActive && "border-border bg-neutral-fill/60",
-        branch.isActive && "border-border",
+        !branch.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
+        branch.isActive && "border-transparent",
       )}
     >
       {/* The same 46pt square the shops list draws, greyed the same way when

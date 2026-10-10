@@ -69,7 +69,7 @@ export function ArtworksList() {
               {[0, 1].map((row) => (
                 <div
                   key={row}
-                  className="h-[90px] rounded-md border border-border bg-surface opacity-60"
+                  className="h-[90px] rounded-lg bg-line-soft"
                 />
               ))}
             </div>
@@ -136,7 +136,7 @@ function FormatSection({
 
   return (
     <section className="flex flex-col gap-sm">
-      <h2 className="ps-md text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+      <h2 className="ps-md text-[19px]">
         {t(`artworks.sections.${format}`)}
       </h2>
       <p className="ps-md pb-xs text-[13px] text-text-soft">
@@ -207,8 +207,8 @@ function Row({
     artwork.id,
     cx(
       ROW,
-      !artwork.isActive && "border-border bg-neutral-fill/60",
-      artwork.isActive && "border-border",
+      !artwork.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
+      artwork.isActive && "border-transparent",
       artwork.isActive && open && "border-active",
     ),
   );

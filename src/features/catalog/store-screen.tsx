@@ -192,7 +192,7 @@ export function StoreScreen({ storeId }: { storeId: string }) {
             )}
 
             <div className="flex min-w-0 flex-col gap-xxs">
-              <h1 className="truncate text-[24px]">
+              <h1 className="truncate text-[30px]">
                 {store.data ? pickLocalized(store.data.name) : ""}
               </h1>
               {store.data && <StoreFacts store={store.data} />}

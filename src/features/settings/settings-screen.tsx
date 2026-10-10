@@ -99,7 +99,7 @@ export function SettingsScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-lg">
-        <h1 className="text-[24px]">{t("content.title")}</h1>
+        <h1 className="text-[30px]">{t("content.title")}</h1>
 
         <div role="tablist" className="-mb-px flex gap-lg">
           {TABS.map(({ key, labelKey }) => (
@@ -219,7 +219,7 @@ function HelpTab() {
               {[0, 1, 2].map((one) => (
                 <div
                   key={one}
-                  className="h-[58px] rounded-md border border-border bg-surface opacity-60"
+                  className="h-[58px] rounded-lg bg-line-soft"
                 />
               ))}
             </div>
@@ -305,10 +305,9 @@ function HelpRow({
     topic.id,
     cx(
       ROW,
-      !topic.isActive && "border-border bg-neutral-fill/60",
-      open &&
-        "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]",
-      topic.isActive && !open && "border-border",
+      !topic.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
+      open && "shadow-selected",
+      topic.isActive && !open && "border-transparent",
       topic.isActive && open && "border-active",
     ),
   );
@@ -543,8 +542,8 @@ function PolicyRow({
     cx(
       ROW,
       open
-        ? "border-active shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]"
-        : "border-border",
+        ? "border-active shadow-selected"
+        : "border-transparent",
     ),
   );
 

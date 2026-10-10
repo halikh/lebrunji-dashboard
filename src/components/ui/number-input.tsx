@@ -66,12 +66,12 @@ export function NumberInput({
       aria-invalid={isInvalid || undefined}
       aria-describedby={rest["aria-describedby"] ?? field?.describedBy}
       className={cx(
-        "w-full rounded-md border bg-surface px-md py-md text-[15px] text-text tabular-nums",
+        "w-full rounded-md border bg-cream px-md py-md text-[15px] text-text tabular-nums",
         "placeholder:text-text-faint",
         "focus:bg-field-focus",
         // Chrome and Safari draw spinners; Firefox uses `appearance`.
         "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-        isInvalid ? "border-danger" : "border-border",
+        isInvalid ? "border-danger" : "border-line",
         className,
       )}
     />

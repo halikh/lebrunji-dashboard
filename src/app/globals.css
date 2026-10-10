@@ -67,7 +67,7 @@ h4 {
 
 /**
  * Arabic anywhere it appears — a menu item's name in a form, a store's title in
- * the queue. Barlow has no Arabic coverage, and a designed Latin face beside a
+ * the queue. Inter has no Arabic coverage, and a designed Latin face beside a
  * fallback Arabic one looks broken rather than bilingual, so the *script* picks
  * the family. Set on `[lang]` rather than on a class, so it applies wherever a
  * localised value is rendered with its own `lang` — which is also what tells a

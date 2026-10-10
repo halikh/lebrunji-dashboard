@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToasts } from "@/components/ui/toast";
 import { pickLocalized } from "@/i18n/db-text";
+import { saveFirstBranchHours, type DayHours } from "./api/hours";
 import type { Localized } from "@/lib/validation";
 import { t } from "@/i18n/translations";
 
@@ -110,14 +111,35 @@ export function useCreateStore() {
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: (input: {
+    /**
+     * The shop, then its week.
+     *
+     * The hours are written after the shop and do not fail the create: the
+     * shop exists by then, and an error here would invite filling the form in
+     * again — a second shop. So it comes back as `hoursSaved`, and a shop
+     * whose hours did not land is sent to its Hours tab to finish.
+     */
+    mutationFn: async (input: {
       draft: StoreDraft;
       countryId: string;
       sortOrder: number;
       name: Localized;
-    }) => createStore(input.draft, input.countryId, input.sortOrder),
+      hours: DayHours[];
+    }) => {
+      const id = await createStore(
+        input.draft,
+        input.countryId,
+        input.sortOrder,
+      );
+      try {
+        await saveFirstBranchHours(id, input.hours);
+        return { id, hoursSaved: true };
+      } catch {
+        return { id, hoursSaved: false };
+      }
+    },
 
-    onSuccess: (_id, input) => {
+    onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: storeKeys.all });
       toast.success(t("store.created", { name: pickLocalized(input.name) }));
     },

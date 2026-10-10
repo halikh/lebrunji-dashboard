@@ -88,8 +88,8 @@ export function TimeField({
       aria-invalid={isInvalid ? "true" : undefined}
       className={cx(
         clock.clock24h ? "w-[104px]" : "w-[124px]",
-        "rounded-md border bg-surface px-md py-sm text-[14px] tabular-nums",
-        isInvalid ? "border-danger" : "border-border",
+        "rounded-md border bg-cream px-md py-sm text-[14px] tabular-nums focus:bg-field-focus",
+        isInvalid ? "border-danger" : "border-line",
         className,
       )}
       wrapperClassName="shrink-0"

@@ -110,7 +110,7 @@ export function StoreDetails({ storeId }: { storeId: string }) {
   if (store.isError || !store.data) {
     return (
       <div className="flex flex-col items-center gap-lg py-huge text-center">
-        <h2 className="text-[18px]">{t("store.detailsFailed")}</h2>
+        <h2 className="text-[19px]">{t("store.detailsFailed")}</h2>
         <Button variant="secondary" onClick={() => void store.refetch()}>
           {t("common.retry")}
         </Button>

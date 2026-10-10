@@ -173,7 +173,7 @@ export function DriversScreen() {
       <div
         role="tablist"
         aria-label={t("drivers.title")}
-        className="flex shrink-0 gap-xxs overflow-x-auto border-b border-border bg-surface px-xxl pt-sm"
+        className="flex shrink-0 gap-xxs border-b border-border bg-surface px-xxl"
       >
         {TABS.map(({ key, labelKey, tone }) => (
           <FilterTab
@@ -301,7 +301,7 @@ function DriverRow({
   const overridden = isOverridden(courier);
 
   return (
-    <div ref={anchor} className={cx(ROW, open ? FOCUS_RING : "border-border")}>
+    <div ref={anchor} className={cx(ROW, open ? FOCUS_RING : "border-transparent")}>
       <Avatar id={courier.id} name={courier.name} />
 
       <div className="flex min-w-0 flex-grow flex-col gap-xxs">

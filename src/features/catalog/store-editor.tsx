@@ -4,7 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { Button, Input } from "@/components/ui";
+import { useToasts } from "@/components/ui/toast";
+
+import { Button, cx, Input } from "@/components/ui";
 import { EditorPage } from "@/components/ui/editor-page";
 import { Field } from "@/components/ui/field";
 import { FieldPair, FormSection } from "@/components/ui/form-section";
@@ -36,14 +38,40 @@ import type { Localized } from "@/lib/validation";
 
 import { fetchDefaultCountry, type StoreDraft } from "./api/stores";
 import { useCategories } from "./use-categories";
+import {
+  checkWeek,
+  draftWeek,
+  WeekEditor,
+  weekToHours,
+  type WeekDraft,
+} from "./store-hours";
 import { useCreateStore, useStores } from "./use-stores";
 
 const LIST_HREF = "/catalogue?tab=shops";
 
 /**
- * Adding a shop — one page, the same shape as the page that edits one.
+ * Adding a shop — three steps: the shop, where it is, and its opening hours.
  *
- * ## It was a four-step wizard
+ * ## Where it is, on a step of its own
+ *
+ * The pin, the WhatsApp number and the prep window are a different question
+ * from the name and the prices — *where does an order go* — and the pin is the
+ * one field here whose mistake costs money (see below). On its own step, with
+ * the map beside it, it is read rather than scrolled past.
+ *
+ * ## And the hours last
+ *
+ * The hours are required, and they were the thing most often forgotten: the
+ * form made a shop, the operator went on to its menu, and the shop sat closed
+ * every day of the week in the app — a missing day *is* a closed day — with
+ * nothing on screen to say so. Asking for the week before the shop exists is
+ * what makes "required" true. They are a step of their own because the week is
+ * a seven-row grid with its own read-back panel, not a field that fits a card.
+ *
+ * Step one is the form described below, unchanged; Next checks it all at once,
+ * and the week is only asked for once the shop itself would be accepted.
+ *
+ * ## Before that, it was a four-step wizard
  *
  * The argument for that was frequency: a menu item is created forty times in an
  * afternoon and wants a form you can fly through, where **a shop is created a
@@ -69,8 +97,7 @@ const LIST_HREF = "/catalogue?tab=shops";
  * An unpinned shop does not fail to quote a delivery. `delivery_fee_for_km`
  * treats an unknown distance as the **top band**, so it quietly charges every
  * customer the most expensive answer there is. That is why the field is
- * required, why the warning sits under it while it is empty, and why the map is
- * on screen rather than a step away.
+ * required and why the map is on screen rather than a step away.
  *
  * ## What it deliberately does not ask
  *
@@ -154,6 +181,12 @@ export function StoreEditor() {
     baseCode && otherCode
       ? t("store.rate", { other: otherCode, base: baseCode })
       : t("store.rateGeneric");
+  /** Which step is on screen: the shop (1), where it is (2), its week (3). */
+  const [step, setStep] = useState<Step>(1);
+  const [week, setWeek] = useState<WeekDraft>(() => draftWeek());
+  const [hoursError, setHoursError] = useState<string | null>(null);
+  const toast = useToasts();
+
   const [prepMin, setPrepMin] = useState("10");
   const [prepMax, setPrepMax] = useState("20");
   const [isActive, setIsActive] = useState(false);
@@ -190,6 +223,7 @@ export function StoreEditor() {
         prepMin,
         prepMax,
         isActive,
+        hours: weekToHours(week),
       },
       {
         name: {},
@@ -204,6 +238,7 @@ export function StoreEditor() {
         prepMin: "10",
         prepMax: "20",
         isActive: false,
+        hours: [],
       },
     ),
   );
@@ -275,11 +310,54 @@ export function StoreEditor() {
     };
   }
 
-  function submit() {
+  /**
+   * Forward to `target`, checking every step on the way.
+   *
+   * Only the fields of the steps being *left* are reported: going from the
+   * shop to where it is must not paint the empty pin box red before anybody
+   * has seen it. If one of them fails, the operator lands on the first step
+   * with a problem rather than staying put.
+   *
+   * Back is never checked — half-filled is a fine state to look at.
+   */
+  function goTo(target: Step): boolean {
+    if (target <= step) {
+      setStep(target);
+      return true;
+    }
     const found = check();
-    setErrors(found);
-    if (Object.values(found).some(Boolean)) return;
+    const leaving = ([1, 2] as const).filter((one) => one < target);
+    const shown = Object.fromEntries(
+      leaving.flatMap((one) =>
+        STEP_FIELDS[one].map((field) => [field, found[field]]),
+      ),
+    ) as typeof found;
+    setErrors(shown);
+    const failed = leaving.find((one) =>
+      STEP_FIELDS[one].some((field) => found[field]),
+    );
+    if (failed) {
+      setStep(failed);
+      return false;
+    }
+    setStep(target);
+    return true;
+  }
+
+  function submit() {
+    // The earlier steps again, in case one was changed by going Back — the
+    // same checks Next made, so nothing reaches the insert that Next would
+    // have refused.
+    if (!goTo(3)) return;
     if (!country.data) return;
+
+    // Required: at least one open day, each with both times. A week of closed
+    // days is a shop nobody can order from, which is what this step is for.
+    const hours = weekToHours(week);
+    const weekProblem =
+      checkWeek(week) ?? (hours.length === 0 ? t("store.hoursRequired") : null);
+    setHoursError(weekProblem);
+    if (weekProblem) return;
 
     const draft: StoreDraft = {
       name,
@@ -301,10 +379,18 @@ export function StoreEditor() {
     };
 
     create.mutate(
-      { draft, countryId: country.data.id, sortOrder, name },
+      { draft, countryId: country.data.id, sortOrder, name, hours },
       {
-        onSuccess: (id) => {
+        onSuccess: ({ id, hoursSaved }) => {
           onClose();
+          if (!hoursSaved) {
+            // The shop is made; only its week did not land. Straight to the
+            // Hours tab with the reason, rather than a form to fill in again
+            // and a second shop.
+            toast.danger(t("store.hoursNotSaved"));
+            router.push(`/catalogue/${id}?tab=hours`);
+            return;
+          }
           // Straight to the new shop's menu, which is what the operator came to
           // build. Landing back on the list would mean finding the row they
           // just created and clicking it.
@@ -323,288 +409,323 @@ export function StoreEditor() {
       width="wide"
       footer={
         <>
-          <Button
-            variant="secondary"
-            disabled={create.isPending}
-            // Guarded, unlike the `onClose` a successful create calls: asking
-            // whether to discard the shop that was just made would be a
-            // question about nothing.
-            onClick={guarded(onClose)}
-          >
-            {t("common.cancel")}
-          </Button>
-          <Button
-            onClick={submit}
-            pending={create.isPending}
-            disabled={!country.data}
-          >
-            {t("store.create")}
-          </Button>
+          {step === 1 ? (
+            <Button
+              variant="secondary"
+              // Guarded, unlike the `onClose` a successful create calls:
+              // asking whether to discard the shop that was just made would
+              // be a question about nothing.
+              onClick={guarded(onClose)}
+            >
+              {t("common.cancel")}
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              disabled={create.isPending}
+              onClick={() => setStep((step - 1) as Step)}
+            >
+              {t("store.back")}
+            </Button>
+          )}
+          {step === 1 && (
+            <Button onClick={() => goTo(2)}>{t("store.nextPlace")}</Button>
+          )}
+          {step === 2 && (
+            <Button onClick={() => goTo(3)}>{t("store.nextHours")}</Button>
+          )}
+          {step === 3 && (
+            <Button
+              onClick={submit}
+              pending={create.isPending}
+              disabled={!country.data}
+            >
+              {t("store.create")}
+            </Button>
+          )}
         </>
       }
     >
-      {/**
-       * The shop in a wide column of cards, its picture and its storefront
-       * switches in a narrow one beside it — the frame every editor here uses
-       * (see `PromotionEditor`), and the same cards the shop's Details tab
-       * draws, so adding a shop and editing one read as one form.
-       *
-       * The main column asks, in order: **who it is** (name and categories),
-       * **what it prices in** (currency and rate), and **where an order reaches
-       * it** (pin, number, prep window — with the map beside them).
-       *
-       * ## The map sits inside the card it is about, and that ended the drift
-       *
-       * Two free-flowing halves put a 260pt map against fields of ninety, so by
-       * the fourth field the columns were twenty-odd points out of step; the
-       * subgrid that aligned them left a hand's width of nothing above
-       * Category. In the place card the map is beside the three fields it
-       * illustrates, and nothing else has to line up with it.
-       *
-       * One column below `lg`, the side column last.
-       */}
-      <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-xxl">
-        <div className="flex min-w-0 flex-col gap-lg">
-          <FormSection>
-            <LocalizedField
-              label={t("store.name")}
-              value={name}
-              onChange={setName}
-              maxLength={TEXT.name}
-              error={errors.name}
-              filter="title"
-              placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارا" }}
-            />
+      <Steps step={step} onStep={goTo} />
 
-            <FieldPair>
+      {/* Step two: where an order reaches the shop. Mounted throughout and
+          hidden, like step one, so the pin and the number survive Back. */}
+      <div className={step === 2 ? undefined : "hidden"}>
+        <FormSection title={t("store.placeSection")}>
+          {/* The fields and the map side by side once the card has room —
+                a pin is a pair of numbers nobody can check by reading, and the
+                marker beside it is how it gets checked. */}
+          <div className="grid grid-cols-1 items-start gap-lg @[44rem]:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-lg">
               <Field
-                label={t("store.category")}
-                hint={t("store.categoryHint")}
-                error={errors.category}
+                label={t("store.pin")}
+                hint={t("store.pinHint")}
+                error={errors.pin}
               >
-                <Select
-                  value={categoryId}
-                  onChange={(next) => {
-                    setCategoryId(next);
-                    // A category promoted to main leaves the extras — it is
-                    // included as the main one, and listing it twice would
-                    // offer a removal that does nothing.
-                    setOtherCategoryIds((current) =>
-                      current.filter((id) => id !== next),
-                    );
-                  }}
-                  placeholder={t("store.pickCategory")}
-                  options={(categories.data ?? []).map((category) => ({
-                    value: category.id,
-                    label: pickLocalized(category.name),
-                  }))}
+                <Input
+                  value={pin}
+                  onChange={(event) => setPin(event.target.value)}
+                  placeholder="33.8938, 35.5018"
                 />
               </Field>
 
-              {/* Every other category the shop is listed under — `0136`. The
-                  main one is what the shop *is*; these are where else a
-                  customer filtering by category should find it. The main one
-                  is left out of the options, since it is always included. */}
               <Field
-                label={t("store.otherCategories")}
-                hint={t("store.otherCategoriesHint")}
+                label={t("store.whatsapp")}
+                hint={t("store.whatsappHint")}
+                error={errors.whatsapp}
               >
-                <MultiSelect
-                  value={otherCategoryIds}
-                  onChange={setOtherCategoryIds}
-                  placeholder={t("store.otherCategoriesPlaceholder")}
-                  options={(categories.data ?? [])
-                    .filter((category) => category.id !== categoryId)
-                    .map((category) => ({
+                <PhoneInput
+                  value={whatsapp}
+                  onChange={setWhatsapp}
+                  placeholder={t("store.whatsappPlaceholder")}
+                />
+              </Field>
+
+              <Field
+                label={t("store.prep")}
+                hint={t("store.prepHint")}
+                error={errors.prep}
+              >
+                <div className="flex items-center gap-md">
+                  <span className="flex-1">
+                    <NumberInput
+                      min={0}
+                      step={1}
+                      value={prepMin}
+                      onChange={(event) => setPrepMin(event.target.value)}
+                      aria-label={t("store.prepMin")}
+                    />
+                  </span>
+                  <span className="shrink-0 text-[13px] text-text-soft">
+                    {t("store.prepTo")}
+                  </span>
+                  <span className="flex-1">
+                    <NumberInput
+                      min={0}
+                      step={1}
+                      value={prepMax}
+                      onChange={(event) => setPrepMax(event.target.value)}
+                      aria-label={t("store.prepMax")}
+                    />
+                  </span>
+                  <span className="shrink-0 text-[13px] text-text-soft">
+                    {t("store.minutes")}
+                  </span>
+                </div>
+              </Field>
+            </div>
+
+            <PinMap
+              latitude={coordinates?.latitude ?? null}
+              longitude={coordinates?.longitude ?? null}
+              label={pickLocalized(name) || t("store.name")}
+              emptyKey="store.mapEmpty"
+              // Sticky beside the fields, so the marker stays in view while
+              // the number and the prep window below the pin are filled in —
+              // the pin is the one to check, and checking it is looking here.
+              className="h-[420px] w-full rounded-md @[44rem]:sticky @[44rem]:top-0"
+            />
+          </div>
+        </FormSection>
+      </div>
+
+      {step === 3 && (
+        <div className="flex flex-col gap-lg">
+          <p className="text-[14px] text-text-soft">{t("store.hoursBlurb")}</p>
+          <WeekEditor
+            week={week}
+            onChange={(nextWeek) => {
+              setWeek(nextWeek);
+              setHoursError(null);
+            }}
+            error={hoursError}
+          />
+        </div>
+      )}
+
+      {/* Step one stays mounted under the later steps, hidden, so the picture
+          being uploaded and every field keep their state — Back returns to
+          exactly what was left. */}
+      <div className={step === 1 ? undefined : "hidden"}>
+        {/**
+         * The shop in a wide column of cards, its picture and its storefront
+         * switches in a narrow one beside it — the frame every editor here uses
+         * (see `PromotionEditor`), and the same cards the shop's Details tab
+         * draws, so adding a shop and editing one read as one form.
+         *
+         * The main column asks, in order: **who it is** (name and categories),
+         * **what it prices in** (currency and rate), and **where an order reaches
+         * it** (pin, number, prep window — with the map beside them).
+         *
+         * ## The map sits inside the card it is about, and that ended the drift
+         *
+         * Two free-flowing halves put a 260pt map against fields of ninety, so by
+         * the fourth field the columns were twenty-odd points out of step; the
+         * subgrid that aligned them left a hand's width of nothing above
+         * Category. In the place card the map is beside the three fields it
+         * illustrates, and nothing else has to line up with it.
+         *
+         * One column below `lg`, the side column last.
+         */}
+        <div className="grid grid-cols-1 items-start gap-lg lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-xxl">
+          <div className="flex min-w-0 flex-col gap-lg">
+            <FormSection>
+              <LocalizedField
+                label={t("store.name")}
+                value={name}
+                onChange={setName}
+                maxLength={TEXT.name}
+                error={errors.name}
+                filter="title"
+                placeholder={{ en: "Nara Kitchen", ar: "مطبخ نارا" }}
+              />
+
+              <FieldPair>
+                <Field
+                  label={t("store.category")}
+                  hint={t("store.categoryHint")}
+                  error={errors.category}
+                >
+                  <Select
+                    value={categoryId}
+                    onChange={(next) => {
+                      setCategoryId(next);
+                      // A category promoted to main leaves the extras — it is
+                      // included as the main one, and listing it twice would
+                      // offer a removal that does nothing.
+                      setOtherCategoryIds((current) =>
+                        current.filter((id) => id !== next),
+                      );
+                    }}
+                    placeholder={t("store.pickCategory")}
+                    options={(categories.data ?? []).map((category) => ({
                       value: category.id,
                       label: pickLocalized(category.name),
                     }))}
-                />
-              </Field>
-            </FieldPair>
-          </FormSection>
+                  />
+                </Field>
 
-          <FormSection title={t("store.pricesSection")}>
-            <FieldPair>
-              <Field
-                label={t("store.currency")}
-                // Not a preference: every price on the menu is denominated in
-                // it, and changing it later reprices nothing — the numbers stay
-                // and simply mean something else.
-                hint={t("store.currencyHint")}
-                error={errors.currency}
-              >
-                <Select
-                  value={currency}
-                  onChange={setCurrencyCode}
-                  placeholder={t("store.pickCurrency")}
-                  options={(currencies ?? []).map((one) => ({
-                    value: one.code,
-                    label: one.code,
-                  }))}
-                />
-              </Field>
+                {/* Every other category the shop is listed under — `0136`. The
+                  main one is what the shop *is*; these are where else a
+                  customer filtering by category should find it. The main one
+                  is left out of the options, since it is always included. */}
+                <Field
+                  label={t("store.otherCategories")}
+                  hint={t("store.otherCategoriesHint")}
+                >
+                  <MultiSelect
+                    value={otherCategoryIds}
+                    onChange={setOtherCategoryIds}
+                    placeholder={t("store.otherCategoriesPlaceholder")}
+                    options={(categories.data ?? [])
+                      .filter((category) => category.id !== categoryId)
+                      .map((category) => ({
+                        value: category.id,
+                        label: pickLocalized(category.name),
+                      }))}
+                  />
+                </Field>
+              </FieldPair>
+            </FormSection>
 
-              {/* Beside the currency, because it is a fact *about* it: what
+            <FormSection title={t("store.pricesSection")}>
+              <FieldPair>
+                <Field
+                  label={t("store.currency")}
+                  // Not a preference: every price on the menu is denominated in
+                  // it, and changing it later reprices nothing — the numbers stay
+                  // and simply mean something else.
+                  hint={t("store.currencyHint")}
+                  error={errors.currency}
+                >
+                  <Select
+                    value={currency}
+                    onChange={setCurrencyCode}
+                    placeholder={t("store.pickCurrency")}
+                    options={(currencies ?? []).map((one) => ({
+                      value: one.code,
+                      label: one.code,
+                    }))}
+                  />
+                </Field>
+
+                {/* Beside the currency, because it is a fact *about* it: what
                   this shop's prices convert at for a customer reading the other
                   one. `0120` for why it cannot move what is charged. */}
-              <Field
-                label={rateLabel}
-                hint={t("store.rateHint")}
-                error={errors.rate}
-              >
-                <NumberInput
-                  value={exchangeRate}
-                  onChange={(event) => setExchangeRate(event.target.value)}
-                  min={0}
-                  step="any"
-                  placeholder={t("store.ratePlatform", {
-                    rate: platformRate
-                      ? platformRate.toLocaleString("en-GB")
-                      : "",
-                  })}
-                  aria-label={rateLabel}
+                <Field
+                  label={rateLabel}
+                  hint={t("store.rateHint")}
+                  error={errors.rate}
+                >
+                  <NumberInput
+                    value={exchangeRate}
+                    onChange={(event) => setExchangeRate(event.target.value)}
+                    min={0}
+                    step="any"
+                    placeholder={t("store.ratePlatform", {
+                      rate: platformRate
+                        ? platformRate.toLocaleString("en-GB")
+                        : "",
+                    })}
+                    aria-label={rateLabel}
+                  />
+                </Field>
+              </FieldPair>
+            </FormSection>
+          </div>
+
+          <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
+            <FormSection>
+              <Field label={t("images.label")} hint={t("store.imageHint")}>
+                <ImageUploader
+                  value={imageUrl}
+                  onChange={setImageUrl}
+                  folder="stores"
+                  disabled={create.isPending}
                 />
               </Field>
-            </FieldPair>
-          </FormSection>
+            </FormSection>
 
-          <FormSection title={t("store.placeSection")}>
-            {/* The fields and the map side by side once the card has room —
-                a pin is a pair of numbers nobody can check by reading, and the
-                marker beside it is how it gets checked. */}
-            <div className="grid grid-cols-1 items-start gap-lg @[44rem]:grid-cols-2">
-              <div className="flex min-w-0 flex-col gap-lg">
-                <Field
-                  label={t("store.pin")}
-                  hint={t("store.pinHint")}
-                  error={errors.pin}
-                >
-                  <Input
-                    value={pin}
-                    onChange={(event) => setPin(event.target.value)}
-                    placeholder="33.8938, 35.5018"
-                  />
-                </Field>
-
-                {/* The consequence, said before it happens rather than found
-                    on a bill: an unpinned shop is charged at the top band,
-                    because `delivery_fee_for_km` treats an unknown distance
-                    that way. */}
-                {!coordinates && (
-                  <p className="rounded-md bg-warning-wash px-lg py-md text-[13px]">
-                    {t("store.noPinWarning")}
-                  </p>
-                )}
-
-                <Field
-                  label={t("store.whatsapp")}
-                  hint={t("store.whatsappHint")}
-                  error={errors.whatsapp}
-                >
-                  <PhoneInput
-                    value={whatsapp}
-                    onChange={setWhatsapp}
-                    placeholder={t("store.whatsappPlaceholder")}
-                  />
-                </Field>
-
-                <Field
-                  label={t("store.prep")}
-                  hint={t("store.prepHint")}
-                  error={errors.prep}
-                >
-                  <div className="flex items-center gap-md">
-                    <span className="flex-1">
-                      <NumberInput
-                        min={0}
-                        step={1}
-                        value={prepMin}
-                        onChange={(event) => setPrepMin(event.target.value)}
-                        aria-label={t("store.prepMin")}
-                      />
-                    </span>
-                    <span className="shrink-0 text-[13px] text-text-soft">
-                      {t("store.prepTo")}
-                    </span>
-                    <span className="flex-1">
-                      <NumberInput
-                        min={0}
-                        step={1}
-                        value={prepMax}
-                        onChange={(event) => setPrepMax(event.target.value)}
-                        aria-label={t("store.prepMax")}
-                      />
-                    </span>
-                    <span className="shrink-0 text-[13px] text-text-soft">
-                      {t("store.minutes")}
-                    </span>
-                  </div>
-                </Field>
-              </div>
-
-              <PinMap
-                latitude={coordinates?.latitude ?? null}
-                longitude={coordinates?.longitude ?? null}
-                label={pickLocalized(name) || t("store.name")}
-                emptyKey="store.mapEmpty"
-                className="h-[300px] w-full rounded-md"
-              />
-            </div>
-          </FormSection>
-        </div>
-
-        <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
-          <FormSection>
-            <Field label={t("images.label")} hint={t("store.imageHint")}>
-              <ImageUploader
-                value={imageUrl}
-                onChange={setImageUrl}
-                folder="stores"
-                disabled={create.isPending}
-              />
-            </Field>
-          </FormSection>
-
-          {/* Both storefront switches in one card: they answer the same
+            {/* Both storefront switches in one card: they answer the same
               question at two strengths — can a customer find this shop, and
               should it be the first one they see. */}
-          <FormSection title={t("store.storefrontSection")}>
-            <Field
-              label={t("store.visibility")}
-              hint={isActive ? t("store.liveHint") : t("store.hiddenHintNew")}
-            >
-              <Toggle
-                on={isActive}
-                onChange={() => setIsActive((current) => !current)}
-                labelOn={t("store.live")}
-                labelOff={t("store.hidden")}
-              />
-            </Field>
+            <FormSection title={t("store.storefrontSection")}>
+              <Field
+                label={t("store.visibility")}
+                hint={isActive ? t("store.liveHint") : t("store.hiddenHintNew")}
+              >
+                <Toggle
+                  on={isActive}
+                  onChange={() => setIsActive((current) => !current)}
+                  labelOn={t("store.live")}
+                  labelOff={t("store.hidden")}
+                />
+              </Field>
 
-            {/* No confirmation here, unlike the shops list.
+              {/* No confirmation here, unlike the shops list.
 
                 There the switch acts the instant it is flicked, on a live shop,
                 from a column of identical rows — which is what the dialog is
                 for. Here nothing happens until Save, the shop does not exist
                 yet, and the row it belongs to is the form being filled in. */}
-            <Field
-              label={t("store.featured")}
-              hint={
-                isFeatured
-                  ? t("store.featuredHint")
-                  : t("store.featuredHintOff")
-              }
-            >
-              <Toggle
-                on={isFeatured}
-                onChange={() => setIsFeatured((current) => !current)}
-                labelOn={t("catalogue.featured")}
-                labelOff={t("store.notFeatured")}
-              />
-            </Field>
-          </FormSection>
-        </aside>
+              <Field
+                label={t("store.featured")}
+                hint={
+                  isFeatured
+                    ? t("store.featuredHint")
+                    : t("store.featuredHintOff")
+                }
+              >
+                <Toggle
+                  on={isFeatured}
+                  onChange={() => setIsFeatured((current) => !current)}
+                  labelOn={t("catalogue.featured")}
+                  labelOff={t("store.notFeatured")}
+                />
+              </Field>
+            </FormSection>
+          </aside>
+        </div>
       </div>
 
       {/* The real message, not a stand-in for it. A country that cannot be read
@@ -625,3 +746,89 @@ export function StoreEditor() {
     </EditorPage>
   );
 }
+
+/**
+ * Where the operator is in adding a shop: three numbered steps, the current one
+ * in ink, a finished one with a tick.
+ *
+ * Pressable, so the steps are also the way between them — going forward runs
+ * the same checks Next does.
+ */
+function Steps({ step, onStep }: { step: Step; onStep: (step: Step) => void }) {
+  const steps: { n: Step; label: string }[] = [
+    { n: 1, label: t("store.stepDetails") },
+    { n: 2, label: t("store.stepPlace") },
+    { n: 3, label: t("store.stepHours") },
+  ];
+
+  return (
+    <ol className="flex items-center gap-md">
+      {steps.map(({ n, label }, index) => {
+        const current = n === step;
+        const done = n < step;
+        return (
+          <li key={n} className="flex items-center gap-md">
+            {index > 0 && (
+              <span
+                aria-hidden
+                className="h-[2px] w-[40px] rounded-full bg-line"
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => onStep(n)}
+              aria-current={current ? "step" : undefined}
+              className="flex items-center gap-sm rounded-full pe-md"
+            >
+              <span
+                className={cx(
+                  "flex size-[28px] items-center justify-center rounded-full text-[13px] font-medium",
+                  current || done
+                    ? "bg-active-fill text-on-active"
+                    : "bg-neutral-fill text-text-soft",
+                )}
+              >
+                {done ? (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.6}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                ) : (
+                  n
+                )}
+              </span>
+              <span
+                className={cx(
+                  "text-[15px] font-medium",
+                  current ? "text-text" : "text-text-soft",
+                )}
+              >
+                {label}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+type Step = 1 | 2 | 3;
+
+/**
+ * Which of `check()`'s answers belong to which step — what Next reports on
+ * the way out of each. The week is checked on its own, by `submit`.
+ */
+const STEP_FIELDS = {
+  1: ["name", "category", "currency", "rate"],
+  2: ["pin", "whatsapp", "prep"],
+} as const;

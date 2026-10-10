@@ -48,7 +48,7 @@ export function TagChip({
       className={cx(
         // `max-w` + `truncate` because a name is merchant-written and a row of
         // them still has to fit beside a dish's own name.
-        "inline-flex items-center font-heading font-semibold text-text",
+        "inline-flex items-center font-semibold text-text",
         size === "sm"
           ? "max-w-[180px] gap-xs text-[13px]"
           : "max-w-[260px] gap-sm text-[15px]",

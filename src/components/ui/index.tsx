@@ -17,8 +17,8 @@
  *
  * ## The rules they encode
  *
- * - **Blue is what you press**, ink is what is chosen. So `Button` defaults to
- *   blue, links are blue, and a selected tab is ink. See `theme.css`.
+ * - **Ink is what you press**, as in the app's second edition: `Button`
+ *   defaults to an espresso fill, exactly the app's `primary`. See `theme.css`.
  * - **Every action can be in flight**, so pending is a prop on the button
  *   rather than something each screen re-invents.
  * - **No component names a colour.** Roles only.
@@ -48,9 +48,10 @@ type ButtonVariant =
   | "quiet"
   | "danger"
   | "danger-quiet"
+  | "danger-soft"
   | "primary-quiet"
   | "accent";
-type ButtonSize = "md" | "sm";
+type ButtonSize = "lg" | "md" | "sm";
 
 /**
  * Size is a prop, not something a caller patches on with a class.
@@ -63,15 +64,21 @@ type ButtonSize = "md" | "sm";
  *
  * Enumerating the sizes here means there is nothing to override.
  */
+// The app's control sizes (`theme/sizing.ts`) at its 440pt reference: `lg` 54
+// for the one action a screen exists for, `md` 48, `sm` 40 for actions that
+// repeat down a list.
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  md: "px-lg py-md text-[15px]",
-  sm: "px-md py-sm text-[13px]",
+  lg: "h-[54px] rounded-md px-lg text-[16px]",
+  md: "h-[48px] rounded-md px-lg text-[15px]",
+  sm: "h-[40px] rounded-xs px-md text-[14px]",
 };
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  // Blue, the app's link blue: the one to press to go on. White on it is 5.2:1.
+  // Ink, the app's `primary`: the one to press to go on. White on it is 17:1.
   primary: "bg-primary-fill text-on-primary hover:bg-primary-deep",
-  secondary: "bg-neutral-fill text-text hover:brightness-[0.97]",
+  // The app's `secondary`: cream with a hairline, ink label.
+  secondary:
+    "border border-line bg-cream text-text hover:bg-neutral-fill",
   quiet: "bg-transparent text-text hover:bg-primary-wash",
   // `danger-action`, not `danger`: the darker red is tuned for text on cream and
   // reads as near-black poured across a whole button.
@@ -96,6 +103,13 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
    * clear of 4.5:1.
    */
   "danger-quiet": "bg-danger-wash text-danger hover:brightness-95",
+  /**
+   * The app's own `danger` button: coral type on the cream-deep fill. For a
+   * destructive choice that sits in a row of ordinary ones — Cancel beside
+   * Dispatch and Amend — where a filled red would shout over the action the
+   * screen is for, and the dialog it opens says the cost.
+   */
+  "danger-soft": "bg-neutral-fill text-danger-action hover:brightness-95",
   /**
    * A filled ground without the weight of the primary action.
    *
@@ -154,7 +168,8 @@ export function Button({
         // Wrapping is the wrong answer for a control whose whole job is one
         // short verb: it is the *field* that should give up width, not the
         // action. `shrink-0` is what says so in a flex row.
-        "shrink-0 items-center justify-center gap-sm whitespace-nowrap rounded-md font-semibold",
+        // The app's button label: Inter 500 with a little air (+0.3pt).
+        "shrink-0 items-center justify-center gap-sm whitespace-nowrap font-medium tracking-[0.02em]",
         "disabled:cursor-not-allowed disabled:opacity-60",
         fullWidth ? "flex w-full" : "inline-flex",
         BUTTON_SIZES[size],
@@ -218,7 +233,7 @@ export function Input({
       aria-invalid={isInvalid || undefined}
       aria-describedby={rest["aria-describedby"] ?? field?.describedBy}
       className={cx(
-        "w-full rounded-md border bg-surface py-md text-[15px] text-text",
+        "w-full rounded-md border bg-cream py-md text-[15px] text-text",
         padding,
         "placeholder:text-text-faint",
         // A shade warmer while it is being typed into — "this one is live",
@@ -229,7 +244,7 @@ export function Input({
         // duplicate and a divergence waiting to happen — the button next to it
         // would have focused differently.
         "focus:bg-field-focus",
-        isInvalid ? "border-danger" : "border-border",
+        isInvalid ? "border-danger" : "border-line",
         className,
       )}
     />
@@ -250,7 +265,7 @@ export function Card({
   return (
     <div
       className={cx(
-        "rounded-xl border border-border bg-surface p-xxl",
+        "rounded-lg bg-surface p-xxl shadow-card",
         className,
       )}
     >

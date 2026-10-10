@@ -103,9 +103,9 @@ export function PhoneInput({
         // inside this one would be a box within a box, and focusing it would
         // ring the digits rather than the field. `field-group` is what hands the
         // group the app's one focus ring; see `globals.css`.
-        "field-group flex w-full items-stretch overflow-hidden rounded-md border bg-surface",
+        "field-group flex w-full items-stretch overflow-hidden rounded-md border bg-cream",
         "focus-within:bg-field-focus",
-        isInvalid ? "border-danger" : "border-border",
+        isInvalid ? "border-danger" : "border-line",
         disabled && "opacity-60",
       )}
     >
@@ -121,7 +121,7 @@ export function PhoneInput({
       <span
         aria-hidden
         className={cx(
-          "flex shrink-0 select-none items-center gap-sm border-e border-border",
+          "flex shrink-0 select-none items-center gap-sm border-e border-line",
           "bg-neutral-fill px-md text-[15px] text-text-soft tabular-nums",
         )}
       >

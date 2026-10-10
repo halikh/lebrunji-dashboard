@@ -86,7 +86,7 @@ export function AccountScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-lg">
-        <h1 className="text-[24px]">{t("account.title")}</h1>
+        <h1 className="text-[30px]">{t("account.title")}</h1>
         <p className="text-[13px] text-text-soft">{t("account.blurb")}</p>
 
         {/* Chapters of one screen, so `SectionTab` — the same underline the
@@ -132,8 +132,8 @@ export function AccountScreen() {
         <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
           {/* Full width and first: which account these two forms are about is
               the thing to establish before either of them is filled in. */}
-          <section className="flex flex-col gap-xs rounded-md border border-border bg-surface p-lg">
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+          <section className="flex flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
+            <h2 className="text-[19px]">
               {t("account.signedInAs")}
             </h2>
             <p className="text-[17px] font-semibold">
@@ -287,7 +287,7 @@ function Change({
   }
 
   return (
-    <section className="flex h-full flex-col gap-lg rounded-md border border-border bg-surface p-lg">
+    <section className="flex h-full flex-col gap-lg rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
       <div className="flex flex-col gap-xs">
         <h2 className="text-[16px] font-semibold">{title}</h2>
         <p className="text-[13px] text-text-soft">{blurb}</p>

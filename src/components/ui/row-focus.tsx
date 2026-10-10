@@ -76,4 +76,6 @@ export function useRowFocus() {
 
 /** The ring a returned-to row wears. The one an open panel used to draw. */
 export const FOCUS_RING =
-  "shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)] border-active";
+  // The order queue's selected row: an ink border and the app's
+  // `selectedShadow`, so an open row looks the same on every screen.
+  "border-active shadow-selected";

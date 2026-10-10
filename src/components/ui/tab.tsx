@@ -69,17 +69,19 @@ export function FilterTab({
       tabIndex={active ? 0 : -1}
       onClick={onClick}
       onKeyDown={onKeyDown}
-      style={
-        active && tone ? { background: tone.wash, color: tone.ink } : undefined
-      }
       className={cx(
         // 15px and a deeper pad. A tab strip is the coarsest navigation on a
         // screen and it was set at the size of a hint — small enough that the
         // selected one had to be found rather than seen, and a small target for
         // something pressed on the way into every task.
-        "flex shrink-0 items-center gap-sm whitespace-nowrap rounded-t-md px-lg py-md text-[15px] font-semibold",
-        active && !tone && "bg-active-wash text-active-ink",
-        !active && "text-text-soft hover:bg-neutral-fill",
+        //
+        // Chosen is an ink underline and ink type, as a chosen thing is in the
+        // app; the count turns to an ink badge with it. The tone stays on the
+        // dot, which is what ties the tab to the rows below it.
+        "-mb-px flex h-[48px] shrink-0 items-center gap-sm whitespace-nowrap border-b-2 px-md text-[15px] font-medium",
+        active
+          ? "border-active text-text"
+          : "border-transparent text-text-soft hover:text-text",
       )}
     >
       {tone && (
@@ -92,7 +94,10 @@ export function FilterTab({
       {label}
       {count !== undefined && count > 0 && (
         <span
-          className={cx("tabular-nums", active ? "font-bold" : "font-medium")}
+          className={cx(
+            "flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-[6px] text-[12px] tabular-nums",
+            active ? "bg-active-fill text-on-active" : "bg-neutral-fill text-text",
+          )}
         >
           {count}
         </span>

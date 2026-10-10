@@ -299,7 +299,7 @@ export function AmendOrder({
               placeholder={t("amend.notePlaceholder")}
               rows={2}
               maxLength={500}
-              className="w-full rounded-md border border-border bg-surface px-md py-sm text-[14px]"
+              className="w-full rounded-md border border-line bg-cream px-md py-sm text-[14px] focus:bg-field-focus"
             />
           </Field>
         </div>

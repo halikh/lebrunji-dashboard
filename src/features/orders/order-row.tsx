@@ -1,12 +1,11 @@
 "use client";
 
 import { Button, cx } from "@/components/ui";
-import { ROW } from "@/components/ui/row";
 import { t } from "@/i18n/translations";
-import { statusTone } from "@/lib/order-status";
 import { formatRelative } from "@/lib/time";
 
 import type { Order, OrderStatus } from "./api/orders";
+import { StatusPill } from "./status-pill";
 import { nextStatus, orderStatus } from "./use-orders";
 
 /**
@@ -22,17 +21,18 @@ import { nextStatus, orderStatus } from "./use-orders";
  * The status shown is the least advanced portion that can still move: an order
  * is not confirmed until every shop has confirmed it.
  *
- * ## The primary button names the next step
+ * ## The button names the next step
  *
  * Not "Advance", and not a dropdown. The common case is always forward, and
  * nobody should open a menu to pick the only sensible answer — so it reads
- * "Confirm", then "Send driver", then "Delivered", in the colour of the step it
- * moves to.
+ * "Confirm", then "Send driver", then "Delivered". It is filled ink only on an
+ * order still waiting to be confirmed; see the note on it.
  */
 export function OrderRow({
   order,
   statuses,
   focused,
+  selected,
   money,
   onAdvance,
   onOpen,
@@ -40,13 +40,17 @@ export function OrderRow({
   order: Order;
   statuses: OrderStatus[] | undefined;
   focused: boolean;
+  /** The order the receipt beside the queue is showing. */
+  selected: boolean;
   money: (minorUnits: number, code: string) => string;
   onAdvance: (to: OrderStatus) => void;
   onOpen: () => void;
 }) {
   const status = orderStatus(order, statuses);
   const next = status ? nextStatus(statuses, status.slug) : null;
-  const tone = statusTone(status?.slug ?? "");
+  // Placed and not yet confirmed: somebody is waiting to hear the shop has
+  // it. The one state on the queue that is the operator's to answer now.
+  const waiting = status?.slug === "ordered";
 
   return (
     <div
@@ -54,78 +58,90 @@ export function OrderRow({
       // navigable without claiming to be a control.
       role="article"
       aria-label={order.code}
+      aria-current={selected || undefined}
       onClick={onOpen}
       className={cx(
-        // `cursor-pointer` stated here rather than left to the global rule:
-        // that rule covers elements which *are* controls, and this is a `div`
-        // that happens to be clickable — a rule broad enough to catch every
-        // `onClick` would put a pointer on half the page. The comment said all
-        // this and the class was never actually written, so every row in the
-        // busiest list in the product showed a plain arrow.
-        "cursor-pointer",
-        ROW,
-        focused
-          ? "border-active shadow-[0_0_0_1px_var(--color-active),0_0_0_4px_var(--color-active-wash)]"
-          : "border-border",
+        // The app's order card: white, radius 16, the soft shadow, no border.
+        // `cursor-pointer` stated because this is a `div` that happens to be
+        // clickable, which the global pointer rule rightly does not cover.
+        //
+        // A real 2px border on every row, transparent until it means something,
+        // so choosing a row never shifts its contents by a pixel. A border and
+        // not a box-shadow ring: the hover shadow would replace a ring, and the
+        // open order would lose its outline exactly while the pointer is on it.
+        "relative flex cursor-pointer items-center gap-lg rounded-lg border-2 bg-surface py-md pl-xl pr-md shadow-card",
+        "transition-[box-shadow,border-color] duration-[var(--duration-control)] hover:shadow-selected",
+        // Chosen is ink, as it is in the app — the order open in the receipt.
+        selected
+          ? "border-active shadow-selected"
+          : // The keyboard's place, when it is not on the open order.
+            focused
+            ? "border-line"
+            : "border-transparent",
       )}
     >
-      <div className="flex w-[150px] shrink-0 flex-col gap-xxs">
-        <span className="text-[15px] font-bold tabular-nums">{order.code}</span>
-        <span className="text-[12px] text-text-faint">
+      {/* A sun edge on an order still waiting to be confirmed — seen from
+          across the room, before a word of the row is read. */}
+      {waiting && (
+        <span
+          aria-hidden
+          className="absolute inset-y-md left-[7px] w-[4px] rounded-full bg-yellow"
+        />
+      )}
+
+      <div className="flex w-[132px] shrink-0 flex-col gap-xxs">
+        <span className="text-[15px] font-medium tabular-nums">{order.code}</span>
+        <span
+          className={cx(
+            "text-[12px]",
+            waiting ? "font-medium text-text" : "text-text-faint",
+          )}
+        >
           {formatRelative(order.placedAt)}
         </span>
       </div>
 
-      <div className="flex w-[180px] shrink-0 flex-col gap-xxs">
+      <div className="flex min-w-0 flex-[1.2] flex-col gap-xxs">
         {order.customerName ? (
-          <span className="text-[14px] font-semibold">
+          <span className="truncate text-[15px] font-medium">
             {order.customerName}
           </span>
         ) : (
           // An empty name is the app's "setup not finished" flag, not missing
           // data. Blank would read as a fault in the dashboard.
-          <span className="text-[14px] font-semibold italic text-text-faint">
+          <span className="truncate text-[15px] italic text-text-faint">
             {t("orders.incompleteSignup")}
           </span>
         )}
-        <span className="truncate text-[12px] text-text-faint">
+        <span className="truncate text-[13px] text-text-soft">
           {order.addressLine}
         </span>
       </div>
 
-      <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-        <span className="flex items-center gap-sm text-[13px]">
-          <span
-            aria-hidden
-            className="size-[7px] shrink-0 rounded-full"
-            style={{ background: tone.dot }}
-          />
-          <span className="font-semibold" style={{ color: tone.ink }}>
-            {status?.name ?? ""}
-          </span>
-        </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-xs">
+        {status && (
+          <StatusPill slug={status.slug} name={status.name} size="md" />
+        )}
         {/* The shops, as information. One order, however many of them. */}
-        <span className="truncate text-[12px] text-text-faint">
+        <span className="truncate text-[13px] text-text-soft">
           {order.stores.map((store) => store.storeName).join(" · ")}
         </span>
       </div>
 
-      <span className="w-[130px] shrink-0 text-right text-[15px] font-bold tabular-nums">
+      <span className="w-[110px] shrink-0 text-right text-[15px] font-medium tabular-nums">
         {money(order.total, order.currencyCode)}
       </span>
 
-      <div className="w-[150px] shrink-0">
+      <div className="w-[140px] shrink-0">
         {next && (
           <Button
             fullWidth
             size="sm"
-            // The colour of the step being moved *to*: the button is a promise
-            // about what happens next, and an operator working quickly learns
-            // the colour of the action rather than reading every button.
-            style={{
-              background: statusTone(next.slug).fill,
-              color: statusTone(next.slug).onFill,
-            }}
+            // Ink only where the order is waiting on the shop — that is the
+            // press the queue exists for, and a column of identical black
+            // buttons would make every row shout equally. Everything further
+            // along is the app's secondary.
+            variant={waiting ? "primary" : "secondary"}
             onClick={(event) => {
               // The row opens the panel; the button only advances. Without
               // this, advancing also opens the detail of an order that has just

@@ -125,11 +125,11 @@ export function BulkForm({
           placeholder={bulkPlaceholder(codes, price, kind)}
           aria-invalid={(!parsed.ok && !blank) || undefined}
           className={cx(
-            "w-full rounded-md border bg-surface p-md text-[14px] text-text",
+            "w-full rounded-md border bg-cream p-md text-[14px] text-text",
             // Monospace so the columns line up: a missing bar shows as a ragged
             // line rather than having to be counted.
             "font-mono placeholder:text-text-faint focus:bg-field-focus",
-            !parsed.ok && !blank ? "border-danger" : "border-border",
+            !parsed.ok && !blank ? "border-danger" : "border-line",
           )}
         />
       </Field>

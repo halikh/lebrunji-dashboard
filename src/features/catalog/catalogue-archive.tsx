@@ -438,7 +438,7 @@ function Group({
 
   return (
     <section className="flex flex-col gap-sm">
-      <h2 className="ps-md text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+      <h2 className="ps-md text-[19px]">
         {t("archive.groupHeading", { title, count })}
       </h2>
       {children}

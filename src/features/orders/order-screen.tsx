@@ -124,7 +124,7 @@ export function OrderScreen({ id }: { id: string }) {
 
         <div className="flex flex-wrap items-center gap-lg">
           <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-            <h1 className="flex items-center gap-sm text-[24px]">
+            <h1 className="flex items-center gap-sm text-[30px]">
               <Copyable value={order.data.code} label={t("orders.copyCode")} />
             </h1>
             <span className="text-[13px] text-text-faint">

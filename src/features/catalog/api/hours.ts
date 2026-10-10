@@ -77,6 +77,34 @@ export async function fetchBranchHours(branchId: string): Promise<DayHours[]> {
  * than a broken one, the caller refetches on success *and* failure so the
  * screen shows whatever actually landed, and running it again fixes it.
  */
+/**
+ * A new shop's week, written to the branch it was created with.
+ *
+ * The shop form asks for hours before the shop exists, and hours belong to a
+ * branch — `0121`'s trigger (or `ensureFirstBranch`) makes that branch in the
+ * create, so this finds it and writes the week there. The first live one by
+ * `sort_order`: a shop seconds old has exactly one.
+ */
+export async function saveFirstBranchHours(
+  storeId: string,
+  week: DayHours[],
+): Promise<void> {
+  const { data, error } = await getClient()
+    .from("branches")
+    .select("id")
+    .eq("store_id", storeId)
+    .is("deleted_at", null)
+    .order("sort_order", { ascending: true })
+    .limit(1);
+
+  if (error) throw new Error(error.message);
+  const branchId = data?.[0]?.id as string | undefined;
+  if (!branchId)
+    throw new Error("The new shop has no branch to hold its hours.");
+
+  await saveBranchHours(branchId, week);
+}
+
 export async function saveBranchHours(
   branchId: string,
   week: DayHours[],

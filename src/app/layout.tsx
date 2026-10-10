@@ -1,40 +1,38 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Barlow, Barlow_Condensed, Cairo } from "next/font/google";
+import { IBM_Plex_Sans_Arabic, Inter, Playfair_Display } from "next/font/google";
 
 import "./globals.css";
 
 /**
- * The app's three faces.
+ * The app's second-edition faces.
  *
- * Barlow for body, Barlow Condensed for headings — the design's pair, chosen
- * because their proportions already agree, so the contrast reads as emphasis
- * rather than as two typefaces sharing a screen. Cairo for Arabic, because
- * neither Barlow has Arabic coverage and a designed Latin face beside a
- * fallback Arabic one looks broken rather than bilingual.
+ * Playfair Display for names, titles and section headings; Inter for
+ * everything read or pressed; IBM Plex Sans Arabic for Arabic. The same three
+ * the app loads from `@expo-google-fonts`, so an order code, a shop name and a
+ * total look the same on the operator's screen as on the customer's phone.
  *
  * The app registers one **family per weight**, since React Native cannot
  * synthesise a weight on a custom family. That constraint does not exist here,
- * so each face is loaded once with the weights it needs and `font-weight` does
- * what it says.
+ * so each face is loaded once and `font-weight` does what it says. Playfair is
+ * 600 only, as in the app, where every display weight maps to it.
  */
-const barlow = Barlow({
-  variable: "--font-barlow",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
-const barlowCondensed = Barlow_Condensed({
-  variable: "--font-barlow-condensed",
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["600"],
   display: "swap",
 });
 
-const cairo = Cairo({
-  variable: "--font-cairo",
-  subsets: ["arabic", "latin"],
+const plexArabic = IBM_Plex_Sans_Arabic({
+  variable: "--font-plex-arabic",
+  subsets: ["arabic"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
 });
@@ -52,7 +50,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${barlow.variable} ${barlowCondensed.variable} ${cairo.variable} h-full antialiased`}
+      className={`${inter.variable} ${playfair.variable} ${plexArabic.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">{children}</body>
     </html>

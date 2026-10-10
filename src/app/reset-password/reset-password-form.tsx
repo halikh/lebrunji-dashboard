@@ -136,7 +136,7 @@ export function ResetPasswordForm() {
   return (
     <Card>
       <form onSubmit={onSubmit} className="flex flex-col gap-lg">
-        <h1 className="text-[22px]">{t("resetPassword.title")}</h1>
+        <h1 className="text-[26px]">{t("resetPassword.title")}</h1>
 
         <FormError>{error}</FormError>
 

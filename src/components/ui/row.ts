@@ -37,8 +37,8 @@
  * the dashboard.
  */
 export const ROW =
-  "relative flex items-center gap-lg rounded-md border bg-surface px-lg py-md " +
-  "transition-colors duration-[var(--duration-control)] hover:border-active";
+  "relative flex items-center gap-lg rounded-lg border-2 bg-surface px-lg py-md shadow-card " +
+  "transition-[box-shadow,border-color] duration-[var(--duration-control)] hover:shadow-selected";
 
 /**
  * The same row, for a list whose rows do not lead anywhere.
@@ -62,8 +62,7 @@ export const ROW =
  * anybody means.
  */
 export const ROW_STATIC =
-  "relative flex items-center gap-lg rounded-md border border-border " +
-  "bg-surface px-lg py-md";
+  "relative flex items-center gap-lg rounded-lg bg-surface px-lg py-md shadow-card";
 
 /**
  * What makes the **whole row** the target, applied to the thing inside it that
@@ -90,7 +89,7 @@ export const ROW_STATIC =
  *
  * Pair it with `ROW_ABOVE` on anything that must stay separately clickable.
  */
-export const ROW_TARGET = "after:absolute after:inset-0 after:rounded-md";
+export const ROW_TARGET = "after:absolute after:inset-0 after:rounded-lg";
 
 /**
  * For a row's own controls, so the stretched target does not swallow them.

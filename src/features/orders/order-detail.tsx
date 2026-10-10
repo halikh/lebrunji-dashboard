@@ -56,7 +56,15 @@ import { nextStatus, orderStatus, useAdvanceOrder } from "./use-orders";
  */
 export type ReadFrom = "panel" | "page";
 
-/** The receipt: who, where, what, and what it came to. */
+/**
+ * The receipt: who, where, what, and what it came to.
+ *
+ * Laid out as the app's own order page is (`app/order/[id].tsx`), so the
+ * operator reads the same receipt the customer is holding: white cards on the
+ * cream ground, each with the soft card shadow and no border — the customer,
+ * where it is going, one card per shop with its lines, then the bill with the
+ * 2px ink rule above the total.
+ */
 export function OrderBody({
   order,
   from,
@@ -64,78 +72,106 @@ export function OrderBody({
   order: OrderWithLines;
   from: ReadFrom;
 }) {
-  return (
-    <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
-      <section className="flex flex-col gap-sm">
-        <SectionTitle>{t("orders.customer")}</SectionTitle>
-        <div className="flex flex-wrap items-baseline gap-md">
-          {/* Through to their profile: the next question after "who is this"
-              is almost always "what else have they ordered", and the answer is
-              one page away rather than a search. */}
-          {/* And back again, to whatever the operator was actually reading.
-              From the panel that is the queue with this order still open; from
-              the order's own page it is that page, named by its code — "Order
-              #DL-260830-00042" says where you are going in a way "All orders"
-              does not, and from a page there is no queue behind you to return
-              to.
+  const itemCount = order.lines.length;
 
-              What travels is the order's **id** — and its code as a label, not
-              as an address. A link built from a return *URL* in a query
-              parameter is a link somebody else chooses the destination of; the
-              profile builds the path itself from a uuid whose shape it can
-              check. */}
-          <Link
-            href={
-              from === "page"
-                ? `/customers/${order.customerId}?fromOrder=${order.id}&code=${encodeURIComponent(order.code)}`
-                : `/customers/${order.customerId}?fromQueue=${order.id}`
-            }
-            className="text-[15px] font-semibold text-primary hover:underline"
-          >
-            {order.customerName || t("orders.incompleteSignup")}
-          </Link>
+  return (
+    <div className="flex min-h-0 flex-grow flex-col gap-md overflow-y-auto scroll-hint bg-background p-lg">
+      <ReceiptCard>
+        <div className="flex items-center gap-md">
+          <Icon path={PERSON} />
+          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+            <Eyebrow>{t("orders.customer")}</Eyebrow>
+            {/* Through to their profile: the next question after "who is
+                this" is almost always "what else have they ordered", and the
+                answer is one page away rather than a search.
+
+                And back again, to whatever the operator was actually reading.
+                From the panel that is the queue with this order still open;
+                from the order's own page it is that page, named by its code.
+
+                What travels is the order's **id** — and its code as a label,
+                not as an address. A link built from a return *URL* in a query
+                parameter is a link somebody else chooses the destination of;
+                the profile builds the path itself from a uuid whose shape it
+                can check. */}
+            <Link
+              href={
+                from === "page"
+                  ? `/customers/${order.customerId}?fromOrder=${order.id}&code=${encodeURIComponent(order.code)}`
+                  : `/customers/${order.customerId}?fromQueue=${order.id}`
+              }
+              className="w-fit max-w-full truncate text-[16px] font-medium text-text hover:underline"
+            >
+              {order.customerName || t("orders.incompleteSignup")}
+            </Link>
+          </div>
           {order.customerPhone ? (
-            // Both: tap to ring, copy to paste into a courier app. The
-            // two are separate gestures on purpose — a number that dialled
-            // when somebody meant to copy it is a call to a customer at
-            // eleven at night.
+            // Both: click to ring, copy to paste into a courier app. The two
+            // are separate gestures on purpose — a number that dialled when
+            // somebody meant to copy it is a call to a customer at eleven at
+            // night.
             <Copyable
               value={formatPhone(order.customerPhone)}
               href={`tel:${formatPhone(order.customerPhone)}`}
               label={t("orders.copyPhone")}
-              className="text-[14px]"
+              className="shrink-0 text-[15px] tabular-nums"
             />
           ) : (
-            <span className="text-[13px] text-text-faint">
+            <span className="shrink-0 text-[13px] text-text-faint">
               {t("orders.noPhone")}
             </span>
           )}
         </div>
-      </section>
+      </ReceiptCard>
 
-      <section className="flex flex-col gap-sm">
-        <SectionTitle>{t("orders.address")}</SectionTitle>
-        {/* The snapshot written at checkout, not the customer's current
-            address — this is what was agreed, and it must not change
-            under a delivery because somebody edited their address book. */}
-        <p className="text-[14px] leading-relaxed">{order.addressLine}</p>
+      <ReceiptCard>
+        <div className="flex items-start gap-md">
+          <Icon path={PIN} />
+          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+            <Eyebrow>{t("orders.deliveringTo")}</Eyebrow>
+            {/* The snapshot written at checkout, not the customer's current
+                address — this is what was agreed, and it must not change
+                under a delivery because somebody edited their address book. */}
+            <p className="text-[15px] font-medium">{order.addressLine}</p>
+          </div>
+        </div>
         {order.courierNote && (
-          <div className="rounded-md bg-yellow-wash px-md py-md text-[13px] leading-relaxed">
-            <strong className="font-semibold">{t("orders.courierNote")}</strong>
+          // Sun-washed, because a courier note is the one line on the receipt
+          // that changes what somebody physically does at the door.
+          <div className="mt-md rounded-sm bg-warning-wash px-md py-md text-[14px]">
+            <span className="font-medium">{t("orders.courierNote")}</span>
             {order.courierNote}
           </div>
         )}
-        {/* The pin comes from `addresses`, which the order references —
-            it is never snapshotted, so this is where the customer's pin
-            is *now*. Good enough to find a door, not evidence. */}
+        {/* The pin comes from `addresses`, which the order references — it is
+            never snapshotted, so this is where the customer's pin is *now*.
+            Good enough to find a door, not evidence. */}
         <Map
+          className="mt-md"
           latitude={order.latitude}
           longitude={order.longitude}
           label={t("orders.locationLabel", {
             name: order.addressLine,
           })}
         />
-      </section>
+      </ReceiptCard>
+
+      {/* "Items" with its count on the same baseline — the app's heading row
+          over its shop cards. */}
+      <div className="flex items-baseline justify-between gap-md px-xxs pt-sm">
+        <h3 className="text-[19px]">{t("orders.items")}</h3>
+        <Eyebrow>
+          {[
+            itemCount === 1
+              ? t("orders.itemCountOne")
+              : t("orders.itemCount", { count: itemCount }),
+            order.stores.length > 1 &&
+              t("orders.fromShops", { count: order.stores.length }),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </Eyebrow>
+      </div>
 
       {order.stores.map((store) => (
         <StoreSection
@@ -147,7 +183,8 @@ export function OrderBody({
         />
       ))}
 
-      <div className="flex flex-col gap-sm border-t border-border pt-lg text-[14px]">
+      <ReceiptCard>
+        <h3 className="mb-sm text-[19px]">{t("orders.payment")}</h3>
         {/* Every line of the bill at the one rate, the platform's money on it
             included. The ladder and the discount were *charged* at the
             platform's rate — `0120` left the money path alone — but what is
@@ -173,19 +210,25 @@ export function OrderBody({
             value={-order.discount}
             code={order.currencyCode}
             shopRate={order.shopRate}
+            good
           />
         )}
-        <div className="flex items-baseline justify-between pt-xs">
-          <span className="text-[16px] font-bold">{t("orders.total")}</span>
+        {/* The app's strong rule: 2px of ink above the total, the one heavy
+            line on the receipt, so the eye lands on what is owed. */}
+        <div aria-hidden className="mt-xs h-[2px] rounded-full bg-text" />
+        <div className="flex items-baseline justify-between pt-md">
+          <span className="font-heading text-[19px] font-semibold">
+            {t("orders.total")}
+          </span>
           <Price
             value={order.total}
             code={order.currencyCode}
             shopRate={order.shopRate}
             align="end"
-            className="text-[16px] font-bold"
+            className="text-[22px] font-medium"
           />
         </div>
-      </div>
+      </ReceiptCard>
     </div>
   );
 }
@@ -244,37 +287,77 @@ export function OrderActions({
   const amendable = movesLeft > 1;
 
   return (
-    <div className="flex shrink-0 flex-col gap-sm border-t border-border p-xxl">
-      {/* One row, both secondary. Neither is the thing the operator came here
-          to press — that is the status button below — and a dispatch control
-          that took a full-width row of its own was spending the panel's most
-          valuable space on something done once per order.
+    // The app's bottom bar: white, pinned under the scrolling receipt, with the
+    // one action the screen exists for at full size at the very bottom.
+    <div className="flex shrink-0 flex-col gap-sm bg-surface px-lg pb-lg pt-md shadow-[0_-3px_10px_rgba(31,25,21,0.06)]">
+      {/* The secondary actions, as one row of equals above the big button.
+          None is what the operator came here to press — that is the step
+          below — so none is filled ink.
 
           Dispatch stays whatever the status is: a driver is told about an order
           being cooked, and told again about one already on its way, so taking
           it away at the end would remove it exactly when somebody is chasing a
           late delivery. Amending does not — see `amendable`. */}
-      <div className="flex items-center gap-sm">
+      <div
+        role="group"
+        aria-label={t("orders.otherActions")}
+        className="flex items-center gap-sm"
+      >
         {/* WhatsApp's own green, so the control that hands off to it is
             recognised before it is read — which matters on a button reached
             for under time pressure. Restricted to controls that open that
             application, like the brand red is restricted to the mark. */}
-        <Button
-          size="sm"
-          onClick={() => setDispatching(true)}
-          className="border-whatsapp bg-whatsapp text-on-whatsapp hover:bg-whatsapp-deep"
-        >
-          <WhatsAppMark size={14} />
-          {t("dispatch.open")}
-        </Button>
-        {amendable && (
+        <span className="flex min-w-0 flex-1">
           <Button
-            variant="secondary"
             size="sm"
-            onClick={() => setAmending(true)}
+            fullWidth
+            onClick={() => setDispatching(true)}
+            className="bg-whatsapp text-on-whatsapp hover:bg-whatsapp-deep"
           >
-            {t("amend.open")}
+            <WhatsAppMark size={16} />
+            {t("dispatch.open")}
           </Button>
+        </span>
+        {amendable && (
+          <span className="flex min-w-0 flex-1">
+            <Button
+              variant="secondary"
+              size="sm"
+              fullWidth
+              onClick={() => setAmending(true)}
+            >
+              {t("amend.open")}
+            </Button>
+          </span>
+        )}
+        {next && cancelled && (
+          <span className="flex min-w-0 flex-1">
+            <ConfirmButton
+              onConfirm={() =>
+                advance({
+                  orderId: order.id,
+                  code: order.code,
+                  fromSlug: status?.slug ?? "",
+                  toSlug: cancelled.slug,
+                  toName: cancelled.name,
+                  undoable: false,
+                })
+              }
+              titleKey="orders.cancelTitle"
+              bodyKey="orders.cancelBody"
+              confirmKey="orders.cancelConfirm"
+              variant="danger"
+              // The app's danger button — coral type on cream-deep. Quiet
+              // enough not to compete with the step below, red enough that
+              // nobody presses it thinking it is Amend. The cost is said by the
+              // dialog it opens.
+              triggerVariant="danger-soft"
+              size="sm"
+              fullWidth
+            >
+              {t("orders.cancel")}
+            </ConfirmButton>
+          </span>
         )}
       </div>
 
@@ -295,61 +378,31 @@ export function OrderActions({
       )}
 
       {next && (
-        <div className="flex items-center gap-sm">
-          {/* `flex-grow`, not `w-full`. `fullWidth` makes the button
-          `w-full`, which took the whole row and pushed Cancel off the
-          edge of the panel — visibly gone, on the one action here that
-          cannot be undone. Growing into what is left leaves room for
-          it. */}
-          <span className="flex min-w-0 flex-grow">
-            <Button
-              fullWidth
-              style={{
-                background: statusTone(next.slug).fill,
-                color: statusTone(next.slug).onFill,
-              }}
-              onClick={() =>
-                advance({
-                  orderId: order.id,
-                  code: order.code,
-                  fromSlug: status?.slug ?? "",
-                  toSlug: next.slug,
-                  toName: next.name,
-                  undoable: next.progress !== null,
-                })
-              }
-            >
-              {next.name}
-            </Button>
-          </span>
-
-          {cancelled && (
-            <ConfirmButton
-              onConfirm={() =>
-                advance({
-                  orderId: order.id,
-                  code: order.code,
-                  fromSlug: status?.slug ?? "",
-                  toSlug: cancelled.slug,
-                  toName: cancelled.name,
-                  undoable: false,
-                })
-              }
-              titleKey="orders.cancelTitle"
-              bodyKey="orders.cancelBody"
-              confirmKey="orders.cancelConfirm"
-              variant="danger"
-              // A filled button rather than a quiet link — a text link beside
-              // a filled button reads as a footnote, the wrong weight for the
-              // one thing here that cannot be undone — but the muted fill, as
-              // every cancel in the dashboard is. The cost is said by the
-              // dialog it opens, not by painting the trigger like an error.
-              triggerVariant="secondary"
-            >
-              {t("orders.cancel")}
-            </ConfirmButton>
-          )}
-        </div>
+        // The app's primary: espresso ink, 54 tall, the whole width. Named
+        // after the step it takes — "Confirm", "Send driver", "Delivered" — and
+        // carrying that step's dot, so the colour an operator has learned for
+        // each step is still on the button without painting the button in it.
+        <Button
+          size="lg"
+          fullWidth
+          onClick={() =>
+            advance({
+              orderId: order.id,
+              code: order.code,
+              fromSlug: status?.slug ?? "",
+              toSlug: next.slug,
+              toName: next.name,
+              undoable: next.progress !== null,
+            })
+          }
+        >
+          <span
+            aria-hidden
+            className="size-[9px] shrink-0 rounded-full"
+            style={{ background: statusTone(next.slug).dot }}
+          />
+          {next.name}
+        </Button>
       )}
     </div>
   );
@@ -370,18 +423,15 @@ function StoreSection({
   const tone = statusTone(store.statusSlug);
 
   return (
-    <section className="flex flex-col gap-md">
-      <div className="flex items-center gap-md">
-        <Thumbnail
-          src={store.storeImageUrl}
-          size={38}
-          rounded
-          name={store.storeName}
-        />
-        <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-          <h3 className="truncate text-[17px]">{store.storeName}</h3>
+    // One card per shop, as the app draws them: the shop's header, then its
+    // lines with hairlines between.
+    <section className="rounded-md bg-surface p-[14px] shadow-card">
+      <div className="flex items-center gap-[10px] pb-sm">
+        <Thumbnail src={store.storeImageUrl} size={36} name={store.storeName} />
+        <div className="flex min-w-0 flex-grow flex-col">
+          <h4 className="truncate text-[17px]">{store.storeName}</h4>
           <span
-            className="flex items-center gap-sm text-[12px] font-semibold"
+            className="flex items-center gap-xs text-[12px] font-medium"
             style={{ color: tone.ink }}
           >
             <span
@@ -394,7 +444,7 @@ function StoreSection({
         </div>
       </div>
 
-      <div className="flex flex-col gap-md">
+      <ul className="flex flex-col divide-y divide-line">
         {lines.map((line) => {
           // What is actually coming. `null` is the ordinary case and means the
           // line is untouched — which is why the strike-through and the note
@@ -404,44 +454,41 @@ function StoreSection({
           const changed = line.fulfilledQuantity !== null;
 
           return (
-            <div key={line.id} className="flex items-start gap-md text-[14px]">
-              <Thumbnail src={line.imageUrl} size={44} name={line.name} />
-              {/* The amount for a line sold by weight, the count otherwise.
-                Since `0122` the price beside it is a proportion of the amount,
-                and "2×" is a number that cannot be checked against it — see
-                `linePrice`. Wider when it holds an amount: "1.5 kg" does not
-                fit the column "2×" was sized for. */}
-              <span
-                className={cx(
-                  "shrink-0 pt-xs font-bold tabular-nums",
-                  itemUnit(line)?.step == null ? "w-[26px]" : "w-[58px]",
-                  gone ? "text-text-faint" : "text-text-soft",
-                )}
-              >
-                {itemUnit(line)?.step == null
-                  ? t("orders.quantity", { count: coming })
-                  : unitLabel(line, coming)}
-              </span>
+            <li key={line.id} className="flex items-start gap-md py-md">
+              <Thumbnail src={line.imageUrl} size={40} name={line.name} />
               <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-                {/* Struck through rather than removed. "We could not bring your
-                    kibbeh" is something the customer needs to see, and a line
-                    that simply vanished from the receipt says nothing at all —
-                    it reads as an order that was always smaller. */}
-                <span
-                  className={cx(
-                    "font-semibold",
-                    gone && "text-text-faint line-through",
-                  )}
-                >
-                  {line.name}
+                <span className="flex items-baseline gap-[6px]">
+                  {/* Struck through rather than removed. "We could not bring
+                      your kibbeh" is something the customer needs to see, and
+                      a line that simply vanished from the receipt says nothing
+                      at all — it reads as an order that was always smaller. */}
+                  <span
+                    className={cx(
+                      "text-[15px] font-medium",
+                      gone && "text-text-faint line-through",
+                    )}
+                  >
+                    {line.name}
+                  </span>
+                  {/* The amount for a line sold by weight, the count
+                      otherwise — the app's eyebrow beside the name. Since
+                      `0122` the price beside it is a proportion of the
+                      amount, and "2×" is a number that cannot be checked
+                      against it — see `linePrice`. */}
+                  <span className="shrink-0 text-[13px] font-medium text-text-faint tabular-nums">
+                    {itemUnit(line)?.step == null
+                      ? t("orders.quantity", { count: coming })
+                      : unitLabel(line, coming)}
+                  </span>
                 </span>
                 {(line.options.length > 0 || line.note) && (
-                  <span className="text-[12px] text-text-faint">
+                  <span className="text-[13px] text-text-soft">
                     {[...line.options, line.note].filter(Boolean).join(" · ")}
                   </span>
                 )}
                 {changed && (
-                  <span className="w-fit rounded-sm bg-warning-wash px-sm text-[12px] font-semibold text-text">
+                  // The app's error pill.
+                  <span className="mt-xxs flex h-[22px] w-fit items-center rounded-full bg-danger-wash px-[9px] text-[11px] font-medium text-danger">
                     {gone
                       ? t("amend.outOfStock")
                       : // The amount on a line sold by weight — "Only 1 kg
@@ -451,7 +498,8 @@ function StoreSection({
                   </span>
                 )}
                 {line.amendmentReason === "substitute" && (
-                  <span className="text-[12px] font-semibold text-active-ink">
+                  // The app's cream pill.
+                  <span className="mt-xxs flex h-[22px] w-fit items-center rounded-full bg-neutral-fill px-[9px] text-[11px] font-medium text-text">
                     {t("amend.substituteFor", {
                       name:
                         lines.find((one) => one.id === line.replacesLineId)
@@ -460,7 +508,7 @@ function StoreSection({
                   </span>
                 )}
               </div>
-              <div className="shrink-0 pt-xs">
+              <div className="shrink-0">
                 <Price
                   // The line's own snapshot, not today's menu: a receipt says
                   // what was charged. `0122`.
@@ -473,13 +521,13 @@ function StoreSection({
                   code={currencyCode}
                   shopRate={shopRate}
                   align="end"
-                  className={cx("font-semibold", gone && "opacity-50")}
+                  className={cx("text-[15px] font-medium", gone && "opacity-50")}
                 />
               </div>
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </section>
   );
 }
@@ -508,7 +556,8 @@ export function Thumbnail({
   /** What it is a picture of, for the button that opens it. */
   name?: string;
 }) {
-  const style = { width: size, height: size, borderRadius: rounded ? 999 : 14 };
+  // 8, the app's `radius.xs` for thumbnails.
+  const style = { width: size, height: size, borderRadius: rounded ? 999 : 8 };
 
   if (!src) {
     return <ImagePlaceholder style={style} />;
@@ -516,21 +565,60 @@ export function Thumbnail({
 
   // It opens full size on a click, like every other picture in the dashboard.
   // Here that is worth more than most: an operator reading an order is often
-  // deciding whether the kitchen sent the right thing, and a 44pt square is
+  // deciding whether the kitchen sent the right thing, and a 40pt square is
   // not enough to settle it.
   return <PreviewImage src={src} name={name} style={style} />;
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+/** The app's standard card: white, radius 14, padding 14, soft shadow. */
+function ReceiptCard({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
+    <section className="rounded-md bg-surface p-[14px] shadow-card">
       {children}
-    </h3>
+    </section>
+  );
+}
+
+/** The app's `eyebrow`: Inter 500, 12, faint, a little tracking. */
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
+      {children}
+    </span>
+  );
+}
+
+const PERSON =
+  "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0";
+const PIN =
+  "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z";
+
+/** The app's 30pt icon chip: cream-deep tile, ink glyph. */
+function Icon({ path }: { path: string }) {
+  return (
+    <span
+      aria-hidden
+      className="flex size-[30px] shrink-0 items-center justify-center rounded-xs bg-neutral-fill text-text"
+    >
+      <svg
+        width="17"
+        height="17"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d={path} />
+      </svg>
+    </span>
   );
 }
 
 /**
- * One line of the breakdown.
+ * One line of the bill — the app's: label and amount both Inter 500 at 15,
+ * the discount in green with its minus sign.
  *
  * `items-baseline` rather than centred: the two labels and the two primary
  * figures sit on one line whether or not a converted figure hangs below, so the
@@ -541,15 +629,23 @@ function Money({
   value,
   code,
   shopRate,
+  good = false,
 }: {
   label: string;
   value: number;
   code: string;
   /** The rate this order reads at — see `Order.shopRate`. */
   shopRate?: number | null;
+  /** Money saved — green, as the app sets it. */
+  good?: boolean;
 }) {
   return (
-    <div className="flex items-baseline justify-between text-text-soft">
+    <div
+      className={cx(
+        "flex items-baseline justify-between py-[6px] text-[15px] font-medium",
+        good && "text-accent-deep",
+      )}
+    >
       <span>{label}</span>
       <Price value={value} code={code} shopRate={shopRate} align="end" />
     </div>
@@ -558,11 +654,11 @@ function Money({
 
 export function PanelSkeleton() {
   return (
-    <div aria-hidden className="flex flex-col gap-lg p-xxl">
-      <div className="h-[24px] w-[180px] rounded-sm bg-neutral-fill" />
-      <div className="h-[14px] w-[120px] rounded-sm bg-neutral-fill" />
-      <div className="mt-lg h-[60px] rounded-md bg-neutral-fill" />
-      <div className="h-[200px] rounded-md bg-neutral-fill" />
+    <div aria-hidden className="flex flex-col gap-md bg-background p-lg">
+      <div className="h-[64px] rounded-md bg-line-soft" />
+      <div className="h-[260px] rounded-md bg-line-soft" />
+      <div className="h-[88px] rounded-md bg-line-soft" />
+      <div className="h-[140px] rounded-md bg-line-soft" />
     </div>
   );
 }

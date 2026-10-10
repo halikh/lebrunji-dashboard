@@ -319,7 +319,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
               {[0, 1, 2].map((row) => (
                 <div
                   key={row}
-                  className="h-[66px] rounded-md border border-border bg-surface opacity-60"
+                  className="h-[66px] rounded-lg bg-line-soft"
                 />
               ))}
             </div>
@@ -328,7 +328,7 @@ export function StoreMenu({ storeId }: { storeId: string }) {
           {menu.isError && (
             <div className="flex flex-col items-center gap-lg py-huge text-center">
               <div className="flex flex-col gap-xs">
-                <h2 className="text-[18px]">{t("menu.failedTitle")}</h2>
+                <h2 className="text-[19px]">{t("menu.failedTitle")}</h2>
                 <p className="text-[14px] text-text-soft">
                   {t("menu.failedBody")}
                 </p>
@@ -367,9 +367,9 @@ export function StoreMenu({ storeId }: { storeId: string }) {
               {matches.data?.sections.map((section) => (
                 <div
                   key={section.id}
-                  className="flex items-center gap-md rounded-md border border-border bg-surface px-lg py-md"
+                  className="flex items-center gap-md rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card"
                 >
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-text-faint">
+                  <span className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
                     {t("menu.sectionLabel")}
                   </span>
                   <span className="text-[16px] font-semibold">
@@ -980,8 +980,8 @@ function ItemRow({
       ROW,
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
-      !item.isActive && "border-border bg-neutral-fill/60",
-      item.isActive && "border-border",
+      !item.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
+      item.isActive && "border-transparent",
     ),
   );
 
@@ -1267,8 +1267,8 @@ function SearchResult({
     <div
       className={cx(
         ROW,
-        !item.isActive && "border-border bg-neutral-fill/60",
-        item.isActive && "border-border",
+        !item.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
+        item.isActive && "border-transparent",
       )}
     >
       <Thumbnail

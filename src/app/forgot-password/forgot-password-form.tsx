@@ -72,7 +72,7 @@ export function ForgotPasswordForm() {
   return (
     <Card>
       <form onSubmit={onSubmit} className="flex flex-col gap-lg">
-        <h1 className="text-[22px]">{t("forgotPassword.title")}</h1>
+        <h1 className="text-[26px]">{t("forgotPassword.title")}</h1>
         <p className="text-[14px] text-text-soft">
           {t("forgotPassword.subtitle")}
         </p>

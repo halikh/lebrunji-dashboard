@@ -202,7 +202,7 @@ export function ReportsScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
-        <h1 className="flex-grow text-[24px]">{t("reports.title")}</h1>
+        <h1 className="flex-grow text-[30px]">{t("reports.title")}</h1>
       </div>
 
       <div className="min-h-0 flex-grow overflow-y-auto scroll-hint">
@@ -213,7 +213,7 @@ export function ReportsScreen() {
               to it. */}
           <section className="flex flex-col gap-md">
             <div className="flex items-baseline justify-between gap-md">
-              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+              <h2 className="text-[19px]">
                 {t("reports.needsYou")}
               </h2>
               <span className="text-[12px] text-text-faint">
@@ -240,7 +240,7 @@ export function ReportsScreen() {
                         // Straight into the queue on that tab — the number is
                         // only useful if you can act on what it counts.
                         href={`/?status=${status.slug}`}
-                        className="flex items-center gap-md rounded-md border border-border bg-surface px-lg py-md hover:border-active"
+                        className="flex items-center gap-md rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card hover:border-active"
                       >
                         <span
                           aria-hidden
@@ -263,7 +263,7 @@ export function ReportsScreen() {
           {/* ---- How we are doing ----------------------------------------- */}
           <section className="flex flex-col gap-lg border-t border-border pt-xxl">
             <div className="flex flex-wrap items-center justify-between gap-md">
-              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-text-faint">
+              <h2 className="text-[19px]">
                 {t("reports.performance")}
               </h2>
 
@@ -377,7 +377,7 @@ export function ReportsScreen() {
                 {[0, 1, 2, 3].map((one) => (
                   <div
                     key={one}
-                    className="h-[76px] rounded-md border border-border bg-surface opacity-60"
+                    className="h-[76px] rounded-lg bg-line-soft"
                   />
                 ))}
               </div>
@@ -666,7 +666,7 @@ function Tile({
   change?: { text: string; up: boolean };
 }) {
   return (
-    <div className="flex flex-col gap-xxs rounded-md border border-border bg-surface px-lg py-md">
+    <div className="flex flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
       <span className="text-[12px] text-text-faint">{label}</span>
       <span className="text-[22px] font-semibold tabular-nums">{value}</span>
       {delta && (
@@ -685,7 +685,7 @@ function Tile({
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-md rounded-md border border-border bg-surface p-lg">
+    <section className="flex flex-col gap-md rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
       <h3 className="text-[13px] font-semibold">{title}</h3>
       {children}
     </section>

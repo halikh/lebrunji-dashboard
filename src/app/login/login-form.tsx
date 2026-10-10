@@ -75,7 +75,7 @@ export function LoginForm() {
   return (
     <Card>
       <form onSubmit={onSubmit} className="flex flex-col gap-lg">
-        <h1 className="text-[22px]">{t("login.title")}</h1>
+        <h1 className="text-[26px]">{t("login.title")}</h1>
 
         <FormError>{error}</FormError>
 

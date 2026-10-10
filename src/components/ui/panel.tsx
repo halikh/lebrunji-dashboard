@@ -38,15 +38,33 @@ export function Panel({
   open,
   onClose,
   label,
+  docked = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   label: string;
+  /**
+   * Always a column from `lg` up, whatever `open` says; `open` then only
+   * decides the narrow-screen overlay, where there is no room for both.
+   *
+   * For a screen whose detail is never "closed" — the order queue always has
+   * an order selected, and the receipt beside it is the point of the screen.
+   */
+  docked?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
   const opener = useRef<Element | null>(null);
+
+  // Held in a ref so the effect below runs on open and close only. Callers pass
+  // an inline arrow, and with it in the deps every render of the screen behind
+  // re-ran the effect — and re-focused the panel, pulling the cursor out of
+  // whatever the operator was typing into.
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -64,7 +82,7 @@ export function Panel({
     panel?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") close.current();
     }
     window.addEventListener("keydown", onKeyDown);
 
@@ -77,9 +95,9 @@ export function Panel({
         (opener.current as HTMLElement | null)?.focus?.();
       }
     };
-  }, [open, onClose]);
+  }, [open]);
 
-  if (!open) return null;
+  if (!open && !docked) return null;
 
   return (
     <aside
@@ -92,11 +110,14 @@ export function Panel({
         // clipped by the panel rather than spilling past it — the panel owns
         // its bounds, and a footer escaping out of the bottom should be a
         // visible mistake, not an invisible one.
-        "flex w-full shrink-0 flex-col overflow-hidden border-border bg-surface outline-none",
+        "w-full shrink-0 flex-col overflow-hidden border-border bg-surface outline-none",
+        // Docked and not opened: the column is there from `lg` up and nowhere
+        // below it, so a phone still sees the queue first.
+        open ? "flex" : "hidden lg:flex",
         // Full width on a phone, a column beside the queue from `lg` up. Below
         // that there is not enough room for both, and a 380px panel next to a
         // 200px queue serves neither.
-        "absolute inset-0 z-10 lg:relative lg:z-auto lg:w-[420px] lg:border-l",
+        "absolute inset-0 z-10 lg:relative lg:z-auto lg:w-[440px] lg:border-l xl:w-[500px]",
         "animate-[panel-in_var(--duration-fade)_var(--ease-arrive)]",
       )}
     >
