@@ -11,7 +11,6 @@ import {
   useGuardedAction,
   useUnsavedChanges,
 } from "@/components/unsaved-changes";
-import { GeneralTab } from "@/features/settings/general-tab";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { PASSWORD } from "@/lib/limits";
 import { validatePassword } from "@/lib/validation";
@@ -21,11 +20,10 @@ import { validatePassword } from "@/lib/validation";
  *
  * ## Its own page, not a tab on Settings
  *
- * It began as a fifth tab there and does not belong: Settings is **the app's
- * prose** — the words customers read in the help screen, the legal documents,
- * the order timeline. An operator's own sign-in is not content the product
- * shows anybody, and filing it beside the privacy policy makes both harder to
- * find.
+ * Settings is **the shop's** — its hours, its sound, the words customers read.
+ * An operator's own sign-in belongs to one person, and filing it beside the
+ * privacy policy makes both harder to find. The traffic runs the other way too:
+ * the shop's clock and hours used to be a tab here, and moved to Settings.
  *
  * It is not a rail section either. The rail is six items and should stay six —
  * it is glanced at all day, and every addition costs a little of the queue's
@@ -54,16 +52,15 @@ import { validatePassword } from "@/lib/validation";
  * when they had not, which is the single worst thing this screen could get
  * wrong.
  */
-type TabKey = "general" | "password" | "email";
+type TabKey = "password" | "email";
 
 const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
-  { key: "general", labelKey: "general.tab" },
   { key: "password", labelKey: "account.tabPassword" },
   { key: "email", labelKey: "account.tabEmail" },
 ];
 
 export function AccountScreen() {
-  const [tab, setTab] = useState<TabKey>("general");
+  const [tab, setTab] = useState<TabKey>("password");
   // These tabs are local state rather than the URL, so there is no `show()` to
   // guard the way the other screens have — the button is the whole switch.
   const guarded = useGuardedAction();
@@ -92,10 +89,9 @@ export function AccountScreen() {
         {/* Chapters of one screen, so `SectionTab` — the same underline the
             store and the customer profile use.
 
-            General is first and it is not an account setting: it is the shop's.
-            It sits here because this is the page an operator opens to change
-            how the thing behaves, and a fifth tab on Settings would have put
-            the clock format next to the privacy policy. */}
+            Only the operator's own sign-in. The shop's clock, hours and sound
+            used to be a General tab here; they are the business's, not this
+            person's, and now live on Settings. */}
         <div role="tablist" className="-mb-px flex gap-lg">
           {TABS.map(({ key, labelKey }) => (
             <SectionTab
@@ -113,70 +109,51 @@ export function AccountScreen() {
         </div>
       </div>
 
-      {tab === "general" && <GeneralTab />}
+      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
+        {/* Full width and first: which account these two forms are about is
+            the thing to establish before either of them is filled in. */}
+        <section className="flex flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
+          <h2 className="text-[19px]">{t("account.signedInAs")}</h2>
+          <p className="text-[17px] font-semibold">
+            {account.data?.email ?? t("common.loading")}
+          </p>
+        </section>
 
-      {/* Unmounted on General, not hidden with a class.
+        {/* One at a time, not side by side. They were a two-column grid,
+            which was right when the page was only these two forms: the same
+            current-password field, the same shape, and stacking them put the
+            second below the fold. With tabs the choice is made above, so
+            showing both would be offering it twice.
 
-          Everything below is a password box or an email box, and `hidden` left
-          all four of them in the DOM sitting just after the two hour selects.
-          Chrome does not need a field to be visible to decide a page carries a
-          credential form, and the username it fills is the text input nearest
-          the passwords — which, on the General tab, is "Closes at". So the
-          operator opened this page and found their own email typed over the
-          closing hour, and the autofill wrote React state on the way in, which
-          is what put an unsaved-changes dialog on a tab that has no Save.
-
-          The two forms below stay siblings, so the state the note on them is
-          about still survives moving between Password and Email. */}
-      {tab !== "general" && (
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
-          {/* Full width and first: which account these two forms are about is
-              the thing to establish before either of them is filled in. */}
-          <section className="flex flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
-            <h2 className="text-[19px]">
-              {t("account.signedInAs")}
-            </h2>
-            <p className="text-[17px] font-semibold">
-              {account.data?.email ?? t("common.loading")}
-            </p>
-          </section>
-
-          {/* One at a time, not side by side. They were a two-column grid,
-              which was right when the page was only these two forms: the same
-              current-password field, the same shape, and stacking them put the
-              second below the fold. With tabs the choice is made above, so
-              showing both would be offering it twice.
-
-              Siblings rather than a swapped child, so a half-typed password
-              survives a look at the email form and back. */}
-          <div className={cx(tab !== "password" && "hidden")}>
-            <Change
-              title={t("account.passwordTitle")}
-              blurb={t("account.passwordBlurb")}
-              submit={t("account.changePassword")}
-              fields="password"
-              onDone={() => toast.success(t("account.passwordChanged"))}
-            />
-          </div>
-
-          <div className={cx(tab !== "email" && "hidden")}>
-            <Change
-              title={t("account.emailTitle")}
-              blurb={t("account.emailBlurb")}
-              submit={t("account.changeEmail")}
-              fields="email"
-              onDone={() => {
-                // Not "saved": the address does not move until the link in the new
-                // inbox is followed.
-                toast.info(t("account.emailPending"));
-                void queryClient.invalidateQueries({
-                  queryKey: ["account", "me"],
-                });
-              }}
-            />
-          </div>
+            Siblings rather than a swapped child, so a half-typed password
+            survives a look at the email form and back. */}
+        <div className={cx(tab !== "password" && "hidden")}>
+          <Change
+            title={t("account.passwordTitle")}
+            blurb={t("account.passwordBlurb")}
+            submit={t("account.changePassword")}
+            fields="password"
+            onDone={() => toast.success(t("account.passwordChanged"))}
+          />
         </div>
-      )}
+
+        <div className={cx(tab !== "email" && "hidden")}>
+          <Change
+            title={t("account.emailTitle")}
+            blurb={t("account.emailBlurb")}
+            submit={t("account.changeEmail")}
+            fields="email"
+            onDone={() => {
+              // Not "saved": the address does not move until the link in the new
+              // inbox is followed.
+              toast.info(t("account.emailPending"));
+              void queryClient.invalidateQueries({
+                queryKey: ["account", "me"],
+              });
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

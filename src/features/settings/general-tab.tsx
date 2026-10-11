@@ -19,12 +19,15 @@ import {
   updateAppSettings,
   type AppSettings,
 } from "./api/app-settings";
-import { CustomerAppSection } from "./customer-app-section";
-import { UnusedPicturesSection } from "./unused-pictures-section";
 import { appSettingsKey, useAppSettings, useClock } from "./use-clock";
 
 /**
- * The three settings that belong to the business rather than to a row.
+ * The settings that belong to the business rather than to a row: how times
+ * read, when orders are taken, and what a new one sounds like.
+ *
+ * The first tab on Settings, because these are the ones a shop actually comes
+ * back to change. The customer-app gate and the storage sweep used to sit
+ * underneath them and now live on Advanced — see `advanced-tab.tsx`.
  *
  * Each was a constant in a file before migration 0093 — the trading day
  * returned a literal `8`, the chime was synthesised in JavaScript, times were
@@ -232,12 +235,6 @@ export function GeneralTab() {
           pending={save.isPending}
         />
       </section>
-
-      {/* ---- the customer app ------------------------------------------- */}
-      <CustomerAppSection />
-
-      {/* ---- storage ---------------------------------------------------- */}
-      <UnusedPicturesSection />
     </div>
   );
 }

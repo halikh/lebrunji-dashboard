@@ -18,7 +18,7 @@ import {
 import { appSettingsKey } from "./use-clock";
 
 /**
- * Under `appSettingsKey`, so the invalidation every other save on this tab
+ * Under `appSettingsKey`, so the invalidation every other app-settings save
  * makes reaches it too.
  */
 const customerAppKey = [...appSettingsKey, "customer-app"] as const;

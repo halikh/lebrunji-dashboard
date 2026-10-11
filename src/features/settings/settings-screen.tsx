@@ -26,6 +26,8 @@ import {
   type PolicyDocument,
   type PolicySection,
 } from "./api/content";
+import { AdvancedTab } from "./advanced-tab";
+import { GeneralTab } from "./general-tab";
 import {
   useDeleteHelpTopic,
   useDeletePolicySection,
@@ -37,21 +39,28 @@ import {
 } from "./use-content";
 
 /**
- * Settings — the writing the app does that nobody could edit.
+ * Settings — how the shop runs, and the writing the app does.
  *
- * ## Why these sit together
+ * ## What is here, and what is not
  *
- * The help topics and the two legal documents are one errand: they are the
- * app's *prose*. Each is a short ordered list of localised text, visited
- * rarely, and neither is big enough to deserve a place on the rail.
+ * Everything that belongs to the business as a whole rather than to a row:
  *
- * Order statuses and payment methods used to be edited here too. The status
- * path is now hardcoded — see `src/lib/order-status.ts` — and payment methods
- * are no longer the dashboard's to manage.
+ * - **General** — the clock, the time zone, the ordering hours and the
+ *   new-order sound. First, because it is what a shop comes back to change.
+ * - **Help** and **Legal** — the app's *prose*. Each is a short ordered list of
+ *   localised text, visited rarely, and neither is big enough to deserve a
+ *   place on the rail.
+ * - **Advanced** — set once and left alone: the oldest customer app still
+ *   served, and clearing unused pictures out of storage.
  *
- * `0016` moved all of this out of translation keys and into the database
- * **precisely so it could be edited**, and then nothing could edit it. This is
- * the screen that sentence was written for.
+ * Not here: money (Pricing, which `delivery_quote` reads as one errand) and the
+ * operator's own sign-in (Your account, at the foot of the rail — it is about
+ * *you*, not the shop). General used to be a tab on Your account, which meant
+ * the opening hours were filed under somebody's password.
+ *
+ * `0016` moved the prose out of translation keys and into the database
+ * **precisely so it could be edited**, and then nothing could edit it. The Help
+ * and Legal tabs are what that sentence was written for.
  *
  * ## Section tabs, not filter tabs
  *
@@ -60,11 +69,13 @@ import {
  * `SectionTab` exists separately from `FilterTab`.
  */
 
-type TabKey = "help" | "legal";
+type TabKey = "general" | "help" | "legal" | "advanced";
 
 const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
+  { key: "general", labelKey: "general.tab" },
   { key: "help", labelKey: "content.tabHelp" },
   { key: "legal", labelKey: "content.tabLegal" },
+  { key: "advanced", labelKey: "content.tabAdvanced" },
 ];
 
 export function SettingsScreen() {
@@ -76,7 +87,7 @@ export function SettingsScreen() {
   const requested = params.get("tab");
   const tab: TabKey = TABS.some((one) => one.key === requested)
     ? (requested as TabKey)
-    : "help";
+    : "general";
 
   /**
    * Switching tabs unmounts whatever is in the current one, so it is a way out
@@ -87,7 +98,7 @@ export function SettingsScreen() {
     void confirmLeave().then((leave) => {
       if (!leave) return;
       const query = new URLSearchParams(params);
-      if (next === "help") query.delete("tab");
+      if (next === "general") query.delete("tab");
       else query.set("tab", next);
       const search = query.toString();
       router.replace(search ? `${pathname}?${search}` : pathname, {
@@ -117,6 +128,21 @@ export function SettingsScreen() {
           ))}
         </div>
       </div>
+      {/* Mounted only while open. General's ordering window is a draft and
+          the tab switch is guarded, so nothing is lost; Advanced lists the
+          whole storage bucket, which should not happen on every visit to the
+          help topics. */}
+      {tab === "general" && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <GeneralTab />
+        </div>
+      )}
+      {tab === "advanced" && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <AdvancedTab />
+        </div>
+      )}
+
       {/* Siblings rather than one swapped child, so a half-scrolled document
           survives a look at the FAQ and back. */}
       <div className={cx("min-h-0 flex-1", tab !== "help" && "hidden")}>

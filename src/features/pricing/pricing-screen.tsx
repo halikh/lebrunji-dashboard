@@ -9,6 +9,7 @@ import { Field } from "@/components/ui/field";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { reveal } from "@/components/ui/reveal";
+import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useMoney } from "@/features/reference/use-currencies";
@@ -76,36 +77,19 @@ export function PricingScreen() {
         <h1 className="text-[30px]">{t("pricing.title")}</h1>
 
         <div role="tablist" className="-mb-px flex gap-lg">
-          {TABS.map(({ key, labelKey }) => {
-            const selected = tab === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => show(key)}
-                onKeyDown={(event) => {
-                  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
-                    return;
-                  }
-                  event.preventDefault();
-                  const at = TABS.findIndex((one) => one.key === tab);
-                  const step = event.key === "ArrowRight" ? 1 : -1;
-                  show(TABS[(at + step + TABS.length) % TABS.length].key);
-                }}
-                className={cx(
-                  "border-b-2 pb-sm text-[14px] font-semibold",
-                  selected
-                    ? "border-active text-text"
-                    : "border-transparent text-text-soft hover:text-text",
-                )}
-              >
-                {t(labelKey)}
-              </button>
-            );
-          })}
+          {TABS.map(({ key, labelKey }) => (
+            <SectionTab
+              key={key}
+              label={t(labelKey)}
+              active={tab === key}
+              onClick={() => show(key)}
+              onKeyDown={tabArrowHandler(
+                TABS.map((one) => one.key),
+                tab,
+                show,
+              )}
+            />
+          ))}
         </div>
       </div>
 

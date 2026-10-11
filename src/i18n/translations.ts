@@ -2412,6 +2412,7 @@ const en = {
     title: "Settings",
     tabHelp: "Help",
     tabLegal: "Legal",
+    tabAdvanced: "Advanced",
     failed: "Could not load this. Try again.",
     searchHelp: "Search questions",
     searchLegal: "Search this document",
