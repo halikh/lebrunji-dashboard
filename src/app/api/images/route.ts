@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireOperator } from "@/lib/auth/operator";
 import { IMAGE, SOUND } from "@/lib/limits";
 import { deleteObject, imageUrlFor, presignUpload } from "@/lib/storage/bucket";
+import { KEY_SHAPE } from "@/lib/storage/sweep";
 
 /**
  * Where the browser asks permission to put a picture in the bucket, and where
@@ -144,7 +145,8 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Removes an object the uploader put there and then replaced.
+ * Removes an object the uploader put there and then replaced. Everything else
+ * that nothing points at is the sweep's — `api/images/unused`.
  *
  * The client says which, and that is a claim worth being careful about: this
  * key is the only thing standing between the endpoint and "delete any picture
@@ -173,9 +175,10 @@ export async function DELETE(request: NextRequest) {
   // deleting an operator's image, which is the claim this endpoint already
   // makes; refusing the old prefix would only mean the orphans it leaves can
   // never be swept up.
-  const shape =
-    /^(menu-items|stores|promotions|artwork|categories|category-art|tag-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
-  if (!shape.test(key)) {
+  //
+  // Shared with the sweep (`lib/storage/sweep.ts`), which deletes by the same
+  // rule.
+  if (!KEY_SHAPE.test(key)) {
     return NextResponse.json({ error: "key" }, { status: 400 });
   }
 

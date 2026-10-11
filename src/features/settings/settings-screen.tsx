@@ -217,10 +217,7 @@ function HelpTab() {
           {topics.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((one) => (
-                <div
-                  key={one}
-                  className="h-[58px] rounded-lg bg-line-soft"
-                />
+                <div key={one} className="h-[58px] rounded-lg bg-line-soft" />
               ))}
             </div>
           )}
@@ -539,12 +536,7 @@ function PolicyRow({
 
   const row = rowProps(
     section.id,
-    cx(
-      ROW,
-      open
-        ? "border-active shadow-selected"
-        : "border-transparent",
-    ),
+    cx(ROW, open ? "border-active shadow-selected" : "border-transparent"),
   );
 
   return (

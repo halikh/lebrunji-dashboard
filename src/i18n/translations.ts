@@ -595,6 +595,30 @@ const en = {
     storeUrlInvalid: "Must be a full link starting with https://",
     saveCustomerApp: "Save app settings",
     savedCustomerApp: "Customer app settings saved",
+
+    // The bucket sweep (`api/images/unused`, migration 0188).
+    unusedTitle: "Unused pictures",
+    unusedBlurb:
+      "Pictures and sounds that nothing points at any more: ones you replaced, ones from things deleted for good, and uploads from forms that were never saved. Archived items keep theirs, so a restore comes back with its picture. Uploads from the last day are left alone.",
+    unusedChecking: "Checking…",
+    unusedNone: "Nothing to clear.",
+    unusedOne: "1 file nobody uses ({size}).",
+    unusedMany: "{count} files nobody uses ({size}).",
+    unusedRemove: "Remove them",
+    unusedConfirmTitle: "Remove unused pictures?",
+    unusedConfirmBody:
+      "{count} files ({size}) are deleted from storage for good. Nothing in the app or the dashboard uses them, and none was uploaded in the last day.",
+    unusedConfirm: "Delete files",
+    unusedRemoved: "Removed {count} files ({size})",
+    unusedSomeFailed:
+      "{count} files could not be removed. Try again in a while.",
+    unusedForbidden: "Only an admin can clear storage.",
+    unusedNotReady:
+      "This database is missing migration 0188, so it cannot say which pictures are in use. Nothing was deleted.",
+    // Said as the refusal it is: either answer here means the sweep cannot tell
+    // used from unused, and deleting on a guess would empty the app.
+    unusedMismatch:
+      "Storage and the database do not look like the same environment, so nothing was deleted. Check S3_BUCKET against the Supabase project this dashboard is using.",
   },
 
   /**

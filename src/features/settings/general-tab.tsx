@@ -20,6 +20,7 @@ import {
   type AppSettings,
 } from "./api/app-settings";
 import { CustomerAppSection } from "./customer-app-section";
+import { UnusedPicturesSection } from "./unused-pictures-section";
 import { appSettingsKey, useAppSettings, useClock } from "./use-clock";
 
 /**
@@ -234,6 +235,9 @@ export function GeneralTab() {
 
       {/* ---- the customer app ------------------------------------------- */}
       <CustomerAppSection />
+
+      {/* ---- storage ---------------------------------------------------- */}
+      <UnusedPicturesSection />
     </div>
   );
 }

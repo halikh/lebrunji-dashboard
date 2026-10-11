@@ -3,6 +3,7 @@ import "server-only";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -183,7 +184,46 @@ export async function getObject(key: string) {
   );
 }
 
-/** Removes one object. Only ever a supersession — see `lib/images.ts`. */
+/** One object in the bucket, as the sweep sees it. */
+export type StoredObject = { key: string; size: number; lastModified: Date };
+
+/**
+ * Every object in the bucket, a thousand per request.
+ *
+ * Only the sweep (`api/images/unused`) reads the whole bucket, and only when an
+ * operator asks it to, so there is no cursor to hand back — it needs the lot to
+ * decide anything.
+ */
+export async function listObjects(): Promise<StoredObject[]> {
+  const config = readBucketConfig();
+  const objects: StoredObject[] = [];
+  let token: string | undefined;
+
+  do {
+    const page = await s3(config).send(
+      new ListObjectsV2Command({
+        Bucket: config.bucket,
+        ContinuationToken: token,
+      }),
+    );
+    for (const item of page.Contents ?? []) {
+      if (!item.Key || !item.LastModified) continue;
+      objects.push({
+        key: item.Key,
+        size: item.Size ?? 0,
+        lastModified: item.LastModified,
+      });
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+
+  return objects;
+}
+
+/**
+ * Removes one object: a supersession (see `lib/images.ts`) or one the sweep
+ * found nothing pointing at.
+ */
 export async function deleteObject(key: string): Promise<void> {
   const config = readBucketConfig();
   await s3(config).send(
