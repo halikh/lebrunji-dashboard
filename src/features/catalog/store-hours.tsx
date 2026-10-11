@@ -510,20 +510,22 @@ export function WeekEditor({
                             {t("hours.removeShift")}
                           </Button>
                         )}
+
+                        {/* On the last shift's row, so the next one is added
+                            where it will appear rather than from a line of
+                            its own. */}
+                        {at === day.windows.length - 1 &&
+                          day.windows.length < MAX_SHIFTS && (
+                            <Button
+                              variant="quiet"
+                              size="sm"
+                              onClick={() => addShift(index)}
+                            >
+                              {t("hours.addShift")}
+                            </Button>
+                          )}
                       </div>
                     ))}
-
-                    {day.windows.length < MAX_SHIFTS && (
-                      <span>
-                        <Button
-                          variant="quiet"
-                          size="sm"
-                          onClick={() => addShift(index)}
-                        >
-                          {t("hours.addShift")}
-                        </Button>
-                      </span>
-                    )}
                   </div>
                 ) : (
                   <span className="text-[13px] text-text-faint">

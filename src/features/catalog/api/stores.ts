@@ -821,7 +821,7 @@ function listedCategories(
  * like a shop with no branches at all — the same trap `fetchMenu` documents.
  * Asked for and dropped here instead.
  */
-function orderPhone(row: Record<string, unknown>): string | null {
+export function orderPhone(row: Record<string, unknown>): string | null {
   const branches = Array.isArray(row.branches)
     ? (row.branches as Record<string, unknown>[])
     : row.branches

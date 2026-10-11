@@ -4,7 +4,7 @@ import { Button, cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
 import { formatRelative } from "@/lib/time";
 
-import type { Order, OrderStatus } from "./api/orders";
+import { placeName, type Order, type OrderStatus } from "./api/orders";
 import { StatusPill } from "./status-pill";
 import { nextStatus, orderStatus } from "./use-orders";
 
@@ -124,7 +124,7 @@ export function OrderRow({
         )}
         {/* The shops, as information. One order, however many of them. */}
         <span className="truncate text-[13px] text-text-soft">
-          {order.stores.map((store) => store.storeName).join(" · ")}
+          {order.stores.map(placeName).join(" · ")}
         </span>
       </div>
 

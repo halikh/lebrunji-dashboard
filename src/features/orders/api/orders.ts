@@ -1,3 +1,4 @@
+import { orderPhone } from "@/features/catalog/api/stores";
 import { oneShopRate } from "@/features/reference/shop-rate";
 import { getClient } from "@/lib/supabase/client";
 import {
@@ -31,6 +32,13 @@ export type OrderStore = {
   id: string;
   storeId: string;
   storeName: string;
+  /**
+   * Which of the shop's places took this portion — only when that is a
+   * question, i.e. the shop has another live branch. Null for a one-branch
+   * shop, whose branch is named after it and would read "Azzurrini — Azzurrini".
+   * See `placeName`.
+   */
+  branchName: string | null;
   storeImageUrl: string | null;
   /**
    * Where this kitchen is sent its half of the order, or null.
@@ -227,9 +235,11 @@ export async function fetchOrders(options: {
   // queue and the panel must not disagree about that.
   const embed = filterSlugs
     ? `order_stores!inner ( id, store_id, subtotal, status,
-         stores ( name, exchange_rate ) )`
+         branches ( id, name ),
+         stores ( name, exchange_rate, branches ( id, deleted_at ) ) )`
     : `order_stores ( id, store_id, subtotal, status,
-         stores ( name, exchange_rate ) )`;
+         branches ( id, name ),
+         stores ( name, exchange_rate, branches ( id, deleted_at ) ) )`;
 
   let query = getClient()
     .from("orders")
@@ -295,7 +305,9 @@ export async function fetchOrder(
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal, status,
-         stores ( name, image_url, whatsapp_phone, exchange_rate ),
+         branches ( id, name, whatsapp_phone ),
+         stores ( name, image_url, whatsapp_phone, exchange_rate,
+           branches ( id, whatsapp_phone, sort_order, created_at, deleted_at ) ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
            options_price, price_unit, unit_quantity, unit_step,
            fulfilled_quantity, replaces_line_id, amendment_reason,
@@ -570,6 +582,56 @@ function pinOf(
   };
 }
 
+/**
+ * Where this portion's kitchen is sent its half of the order.
+ *
+ * The number lives on the branch since `0101`, and the dashboard writes it
+ * nowhere else — so `stores.whatsapp_phone` is null for every shop made since,
+ * and reading only that told the operator to add a number the shop already had.
+ *
+ * The branch that took the order first: on a chain, the message has to reach
+ * the kitchen cooking it, not the main one. An archived branch is still asked —
+ * the order was placed there and that kitchen is the one holding it. Then the
+ * shop's own number as the Catalogue shows it (first live branch, then the
+ * legacy column), for portions written before `branch_id` was.
+ */
+/**
+ * The branch's name, when the shop has somewhere else it could be.
+ *
+ * Counted against the shop's *other* live branches, not all of them: a chain
+ * that has closed every place but one is a one-place shop again, and an order
+ * taken at a branch archived since still names it while another stays open —
+ * the driver has to know it is not the one still trading.
+ */
+function branchNameOf(
+  portion: Record<string, unknown>,
+  locale: string,
+): string | null {
+  const branch = asRecord(portion.branches);
+  if (!branch) return null;
+  const others = asArray(asRecord(portion.stores)?.branches).filter(
+    (one) => one.deleted_at == null && one.id !== branch.id,
+  );
+  if (others.length === 0) return null;
+  return localized(branch.name, locale) || null;
+}
+
+/** "Azzurrini — Hamra" on a chain, "Azzurrini" otherwise. */
+export function placeName(
+  store: Pick<OrderStore, "storeName" | "branchName">,
+): string {
+  return store.branchName
+    ? `${store.storeName} — ${store.branchName}`
+    : store.storeName;
+}
+
+function kitchenPhone(portion: Record<string, unknown>): string | null {
+  const fromBranch = asRecord(portion.branches)?.whatsapp_phone;
+  if (typeof fromBranch === "string" && fromBranch) return fromBranch;
+  const store = asRecord(portion.stores);
+  return store ? orderPhone(store) : null;
+}
+
 function toOrder(row: Record<string, unknown>, locale: string): Order {
   const user = asRecord(row.users);
   const address = asRecord(row.addresses);
@@ -605,8 +667,8 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
         id: store.id as string,
         storeId: store.store_id as string,
         storeName: localized(asRecord(store.stores)?.name, locale),
-        storeWhatsapp:
-          (asRecord(store.stores)?.whatsapp_phone as string | null) ?? null,
+        branchName: branchNameOf(store, locale),
+        storeWhatsapp: kitchenPhone(store),
         storeImageUrl:
           (asRecord(store.stores)?.image_url as string | null) ?? null,
         statusSlug: slug,

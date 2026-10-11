@@ -624,6 +624,32 @@ dialog[open]::backdrop {
   border-radius: var(--radius-md);
 }
 
+/* The one layout rule. The library fixes the column at 85px, which fits `21:00`
+ * and not `12:00 AM`, so the 12-hour list scrolled sideways. Sized to its
+ * widest entry instead, and only ever scrolled up and down. */
+.react-datepicker__time-container,
+.react-datepicker__time-container
+  .react-datepicker__time
+  .react-datepicker__time-box {
+  width: auto;
+}
+
+.react-datepicker__time-container
+  .react-datepicker__time
+  .react-datepicker__time-box
+  ul.react-datepicker__time-list {
+  overflow-x: hidden;
+}
+
+.react-datepicker__time-container
+  .react-datepicker__time
+  .react-datepicker__time-box
+  ul.react-datepicker__time-list
+  li.react-datepicker__time-list-item {
+  padding-inline: 16px;
+  white-space: nowrap;
+}
+
 .react-datepicker__time-list-item {
   color: var(--color-text);
   font-size: 14px;

@@ -24,6 +24,7 @@ import { formatMoney } from "@/lib/money";
 import { amendOrder, type LineChange, type Substitution } from "./api/amend";
 import { countAmendments } from "./api/history";
 import {
+  placeName,
   roundingOf,
   roundToCash,
   type Order,
@@ -323,7 +324,7 @@ export function AmendOrder({
                     name={store.storeName}
                   />
                   <h3 className="truncate text-[15px] font-semibold">
-                    {store.storeName}
+                    {placeName(store)}
                   </h3>
                 </div>
 

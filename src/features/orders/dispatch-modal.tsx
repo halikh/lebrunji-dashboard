@@ -24,7 +24,7 @@ import { formatPhone } from "@/lib/phone";
 import { formatDayAndTime } from "@/lib/time";
 
 import { fetchHandovers } from "./api/history";
-import type { Order, OrderLine } from "./api/orders";
+import { placeName, type Order, type OrderLine } from "./api/orders";
 import { OrderRefusal } from "./api/refusal";
 import { useClock } from "@/features/settings/use-clock";
 import { orderKeys, patchOrderCaches } from "./use-orders";
@@ -413,7 +413,7 @@ export function DispatchModal({
                 >
                   <div className="flex min-w-0 flex-grow flex-col gap-xxs">
                     <span className="truncate text-[15px] font-semibold">
-                      {portion.storeName}
+                      {placeName(portion)}
                     </span>
                     <span className="truncate text-[12px] tabular-nums text-text-faint">
                       {formatPhone(portion.storeWhatsapp)}
@@ -443,7 +443,7 @@ export function DispatchModal({
                   key={portion.id}
                   className="rounded-lg border border-dashed border-border px-lg py-md text-[13px] text-text-faint"
                 >
-                  {portion.storeName} — {t("dispatch.kitchenNoNumber")}{" "}
+                  {placeName(portion)} — {t("dispatch.kitchenNoNumber")}{" "}
                   <Link
                     href={`/catalogue/${portion.storeId}`}
                     className="font-semibold text-primary hover:underline"

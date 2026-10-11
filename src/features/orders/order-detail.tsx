@@ -17,6 +17,7 @@ import { unitLabel } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
 import {
+  placeName,
   roundingOf,
   type Order,
   type OrderLine,
@@ -349,14 +350,14 @@ export function OrderActions({
       <div
         role="group"
         aria-label={t("orders.otherActions")}
-        className="flex items-center gap-sm empty:hidden"
+        className="flex flex-wrap items-center gap-sm empty:hidden"
       >
         {/* WhatsApp's own green, so the control that hands off to it is
             recognised before it is read — which matters on a button reached
             for under time pressure. Restricted to controls that open that
             application, like the brand red is restricted to the mark. */}
         {!finished && (
-          <span className="flex min-w-0 flex-1">
+          <span className="flex min-w-fit flex-1">
             <Button
               size="sm"
               fullWidth
@@ -390,7 +391,7 @@ export function OrderActions({
           </a>
         )}
         {amendable && (
-          <span className="flex min-w-0 flex-1">
+          <span className="flex min-w-fit flex-1">
             <Button
               variant="secondary"
               size="sm"
@@ -402,7 +403,7 @@ export function OrderActions({
           </span>
         )}
         {next && cancelled && (
-          <span className="flex min-w-0 flex-1">
+          <span className="flex min-w-fit flex-1">
             <ConfirmButton
               onConfirm={() =>
                 advance({
@@ -500,7 +501,7 @@ function StoreSection({
       <div className="flex items-center gap-[10px] pb-sm">
         <Thumbnail src={store.storeImageUrl} size={36} name={store.storeName} />
         <div className="flex min-w-0 flex-grow flex-col">
-          <h4 className="truncate text-[17px]">{store.storeName}</h4>
+          <h4 className="truncate text-[17px]">{placeName(store)}</h4>
           <span
             className="flex items-center gap-xs text-[12px] font-medium"
             style={{ color: tone.ink }}

@@ -5,7 +5,12 @@ import { formatPhone } from "@/lib/phone";
 import { unitLabel } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
-import { roundingOf, type Order, type OrderLine } from "./api/orders";
+import {
+  placeName,
+  roundingOf,
+  type Order,
+  type OrderLine,
+} from "./api/orders";
 
 /**
  * Handing an order to a driver, over WhatsApp.
@@ -122,7 +127,7 @@ export function dispatchMessage(
   // `order_stores` row it belongs to — the same shape the receipt draws from.
   for (const store of order.stores) {
     lines.push("");
-    lines.push(t("dispatch.from", { store: store.storeName }));
+    lines.push(t("dispatch.from", { store: placeName(store) }));
 
     for (const line of order.lines.filter(
       (one) => one.orderStoreId === store.id,
@@ -262,7 +267,7 @@ export function kitchenMessage(
 
   if (portion) {
     lines.push("");
-    lines.push(t("dispatch.kitchenFooter", { store: portion.storeName }));
+    lines.push(t("dispatch.kitchenFooter", { store: placeName(portion) }));
   }
 
   return lines.join("\n");

@@ -152,6 +152,7 @@ describe("withOrderMoved", () => {
     storeId: `store-${id}`,
     storeName: id,
     storeImageUrl: null,
+    branchName: null,
     storeWhatsapp: null,
     statusSlug: slug,
     statusName: statusName(slug),
