@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { t } from "@/i18n/translations";
-import { isUndoableMove, orderStatuses } from "@/lib/order-status";
+import { isUndoableMove, orderStatuses, statusName } from "@/lib/order-status";
 
 import {
   liveStatusSlugs,
   roundingOf,
   roundToCash,
   searchTerm,
+  withOrderMoved,
   type OrderStatus,
+  type OrderStore,
 } from "./orders";
 import { OrderRefusal, orderRefusal } from "./refusal";
 
@@ -140,5 +142,61 @@ describe("roundToCash", () => {
 
   it("leaves a currency without a cash step alone", () => {
     expect(roundToCash(1_875, "USD")).toBe(1_875);
+  });
+});
+
+describe("withOrderMoved", () => {
+  /** A portion at `slug`, carrying what `toOrder` would have read for it. */
+  const portion = (id: string, slug: string): OrderStore => ({
+    id,
+    storeId: `store-${id}`,
+    storeName: id,
+    storeImageUrl: null,
+    storeWhatsapp: null,
+    statusSlug: slug,
+    statusName: statusName(slug),
+    progress: PATH.find((s) => s.slug === slug)?.progress ?? null,
+    subtotal: 0,
+  });
+
+  it("moves every live portion, carrying the target's name and position", () => {
+    const moved = withOrderMoved(
+      { stores: [portion("a", "ordered"), portion("b", "confirmed")] },
+      "driverSent",
+    );
+    expect(moved.stores).toEqual([
+      portion("a", "driverSent"),
+      portion("b", "driverSent"),
+    ]);
+  });
+
+  it("leaves delivered and cancelled portions where they are, as the function does", () => {
+    const delivered = portion("a", "delivered");
+    const cancelled = portion("b", "cancelled");
+    const moved = withOrderMoved(
+      { stores: [delivered, cancelled, portion("c", "confirmed")] },
+      "ordered",
+    );
+    expect(moved.stores[0]).toBe(delivered);
+    expect(moved.stores[1]).toBe(cancelled);
+    expect(moved.stores[2]).toEqual(portion("c", "ordered"));
+  });
+
+  it("keeps the rest of the order, lines included", () => {
+    const order = {
+      id: "o",
+      lines: ["kept"],
+      stores: [portion("a", "ordered")],
+    };
+    const moved = withOrderMoved(order, "confirmed");
+    expect(moved.id).toBe("o");
+    expect(moved.lines).toBe(order.lines);
+  });
+
+  it("returns the same order when nothing would move", () => {
+    const order = {
+      stores: [portion("a", "confirmed"), portion("b", "delivered")],
+    };
+    expect(withOrderMoved(order, "confirmed")).toBe(order);
   });
 });

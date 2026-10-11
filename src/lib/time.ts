@@ -33,15 +33,57 @@
  * whole hour of trade under the wrong day twice a year. So the zone is named
  * and `Intl` resolves the offset for each instant.
  *
- * ## The seam for later
+ * ## Where the zone comes from
  *
- * `user_preferences.timezone` exists in the schema, so a merchant operating
- * somewhere else is a future question. The constant below is the single place
- * that answer would come from; nothing else in the dashboard names a zone.
+ * The database. `app_settings.timezone` names a row of `timezones` (app repo,
+ * migration 0183), and it is the same value SQL's `business_timezone()` reads,
+ * so this dashboard, the customer app and every report agree by construction.
+ * Today it is Asia/Beirut, the only zone on the list.
+ *
+ * `fetchAppSettings` hands it to `setBusinessClock` when the settings row
+ * arrives, together with the hour the trading day starts. Until then they are
+ * the column defaults below. Nothing else in the dashboard names a zone: a
+ * screen asks `businessTimezone()`.
  */
 
-/** The one place a timezone is named. */
-export const BUSINESS_TIMEZONE = "Asia/Beirut";
+/** The column default in 0183, used until the settings row says otherwise. */
+export const DEFAULT_BUSINESS_TIMEZONE = "Asia/Beirut";
+
+let zone = DEFAULT_BUSINESS_TIMEZONE;
+
+/** The IANA id every wall-clock reading here is in, e.g. `Asia/Beirut`. */
+export function businessTimezone(): string {
+  return zone;
+}
+
+/**
+ * Adopt the business clock from the settings row: the zone, and the hour the
+ * trading day begins (`orders_open_hour`, which `business_day_starts_at()`
+ * reads too). A zone this browser cannot resolve is ignored rather than
+ * thrown on, keeping the last one that worked.
+ */
+export function setBusinessClock(next: {
+  timezone?: string | null;
+  dayStartsAt?: number | null;
+}): void {
+  if (next.timezone && next.timezone !== zone) {
+    try {
+      new Intl.DateTimeFormat("en-GB", { timeZone: next.timezone });
+      zone = next.timezone;
+      formatters = null;
+    } catch {
+      // Not a zone this engine knows; keep the current one.
+    }
+  }
+  if (
+    next.dayStartsAt != null &&
+    Number.isInteger(next.dayStartsAt) &&
+    next.dayStartsAt >= 0 &&
+    next.dayStartsAt <= 23
+  ) {
+    dayStartsAt = next.dayStartsAt;
+  }
+}
 
 /** A wall-clock reading — what a clock in Beirut would show. */
 export type WallClock = {
@@ -54,22 +96,50 @@ export type WallClock = {
   second: number;
 };
 
-const partsFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: BUSINESS_TIMEZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
+/**
+ * Built once per zone, and rebuilt only when `setBusinessClock` moves it:
+ * constructing a `DateTimeFormat` is the expensive half of formatting.
+ */
+let formatters: {
+  parts: Intl.DateTimeFormat;
+  date: Intl.DateTimeFormat;
+  dayMonth: Intl.DateTimeFormat;
+} | null = null;
+
+function zoned() {
+  if (!formatters) {
+    formatters = {
+      parts: new Intl.DateTimeFormat("en-GB", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }),
+      date: new Intl.DateTimeFormat("en-GB", {
+        timeZone: zone,
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }),
+      dayMonth: new Intl.DateTimeFormat("en-GB", {
+        timeZone: zone,
+        day: "numeric",
+        month: "short",
+      }),
+    };
+  }
+  return formatters;
+}
 
 /** What a clock in Beirut read at this instant. */
 export function toWallClock(instant: Date): WallClock {
   const parts = Object.fromEntries(
-    partsFormatter
-      .formatToParts(instant)
+    zoned()
+      .parts.formatToParts(instant)
       .map((part) => [part.type, part.value]),
   );
 
@@ -157,9 +227,19 @@ export function fromWallClock(
  * every late night split across two bars.
  *
  * One number, in one place, because it is the sort of thing that would
- * otherwise be an `8` in five files.
+ * otherwise be an `8` in five files. It is `app_settings.orders_open_hour`,
+ * the same column `business_day_starts_at()` reads, so the shift this cuts
+ * and the one the server's reports cut cannot drift apart; 8 until the
+ * settings row arrives.
  */
-export const BUSINESS_DAY_STARTS_AT = 8;
+export const DEFAULT_BUSINESS_DAY_STARTS_AT = 8;
+
+let dayStartsAt = DEFAULT_BUSINESS_DAY_STARTS_AT;
+
+/** The hour, on the business clock, a trading day begins. */
+export function businessDayStartsAt(): number {
+  return dayStartsAt;
+}
 
 /**
  * Which shift an instant belongs to, as a calendar date.
@@ -186,7 +266,7 @@ function shiftDate(instant: Date): {
       clock.year,
       clock.month - 1,
       clock.day,
-      clock.hour - BUSINESS_DAY_STARTS_AT,
+      clock.hour - dayStartsAt,
     ),
   );
   return {
@@ -203,7 +283,7 @@ function shiftDate(instant: Date): {
  * answers for *that* shift, so it is correct for any moment, not only for now.
  */
 export function startOfBusinessDay(instant: Date = new Date()): Date {
-  return fromWallClock({ ...shiftDate(instant), hour: BUSINESS_DAY_STARTS_AT });
+  return fromWallClock({ ...shiftDate(instant), hour: dayStartsAt });
 }
 
 /** The instant `days` shifts after the one containing `instant`. */
@@ -219,8 +299,20 @@ export function startOfBusinessDayPlus(
     year: rolled.getUTCFullYear(),
     month: rolled.getUTCMonth() + 1,
     day: rolled.getUTCDate(),
-    hour: BUSINESS_DAY_STARTS_AT,
+    hour: dayStartsAt,
   });
+}
+
+/**
+ * The trading day an instant belongs to, as a calendar date: what
+ * `business_day()` returns in SQL. 01:00 on the 1st is still the 31st's.
+ */
+export function businessDate(instant: Date | string): {
+  year: number;
+  month: number;
+  day: number;
+} {
+  return shiftDate(asDate(instant));
 }
 
 /** Whether two instants fall in the same shift. */
@@ -265,19 +357,6 @@ export function isSameBusinessDay(a: Date, b: Date): boolean {
 // pattern inside a library. So the shape is spelled once, below, and everything
 // that shows a time matches by construction rather than by coincidence.
 
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: BUSINESS_TIMEZONE,
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
-
-const dayMonthFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: BUSINESS_TIMEZONE,
-  day: "numeric",
-  month: "short",
-});
-
 /**
  * An hour and a minute, in the shop's format.
  *
@@ -300,7 +379,20 @@ export function formatTime(instant: Date | string, clock24h: boolean): string {
 
 /** `30 Aug 2026` — no clock in it, so the shop's format cannot reach it. */
 export function formatDate(instant: Date | string): string {
-  return dateFormatter.format(asDate(instant));
+  return zoned().date.format(asDate(instant));
+}
+
+/**
+ * `30 Aug 2026` — the **trading day** an instant belongs to rather than its
+ * calendar date. For naming a day of a report: the last instant of a range
+ * is 07:59 the next morning, and its calendar date is a day the figures do
+ * not include.
+ */
+export function formatBusinessDay(instant: Date | string): string {
+  const { year, month, day } = businessDate(instant);
+  // Noon on that date: a moment that is unambiguously on it, whatever the
+  // offset, so the zone's own formatter prints the same day back.
+  return zoned().date.format(fromWallClock({ year, month, day, hour: 12 }));
 }
 
 /** `30 Aug, 14:32`, or `30 Aug, 2:32 PM`. */
@@ -309,7 +401,7 @@ export function formatDateTime(
   clock24h: boolean,
 ): string {
   const date = asDate(instant);
-  return `${dayMonthFormatter.format(date)}, ${formatTime(date, clock24h)}`;
+  return `${zoned().dayMonth.format(date)}, ${formatTime(date, clock24h)}`;
 }
 
 /**

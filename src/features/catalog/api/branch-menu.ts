@@ -1,3 +1,4 @@
+import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
 import { getClient } from "@/lib/supabase/client";
 
@@ -162,6 +163,19 @@ export async function setItemHidden(
 }
 
 /**
+ * The database's refusal, in words an operator can act on.
+ *
+ * `NOCHO` (0181): hiding the last answer a branch offers to a required
+ * question, or asking such a question again here while every answer is hidden.
+ * The way out is on this screen — turn the question off here, or the dish —
+ * which the database's sentence cannot name.
+ */
+function branchMenuError(error: { message: string; code?: string | null }): Error {
+  if (error.code === "NOCHO") return new Error(t("branchMenu.lastChoiceRefused"));
+  return new Error(error.message);
+}
+
+/**
  * A question this branch does not ask, or a choice it does not offer.
  *
  * Hiding a **group** takes its choices with it, the same way hiding a section
@@ -185,7 +199,7 @@ export async function setGroupHidden(
         .eq("branch_id", branchId)
         .eq("option_group_id", groupId);
 
-  if (error) throw new Error(error.message);
+  if (error) throw branchMenuError(error);
 }
 
 export async function setOptionHidden(
@@ -205,7 +219,7 @@ export async function setOptionHidden(
         .eq("branch_id", branchId)
         .eq("item_option_id", optionId);
 
-  if (error) throw new Error(error.message);
+  if (error) throw branchMenuError(error);
 }
 
 /**

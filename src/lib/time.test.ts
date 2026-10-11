@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_BUSINESS_DAY_STARTS_AT,
+  DEFAULT_BUSINESS_TIMEZONE,
+  businessDate,
+  businessTimezone,
+  formatBusinessDay,
+  setBusinessClock,
   formatDate,
   formatClockString,
   formatHour,
@@ -400,5 +406,48 @@ describe("the 12-hour clock", () => {
     expect(formatHour(8, false)).toBe("8:00 AM");
     expect(formatHour(0, false)).toBe("12:00 AM");
     expect(formatHour(2, false)).toBe("2:00 AM");
+  });
+});
+
+describe("the business clock from the settings row (0183)", () => {
+  afterEach(() => {
+    setBusinessClock({
+      timezone: DEFAULT_BUSINESS_TIMEZONE,
+      dayStartsAt: DEFAULT_BUSINESS_DAY_STARTS_AT,
+    });
+  });
+
+  it("adopts the zone the database names", () => {
+    setBusinessClock({ timezone: "Europe/Paris" });
+    expect(businessTimezone()).toBe("Europe/Paris");
+    // 10:05Z in January is 11:05 in Paris, 12:05 in Beirut.
+    expect(toWallClock(new Date("2026-01-14T10:05:00Z")).hour).toBe(11);
+  });
+
+  it("keeps the last good zone when handed one it cannot resolve", () => {
+    setBusinessClock({ timezone: "Not/AZone" });
+    expect(businessTimezone()).toBe(DEFAULT_BUSINESS_TIMEZONE);
+  });
+
+  it("moves the trading day with the opening hour", () => {
+    // 05:30 Beirut on the 14th: yesterday's shift at 08:00, today's at 05:00.
+    const at = new Date("2026-01-14T03:30:00Z");
+    expect(businessDate(at).day).toBe(13);
+    setBusinessClock({ dayStartsAt: 5 });
+    expect(businessDate(at).day).toBe(14);
+  });
+});
+
+describe("formatBusinessDay", () => {
+  it("names the trading day, not the calendar day", () => {
+    // 07:59 Beirut on 1 Sep is the last minute of 31 Aug's shift — the last
+    // instant of a range that ends at 1 Sep 08:00.
+    expect(formatBusinessDay(new Date("2026-09-01T04:59:00Z"))).toBe(
+      "31 Aug 2026",
+    );
+    // And 08:00 begins the 1st's. "Sep" or "Sept" is the engine's choice.
+    expect(formatBusinessDay(new Date("2026-09-01T05:00:00Z"))).toMatch(
+      /^1 Sept? 2026$/,
+    );
   });
 });

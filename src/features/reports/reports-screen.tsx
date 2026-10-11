@@ -20,7 +20,7 @@ import {
 import { pickLocalized } from "@/i18n/db-text";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
-import { formatDate, toWallClock } from "@/lib/time";
+import { businessDate, formatBusinessDay } from "@/lib/time";
 
 import type { Stats } from "./api/stats";
 import {
@@ -349,11 +349,11 @@ export function ReportsScreen() {
 
             <p className="ps-md text-[12px] text-text-faint">
               {t("reports.rangeNote", {
-                from: formatDate(current.from),
+                from: formatBusinessDay(current.from),
                 // The range is half-open, so the last day *in* it is the day
                 // before `to`. Printing `to` would name a day the figures do
                 // not include.
-                to: formatDate(new Date(current.to.getTime() - 1)),
+                to: formatBusinessDay(new Date(current.to.getTime() - 1)),
               })}
             </p>
 
@@ -598,8 +598,10 @@ export function ReportsScreen() {
  * in the first two or three hours of a Beirut morning.
  */
 function toDayKey(instant: Date): string {
-  const clock = toWallClock(instant);
-  return `${clock.year}-${String(clock.month).padStart(2, "0")}-${String(clock.day).padStart(2, "0")}`;
+  // The trading day's date, as the server's `day` buckets are: the last
+  // instant of a range is 07:59 the next morning, which is still this day.
+  const day = businessDate(instant);
+  return `${day.year}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`;
 }
 
 /** What the report can be written as. Order is the order they are offered in. */

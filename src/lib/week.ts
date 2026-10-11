@@ -1,4 +1,4 @@
-import { businessWeekday, toWallClock } from "./time";
+import { toWallClock } from "./time";
 
 /**
  * Reading a shop's week back: is it open, and what does the timetable say.
@@ -145,9 +145,13 @@ export function isOpenNow(week: DayWindow[], now: Date = new Date()): boolean {
   const clock = toWallClock(now);
   return isOpenAt(
     week,
-    // `businessWeekday` reads the same instant, so the day and the time below
-    // cannot come from two sides of a midnight.
-    businessWeekday(now),
+    // The **calendar** weekday of the same wall clock, so the day and the time
+    // cannot come from two sides of a midnight. Not `businessWeekday`, which
+    // is the trading day's: at 01:00 on Saturday that says Friday, and
+    // `isOpenAt` would then look for Friday's 01:00 and Thursday's spill,
+    // missing Friday night's rota entirely. `isOpenAt` handles the spill past
+    // midnight itself.
+    new Date(Date.UTC(clock.year, clock.month - 1, clock.day)).getUTCDay(),
     `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`,
   );
 }

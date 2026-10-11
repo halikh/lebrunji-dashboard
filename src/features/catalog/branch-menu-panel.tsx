@@ -3,7 +3,6 @@
 import { Button, cx } from "@/components/ui";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
-import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Toggle } from "@/components/ui/toggle";
 import { useState } from "react";
 
@@ -378,13 +377,6 @@ function toMajor(minorUnits: number, decimals: number | null): string {
  * and so does `add_to_cart` -- so the rows beneath are dimmed and inert rather
  * than left looking editable.
  */
-/** Asked before the last served choice of a required question goes off. */
-const LAST_CHOICE_QUESTION = {
-  titleKey: "branchMenu.lastChoiceTitle",
-  bodyKey: "branchMenu.lastChoiceBody",
-  confirmKey: "branchMenu.lastChoiceConfirm",
-} as const;
-
 function ItemOptionsAtBranch({
   branchId,
   itemId,
@@ -498,28 +490,23 @@ function ItemOptionsAtBranch({
                     />
                   </span>
 
-                  {lastChoice ? (
-                    <ConfirmToggle
-                      on={!optionOff}
-                      disabled={disabled || groupOff}
-                      onChange={flip}
-                      labelOn={t("branchMenu.served")}
-                      labelOff={t("branchMenu.notServed")}
-                      // Only ever asked going off: `lastChoice` is false for a
-                      // choice that is already off.
-                      whenTurningOff={LAST_CHOICE_QUESTION}
-                      whenTurningOn={LAST_CHOICE_QUESTION}
-                      params={{ name }}
-                    />
-                  ) : (
+                  {/* The last answer a required question has here cannot go:
+                      the database refuses it (0181), because the dish could
+                      not then be ordered at this branch. Locked, with the way
+                      out said on hover — turn the question off instead. */}
+                  <span
+                    title={
+                      lastChoice ? t("branchMenu.lastChoiceLocked") : undefined
+                    }
+                  >
                     <Toggle
                       on={!optionOff}
-                      disabled={disabled || groupOff}
+                      disabled={disabled || groupOff || lastChoice}
                       onChange={flip}
                       labelOn={t("branchMenu.served")}
                       labelOff={t("branchMenu.notServed")}
                     />
-                  )}
+                  </span>
                 </div>
               );
             })}

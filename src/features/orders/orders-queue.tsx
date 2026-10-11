@@ -150,7 +150,7 @@ export function OrdersQueue() {
   const statuses = useOrderStatuses();
   const counts = useStatusCounts(scope);
   const orders = useOrders(scope, statusSlug, search);
-  const { advance } = useAdvanceOrder(statuses);
+  const { advance } = useAdvanceOrder();
   const { format } = useMoney();
   const undoLast = useUndoLast();
 

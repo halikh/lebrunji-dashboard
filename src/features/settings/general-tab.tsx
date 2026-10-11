@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 
 import { Button, Field, cx } from "@/components/ui";
@@ -12,9 +12,13 @@ import { t } from "@/i18n/translations";
 import { chime } from "@/lib/chime";
 import { uploadSound } from "@/lib/images";
 import { SOUND } from "@/lib/limits";
-import { BUSINESS_TIMEZONE } from "@/lib/time";
+import { businessTimezone } from "@/lib/time";
 
-import { updateAppSettings, type AppSettings } from "./api/app-settings";
+import {
+  fetchTimezones,
+  updateAppSettings,
+  type AppSettings,
+} from "./api/app-settings";
 import { CustomerAppSection } from "./customer-app-section";
 import { appSettingsKey, useAppSettings, useClock } from "./use-clock";
 
@@ -49,6 +53,7 @@ import { appSettingsKey, useAppSettings, useClock } from "./use-clock";
  */
 function savedKey(patch: Partial<AppSettings>) {
   if (patch.clock24h !== undefined) return "general.savedClock" as const;
+  if (patch.timezone !== undefined) return "general.savedZone" as const;
   if (patch.notificationSoundUrl !== undefined) {
     return "general.savedSound" as const;
   }
@@ -66,6 +71,11 @@ export function GeneralTab() {
   // invalidation below is what re-formats all of them.
   const settings = useAppSettings();
   const clock = useClock();
+  const zones = useQuery({
+    queryKey: ["timezones"],
+    queryFn: fetchTimezones,
+    staleTime: 10 * 60_000,
+  });
 
   const save = useMutation({
     mutationFn: (patch: Partial<AppSettings>) => updateAppSettings(patch),
@@ -118,6 +128,25 @@ export function GeneralTab() {
             className="w-[132px]"
           />
         </Field>
+
+        {/* Hidden until 0183 is applied: no list, nothing to choose. */}
+        {(zones.data?.length ?? 0) > 0 && (
+          <Field label={t("general.zoneLabel")} hint={t("general.zoneHint")}>
+            <div className="w-[260px]">
+              <Select
+                value={current?.timezone ?? businessTimezone()}
+                onChange={(timezone) => {
+                  if (timezone !== current?.timezone) save.mutate({ timezone });
+                }}
+                options={(zones.data ?? []).map((zone) => ({
+                  value: zone.name,
+                  label: `${zone.label} (${zone.name})`,
+                }))}
+                disabled={!current || save.isPending}
+              />
+            </div>
+          </Field>
+        )}
       </section>
 
       {/* ---- the shift --------------------------------------------------- */}
@@ -187,7 +216,7 @@ export function GeneralTab() {
         )}
 
         <p className="text-[11px] text-text-faint">
-          {t("promotions.inZone", { zone: BUSINESS_TIMEZONE })}
+          {t("promotions.inZone", { zone: businessTimezone() })}
         </p>
       </section>
 

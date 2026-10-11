@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useId, useState } from "react";
 
@@ -27,7 +27,7 @@ import { fetchHandovers } from "./api/history";
 import type { Order, OrderLine } from "./api/orders";
 import { OrderRefusal } from "./api/refusal";
 import { useClock } from "@/features/settings/use-clock";
-import { orderKeys } from "./use-orders";
+import { orderKeys, patchOrderCaches } from "./use-orders";
 
 import { dispatchMessage, kitchenMessage, whatsappLink } from "./dispatch";
 
@@ -98,6 +98,7 @@ export function DispatchModal({
   const clock = useClock();
   const { currencies, convertTo, secondaryCode } = useMoney();
   const dispatch = useDispatchOrder();
+  const queryClient = useQueryClient();
 
   // Who has it now — newest first, so the first is the holder. The same key
   // the history tab reads, so the two never disagree.
@@ -262,6 +263,11 @@ export function DispatchModal({
       { orderId: order.id, courierId: driver.id, reassign },
       {
         onSuccess: () => {
+          // The function has moved every live portion to `driverSent`, so
+          // the receipt says "On the way" now rather than when the refetch
+          // the hook started lands. That refetch still runs and is the
+          // authority; this only closes the gap before it.
+          patchOrderCaches(queryClient, order.id, "driverSent");
           if (win && !win.closed) {
             win.location.replace(href);
             onClose();

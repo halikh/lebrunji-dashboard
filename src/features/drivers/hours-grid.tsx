@@ -5,7 +5,7 @@ import { TimeField } from "@/components/ui/time-field";
 import { cx } from "@/components/ui";
 import { useClock } from "@/features/settings/use-clock";
 import { t, type TranslationKey } from "@/i18n/translations";
-import { BUSINESS_TIMEZONE } from "@/lib/time";
+import { businessTimezone } from "@/lib/time";
 import { isOpenNow, summarise } from "@/lib/week";
 import type { DayHours } from "@/features/catalog/api/hours";
 
@@ -198,7 +198,7 @@ export function WeekSummary({
           {onShift ? t("drivers.onShift") : t("drivers.offShift")}
         </span>
         <span className="text-[11px] text-text-faint">
-          {t("promotions.inZone", { zone: BUSINESS_TIMEZONE })}
+          {t("promotions.inZone", { zone: businessTimezone() })}
         </span>
       </div>
 

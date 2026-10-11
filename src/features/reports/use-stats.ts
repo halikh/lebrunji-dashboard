@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import {
+  businessDayStartsAt,
   fromWallClock,
   startOfBusinessDay,
   startOfBusinessDayPlus,
@@ -24,8 +25,9 @@ export const statsKeys = {
  * "Last 30 days" ending at a UTC midnight is thirty days plus or minus two
  * hours of somebody's trade — and a different amount either side of the two DST
  * changes. `startOfBusinessDayPlus` walks the *calendar*, so the boundaries are
- * the moments Beirut's clock struck midnight, whatever the offset was that
- * week.
+ * the moments a trading day began on Beirut's clock (08:00, the opening hour),
+ * whatever the offset was that week — the same days `business_day()` buckets
+ * by on the server.
  *
  * ## Half-open, `[from, to)`
  *
@@ -59,9 +61,15 @@ export function previousRange(days: number, now: Date = new Date()) {
  * ## Both ends are Beirut days, and the far end is inclusive
  *
  * Somebody choosing "1 August to 31 August" means the whole of the 31st. So
- * `to` becomes the start of the **next** Beirut day: the range is half-open in
- * the query and inclusive on screen, which is the only pair of those two that
- * is not surprising.
+ * `to` becomes the start of the **next** trading day: the range is half-open
+ * in the query and inclusive on screen, which is the only pair of those two
+ * that is not surprising.
+ *
+ * Both ends sit at the hour a trading day begins, not at midnight, because
+ * that is how `api_v1_admin_stats` buckets (`business_day`, 0087). A range
+ * from Beirut midnight would start inside 31 July's night: a stray partial
+ * bar for the 31st, its after-midnight orders in August's total, and the
+ * 31st of August's own after-midnight orders missing.
  *
  * Ending at the picked day's own midnight would silently drop a day's trade —
  * and it would drop the most recent one, which is the day somebody choosing a
@@ -84,12 +92,14 @@ export function customRange(from: string, to: string) {
       year: start.year,
       month: start.month,
       day: start.day,
+      hour: businessDayStartsAt(),
     }),
     // The day *after* the one picked — see above.
     to: fromWallClock({
       year: end.year,
       month: end.month,
       day: end.day + 1,
+      hour: businessDayStartsAt(),
     }),
   };
 }
@@ -114,6 +124,9 @@ export function previousOf(from: Date, to: Date) {
       year: start.year,
       month: start.month,
       day: start.day - days,
+      // The same hour `from` sits at: a trading day's start.
+      hour: start.hour,
+      minute: start.minute,
     }),
     to: from,
   };

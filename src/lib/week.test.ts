@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isOpenAt, summarise, type DayWindow } from "./week";
+import { isOpenAt, isOpenNow, summarise, type DayWindow } from "./week";
 
 /** Monday first, as the dashboard reads a week. */
 const READING_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
@@ -104,5 +104,29 @@ describe("summarise", () => {
     expect(summarise([], READING_ORDER)).toEqual([
       { open: false, from: 1, to: 0 },
     ]);
+  });
+});
+
+describe("isOpenNow", () => {
+  // Friday 18:00 → 02:00, and nothing else.
+  const friday: DayWindow[] = [
+    { dayOfWeek: 5, opensAt: "18:00", closesAt: "02:00" },
+  ];
+
+  it("reads Friday night's rota after midnight on Saturday", () => {
+    // 23:00Z Friday 16 Jan 2026 is 01:00 Saturday in Beirut (UTC+2). The
+    // trading day is still Friday's, but the calendar day is Saturday and the
+    // spill from Friday is what keeps the driver on shift.
+    expect(isOpenNow(friday, new Date("2026-01-16T23:00:00Z"))).toBe(true);
+  });
+
+  it("is off once Friday night's window has closed", () => {
+    // 01:00Z Saturday is 03:00 in Beirut.
+    expect(isOpenNow(friday, new Date("2026-01-17T01:00:00Z"))).toBe(false);
+  });
+
+  it("is on during the evening itself", () => {
+    // 17:00Z Friday is 19:00 in Beirut.
+    expect(isOpenNow(friday, new Date("2026-01-16T17:00:00Z"))).toBe(true);
   });
 });

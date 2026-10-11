@@ -280,7 +280,7 @@ export function OrderActions({
   order: OrderWithLines;
   statuses: OrderStatus[] | undefined;
 }) {
-  const { advance } = useAdvanceOrder(statuses);
+  const { advance } = useAdvanceOrder();
   const [amending, setAmending] = useState(false);
   const [dispatching, setDispatching] = useState(false);
 

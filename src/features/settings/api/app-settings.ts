@@ -1,4 +1,5 @@
 import { getClient } from "@/lib/supabase/client";
+import { DEFAULT_BUSINESS_TIMEZONE, setBusinessClock } from "@/lib/time";
 
 /**
  * The settings that belong to the business rather than to a row.
@@ -42,20 +43,44 @@ export type AppSettings = {
    * a change applies to the next checkout, not to orders already placed.
    */
   extraStoreFee: number;
+  /**
+   * The business clock's IANA zone, a row of `timezones` (0183). Every time
+   * the dashboard and the app show, and every day the reports cut, is read in
+   * it. `fetchAppSettings` hands it to `setBusinessClock`, so a formatter
+   * called outside React reads it too.
+   */
+  timezone: string;
 };
 
 const COLUMNS =
   "clock_24h, orders_open_hour, orders_close_hour, notification_sound_url, extra_store_fee";
 
 export async function fetchAppSettings(): Promise<AppSettings> {
-  const { data, error } = await getClient()
+  // With 0183's column, and without it on a database that has not had it
+  // yet: every screen that shows a time reads this, so a missing column
+  // must cost the zone setting and nothing else.
+  let { data, error } = await getClient()
     .from("app_settings")
-    .select(COLUMNS)
+    .select(`${COLUMNS}, timezone`)
     .single();
+  if (error && isMissingColumn(error)) {
+    ({ data, error } = await getClient()
+      .from("app_settings")
+      .select(COLUMNS)
+      .single());
+  }
 
   if (error) throw new Error(`Could not read the settings: ${error.message}`);
 
   const row = data as Record<string, unknown>;
+  const timezone =
+    (row.timezone as string | null | undefined) ?? DEFAULT_BUSINESS_TIMEZONE;
+
+  // Here rather than in a hook, so the zone and the trading day's start are
+  // in place for every formatter the moment the row lands — including the
+  // ones `dispatchMessage` calls outside React.
+  setBusinessClock({ timezone, dayStartsAt: row.orders_open_hour as number });
+
   return {
     clock24h: row.clock_24h as boolean,
     openHour: row.orders_open_hour as number,
@@ -64,6 +89,7 @@ export async function fetchAppSettings(): Promise<AppSettings> {
     // `bigint` can arrive as a string over the wire; a string here would make
     // `60 !== "60"` and the field look edited the moment it loaded.
     extraStoreFee: Number(row.extra_store_fee ?? 0),
+    timezone,
   };
 }
 
@@ -91,6 +117,7 @@ export async function updateAppSettings(
   if (patch.extraStoreFee !== undefined) {
     row.extra_store_fee = patch.extraStoreFee;
   }
+  if (patch.timezone !== undefined) row.timezone = patch.timezone;
 
   if (Object.keys(row).length === 0) return;
 
@@ -210,4 +237,41 @@ export async function updateCustomerAppSettings(
     .eq("id", true);
 
   if (error) throw new Error(error.message);
+}
+
+// ---------------------------------------------------------------------------
+// The zones the business can run on
+// ---------------------------------------------------------------------------
+
+/** A row of `timezones` (0183). */
+export type TimezoneOption = {
+  /** The IANA id: what `app_settings.timezone` stores. */
+  name: string;
+  /** What a person reads: "Beirut". */
+  label: string;
+};
+
+/**
+ * The active zones, in their order. One today, Asia/Beirut, because Lebanon
+ * is the only place we deliver. Empty on a database without 0183, which hides
+ * the picker rather than breaking the tab.
+ */
+export async function fetchTimezones(): Promise<TimezoneOption[]> {
+  const { data, error } = await getClient()
+    .from("timezones")
+    .select("name, label")
+    .eq("is_active", true)
+    .order("sort_order")
+    .order("name");
+
+  if (error) {
+    // PGRST205 / 42P01: the table is not there yet.
+    if (error.code === "PGRST205" || error.code === "42P01") return [];
+    throw new Error(`Could not read the time zones: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => ({
+    name: row.name as string,
+    label: row.label as string,
+  }));
 }

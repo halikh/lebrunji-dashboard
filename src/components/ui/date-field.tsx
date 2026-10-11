@@ -4,7 +4,7 @@ import DatePicker from "react-datepicker";
 
 import { useClock } from "@/features/settings/use-clock";
 import { t } from "@/i18n/translations";
-import { BUSINESS_TIMEZONE, fromWallClock, toWallClock } from "@/lib/time";
+import { businessTimezone, fromWallClock, toWallClock } from "@/lib/time";
 
 import { useFieldWiring } from "./field";
 import { cx } from "./index";
@@ -88,7 +88,7 @@ export function DateField({
         popperPlacement="bottom-start"
       />
       <span className="ps-md text-[11px] text-text-faint">
-        {t("promotions.inZone", { zone: BUSINESS_TIMEZONE })}
+        {t("promotions.inZone", { zone: businessTimezone() })}
       </span>
     </div>
   );
@@ -196,7 +196,7 @@ export function DateRangeField({
         popperPlacement="bottom-start"
       />
       <span className="ps-md text-[11px] text-text-faint">
-        {t("promotions.inZone", { zone: BUSINESS_TIMEZONE })}
+        {t("promotions.inZone", { zone: businessTimezone() })}
       </span>
     </div>
   );

@@ -434,6 +434,42 @@ export async function advanceOrder(
 }
 
 /**
+ * An order as `api_v1_advance_order` would leave it after moving to `toSlug`.
+ *
+ * For the optimistic cache, which has to land where the server will or the
+ * refetch visibly undoes it. So the function's own rule, portion by portion: a
+ * delivered or cancelled portion is skipped — it will not move off either — and
+ * so is one already at the target. Everything else moves, and carries the
+ * target's name and position with it, because the receipt reads those off the
+ * portion rather than looking the slug up again.
+ *
+ * `api_v1_dispatch_order` moves the same portions to `driverSent`, so a
+ * hand-over is this with that target.
+ *
+ * The same object back when nothing moved, so a cache that holds it does not
+ * re-render for a move that changed nothing.
+ */
+export function withOrderMoved<T extends Pick<Order, "stores">>(
+  order: T,
+  toSlug: string,
+): T {
+  let moved = false;
+  const stores = order.stores.map((store) => {
+    if (isFinishedSlug(store.statusSlug) || store.statusSlug === toSlug) {
+      return store;
+    }
+    moved = true;
+    return {
+      ...store,
+      statusSlug: toSlug,
+      statusName: statusName(toSlug),
+      progress: statusProgress(toSlug),
+    };
+  });
+  return moved ? { ...order, stores } : order;
+}
+
+/**
  * The smallest amount a currency is paid in, in minor units — `currencies.cash_step`.
  *
  * Only lira has one: nobody hands over a 500 note, so a lira total is rounded

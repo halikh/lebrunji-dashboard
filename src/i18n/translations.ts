@@ -540,6 +540,7 @@ const en = {
     savedClock: "Clock format saved",
     savedHours: "Ordering hours saved",
     savedSound: "New-order sound saved",
+    savedZone: "Time zone saved",
 
     clockTitle: "Times",
     clockLabel: "Clock",
@@ -547,6 +548,10 @@ const en = {
       "How times read across the dashboard and the app. Both show the same thing, so a total read down the phone matches the customer's screen.",
     clock24: "22:00",
     clock12: "10:00 PM",
+    // The business clock (0183): the list comes from the `timezones` table.
+    zoneLabel: "Time zone",
+    zoneHint:
+      "Every time in the dashboard and the app is shown in it, and every day in the reports is cut by it — wherever the screen reading it is.",
 
     shiftTitle: "When you take orders",
     // The consequence, before the control rather than after it.
@@ -2734,10 +2739,11 @@ const en = {
     // be added to a basket at this branch.
     requiredEmpty:
       "Every choice for this required question is off here, so customers at this branch cannot order the dish. Turn one back on, or turn the question off.",
-    lastChoiceTitle: "Turn off {name}?",
-    lastChoiceBody:
-      "It is the last choice this branch serves for a required question. With it off, customers here cannot order the dish at all.",
-    lastChoiceConfirm: "Turn it off",
+    // 0181: the database refuses the last served answer to a required question.
+    lastChoiceLocked:
+      "The last choice for a required question here. To stop serving it, turn the question off at this branch, or the dish.",
+    lastChoiceRefused:
+      "That would leave a required question with nothing to choose at this branch. Turn the question off here instead, or the dish.",
     optionPriceFor: "Price for {name} at this branch",
   },
 

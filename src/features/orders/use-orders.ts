@@ -5,6 +5,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
 } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
@@ -18,7 +19,9 @@ import {
   fetchOrders,
   fetchLiveOrderCount,
   fetchStatusCounts,
+  withOrderMoved,
   type Order,
+  type OrderLine,
   type OrderStatus,
   type Scope,
 } from "./api/orders";
@@ -134,16 +137,47 @@ export function useOrder(id: string | null) {
   });
 }
 
-/** Terminal: off the path, or the end of it. Mirrors the RPC's own rule. */
-function isTerminalSlug(
-  slug: string,
-  statuses: OrderStatus[] | undefined,
-): boolean {
-  if (!statuses) return false;
-  const status = statuses.find((s) => s.slug === slug);
-  if (!status || status.progress === null) return true;
-  const highest = Math.max(...statuses.map((s) => s.progress ?? -1));
-  return status.progress >= highest;
+/**
+ * Moves one order to `toSlug` everywhere the cache holds it: every list it is
+ * in, and its receipt.
+ *
+ * Across every *page* of every list. An infinite query holds an array of
+ * pages, and patching only the first would leave a scrolled-down operator
+ * watching a row that did not move.
+ *
+ * And the receipt, because that is where the button was pressed more often
+ * than not. Patching only the lists left the panel showing the old status —
+ * its next step, its undo, whether it can still be amended — until the
+ * refetch a moment later, which is the half-second an operator presses the
+ * same button twice in.
+ *
+ * Exported for the dispatch dialog: a hand-over moves the order to
+ * `driverSent` on the server, and the receipt should say so as soon as the
+ * server has said yes rather than when the refetch lands.
+ */
+export function patchOrderCaches(
+  queryClient: QueryClient,
+  orderId: string,
+  toSlug: string,
+): void {
+  queryClient.setQueriesData<{ pages: { orders: Order[] }[] }>(
+    { queryKey: ["orders", "list"] },
+    (data) =>
+      data && {
+        ...data,
+        pages: data.pages.map((page) => ({
+          ...page,
+          orders: page.orders.map((order) =>
+            order.id === orderId ? withOrderMoved(order, toSlug) : order,
+          ),
+        })),
+      },
+  );
+
+  queryClient.setQueryData<Order & { lines: OrderLine[] }>(
+    orderKeys.detail(orderId),
+    (order) => order && withOrderMoved(order, toSlug),
+  );
 }
 
 /**
@@ -248,7 +282,7 @@ export function orderStatus(
  * the RPC will not move off `delivered` or `cancelled` — see `isUndoableMove`.
  * That is decided here, from the target, rather than trusted to each caller.
  */
-export function useAdvanceOrder(statuses?: OrderStatus[]) {
+export function useAdvanceOrder() {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
@@ -272,49 +306,26 @@ export function useAdvanceOrder(statuses?: OrderStatus[]) {
     },
 
     onMutate: async (input) => {
-      // Stop any list refetch from landing mid-flight and overwriting the
-      // optimistic row with the pre-move server state.
+      // Stop any refetch — a list's or the receipt's — from landing mid-flight
+      // and overwriting the optimistic order with the pre-move server state.
+      // The detail key is under `orders` too, so this prefix covers it.
       await queryClient.cancelQueries({ queryKey: orderKeys.all });
 
       const snapshot = queryClient.getQueriesData({ queryKey: orderKeys.all });
 
-      // Across every *page* of every list. An infinite query holds an array of
-      // pages, and patching only the first would leave a scrolled-down operator
-      // watching a row that did not move.
-      queryClient.setQueriesData<{ pages: { orders: Order[] }[] }>(
-        { queryKey: ["orders", "list"] },
-        (data) =>
-          data && {
-            ...data,
-            pages: data.pages.map((page) => ({
-              ...page,
-              orders: page.orders.map((order) =>
-                order.id !== input.orderId
-                  ? order
-                  : {
-                      ...order,
-                      // Every portion, because the whole order moved. Terminal
-                      // ones stay put — the function will not move them either,
-                      // so an optimistic row that did would disagree with what
-                      // comes back.
-                      stores: order.stores.map((store) =>
-                        isTerminalSlug(store.statusSlug, statuses)
-                          ? store
-                          : { ...store, statusSlug: input.toSlug },
-                      ),
-                    },
-              ),
-            })),
-          },
-      );
+      // Every portion, because the whole order moved — and only the ones the
+      // function will move. See `withOrderMoved`: an optimistic row that moved
+      // a delivered portion would disagree with what comes back.
+      patchOrderCaches(queryClient, input.orderId, input.toSlug);
 
       return { snapshot };
     },
 
     onError: (error, _input, context) => {
-      // Every list is restored, not just the one on screen: the same order can
-      // be in the "needs you" tab and a search result at once, and half a
-      // rollback is a queue that disagrees with itself.
+      // Every list is restored, not just the one on screen, and the receipt
+      // with them: the same order can be in the "needs you" tab, a search
+      // result and the panel at once, and half a rollback is a screen that
+      // disagrees with itself.
       for (const [key, data] of context?.snapshot ?? []) {
         queryClient.setQueryData(key, data);
       }

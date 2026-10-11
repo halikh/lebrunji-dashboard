@@ -123,36 +123,3 @@ export async function amendOrder(input: {
     total: Number(row.total),
   };
 }
-
-export type Amendment = {
-  id: string;
-  note: string | null;
-  previousTotal: number;
-  newTotal: number;
-  createdAt: string;
-};
-
-/**
- * What has already been changed on this order, newest first.
- *
- * Read separately from the order rather than embedded in it, because the queue
- * fetches hundreds of orders and almost none of them have one. A join that is
- * empty for 99% of rows is a column of nulls carried down the wire all day.
- */
-export async function fetchAmendments(orderId: string): Promise<Amendment[]> {
-  const { data, error } = await getClient()
-    .from("order_amendments")
-    .select("id, note, previous_total, new_total, created_at")
-    .eq("order_id", orderId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error(`Could not read the changes: ${error.message}`);
-
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    note: row.note as string | null,
-    previousTotal: Number(row.previous_total),
-    newTotal: Number(row.new_total),
-    createdAt: row.created_at as string,
-  }));
-}

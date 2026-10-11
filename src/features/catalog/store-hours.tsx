@@ -13,7 +13,7 @@ import { useUnsavedChanges } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 
 import { useClock } from "@/features/settings/use-clock";
-import { BUSINESS_TIMEZONE, toWallClock } from "@/lib/time";
+import { businessTimezone, toWallClock } from "@/lib/time";
 import { isOpenAt, summarise, type DayWindow } from "@/lib/week";
 
 import { Select } from "@/components/ui/select";
@@ -553,7 +553,7 @@ function Summary({
         {/* The zone is named. Otherwise a time on screen is only ever an
             assertion about whose clock it came from. */}
         <span className="text-[12px] text-text-faint">
-          {t("hours.beirutTime", { time, zone: BUSINESS_TIMEZONE })}
+          {t("hours.beirutTime", { time, zone: businessTimezone() })}
         </span>
 
         {children}
