@@ -2738,10 +2738,6 @@ const en = {
    * at the airport.
    */
   branchMenu: {
-    // Says which controls are whose: the rows are the shop's, the strips are
-    // the branch's.
-    intro:
-      'Names, photos, prices and Live apply to every branch. The "At {name}" lines apply to {name} only: turn off what it does not serve, and fill in a price only where it charges something different.',
     // Heads each branch strip and the section's branch switch.
     at: "At {name}",
     served: "Served",
@@ -2757,8 +2753,6 @@ const en = {
      * word implying a standing link would promise that later changes follow,
      * which they do not.
      */
-    copyFrom: "Copy prices from",
-    copyAll: "Copy whole menu",
     copySection: "Copy section",
     copyItem: "Copy",
     // Says how many, because a bare "done" on something that rewrites a price

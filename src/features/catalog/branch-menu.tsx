@@ -5,7 +5,6 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { Button, cx } from "@/components/ui";
 import { MoneyInput } from "@/components/ui/money-input";
 import { ROW_ABOVE } from "@/components/ui/row";
-import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
@@ -151,54 +150,6 @@ export function BranchMenuProvider({
     <BranchMenuContext.Provider value={value}>
       {children}
     </BranchMenuContext.Provider>
-  );
-}
-
-/**
- * The sentence that says which controls are whose, and copying a whole price
- * list in.
- *
- * The source is picked once here and applied at whatever scope the operator
- * presses — the whole menu, one section or one dish — because they are
- * answering "make this place match Hamra", and re-saying *Hamra* on each of
- * forty rows would be the retyping this exists to remove.
- */
-export function BranchMenuBar() {
-  const menu = useBranchMenu();
-  if (!menu) return null;
-  const { from, others } = menu;
-
-  return (
-    <div className="flex flex-wrap items-center gap-md">
-      <p className="min-w-0 flex-grow basis-[320px] ps-md text-[12px] text-text-faint">
-        {t("branchMenu.intro", { name: menu.name })}
-      </p>
-      {from && (
-        <div className="flex items-center gap-sm">
-          <span className="shrink-0 text-[13px] font-semibold text-text-soft">
-            {t("branchMenu.copyFrom")}
-          </span>
-          <span className="w-[180px]">
-            <Select
-              value={from.id}
-              onChange={menu.setSource}
-              options={others.map((one) => ({
-                value: one.id,
-                label: pickLocalized(one.name),
-              }))}
-            />
-          </span>
-          <Button
-            variant="primary-quiet"
-            size="sm"
-            pending={menu.copying}
-            onClick={() => menu.copyFrom({})}
-          >
-            {t("branchMenu.copyAll")}
-          </Button>
-        </div>
-      )}
-    </div>
   );
 }
 

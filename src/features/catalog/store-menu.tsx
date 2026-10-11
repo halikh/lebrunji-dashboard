@@ -29,7 +29,6 @@ import { validateLocalizedText, type Localized } from "@/lib/validation";
 import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
 import {
   BranchItemStrip,
-  BranchMenuBar,
   BranchMenuProvider,
   BranchSectionControls,
   BranchSectionNote,
@@ -380,7 +379,6 @@ function MenuEditor({ storeId }: { storeId: string }) {
           <span id={searchHintId} className="ps-md text-[12px] text-text-faint">
             {t("menu.searchHint")}
           </span>
-          <BranchMenuBar />
         </div>
         <div
           ref={scroller}
