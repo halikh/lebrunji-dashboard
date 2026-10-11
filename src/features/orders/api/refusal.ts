@@ -76,6 +76,18 @@ function messageFor(
       return t("dispatch.driverGone");
     case "LINEX":
       return t("amend.lineAlreadyChanged");
+    // A substitute past the basket's own caps (0184): 50 of one dish, or
+    // 20 kg / 20 L of one sold by weight. The server names the weight.
+    case "QTMAX":
+      return t("amend.tooMany");
+    case "WTMAX": {
+      const amount = /up to ([\d.]+ \w+)/.exec(message)?.[1] ?? "20 kg";
+      return t("amend.tooHeavy", { amount });
+    }
+    // An exchange rate the order needs is missing or zero (0184): the server
+    // refuses rather than writing dollars as lira. Set the rate, then retry.
+    case "NORAT":
+      return t("amend.noRate");
     // `check_violation`. From the amend function it is the order having left
     // the kitchen — or finished — while the form was open. A table CHECK says
     // "violates check constraint", and that is a different failure with a

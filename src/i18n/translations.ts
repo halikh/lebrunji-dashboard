@@ -489,6 +489,11 @@ const en = {
       "Somebody else changed this order while you had it open. It has been reloaded — open it again to make your change.",
     lineAlreadyChanged:
       "One of these lines was already replaced by an earlier change. The order has been reloaded — open it again.",
+    // 0184: a substitute is held to the basket's caps.
+    tooMany: "A substitute can be at most 50 of one dish.",
+    tooHeavy: "A substitute can be at most {amount} of one dish.",
+    noRate:
+      "The exchange rate this order needs is missing. Set it under Pricing, then try again.",
     tooLate:
       "This order can no longer be changed — it is on its way, delivered or cancelled.",
   },
