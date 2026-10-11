@@ -414,9 +414,16 @@ function MenuEditor({ storeId }: { storeId: string }) {
             </div>
           )}
 
-          {menu.isSuccess && menu.data.length === 0 && (
-            <EmptyState titleKey="menu.emptyTitle" bodyKey="menu.emptyBody" />
-          )}
+          {/* Not while a section is being added: the empty state fills the
+              scroller, so the form opened under it — below the fold, on a page
+              that said there was nothing here. Nor while searching, which has
+              its own empty state and would stack a second one on this. */}
+          {menu.isSuccess &&
+            menu.data.length === 0 &&
+            adding === "none" &&
+            !searching && (
+              <EmptyState titleKey="menu.emptyTitle" bodyKey="menu.emptyBody" />
+            )}
 
           {searching ? (
             <div className="flex flex-col gap-sm">
@@ -972,60 +979,66 @@ function Section({
                 onArchive={() => onArchive(item)}
               />
             ))}
-
-          {/* At the bottom of the section, not in a header. It is where the eye
-          already is after reading the list. */}
-          {pasting ? (
-            <BulkForm
-              kind="items"
-              // An item without a price is not an item — unlike a choice, where
-              // free is the common case.
-              price="required"
-              decimals={decimals}
-              pending={bulk.pending}
-              onCancel={guarded(() => setPasting(false))}
-              onSubmit={(rows) => {
-                bulk.add(
-                  section.id,
-                  // Never null under the `required` rule.
-                  rows.map((row) => ({
-                    name: row.name,
-                    price: row.price ?? 0,
-                  })),
-                  nextSortOrder(section),
-                );
-                setPasting(false);
-              }}
-            />
-          ) : (
-            <div className="flex flex-wrap items-center gap-sm">
-              <button
-                type="button"
-                onClick={onAdd}
-                className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-faint hover:bg-neutral-fill hover:text-text-soft"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.75}
-                  strokeLinecap="round"
-                  aria-hidden
-                >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                {t("menu.addItem", { section: title })}
-              </button>
-
-              <Button variant="secondary" onClick={() => setPasting(true)}>
-                {t("menu.bulkItems")}
-              </Button>
-            </div>
-          )}
         </div>
       </Collapse>
+
+      {/* At the bottom of the section, not in a header. It is where the eye
+          already is after reading the list.
+
+          Outside the collapse, so a closed section still offers it: adding a
+          dish should not need the section opened first, least of all an empty
+          one, where opening it showed nothing but this. Gone while carried —
+          a carried section is only its heading. */}
+      {!carried &&
+        (pasting ? (
+          <BulkForm
+            kind="items"
+            // An item without a price is not an item — unlike a choice, where
+            // free is the common case.
+            price="required"
+            decimals={decimals}
+            pending={bulk.pending}
+            onCancel={guarded(() => setPasting(false))}
+            onSubmit={(rows) => {
+              bulk.add(
+                section.id,
+                // Never null under the `required` rule.
+                rows.map((row) => ({
+                  name: row.name,
+                  price: row.price ?? 0,
+                })),
+                nextSortOrder(section),
+              );
+              setPasting(false);
+            }}
+          />
+        ) : (
+          <div className="flex flex-wrap items-center gap-sm">
+            <button
+              type="button"
+              onClick={onAdd}
+              className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-faint hover:bg-neutral-fill hover:text-text-soft"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                aria-hidden
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              {t("menu.addItem", { section: title })}
+            </button>
+
+            <Button variant="secondary" onClick={() => setPasting(true)}>
+              {t("menu.bulkItems")}
+            </Button>
+          </div>
+        ))}
     </section>
   );
 }
