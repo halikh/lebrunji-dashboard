@@ -27,7 +27,14 @@ import { itemUnit, pricePerUnit, unitKey } from "@/lib/units";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
-import { BranchMenuPanel } from "./branch-menu-panel";
+import {
+  BranchItemStrip,
+  BranchMenuBar,
+  BranchMenuProvider,
+  BranchSectionControls,
+  BranchSectionNote,
+  useBranchMenu,
+} from "./branch-menu";
 import { BulkForm } from "./bulk-form";
 import { ItemTags } from "./tag-chip";
 import {
@@ -102,76 +109,74 @@ function rememberOpen(storeId: string, sectionId: string, open: boolean) {
 }
 
 /**
- * The Menu tab: the shared menu, or what one branch does differently to it.
+ * The Menu tab — on a chain, always at one of its branches.
  *
- * ## One tab, a picker over it
+ * ## The picker lists branches, and nothing else
  *
  * A branch's differences used to be a page of their own, reached from a
- * "Menu here" button on the Branches tab. That put the question "what does
- * Jounieh serve" one tab away from the menu it is a question about, behind a
- * button on a row whose every other click opened the branch's form. The picker
- * is the same one the Hours tab has, for the same reason: a chain's places
- * share one shop page, and the tab is where you choose which one you mean.
+ * "Menu here" button on the Branches tab, and then a view this tab swapped in
+ * beside an "every branch" choice. Either way there were two screens of the
+ * same dishes — one to rename, photograph and add them, one to turn them off
+ * or reprice them at Jounieh — and the operator had to know which they wanted
+ * before they could see it.
  *
- * It hides itself on a shop with one branch — there is nothing for a branch
- * to differ from, so every override would apply everywhere the shop trades,
- * which is what the shared menu already edits.
+ * Now there is one. The picker chooses which branch is being read, the full
+ * editor is always there, and that branch's switches and prices sit on the
+ * rows beside it (see `branch-menu.tsx`). Defaults to the first branch, as the
+ * Hours tab does: the list is ordered, and the first one is the one the shop
+ * thinks of as its own.
  *
- * ## The shared menu stays mounted under a branch
+ * It hides itself on a shop with one branch — there is nothing for a branch to
+ * differ from, so the shared menu is the whole story.
  *
- * Hidden rather than unmounted, like the tab panes around it: its scroll
- * position, its open sections and any half-typed section name are still there
- * when the picker goes back to it. The branch view is cheap to rebuild — it
- * reads the same cached menu plus one query of overrides — so it is mounted
- * only while shown, keyed on the branch so nothing carries from one to the
- * next.
+ * Each branch carries its WhatsApp number under its name in the list: branch
+ * names are often a neighbourhood, and the number is what the kitchen answers.
  */
 export function StoreMenu({ storeId }: { storeId: string }) {
   const branches = useBranches(storeId);
   const rows = branches.data ?? [];
-  // `""` is the shared menu. A branch that has since been closed falls back to
-  // it rather than to a page of switches for a place that no longer trades.
-  const [branchId, setBranchId] = useState("");
+  const [chosen, setChosen] = useState<string | null>(null);
+  // A chosen branch since closed falls back to the first rather than to
+  // nothing.
   const branch =
-    rows.length > 1 ? (rows.find((row) => row.id === branchId) ?? null) : null;
+    rows.length > 1
+      ? (rows.find((row) => row.id === chosen) ?? rows[0] ?? null)
+      : null;
 
   return (
     <div className="flex h-full flex-col">
-      {rows.length > 1 && (
+      {branch && (
         <div className="flex shrink-0 items-center gap-md border-b border-border bg-surface px-xxl py-lg">
           <span className="shrink-0 text-[13px] font-semibold text-text-soft">
             {t("menu.forBranch")}
           </span>
           <span className="w-[280px]">
             <Select
-              value={branch?.id ?? ""}
-              onChange={setBranchId}
-              options={[
-                { value: "", label: t("menu.everyBranch") },
-                ...rows.map((one) => ({
-                  value: one.id,
-                  label: pickLocalized(one.name),
-                })),
-              ]}
+              value={branch.id}
+              onChange={setChosen}
+              options={rows.map((one) => ({
+                value: one.id,
+                label: pickLocalized(one.name),
+                detail: one.whatsappPhone ? `+${one.whatsappPhone}` : undefined,
+              }))}
             />
           </span>
         </div>
       )}
 
-      <div className={cx("min-h-0 flex-1", branch && "hidden")}>
-        <SharedMenu storeId={storeId} />
+      {/* Not keyed on the branch: switching branch changes what the strips
+          read, and the menu under them — its scroll, its open sections, a
+          half-typed section name — stays exactly where it was. */}
+      <div className="min-h-0 flex-1">
+        <BranchMenuProvider branch={branch} storeId={storeId}>
+          <MenuEditor storeId={storeId} />
+        </BranchMenuProvider>
       </div>
-
-      {branch && (
-        <div className="min-h-0 flex-1 overflow-y-auto scroll-hint p-xxl">
-          <BranchMenuPanel key={branch.id} branch={branch} storeId={storeId} />
-        </div>
-      )}
     </div>
   );
 }
 
-function SharedMenu({ storeId }: { storeId: string }) {
+function MenuEditor({ storeId }: { storeId: string }) {
   const router = useRouter();
   const store = useStore(storeId);
   const menu = useMenu(storeId);
@@ -375,6 +380,7 @@ function SharedMenu({ storeId }: { storeId: string }) {
           <span id={searchHintId} className="ps-md text-[12px] text-text-faint">
             {t("menu.searchHint")}
           </span>
+          <BranchMenuBar />
         </div>
         <div
           ref={scroller}
@@ -888,6 +894,10 @@ function Section({
               palette says which ground: **blue is what you act on**. A neutral
               fill made it look like a label with a box round it, and blue is
               reserved for the one primary move on a screen. */}
+            {/* This branch's switch first, apart from the shop's own Rename
+                and Archive — see `branch-menu.tsx`. Nothing on a one-branch
+                shop. */}
+            <BranchSectionControls sectionId={section.id} />
             <Button variant="primary-quiet" size="sm" onClick={onRename}>
               {t("menu.renameSection")}
             </Button>
@@ -905,6 +915,8 @@ function Section({
           </div>
         </div>
       )}
+
+      <BranchSectionNote sectionId={section.id} />
 
       {itemOrder.instructions}
 
@@ -948,6 +960,7 @@ function Section({
               <ItemRow
                 key={item.id}
                 item={item}
+                sectionId={section.id}
                 currencyCode={currencyCode}
                 shopRate={shopRate}
                 handleProps={itemOrder.handleProps}
@@ -1020,6 +1033,7 @@ function Section({
 
 function ItemRow({
   item,
+  sectionId,
   currencyCode,
   shopRate,
   anchor,
@@ -1031,6 +1045,8 @@ function ItemRow({
   onArchive,
 }: {
   item: MenuItem;
+  /** For the branch strip, which dims under a section off at its branch. */
+  sectionId: string;
   currencyCode: string;
   /**
    * `stores.exchange_rate` — `0120` — so the lira line under a dollar price is
@@ -1047,10 +1063,14 @@ function ItemRow({
   onToggle: () => void;
   onArchive: () => Promise<void>;
 } & ReorderProps) {
+  // On a chain the row wraps, so the branch strip can take a line of its own
+  // under the dish rather than crowding the shop's controls.
+  const atBranch = useBranchMenu() !== null;
   const row = rowProps(
     item.id,
     cx(
       ROW,
+      atBranch && "flex-wrap",
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
       !item.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
@@ -1180,6 +1200,8 @@ function ItemRow({
           >
             {t("menu.archive")}
           </ConfirmButton>
+
+          <BranchItemStrip item={item} sectionId={sectionId} />
         </>
       )}
     </div>

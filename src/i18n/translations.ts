@@ -2487,8 +2487,7 @@ const en = {
     title: "Menu",
     // The picker over the Menu tab, on a shop with more than one branch. The
     // first choice is the menu itself; a branch shows what it does differently.
-    forBranch: "Showing",
-    everyBranch: "Every branch (the shared menu)",
+    forBranch: "Branch",
     back: "All shops",
     itemNotFound: "That item is not here any more.",
     sectionNotFound: "That section is not here any more.",
@@ -2736,14 +2735,17 @@ const en = {
    * at the airport.
    */
   branchMenu: {
+    // Says which controls are whose: the rows are the shop's, the strips are
+    // the branch's.
     intro:
-      "The menu belongs to the shop and every branch serves it. Turn off what this branch does not, and fill in a price only where it charges something different.",
+      "Names, photos, prices and Live apply to every branch. The \"At {name}\" lines apply to {name} only: turn off what it does not serve, and fill in a price only where it charges something different.",
+    // Heads each branch strip and the section's branch switch.
+    at: "At {name}",
     served: "Served",
     notServed: "Not served",
     // Said once under a section that is off, rather than on each row beneath
     // it: the rows are already dimmed, and the sentence explains the dimming.
     sectionOff: "The whole section is off here, so nothing in it is served.",
-    noMenu: "This shop has no menu yet.",
     priceFor: "Price for {name} at this branch",
     /**
      * Copying a price list in from another branch.

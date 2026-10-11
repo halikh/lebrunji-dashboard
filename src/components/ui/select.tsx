@@ -63,6 +63,12 @@ export type SelectOption = {
    * sight is one nobody can find by typing.
    */
   render?: ReactNode;
+  /**
+   * A small second line under the label, in the open list only — a branch's
+   * phone number under its name. The closed control stays one line, so it is
+   * the same height as the fields beside it.
+   */
+  detail?: string;
 };
 
 /**
@@ -146,8 +152,11 @@ export function Select({
  * `render` wins over the label text where an option has one; the note sits
  * beside either.
  */
-function renderOption(option: SelectOption) {
-  return (
+function renderOption(
+  option: SelectOption,
+  meta?: { context: "menu" | "value" },
+) {
+  const line = (
     <span className="flex items-baseline gap-sm">
       <span className="min-w-0 truncate">{option.render ?? option.label}</span>
       {option.note && (
@@ -155,6 +164,17 @@ function renderOption(option: SelectOption) {
           {option.note}
         </span>
       )}
+    </span>
+  );
+
+  if (!option.detail || meta?.context !== "menu") return line;
+
+  return (
+    <span className="flex flex-col">
+      {line}
+      <span className="truncate text-[12px] text-text-faint">
+        {option.detail}
+      </span>
     </span>
   );
 }
