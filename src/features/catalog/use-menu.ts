@@ -240,8 +240,15 @@ export function useUpdateMenuSection(storeId: string) {
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: (input: { id: string; title: Localized }) =>
-      updateMenuSection(input.id, { title: input.title }),
+    mutationFn: (input: {
+      id: string;
+      title: Localized;
+      imageUrl: string | null;
+    }) =>
+      updateMenuSection(input.id, {
+        title: input.title,
+        imageUrl: input.imageUrl,
+      }),
     onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
       toast.success(

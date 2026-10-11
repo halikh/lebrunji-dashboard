@@ -1032,6 +1032,15 @@ const en = {
       "It leads the home screen, above the shops that are not featured.",
     featuredHintOff:
       "It appears in its category like any other shop. You can promote it later from the shops list.",
+    // How the app draws the shop's menu — `stores.menu_layout`, 0190/0191.
+    // Chosen per shop: nothing infers it from the shop's categories.
+    menuLayout: "Menu layout",
+    menuLayoutList: "List",
+    menuLayoutAisles: "Aisles",
+    menuLayoutListHint:
+      "A restaurant's menu: each section a list of items, one under the other.",
+    menuLayoutAislesHint:
+      "A supermarket's: a row of aisle pictures, and each section a shelf customers swipe, with See all for the whole aisle.",
     hiddenHintNew:
       "Recommended for now — it has no menu or opening hours yet. Turn it on from the shops list when it is ready.",
 
@@ -2560,6 +2569,10 @@ const en = {
     bulkItems: "Paste items",
     sectionTitle: "Section name",
     sectionTitleHint: "What customers see above the items in it.",
+    // `menu_sections.image_url`, 0190 — read only by the Aisles layout.
+    sectionImage: "Aisle picture",
+    sectionImageHint:
+      "Shown on the aisle's tile when the shop's menu layout is Aisles. Without one, the aisle shows its first item's picture.",
     sectionAdded: "{name} added",
     // The new name, not the old one: it is what the operator is looking at
     // in the list, and it confirms the edit landed as typed.

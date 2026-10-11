@@ -14,6 +14,15 @@ import { createBranch } from "./branches";
  * database's: column names stay in this file, so a rename is one edit.
  */
 
+/**
+ * How the app's store page draws a shop's menu — `stores.menu_layout`
+ * (`0190`, `0191`). `list` is a restaurant's column of dishes; `aisles` is a
+ * supermarket's: a row of aisle tiles, and each section a horizontal shelf
+ * with "See all" into a page of its own. Chosen per shop, never inferred from
+ * its categories — a shop can sit in several.
+ */
+export type MenuLayout = "list" | "aisles";
+
 export type Store = {
   id: string;
   slug: string;
@@ -35,6 +44,8 @@ export type Store = {
   currencyCode: string;
   isActive: boolean;
   isFeatured: boolean;
+  /** How the app draws this shop's menu — see `MenuLayout`. */
+  menuLayout: MenuLayout;
   /**
    * Where the shop sits on the **customer's** home screen.
    *
@@ -150,7 +161,7 @@ export async function fetchStores(
   let query = getClient()
     .from("stores")
     .select(
-      `id, slug, name, image_url, category_id, currency_code, is_active, is_featured,
+      `id, slug, name, image_url, category_id, currency_code, is_active, is_featured, menu_layout,
        sort_order, admin_sort_order, exchange_rate,
        latitude, longitude, prep_min_minutes, prep_max_minutes,
        whatsapp_phone,
@@ -194,7 +205,7 @@ export async function fetchStore(id: string): Promise<Store> {
   const { data, error } = await getClient()
     .from("stores")
     .select(
-      `id, slug, name, image_url, category_id, currency_code, is_active, is_featured,
+      `id, slug, name, image_url, category_id, currency_code, is_active, is_featured, menu_layout,
        sort_order, admin_sort_order, exchange_rate,
        latitude, longitude, prep_min_minutes, prep_max_minutes,
        whatsapp_phone,
@@ -284,6 +295,8 @@ export type StoreDraft = {
    * at the top of the home screen.
    */
   isFeatured: boolean;
+  /** Asked on the form, `list` unless the operator says otherwise. */
+  menuLayout: MenuLayout;
   /**
    * This shop's own rate for the non-base currency — `0120`.
    *
@@ -389,6 +402,7 @@ export async function createStore(
       prep_max_minutes: draft.prepMaxMinutes,
       is_active: draft.isActive,
       is_featured: draft.isFeatured,
+      menu_layout: draft.menuLayout,
       exchange_rate: draft.exchangeRate,
       sort_order: sortOrder,
     })
@@ -523,6 +537,7 @@ export type StorePatch = {
   imageUrl?: string | null;
   isActive?: boolean;
   isFeatured?: boolean;
+  menuLayout?: MenuLayout;
   /**
    * Null is a value here — it is how a shop is put back on the platform’s
    * rate — so the check below is for the key being absent, not the value being
@@ -559,11 +574,11 @@ export async function updateStore(
   requireTradeable(patch);
 
   const row: Record<string, unknown> = {};
-  if (patch.name !== undefined)
-    row.name = titleLocalized(patch.name);
+  if (patch.name !== undefined) row.name = titleLocalized(patch.name);
   if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.isFeatured !== undefined) row.is_featured = patch.isFeatured;
+  if (patch.menuLayout !== undefined) row.menu_layout = patch.menuLayout;
   if (patch.exchangeRate !== undefined) {
     row.exchange_rate = patch.exchangeRate;
   }
@@ -592,10 +607,7 @@ export async function updateStore(
 
   // A patch may be categories only, which is no column on this row.
   if (Object.keys(row).length > 0) {
-    const { error } = await getClient()
-      .from("stores")
-      .update(row)
-      .eq("id", id);
+    const { error } = await getClient().from("stores").update(row).eq("id", id);
     if (error) throw new Error(friendly(error.message));
   }
 
@@ -742,9 +754,7 @@ function toStore(row: Record<string, unknown>): Store {
     ? row.categories[0]
     : row.categories;
   const categoryId = row.category_id as string;
-  const categoryName = pick(
-    (category as Record<string, unknown> | null)?.name,
-  );
+  const categoryName = pick((category as Record<string, unknown> | null)?.name);
   const listed = listedCategories(row, categoryId, categoryName);
 
   return {
@@ -759,12 +769,12 @@ function toStore(row: Record<string, unknown>): Store {
     currencyCode: row.currency_code as string,
     isActive: row.is_active as boolean,
     isFeatured: row.is_featured as boolean,
+    menuLayout: row.menu_layout === "aisles" ? "aisles" : "list",
     sortOrder: row.sort_order as number,
     adminSortOrder: (row.admin_sort_order as number | null) ?? 0,
     // `numeric` arrives as a string from PostgREST — exact there, and parsed
     // once here so no screen compares "95000" to 95000.
-    exchangeRate:
-      row.exchange_rate == null ? null : Number(row.exchange_rate),
+    exchangeRate: row.exchange_rate == null ? null : Number(row.exchange_rate),
     latitude: (row.latitude as number | null) ?? null,
     longitude: (row.longitude as number | null) ?? null,
     whatsappPhone: (row.whatsapp_phone as string | null) ?? null,
@@ -833,7 +843,9 @@ export function orderPhone(row: Record<string, unknown>): string | null {
     .sort((a, b) => {
       const order = Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0);
       if (order !== 0) return order;
-      return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+      return String(a.created_at ?? "").localeCompare(
+        String(b.created_at ?? ""),
+      );
     });
 
   const fromBranch = live.find(

@@ -66,6 +66,8 @@ const FOLDERS = [
   "artwork",
   "category-art",
   "tag-art",
+  // An aisle's picture on a supermarket's page — `menu_sections.image_url`, 0190.
+  "menu-sections",
   "sounds",
 ] as const;
 type Folder = (typeof FOLDERS)[number];
@@ -92,6 +94,7 @@ const ALLOWED: Record<Folder, { types: readonly string[]; maxBytes: number }> =
     artwork: { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     "category-art": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     "tag-art": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
+    "menu-sections": { types: IMAGE.types, maxBytes: IMAGE.maxBytes },
     sounds: { types: SOUND.types, maxBytes: SOUND.maxBytes },
   };
 

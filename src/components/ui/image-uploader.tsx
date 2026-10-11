@@ -60,7 +60,8 @@ export function ImageUploader({
     | "promotions"
     | "artwork"
     | "category-art"
-    | "tag-art";
+    | "tag-art"
+    | "menu-sections";
   disabled?: boolean;
 }) {
   const field = useFieldWiring();

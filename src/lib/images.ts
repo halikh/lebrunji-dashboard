@@ -72,7 +72,8 @@ export async function uploadImage(
     | "promotions"
     | "artwork"
     | "category-art"
-    | "tag-art",
+    | "tag-art"
+    | "menu-sections",
   options: {
     onProgress?: (fraction: number) => void;
     signal?: AbortSignal;

@@ -29,7 +29,7 @@ import {
 } from "@/lib/validation";
 
 import type { Branch } from "./api/branches";
-import type { CurrencyChangeMode, Store } from "./api/stores";
+import type { CurrencyChangeMode, MenuLayout, Store } from "./api/stores";
 import { useBranches, useUpdateBranch } from "./use-branches";
 import { useCategories } from "./use-categories";
 import { useMenu } from "./use-menu";
@@ -168,6 +168,7 @@ function signature(store: Store, sole: Branch | null): string {
     store.categoryIds,
     store.currencyCode,
     store.isFeatured,
+    store.menuLayout,
     store.exchangeRate,
     // The branch's half, so a pin changed elsewhere rebuilds these fields too.
     sole?.id ?? null,
@@ -206,6 +207,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     useState<string[]>(initialOthers);
   const [currencyCode, setCurrencyCode] = useState(store.currencyCode);
   const [isFeatured, setIsFeatured] = useState(store.isFeatured);
+  const [menuLayout, setMenuLayout] = useState<MenuLayout>(store.menuLayout);
   /**
    * The shop's own rate, as typed. Empty is the platform's — `0120`.
    *
@@ -263,6 +265,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         otherCategoryIds,
         currencyCode,
         isFeatured,
+        menuLayout,
         rate,
         pin,
         prepMin,
@@ -276,6 +279,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         otherCategoryIds: initialOthers,
         currencyCode: store.currencyCode,
         isFeatured: store.isFeatured,
+        menuLayout: store.menuLayout,
         rate: store.exchangeRate == null ? "" : String(store.exchangeRate),
         pin:
           sole && sole.latitude !== null && sole.longitude !== null
@@ -443,6 +447,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     const imageMoved = imageUrl !== store.imageUrl;
     const categoryMoved = categoryId !== "" && categoryId !== store.categoryId;
     const featureMoved = isFeatured !== store.isFeatured;
+    const layoutMoved = menuLayout !== store.menuLayout;
     // As a set: the order chips were picked in is not something saved.
     const nextCategoryIds = [
       categoryId || store.categoryId,
@@ -478,6 +483,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
           // After the row, inside `updateStore` — see `setStoreCategories`.
           ...(categoriesMoved && { categoryIds: nextCategoryIds }),
           ...(featureMoved && { isFeatured }),
+          ...(layoutMoved && { menuLayout }),
           ...(rateMoved && { exchangeRate: nextRate }),
         },
         name: store.name,
@@ -880,6 +886,26 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
                   onChange={() => setIsFeatured((current) => !current)}
                   labelOn={t("catalogue.featured")}
                   labelOff={t("store.notFeatured")}
+                />
+              </Field>
+
+              <Field
+                label={t("store.menuLayout")}
+                hint={
+                  menuLayout === "aisles"
+                    ? t("store.menuLayoutAislesHint")
+                    : t("store.menuLayoutListHint")
+                }
+              >
+                <Select
+                  value={menuLayout}
+                  onChange={(value) =>
+                    setMenuLayout(value === "aisles" ? "aisles" : "list")
+                  }
+                  options={[
+                    { value: "list", label: t("store.menuLayoutList") },
+                    { value: "aisles", label: t("store.menuLayoutAisles") },
+                  ]}
                 />
               </Field>
             </FormSection>

@@ -36,7 +36,11 @@ import {
 } from "@/lib/validation";
 import type { Localized } from "@/lib/validation";
 
-import { fetchDefaultCountry, type StoreDraft } from "./api/stores";
+import {
+  fetchDefaultCountry,
+  type MenuLayout,
+  type StoreDraft,
+} from "./api/stores";
 import { useCategories } from "./use-categories";
 import {
   checkWeek,
@@ -158,6 +162,7 @@ export function StoreEditor() {
   // shop they have just agreed a promotion for can say so here rather than
   // leaving, finding it in the list and flicking a second switch.
   const [isFeatured, setIsFeatured] = useState(false);
+  const [menuLayout, setMenuLayout] = useState<MenuLayout>("list");
   /**
    * The shop's own rate, as typed. Empty is the platform's — `0120`.
    *
@@ -219,6 +224,7 @@ export function StoreEditor() {
         pin,
         whatsapp,
         isFeatured,
+        menuLayout,
         exchangeRate,
         prepMin,
         prepMax,
@@ -234,6 +240,7 @@ export function StoreEditor() {
         pin: "",
         whatsapp: "",
         isFeatured: false,
+        menuLayout: "list",
         exchangeRate: "",
         prepMin: "10",
         prepMax: "20",
@@ -371,6 +378,7 @@ export function StoreEditor() {
       prepMaxMinutes: Number(prepMax),
       whatsappPhone: whatsapp.trim() || null,
       isFeatured,
+      menuLayout,
       // Empty is null, which is what leaves the shop on the platform's rate —
       // not zero, which `0120` refuses and which would read as a shop quoting
       // nothing per dollar.
@@ -721,6 +729,26 @@ export function StoreEditor() {
                   onChange={() => setIsFeatured((current) => !current)}
                   labelOn={t("catalogue.featured")}
                   labelOff={t("store.notFeatured")}
+                />
+              </Field>
+
+              <Field
+                label={t("store.menuLayout")}
+                hint={
+                  menuLayout === "aisles"
+                    ? t("store.menuLayoutAislesHint")
+                    : t("store.menuLayoutListHint")
+                }
+              >
+                <Select
+                  value={menuLayout}
+                  onChange={(value) =>
+                    setMenuLayout(value === "aisles" ? "aisles" : "list")
+                  }
+                  options={[
+                    { value: "list", label: t("store.menuLayoutList") },
+                    { value: "aisles", label: t("store.menuLayoutAisles") },
+                  ]}
                 />
               </Field>
             </FormSection>

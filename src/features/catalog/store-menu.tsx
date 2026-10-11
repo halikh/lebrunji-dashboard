@@ -6,7 +6,8 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useGuardedAction } from "@/components/unsaved-changes";
 
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
-import { Button, cx } from "@/components/ui";
+import { Button, cx, Field } from "@/components/ui";
+import { ImageUploader } from "@/components/ui/image-uploader";
 import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { useRowFocus } from "@/components/ui/row-focus";
@@ -394,10 +395,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
           {menu.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (
-                <div
-                  key={row}
-                  className="h-[66px] rounded-lg bg-line-soft"
-                />
+                <div key={row} className="h-[66px] rounded-lg bg-line-soft" />
               ))}
             </div>
           )}
@@ -541,9 +539,9 @@ function MenuEditor({ storeId }: { storeId: string }) {
                   renaming={renamingId === section.id}
                   renamePending={renameSection.isPending}
                   onRename={guarded(() => setRenamingId(section.id))}
-                  onRenameSave={(title) =>
+                  onRenameSave={(fields) =>
                     renameSection.mutate(
-                      { id: section.id, title },
+                      { id: section.id, ...fields },
                       { onSuccess: () => setRenamingId(null) },
                     )
                   }
@@ -616,10 +614,10 @@ function MenuEditor({ storeId }: { storeId: string }) {
           {!searching && menu.isSuccess && adding === "one" && (
             <SectionForm
               pending={createSection.isPending}
-              onSave={(title) =>
+              onSave={(fields) =>
                 createSection.mutate(
                   {
-                    draft: { storeId, title },
+                    draft: { storeId, ...fields },
                     // At the end. The column has no default, and where a new
                     // section goes is a question the caller can answer and the
                     // database cannot.
@@ -694,7 +692,7 @@ function Section({
   /** This section's name is being edited, in place of its heading. */
   renaming: boolean;
   renamePending: boolean;
-  onRenameSave: (title: Localized) => void;
+  onRenameSave: (fields: SectionFields) => void;
   onRenameCancel: () => void;
   /** Being dragged, so it shows as its heading alone. */
   carried: boolean;
@@ -801,7 +799,7 @@ function Section({
           items stay where they are — the section is not going anywhere. */}
       {renaming ? (
         <SectionForm
-          initial={section.title}
+          initial={{ title: section.title, imageUrl: section.imageUrl }}
           pending={renamePending}
           onSave={onRenameSave}
           onCancel={onRenameCancel}
@@ -1243,15 +1241,18 @@ function ItemRow({
  * No slug field, in either: the trigger from migration 0071 derives one from
  * the English title and makes it unique within the shop.
  */
+/** What the section form edits — its name, and its aisle picture. */
+type SectionFields = { title: Localized; imageUrl: string | null };
+
 function SectionForm({
   initial,
   pending,
   onSave,
   onCancel,
 }: {
-  initial?: Localized;
+  initial?: SectionFields;
   pending: boolean;
-  onSave: (title: Localized) => void;
+  onSave: (fields: SectionFields) => void;
   onCancel: () => void;
 }) {
   const languages = useLanguages();
@@ -1266,7 +1267,13 @@ function SectionForm({
   // takes focus itself so that Escape closes it.
   const form = useRevealOnMount<HTMLDivElement>({ focus: true });
 
-  const [title, setTitle] = useState<Localized>(initial ?? {});
+  const [title, setTitle] = useState<Localized>(initial?.title ?? {});
+  // Asked of every shop's sections, not only of supermarkets': it is read only
+  // when the shop's menu layout is Aisles, and asking regardless lets the
+  // pictures be in place before the layout is switched.
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    initial?.imageUrl ?? null,
+  );
   const [error, setError] = useState<string | undefined>(undefined);
 
   function submit() {
@@ -1276,7 +1283,7 @@ function SectionForm({
       return;
     }
     setError(undefined);
-    onSave(title);
+    onSave({ title, imageUrl });
   }
 
   const field = (
@@ -1311,6 +1318,14 @@ function SectionForm({
       className="flex flex-col gap-lg rounded-md border border-active bg-surface p-lg"
     >
       {field}
+      <Field label={t("menu.sectionImage")} hint={t("menu.sectionImageHint")}>
+        <ImageUploader
+          value={imageUrl}
+          onChange={setImageUrl}
+          folder="menu-sections"
+          disabled={pending}
+        />
+      </Field>
       <div className="flex items-center gap-sm">{buttons}</div>
     </div>
   );

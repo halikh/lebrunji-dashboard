@@ -70,6 +70,11 @@ export type MenuSection = {
   id: string;
   slug: string;
   title: Localized;
+  /**
+   * The aisle's tile picture when the shop's menu layout is Aisles —
+   * `menu_sections.image_url`, 0190. Null shows its first pictured item.
+   */
+  imageUrl: string | null;
   sortOrder: number;
   items: MenuItem[];
 };
@@ -86,7 +91,7 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
   const { data, error } = await getClient()
     .from("menu_sections")
     .select(
-      `id, slug, title, sort_order,
+      `id, slug, title, image_url, sort_order,
        menu_items ( id, menu_section_id, slug, name, description, price,
                     image_url, is_active, sort_order, deleted_at,
                     price_unit, unit_quantity, unit_step,
@@ -108,6 +113,7 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
     id: section.id as string,
     slug: section.slug as string,
     title: (section.title as Localized) ?? {},
+    imageUrl: (section.image_url as string | null) ?? null,
     sortOrder: section.sort_order as number,
     items: asArray(section.menu_items)
       // Filtered here rather than in the query: a `deleted_at` filter on an
@@ -249,7 +255,6 @@ async function searchMenuItems(
   storeId: string,
   term: string,
 ): Promise<MenuItem[]> {
-
   const { data, error } = await getClient()
     .from("menu_items")
     .select(
@@ -259,12 +264,7 @@ async function searchMenuItems(
     )
     .eq("store_id", storeId)
     .is("deleted_at", null)
-    .or(
-      likeAny(
-        ["name->>en", "name->>ar", "description->>en", "slug"],
-        term,
-      ),
-    )
+    .or(likeAny(["name->>en", "name->>ar", "description->>en", "slug"], term))
     .order("sort_order", { ascending: true })
     .limit(PAGE.size);
 
@@ -415,8 +415,7 @@ export async function updateMenuItem(
   patch: MenuItemPatch,
 ): Promise<void> {
   const row: Record<string, unknown> = {};
-  if (patch.name !== undefined)
-    row.name = titleLocalized(patch.name);
+  if (patch.name !== undefined) row.name = titleLocalized(patch.name);
   if (patch.description !== undefined) {
     row.description = cleanLocalized(localizedOrNull(patch.description));
   }
@@ -472,6 +471,8 @@ export async function archiveMenuItem(id: string): Promise<void> {
 export type MenuSectionDraft = {
   storeId: string;
   title: Localized;
+  /** Optional; the bulk add never asks for one. */
+  imageUrl?: string | null;
 };
 
 /**
@@ -490,6 +491,7 @@ export async function createMenuSection(
     .insert({
       store_id: draft.storeId,
       title: titleLocalized(draft.title),
+      image_url: draft.imageUrl ?? null,
       sort_order: sortOrder,
     });
 
@@ -498,7 +500,7 @@ export async function createMenuSection(
 
 export async function updateMenuSection(
   id: string,
-  patch: { title?: Localized },
+  patch: { title?: Localized; imageUrl?: string | null },
 ): Promise<void> {
   const { error } = await getClient()
     .from("menu_sections")
@@ -507,9 +509,9 @@ export async function updateMenuSection(
     // `title` is `not null`.
     .update({
       title:
-        patch.title === undefined
-          ? undefined
-          : titleLocalized(patch.title),
+        patch.title === undefined ? undefined : titleLocalized(patch.title),
+      // Null is a value here — it takes the picture off.
+      image_url: patch.imageUrl,
     })
     .eq("id", id);
 

@@ -36,7 +36,7 @@
 
 /** The shape `POST /api/images` mints, plus the pre-rename `categories`. */
 export const KEY_SHAPE =
-  /^(menu-items|stores|promotions|artwork|categories|category-art|tag-art|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
+  /^(menu-items|stores|promotions|artwork|categories|category-art|tag-art|menu-sections|sounds)\/[0-9a-f-]{36}\.(jpg|png|webp|mp3)$/;
 
 /** How long an unreferenced upload is left alone. */
 export const GRACE_MS = 24 * 60 * 60 * 1000;
