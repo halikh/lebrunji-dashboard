@@ -177,6 +177,7 @@ function signature(store: Store, sole: Branch | null): string {
     sole?.prepMinMinutes ?? null,
     sole?.prepMaxMinutes ?? null,
     sole?.whatsappPhone ?? null,
+    sole?.isActive ?? null,
   ]);
 }
 
@@ -241,6 +242,12 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
   const [prepMin, setPrepMin] = useState(String(sole?.prepMinMinutes ?? 10));
   const [prepMax, setPrepMax] = useState(String(sole?.prepMaxMinutes ?? 20));
   const [whatsapp, setWhatsapp] = useState(sole?.whatsappPhone ?? "");
+  /**
+   * Whether the one branch trades at all — the branch editor's Branch status.
+   * A shop that is one place never shows that editor's switch anywhere else,
+   * so a branch turned off had no way back on from the shop's own page.
+   */
+  const [trading, setTrading] = useState(sole?.isActive ?? true);
 
   const located = parseLocation(pin);
   const coordinates = located.ok ? located : null;
@@ -271,6 +278,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         prepMin,
         prepMax,
         whatsapp,
+        trading,
       },
       {
         name: store.name,
@@ -288,6 +296,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         prepMin: String(sole?.prepMinMinutes ?? 10),
         prepMax: String(sole?.prepMaxMinutes ?? 20),
         whatsapp: sole?.whatsappPhone ?? "",
+        trading: sole?.isActive ?? true,
       },
     ),
   );
@@ -523,8 +532,9 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
       Number(prepMax) !== sole.prepMaxMinutes;
     const phone = digitsOf(whatsapp) || null;
     const phoneMoved = phone !== sole.whatsappPhone;
+    const tradingMoved = trading !== sole.isActive;
 
-    if (nameMoved || pinMoved || prepMoved || phoneMoved) {
+    if (nameMoved || pinMoved || prepMoved || phoneMoved || tradingMoved) {
       updateBranch.mutate({
         id: sole.id,
         patch: {
@@ -538,6 +548,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
             prepMaxMinutes: Number(prepMax),
           }),
           ...(phoneMoved && { whatsappPhone: phone }),
+          ...(tradingMoved && { isActive: trading }),
         },
         name: pickLocalized(sole.name),
         // One Save is one notice. Silent when the store write above has
@@ -817,6 +828,22 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
                           {t("store.minutes")}
                         </span>
                       </div>
+                    </Field>
+
+                    <Field
+                      label={t("branches.visibility")}
+                      hint={
+                        trading
+                          ? t("branches.liveHint")
+                          : t("branches.hiddenHint")
+                      }
+                    >
+                      <Toggle
+                        on={trading}
+                        onChange={() => setTrading((current) => !current)}
+                        labelOn={t("branches.live")}
+                        labelOff={t("branches.hidden")}
+                      />
                     </Field>
                   </div>
 

@@ -491,7 +491,10 @@ async function ensureFirstBranch(
         // branch that stopped following the brand before anybody had opened it.
         imageUrl: null,
         currencyCode: null,
-        isActive: draft.isActive,
+        // Trading, as the database's own first branch is since `0192`: the
+        // shop's visibility is what hides a new shop, and a branch copied off
+        // with it stayed off after the shop went live.
+        isActive: true,
       },
       0,
     );
