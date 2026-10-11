@@ -6,6 +6,7 @@ import { isOpenNow } from "@/lib/week";
 import { matchesLike } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { oneShopRate } from "@/features/reference/shop-rate";
+import { orderRefusal } from "@/features/orders/api/refusal";
 
 /**
  * The drivers an order can be handed to.
@@ -211,25 +212,39 @@ export async function fetchDispatches(
 }
 
 /**
- * Records that an order was handed over.
+ * Hands an order to a driver: records it, and puts the order on its way.
  *
- * Called as the WhatsApp link is followed rather than after it — there is no
- * "after". The chat opens in another tab or another application and nothing
- * comes back, so this is the only moment the dashboard knows anything happened.
+ * `api_v1_dispatch_order` (`0173`), one transaction. It writes the
+ * `order_dispatches` row **and** moves every live portion to `driverSent` — the
+ * owner's rule is that dispatching *is* "On the way", and two requests would
+ * leave a window where an order has a driver and is still "Confirmed", or the
+ * reverse. Direct inserts into `order_dispatches` are refused since then; the
+ * table is select-only.
  *
- * A failure here is swallowed by the caller on purpose: losing the record is
- * bad, and blocking the hand-off because the record could not be written is
- * worse. The food is going out either way.
+ * Refuses, by code, what should stop a message going out: `CANCL` (cancelled),
+ * `DONE` (delivered), `TAKEN` (somebody already has it and `reassign` was not
+ * asked for), `NOCOU` (that driver has left). See `orderRefusal`.
+ *
+ * Returns the new handover's id.
  */
-export async function recordDispatch(
+export async function dispatchOrder(
   orderId: string,
   courierId: string,
-): Promise<void> {
-  const { error } = await getClient()
-    .from("order_dispatches")
-    .insert({ order_id: orderId, courier_id: courierId });
+  /**
+   * Hand it on even though somebody already has it. Only ever true after the
+   * operator has been shown who that is and said yes — the default refusal is
+   * what stops two operators sending the same address to two drivers.
+   */
+  reassign = false,
+): Promise<string> {
+  const { data, error } = await getClient().rpc("api_v1_dispatch_order", {
+    p_order_id: orderId,
+    p_courier_id: courierId,
+    p_reassign: reassign,
+  });
 
-  if (error) throw new Error(error.message);
+  if (error) throw orderRefusal(error, "dispatch");
+  return data as string;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

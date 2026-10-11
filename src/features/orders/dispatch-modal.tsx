@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useId, useState } from "react";
 
@@ -10,18 +11,23 @@ import { Copyable } from "@/components/ui/copyable";
 import { Modal } from "@/components/ui/modal";
 import { SearchInput } from "@/components/ui/search-input";
 import { EmptyState } from "@/components/ui/empty-state";
-import { isTakingOrders } from "@/features/drivers/api/couriers";
+import { isTakingOrders, type Courier } from "@/features/drivers/api/couriers";
 import {
   useCouriers,
-  useRecordDispatch,
+  useDispatchOrder,
 } from "@/features/drivers/use-couriers";
 import { useMoney } from "@/features/reference/use-currencies";
 import { t } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
+import { isFinishedSlug } from "@/lib/order-status";
 import { formatPhone } from "@/lib/phone";
+import { formatDayAndTime } from "@/lib/time";
 
+import { fetchHandovers } from "./api/history";
 import type { Order, OrderLine } from "./api/orders";
+import { OrderRefusal } from "./api/refusal";
 import { useClock } from "@/features/settings/use-clock";
+import { orderKeys } from "./use-orders";
 
 import { dispatchMessage, kitchenMessage, whatsappLink } from "./dispatch";
 
@@ -43,15 +49,32 @@ import { dispatchMessage, kitchenMessage, whatsappLink } from "./dispatch";
  * press**. Each carries a face, a name and the number the message is going to
  * — which is the thing worth checking before you send somebody an address.
  *
- * ## Each row is a link, not a button
+ * ## Recorded first, then the chat — never the other way round
  *
- * Pressing one opens WhatsApp. That is a navigation, so it is an `<a>`: it
- * opens in a new tab, it can be middle-clicked, and the browser handles the
- * handoff to the desktop application. A click handler calling `window.open`
- * would be a popup for a blocker to eat.
+ * A driver row used to be a plain link that recorded the hand-over on the way
+ * past and swallowed any failure. Since `0173` the record is
+ * `api_v1_dispatch_order`, and its refusals are exactly the reasons a message
+ * must **not** go out: the order was cancelled a moment ago (`CANCL`), it was
+ * delivered (`DONE`), another operator has just handed it to somebody else
+ * (`TAKEN`), or the driver has left (`NOCOU`). Opening the chat first and
+ * reporting the failure afterwards would put a customer's address on a
+ * stranger's phone or send a driver to a cancelled order, and a message once
+ * sent cannot be called back. A record that fails is a retry; a message that
+ * should not have been sent is not.
  *
- * The hand-over is recorded on the way past — see `recordDispatch` on why a
- * failure there is swallowed rather than blocking the send.
+ * So the row is a button. The press opens a blank window straight away —
+ * inside the click, so no pop-up blocker treats it as unrequested — and that
+ * window is pointed at WhatsApp only once the server has said yes. On a
+ * refusal it is closed and the dialog says why. If the browser refused even the
+ * blank window, the dialog offers the chat as a link once the record succeeds.
+ *
+ * ## Somebody already has it
+ *
+ * The dialog says who, and since when, and a press on anybody else asks first:
+ * reassigning sends the address to a second person, and the first still has
+ * it. The server refuses a silent second hand-over too (`TAKEN`), so two
+ * operators racing on the same order meet the same question rather than both
+ * succeeding.
  */
 /**
  * How many drivers fit on a screen before a list stops being browsable.
@@ -73,8 +96,49 @@ export function DispatchModal({
 }) {
   const titleId = useId();
   const clock = useClock();
-  const { currencies } = useMoney();
-  const record = useRecordDispatch();
+  const { currencies, convertTo, secondaryCode } = useMoney();
+  const dispatch = useDispatchOrder();
+
+  // Who has it now — newest first, so the first is the holder. The same key
+  // the history tab reads, so the two never disagree.
+  const handovers = useQuery({
+    queryKey: orderKeys.handovers(order.id),
+    queryFn: () => fetchHandovers(order.id),
+  });
+  const holder = handovers.data?.[0] ?? null;
+
+  /**
+   * Finished while the dialog was open — realtime refetched the order under
+   * it. The receipt hides Notify for a finished order; this is the same rule
+   * for one that finished after the button was pressed.
+   */
+  const finished =
+    order.stores.length > 0 &&
+    order.stores.every((portion) => isFinishedSlug(portion.statusSlug));
+
+  /**
+   * Already with a driver: every portion still in play is `driverSent`. Read
+   * from the order, not from the hand-overs — an Undo moves the order back
+   * without taking the hand-over away, so "has a holder" and "is on the way"
+   * can disagree, and it is the second that blocks an amend or a cancel.
+   */
+  const onTheWay =
+    order.stores.some((portion) => portion.statusSlug === "driverSent") &&
+    order.stores.every(
+      (portion) =>
+        portion.statusSlug === "driverSent" ||
+        isFinishedSlug(portion.statusSlug),
+    );
+
+  /** The driver about to replace the holder, waiting on a yes. */
+  const [confirming, setConfirming] = useState<Courier | null>(null);
+  /** Why the last hand-over was refused, beside the driver it was about. */
+  const [failure, setFailure] = useState<string | null>(null);
+  /** The chat, when the browser would not open a window for it. */
+  const [fallback, setFallback] = useState<{
+    href: string;
+    name: string;
+  } | null>(null);
 
   const [search, setSearch] = useState("");
 
@@ -168,7 +232,89 @@ export function DispatchModal({
     // that has to reach it — the message is composed here and sent from a
     // device that has no idea what this setting says.
     clock.clock24h,
+    // The total in the other currency, at the rate the receipt reads it at.
+    (minor) => {
+      const other = secondaryCode(order.currencyCode);
+      return other
+        ? convertTo(minor, order.currencyCode, other, order.shopRate)
+        : null;
+    },
   );
+
+  /**
+   * Records the hand-over, then opens the chat — see the header.
+   *
+   * Must run inside the click: the blank window is opened synchronously so it
+   * counts as the operator's own, and only navigated once the record lands.
+   */
+  function send(driver: Courier, reassign: boolean) {
+    setFailure(null);
+    setConfirming(null);
+    setFallback(null);
+
+    const href = whatsappLink(driver.phone, message);
+    const win = window.open("about:blank", `dispatch-${order.id}`);
+    // Cut by hand rather than with `noopener`, which would return null and
+    // leave nothing to point at the chat once the record lands.
+    if (win) win.opener = null;
+
+    dispatch.mutate(
+      { orderId: order.id, courierId: driver.id, reassign },
+      {
+        onSuccess: () => {
+          if (win && !win.closed) {
+            win.location.replace(href);
+            onClose();
+          } else {
+            setFallback({ href, name: driver.name });
+          }
+        },
+        onError: (error) => {
+          win?.close();
+          // Somebody got there first. Not a dead end: show who, and ask.
+          if (error instanceof OrderRefusal && error.code === "TAKEN") {
+            void handovers.refetch();
+            setConfirming(driver);
+            return;
+          }
+          setFailure(
+            error instanceof Error
+              ? error.message
+              : t("common.somethingWentWrong"),
+          );
+        },
+      },
+    );
+  }
+
+  /** A press on a driver row. */
+  function choose(driver: Courier) {
+    if (holder && holder.courierId === driver.id) {
+      // The same person, but the order is no longer "On the way" — an Undo
+      // moved it back. Skipping the function here left it confirmed while the
+      // driver rode off with it, and confirmed is the state that still lets it
+      // be amended or cancelled behind their back. Recorded again, as a
+      // reassignment, so it moves back to driverSent.
+      if (!onTheWay) {
+        send(driver, true);
+        return;
+      }
+      // Sending it again to the person who has it: nothing to record, nothing
+      // moves. Just the chat, for a message that went astray.
+      const win = window.open(
+        whatsappLink(driver.phone, message),
+        `dispatch-${order.id}`,
+      );
+      if (win) win.opener = null;
+      onClose();
+      return;
+    }
+    if (holder) {
+      setConfirming(driver);
+      return;
+    }
+    send(driver, false);
+  }
 
   return (
     <Modal
@@ -307,7 +453,82 @@ export function DispatchModal({
             {t("dispatch.driverTab")}
           </h3>
 
-          {couriers.isPending && (
+          {holder && (
+            // Who has it, before anybody is offered it again.
+            <p className="rounded-sm bg-neutral-fill px-md py-sm text-[13px]">
+              {t("dispatch.alreadyWith", {
+                name: holder.courierName,
+                when: formatDayAndTime(holder.dispatchedAt, clock.clock24h),
+              })}
+            </p>
+          )}
+
+          {failure && (
+            <p
+              role="alert"
+              className="rounded-sm bg-danger-wash px-md py-sm text-[13px] text-danger"
+            >
+              {failure}
+            </p>
+          )}
+
+          {fallback && (
+            // Recorded, but the browser would not open a window. The chat as
+            // a link — a real navigation the operator makes themselves.
+            <a
+              href={fallback.href}
+              target="_blank"
+              rel="noreferrer"
+              onClick={onClose}
+              className="flex items-center justify-center gap-sm rounded-md bg-whatsapp px-lg py-sm text-[14px] font-semibold text-on-whatsapp hover:bg-whatsapp-deep"
+            >
+              <WhatsAppMark />
+              {t("dispatch.openChat", { name: fallback.name })}
+            </a>
+          )}
+
+          {confirming && (
+            <div
+              role="alertdialog"
+              aria-label={t("dispatch.reassignTitle", { name: confirming.name })}
+              className="flex flex-col gap-md rounded-lg border-2 border-warning bg-warning-wash/60 p-lg"
+            >
+              <div className="flex flex-col gap-xxs">
+                <span className="text-[15px] font-semibold">
+                  {t("dispatch.reassignTitle", { name: confirming.name })}
+                </span>
+                <span className="text-[13px] text-text-soft">
+                  {t("dispatch.reassignBody", {
+                    name: holder?.courierName || t("dispatch.someoneElse"),
+                  })}
+                </span>
+              </div>
+              <div className="flex items-center justify-end gap-sm">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setConfirming(null)}
+                >
+                  {t("dispatch.reassignBack")}
+                </Button>
+                <Button
+                  size="sm"
+                  pending={dispatch.isPending}
+                  onClick={() => send(confirming, true)}
+                >
+                  {t("dispatch.reassignConfirm", { name: confirming.name })}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {finished && (
+            <p className="rounded-sm bg-neutral-fill px-md py-sm text-[13px] text-text-soft">
+              {t("dispatch.finished")}
+            </p>
+          )}
+
+          {!finished && couriers.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1].map((row) => (
                 <div
@@ -318,7 +539,7 @@ export function DispatchModal({
             </div>
           )}
 
-          {couriers.isSuccess && live.length === 0 && searching && (
+          {!finished && couriers.isSuccess && live.length === 0 && searching && (
             <EmptyState
               titleKey="drivers.searchNone"
               params={{ term: search.trim() }}
@@ -326,7 +547,7 @@ export function DispatchModal({
             />
           )}
 
-          {couriers.isSuccess && live.length === 0 && !searching && (
+          {!finished && couriers.isSuccess && live.length === 0 && !searching && (
             // Not a broken control and not an empty list — a sentence with the
             // next step in it. A button that opened an empty chat would be
             // worse than one that is absent.
@@ -354,22 +575,25 @@ export function DispatchModal({
             />
           )}
 
-          {live.map((driver) => (
-            <a
+          {!finished && live.map((driver) => (
+            <button
               key={driver.id}
-              href={whatsappLink(driver.phone, message)}
-              target="_blank"
-              rel="noreferrer"
-              onClick={() => {
-                record.mutate({ orderId: order.id, courierId: driver.id });
-                // Closed on the way out. Leaving the dialog open behind a chat
-                // that has just opened in another window means coming back to a
-                // question already answered.
-                onClose();
-              }}
+              type="button"
+              // One hand-over at a time: a second press while the first is in
+              // flight would be the server's `TAKEN`, asked of the operator
+              // about their own press.
+              disabled={dispatch.isPending}
+              aria-busy={
+                dispatch.isPending &&
+                dispatch.variables?.courierId === driver.id
+                  ? true
+                  : undefined
+              }
+              onClick={() => choose(driver)}
               className={cx(
-                "flex items-center gap-lg rounded-lg border-2 border-transparent bg-surface p-lg shadow-card",
+                "flex items-center gap-lg rounded-lg border-2 border-transparent bg-surface p-lg text-start shadow-card",
                 "transition-[border-color,background-color] hover:border-whatsapp hover:bg-whatsapp-wash/60",
+                "disabled:cursor-wait disabled:opacity-60",
               )}
             >
               <Avatar id={driver.id} name={driver.name} />
@@ -392,9 +616,11 @@ export function DispatchModal({
                   rule the brand red follows. */}
               <span className="flex shrink-0 items-center gap-sm rounded-md bg-whatsapp px-lg py-sm text-[14px] font-semibold text-on-whatsapp">
                 <WhatsAppMark />
-                {t("dispatch.send")}
+                {holder?.courierId === driver.id
+                  ? t("dispatch.sendAgain")
+                  : t("dispatch.send")}
               </span>
-            </a>
+            </button>
           ))}
         </div>
 

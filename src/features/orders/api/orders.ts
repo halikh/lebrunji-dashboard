@@ -9,6 +9,8 @@ import {
 import { startOfBusinessDay } from "@/lib/time";
 import { unitNumber } from "@/lib/units";
 
+import { orderRefusal } from "./refusal";
+
 /**
  * Reading and advancing orders.
  *
@@ -122,13 +124,14 @@ export type Order = {
   addressLine: string;
   courierNote: string | null;
   /**
-   * Where the address is, if it is known.
+   * Where the door is, if it is known.
    *
-   * Read from `addresses`, not from the order: `orders` snapshots the address
-   * *line* (migration 0024) and never the coordinates. So this is the pin as it
-   * stands **now** — null for a one-time address with no `address_id`, and
-   * stale if the customer has since moved the pin. The line is the record; this
-   * is only a convenience for finding the door.
+   * The order's own pin first — `orders.latitude` / `longitude`, snapshotted at
+   * placement since `0131` — because that is the spot the delivery was priced
+   * from and the one the customer confirmed. The saved address's pin only for
+   * an order placed before `0131` that has none: that one is the pin as it
+   * stands **now**, and stale if the customer has since moved it. Null when
+   * neither exists. Only ever read on the detail; the queue does not ask.
    */
   latitude: number | null;
   longitude: number | null;
@@ -288,6 +291,7 @@ export async function fetchOrder(
        subtotal, delivery_fee, discount, total, amended_at,
        user_id,
        contact_phone,
+       latitude, longitude,
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal, status,
@@ -296,7 +300,7 @@ export async function fetchOrder(
            options_price, price_unit, unit_quantity, unit_step,
            fulfilled_quantity, replaces_line_id, amendment_reason,
            menu_items ( image_url ),
-           order_line_options ( item_options ( name ) ) ) )`,
+           order_line_options ( name, item_options ( name ) ) ) )`,
     )
     .eq("id", id)
     .single();
@@ -329,8 +333,14 @@ export async function fetchOrder(
         note: (line.note as string | null) ?? null,
         imageUrl:
           (asRecord(line.menu_items)?.image_url as string | null) ?? null,
-        options: asArray(line.order_line_options).map((o) =>
-          localized(asRecord(o.item_options)?.name, locale),
+        // The name as it was when the order was placed — `0173` snapshots it
+        // on the line, as the dish's own name always was. Today's option name
+        // only for a row that somehow has no snapshot: a choice renamed since
+        // would otherwise rewrite what the customer picked.
+        options: asArray(line.order_line_options).map(
+          (o) =>
+            localized(o.name, locale) ||
+            localized(asRecord(o.item_options)?.name, locale),
         ),
       });
     }
@@ -387,26 +397,6 @@ export async function fetchStatusCounts(
 }
 
 /**
- * Moves one shop's portion of an order.
- *
- * The RPC, not an update. `order_stores` carries the subtotal and the shop as
- * well as the status, and an `update` policy would grant all three — so
- * migration 0064 exposes exactly this one column, refuses a move off a terminal
- * status, and refuses an unknown slug rather than writing a null.
- */
-export async function setOrderStatus(
-  orderStoreId: string,
-  statusSlug: string,
-): Promise<void> {
-  const { error } = await getClient().rpc("api_v1_set_order_status", {
-    p_order_store_id: orderStoreId,
-    p_status_slug: statusSlug,
-  });
-
-  if (error) throw new Error(error.message);
-}
-
-/**
  * Sets a whole order's status.
  *
  * **The order is the unit, not the shop.** A customer who orders from two shops
@@ -423,14 +413,66 @@ export async function setOrderStatus(
 export async function advanceOrder(
   orderId: string,
   statusSlug: string,
+  /**
+   * The status the screen showed when the operator pressed — `0173`.
+   *
+   * With it, the function refuses (`MOVED`) when any live portion is somewhere
+   * else: another operator, another tab, or the customer moved it first, and a
+   * press made against a stale row would otherwise land on top of theirs. An
+   * undo passes the status it is undoing *from*, for the same reason.
+   */
+  expectedFrom: string | null,
 ): Promise<number> {
   const { data, error } = await getClient().rpc("api_v1_advance_order", {
     p_order_id: orderId,
     p_status_slug: statusSlug,
+    p_expected_from: expectedFrom,
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throw orderRefusal(error, "advance");
   return (data as number | null) ?? 0;
+}
+
+/**
+ * The smallest amount a currency is paid in, in minor units — `currencies.cash_step`.
+ *
+ * Only lira has one: nobody hands over a 500 note, so a lira total is rounded
+ * to the nearest 1,000 (`0173`). Held here rather than read from the row
+ * because the dashboard's currency query does not carry the column, and it is
+ * one figure that has not moved since the lira lost its coins. A currency not
+ * listed pays to the minor unit.
+ */
+export const CASH_STEP: Readonly<Record<string, number>> = { LBP: 1000 };
+
+/**
+ * A total as `round_to_cash` leaves it: to the currency's cash step, never
+ * below zero.
+ *
+ * Half away from zero, because that is what Postgres's `round(numeric)` does —
+ * `Math.round` rounds half *up*, which is the same for anything positive and
+ * not for a negative sum, and this is a preview that has to land on the
+ * figure the server writes.
+ */
+export function roundToCash(amount: number, currencyCode: string): number {
+  const step = CASH_STEP[currencyCode];
+  if (!step || step <= 1) return Math.max(amount, 0);
+  const steps = Math.sign(amount) * Math.round(Math.abs(amount) / step);
+  return Math.max(steps * step, 0);
+}
+
+/**
+ * What the server's cash rounding added to, or took off, the total.
+ *
+ * The total is what was charged and is never recomputed here. This is only the
+ * gap between it and the lines above it, so the bill adds up on screen. Zero
+ * when the sum is not positive: a total clamped at nothing is not rounding,
+ * and calling it that would explain the wrong thing.
+ */
+export function roundingOf(
+  order: Pick<Order, "subtotal" | "deliveryFee" | "discount" | "total">,
+): number {
+  const sum = order.subtotal + order.deliveryFee - order.discount;
+  return sum > 0 ? order.total - sum : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -476,6 +518,22 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
+/** The order's own pin, else the saved address's — see `Order.latitude`. */
+function pinOf(
+  row: Record<string, unknown>,
+  address: Record<string, unknown> | null,
+): { latitude: number | null; longitude: number | null } {
+  const own = {
+    latitude: (row.latitude as number | null) ?? null,
+    longitude: (row.longitude as number | null) ?? null,
+  };
+  if (own.latitude !== null && own.longitude !== null) return own;
+  return {
+    latitude: (address?.latitude as number | null) ?? null,
+    longitude: (address?.longitude as number | null) ?? null,
+  };
+}
+
 function toOrder(row: Record<string, unknown>, locale: string): Order {
   const user = asRecord(row.users);
   const address = asRecord(row.addresses);
@@ -495,8 +553,10 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     customerPhone: ((row.contact_phone as string | null) || (user?.phone as string)) ?? "",
     addressLine: row.address_line as string,
     courierNote: (row.courier_note as string | null) ?? null,
-    latitude: (address?.latitude as number | null) ?? null,
-    longitude: (address?.longitude as number | null) ?? null,
+    // Both from one source, never one from each: `0131` holds the order's pair
+    // to both-or-neither, and a latitude from the order beside a longitude
+    // from the address book is a point nobody chose.
+    ...pinOf(row, address),
     currencyCode: row.currency_code as string,
     shopRate: oneShopRate(asArray(row.order_stores)),
     subtotal: row.subtotal as number,

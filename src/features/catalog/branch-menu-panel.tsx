@@ -3,6 +3,7 @@
 import { Button, cx } from "@/components/ui";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
+import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Toggle } from "@/components/ui/toggle";
 import { useState } from "react";
 
@@ -377,6 +378,13 @@ function toMajor(minorUnits: number, decimals: number | null): string {
  * and so does `add_to_cart` -- so the rows beneath are dimmed and inert rather
  * than left looking editable.
  */
+/** Asked before the last served choice of a required question goes off. */
+const LAST_CHOICE_QUESTION = {
+  titleKey: "branchMenu.lastChoiceTitle",
+  bodyKey: "branchMenu.lastChoiceBody",
+  confirmKey: "branchMenu.lastChoiceConfirm",
+} as const;
+
 function ItemOptionsAtBranch({
   branchId,
   itemId,
@@ -412,6 +420,15 @@ function ItemOptionsAtBranch({
     <div className="flex flex-col gap-sm rounded-md bg-neutral-fill px-lg py-md">
       {rows.map((group) => {
         const groupOff = state?.hiddenGroups.has(group.id) ?? false;
+        // The choices this branch still serves. A required question with none
+        // left means the dish cannot be added to a basket here at all — the
+        // customer is asked a question with no answers. Nothing refuses that
+        // at the branch, so it is said before, and while, it is true.
+        const required = group.isActive && group.minSelections > 0 && !groupOff;
+        const servedChoices = group.options.filter(
+          (option) =>
+            option.isActive && !(state?.hiddenOptions.has(option.id) ?? false),
+        );
 
         return (
           <div key={group.id} className="flex flex-col gap-xs">
@@ -430,10 +447,31 @@ function ItemOptionsAtBranch({
               />
             </div>
 
+            {required && servedChoices.length === 0 && (
+              <p
+                role="status"
+                className="rounded-sm bg-warning-wash px-md py-xs text-[12px]"
+              >
+                {t("branchMenu.requiredEmpty")}
+              </p>
+            )}
+
             {group.options.map((option) => {
               const optionOff = state?.hiddenOptions.has(option.id) ?? false;
               const override = state?.optionPrices.get(option.id) ?? null;
               const name = pickLocalized(option.name);
+              // Turning this one off would leave the required question with
+              // nothing to choose — that press asks first.
+              const lastChoice =
+                required &&
+                !optionOff &&
+                servedChoices.length === 1 &&
+                servedChoices[0]?.id === option.id;
+              const flip = () =>
+                setOption.mutate({
+                  optionId: option.id,
+                  hidden: !optionOff,
+                });
 
               return (
                 <div
@@ -460,18 +498,28 @@ function ItemOptionsAtBranch({
                     />
                   </span>
 
-                  <Toggle
-                    on={!optionOff}
-                    disabled={disabled || groupOff}
-                    onChange={() =>
-                      setOption.mutate({
-                        optionId: option.id,
-                        hidden: !optionOff,
-                      })
-                    }
-                    labelOn={t("branchMenu.served")}
-                    labelOff={t("branchMenu.notServed")}
-                  />
+                  {lastChoice ? (
+                    <ConfirmToggle
+                      on={!optionOff}
+                      disabled={disabled || groupOff}
+                      onChange={flip}
+                      labelOn={t("branchMenu.served")}
+                      labelOff={t("branchMenu.notServed")}
+                      // Only ever asked going off: `lastChoice` is false for a
+                      // choice that is already off.
+                      whenTurningOff={LAST_CHOICE_QUESTION}
+                      whenTurningOn={LAST_CHOICE_QUESTION}
+                      params={{ name }}
+                    />
+                  ) : (
+                    <Toggle
+                      on={!optionOff}
+                      disabled={disabled || groupOff}
+                      onChange={flip}
+                      labelOn={t("branchMenu.served")}
+                      labelOff={t("branchMenu.notServed")}
+                    />
+                  )}
                 </div>
               );
             })}

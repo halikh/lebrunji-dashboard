@@ -311,6 +311,41 @@ const en = {
     popupCopyAddress: "Copy this dashboard’s address",
     kitchenSent: "Opened",
     driverTab: "Driver",
+
+    // A lira total the server rounded to its cash step (0173), so the lines
+    // above the amount to collect add up to it.
+    rounding: "Rounding: {amount}",
+    // The amount to collect, in the other currency — at the rate the receipt
+    // reads it at.
+    collectOther: "Or {amount}",
+
+    // Who has it already, at the top of the driver list.
+    alreadyWith: "Already with {name} since {when}",
+    // On the current holder's own row: re-opens the chat, records nothing.
+    sendAgain: "Send again",
+    reassignTitle: "Hand it to {name} instead?",
+    reassignBody:
+      "{name} has this order and its address in their messages already. Tell them it is off once you have sent it on.",
+    someoneElse: "Another driver",
+    reassignBack: "Back",
+    reassignConfirm: "Hand it to {name}",
+    // The record landed but the browser would not open a window for the chat.
+    openChat: "Open the chat with {name}",
+    finished:
+      "This order is finished — there is nothing to hand to a driver.",
+
+    // Refusals from api_v1_dispatch_order (0173).
+    alreadyDelivered: "This order has already been delivered.",
+    alreadyTaken:
+      "Somebody has just handed this order to another driver.",
+    driverGone:
+      "That driver is no longer on the books. Choose somebody else.",
+
+    // Standing a driver down when an order they hold is cancelled.
+    tellDriver: "Tell {name}",
+    cancelHeading: "Cancelled — {code}",
+    cancelBody:
+      "This order has been cancelled. Please do not collect or deliver it. Sorry for the trouble.",
   },
 
   drivers: {
@@ -447,6 +482,15 @@ const en = {
     short: "Only {count} available",
     replacedBy: "Replaced",
     substituteFor: "Instead of {name}",
+
+    // Refusals from api_v1_amend_order (0173). Each one closes the form,
+    // because saving again from it would be refused the same way.
+    changedElsewhere:
+      "Somebody else changed this order while you had it open. It has been reloaded — open it again to make your change.",
+    lineAlreadyChanged:
+      "One of these lines was already replaced by an earlier change. The order has been reloaded — open it again.",
+    tooLate:
+      "This order can no longer be changed — it is on its way, delivered or cancelled.",
   },
 
   /**
@@ -611,6 +655,15 @@ const en = {
     // universal.
     quantity: "×{count}",
     locationLabel: "Where {name} is",
+    // The receipt's line for the server's cash rounding (0173), shown only
+    // when the total differs from the lines above it.
+    rounding: "Rounding",
+
+    // Refusals from api_v1_advance_order. The queue rolls back and refetches
+    // either way, so both say what is true now rather than what failed.
+    movedElsewhere:
+      "This order was moved by someone else. The screen now shows where it is.",
+    wasCancelled: "This order was cancelled. Nothing was moved.",
   },
 
   /**
@@ -1650,6 +1703,9 @@ const en = {
     groupAdded: "{name} created",
     // The one constraint an operator can actually hit: a floor above the
     // ceiling is unsatisfiable, and the database says so by constraint name.
+    // NOCHO, 0173: withdrawing the last live choice of a required question.
+    lastRequiredChoice:
+      "This is the last choice for a required question — make the question optional or add another choice first.",
     rangeImpossible:
       "At least cannot be more than At most — nobody could satisfy that.",
   },
@@ -1837,8 +1893,10 @@ const en = {
     valueRequired: "Say how much comes off.",
     valueOutOfRange: "That amount is outside what a discount can be.",
     minSubtotal: "Minimum spend",
+    // Since 0173 a narrowed promotion counts only the matching items towards
+    // the minimum — said here, because "spend 20" reads as the whole basket.
     minSubtotalHint:
-      "In {code}. Below this the promotion does not apply — and it is compared after conversion, so it means the same amount of money whatever a shop prices in. Leave empty for no minimum.",
+      "In {code}. Below this the promotion does not apply. When it is narrowed to shops, categories or items, only those count towards it. Compared after conversion, so it means the same amount of money whatever a shop prices in. Leave empty for no minimum.",
     noMinimum: "No minimum",
     maxDiscount: "Most it can take off",
     maxDiscountHint:
@@ -1848,8 +1906,10 @@ const en = {
     // ---- who gets it -------------------------------------------------------
     whoSection: "Who gets it",
     appliesTo: "Applies to",
+    // 0173: a narrowed percentage comes off the matching items only. It used
+    // to come off the whole subtotal, and this hint said so.
     appliesToHint:
-      "Narrowing it means the basket has to contain something matching. The discount still comes off the whole subtotal.",
+      "Narrowing it means the basket has to contain something matching. A percentage then comes off the matching items only, not the whole order.",
     scopes: {
       order: "Every order",
       store: "Orders from certain shops",
@@ -2653,6 +2713,14 @@ const en = {
     // asked about, and a menu is a lot of questions to fetch up front.
     options: "Options",
     noOptions: "This dish asks nothing.",
+    // A required question with every choice turned off here: the dish cannot
+    // be added to a basket at this branch.
+    requiredEmpty:
+      "Every choice for this required question is off here, so customers at this branch cannot order the dish. Turn one back on, or turn the question off.",
+    lastChoiceTitle: "Turn off {name}?",
+    lastChoiceBody:
+      "It is the last choice this branch serves for a required question. With it off, customers here cannot order the dish at all.",
+    lastChoiceConfirm: "Turn it off",
     optionPriceFor: "Price for {name} at this branch",
   },
 

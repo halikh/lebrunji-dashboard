@@ -429,7 +429,7 @@ export async function updateOptionGroup(
     .from("option_groups")
     .update(row)
     .eq("id", id);
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error.code));
 }
 
 export async function createItemOption(
@@ -504,7 +504,7 @@ export async function updateItemOption(
     .from("item_options")
     .update(row)
     .eq("id", id);
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error.code));
 }
 
 /**
@@ -548,8 +548,15 @@ export async function setDefaultOption(
  * it wrote itself — "This item would have no choices left for that question" —
  * and re-mapping that on a substring would be a second copy of the wording,
  * kept in a different repository from the first.
+ *
+ * `NOCHO` is the exception, and it is read off the code rather than the words:
+ * `0173` refuses to withdraw the last live choice of a required question —
+ * a customer could then never add the dish — and the way out is a step on this
+ * screen (make the question optional, or add a choice), which the database's
+ * sentence cannot name.
  */
-function friendly(message: string): string {
+function friendly(message: string, code?: string | null): string {
+  if (code === "NOCHO") return t("options.lastRequiredChoice");
   if (message.includes("selection_range")) return t("options.rangeImpossible");
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("slug")) return t("dbError.duplicateSlug");

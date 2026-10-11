@@ -10,6 +10,7 @@ import { Price } from "@/features/reference/price";
 
 import { fetchAmendments, fetchHandovers } from "./api/history";
 import type { Order } from "./api/orders";
+import { orderKeys } from "./use-orders";
 
 /**
  * Everything that has happened to an order since it was placed.
@@ -38,11 +39,11 @@ import type { Order } from "./api/orders";
 export function OrderHistory({ order }: { order: Order }) {
   const clock = useClock();
   const amendments = useQuery({
-    queryKey: ["orders", order.id, "amendments"],
+    queryKey: orderKeys.amendments(order.id),
     queryFn: () => fetchAmendments(order.id),
   });
   const handovers = useQuery({
-    queryKey: ["orders", order.id, "handovers"],
+    queryKey: orderKeys.handovers(order.id),
     queryFn: () => fetchHandovers(order.id),
   });
 

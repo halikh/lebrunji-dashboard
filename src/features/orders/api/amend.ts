@@ -1,5 +1,7 @@
 import { getClient } from "@/lib/supabase/client";
 
+import { orderRefusal } from "./refusal";
+
 /**
  * Changing an order that has already been placed.
  *
@@ -69,6 +71,25 @@ export async function amendOrder(input: {
   changes: LineChange[];
   substitutions: Substitution[];
   note: string;
+  /**
+   * The order's total when the form was opened — `0173`.
+   *
+   * The function refuses (`MOVED`) when the total has changed since: another
+   * operator amended it while this form was open, and these changes were
+   * chosen against lines that are no longer what the order says. Without it,
+   * the second save landed on top of the first and the customer was told one
+   * total on the phone and charged another.
+   */
+  expectedTotal: number;
+  /**
+   * How many amendments the order had when the form was opened — `0175`.
+   *
+   * The real version check. Two different amendments can land on the same
+   * total, since a lira total rounds to 1,000, so the total alone can miss
+   * one; the count cannot. Null when it could not be read, which leaves the
+   * total check standing on its own.
+   */
+  expectedAmendments: number | null;
 }): Promise<AmendedTotals> {
   const { data, error } = await getClient()
     .rpc("api_v1_amend_order", {
@@ -87,10 +108,12 @@ export async function amendOrder(input: {
         })),
       },
       p_note: input.note,
+      p_expected_total: input.expectedTotal,
+      p_expected_amendments: input.expectedAmendments ?? undefined,
     })
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw orderRefusal(error, "amend");
 
   const row = data as Record<string, unknown>;
   return {

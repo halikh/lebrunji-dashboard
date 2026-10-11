@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -11,11 +12,17 @@ import { Map } from "@/components/ui/map";
 import { Price } from "@/features/reference/price";
 import { t } from "@/i18n/translations";
 import { formatPhone } from "@/lib/phone";
-import { statusTone } from "@/lib/order-status";
+import { isFinishedSlug, statusTone } from "@/lib/order-status";
 import { unitLabel } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
-import type { Order, OrderLine, OrderStore, OrderStatus } from "./api/orders";
+import {
+  roundingOf,
+  type Order,
+  type OrderLine,
+  type OrderStore,
+  type OrderStatus,
+} from "./api/orders";
 
 /**
  * An order with its lines — what `fetchOrder` returns, and what a receipt
@@ -24,9 +31,16 @@ import type { Order, OrderLine, OrderStore, OrderStatus } from "./api/orders";
  */
 type OrderWithLines = Order & { lines: OrderLine[] };
 
+import { fetchHandovers } from "./api/history";
 import { AmendOrder } from "./amend-order";
+import { cancellationMessage, whatsappLink } from "./dispatch";
 import { DispatchModal, WhatsAppMark } from "./dispatch-modal";
-import { nextStatus, orderStatus, useAdvanceOrder } from "./use-orders";
+import {
+  nextStatus,
+  orderKeys,
+  orderStatus,
+  useAdvanceOrder,
+} from "./use-orders";
 
 /**
  * One order's receipt, and the actions on it.
@@ -143,9 +157,10 @@ export function OrderBody({
             {order.courierNote}
           </div>
         )}
-        {/* The pin comes from `addresses`, which the order references — it is
-            never snapshotted, so this is where the customer's pin is *now*.
-            Good enough to find a door, not evidence. */}
+        {/* The order's own pin, snapshotted when it was placed (`0131`) —
+            the spot delivery was priced from. Only an order older than that
+            falls back to the saved address's pin as it stands *now*. See
+            `Order.latitude`. */}
         <Map
           className="mt-md"
           latitude={order.latitude}
@@ -213,6 +228,18 @@ export function OrderBody({
             good
           />
         )}
+        {/* The cash step. The server rounds a lira total to the nearest
+            1,000 (`0173`), so the lines above can miss the total by that
+            much — and a bill that does not add up reads as a mistake. Shown
+            only when it moved something. */}
+        {roundingOf(order) !== 0 && (
+          <Money
+            label={t("orders.rounding")}
+            value={roundingOf(order)}
+            code={order.currencyCode}
+            shopRate={order.shopRate}
+          />
+        )}
         {/* The app's strong rule: 2px of ink above the total, the one heavy
             line on the receipt, so the eye lands on what is owed. */}
         <div aria-hidden className="mt-xs h-[2px] rounded-full bg-text" />
@@ -262,6 +289,26 @@ export function OrderActions({
   const next = status ? nextStatus(statuses, status.slug) : null;
 
   /**
+   * Delivered or cancelled — nobody is cooking it and nobody is carrying it.
+   *
+   * Notify goes then: `api_v1_dispatch_order` refuses both (`DONE`, `CANCL`),
+   * and a kitchen ticket for a finished order is an instruction to cook for
+   * nobody.
+   */
+  const finished = status ? isFinishedSlug(status.slug) : false;
+  const wasCancelled = status?.slug === "cancelled";
+
+  // Who has it, read only once it is cancelled: the one question the actions
+  // bar asks of the handovers is whether somebody is still out there with the
+  // order in their messages. Same key as the dialog and the history tab.
+  const handovers = useQuery({
+    queryKey: orderKeys.handovers(order.id),
+    queryFn: () => fetchHandovers(order.id),
+    enabled: wasCancelled,
+  });
+  const holder = wasCancelled ? (handovers.data?.[0] ?? null) : null;
+
+  /**
    * Whether the order can still be changed.
    *
    * Not "is it terminal". An order that has left the kitchen cannot be amended
@@ -294,30 +341,54 @@ export function OrderActions({
           None is what the operator came here to press — that is the step
           below — so none is filled ink.
 
-          Dispatch stays whatever the status is: a driver is told about an order
-          being cooked, and told again about one already on its way, so taking
-          it away at the end would remove it exactly when somebody is chasing a
-          late delivery. Amending does not — see `amendable`. */}
+          Dispatch stays for as long as the order is live: a driver is told
+          about an order being cooked, and told again about one already on its
+          way, so taking it away early would remove it exactly when somebody is
+          chasing a late delivery. It goes once the order is finished — see
+          `finished`. Amending goes earlier — see `amendable`. */}
       <div
         role="group"
         aria-label={t("orders.otherActions")}
-        className="flex items-center gap-sm"
+        className="flex items-center gap-sm empty:hidden"
       >
         {/* WhatsApp's own green, so the control that hands off to it is
             recognised before it is read — which matters on a button reached
             for under time pressure. Restricted to controls that open that
             application, like the brand red is restricted to the mark. */}
-        <span className="flex min-w-0 flex-1">
-          <Button
-            size="sm"
-            fullWidth
-            onClick={() => setDispatching(true)}
-            className="bg-whatsapp text-on-whatsapp hover:bg-whatsapp-deep"
+        {!finished && (
+          <span className="flex min-w-0 flex-1">
+            <Button
+              size="sm"
+              fullWidth
+              onClick={() => setDispatching(true)}
+              className="bg-whatsapp text-on-whatsapp hover:bg-whatsapp-deep"
+            >
+              <WhatsAppMark size={16} />
+              {t("dispatch.open")}
+            </Button>
+          </span>
+        )}
+        {/* Cancelled after it was handed over. The driver still has the
+            address and the amount in their messages and nothing tells them
+            otherwise — the app has no driver side. So the receipt offers the
+            message that stands them down, already written, in the same
+            thread. A link, like every hand-off to WhatsApp here. */}
+        {holder?.courierPhone && (
+          <a
+            href={whatsappLink(
+              holder.courierPhone,
+              cancellationMessage(order),
+            )}
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-[40px] min-w-0 flex-1 items-center justify-center gap-sm rounded-xs bg-whatsapp px-md text-[14px] font-medium text-on-whatsapp hover:bg-whatsapp-deep"
           >
             <WhatsAppMark size={16} />
-            {t("dispatch.open")}
-          </Button>
-        </span>
+            <span className="truncate">
+              {t("dispatch.tellDriver", { name: holder.courierName })}
+            </span>
+          </a>
+        )}
         {amendable && (
           <span className="flex min-w-0 flex-1">
             <Button
@@ -361,7 +432,7 @@ export function OrderActions({
         )}
       </div>
 
-      {dispatching && (
+      {dispatching && !finished && (
         <DispatchModal
           order={order}
           lines={order.lines}
@@ -392,7 +463,7 @@ export function OrderActions({
               fromSlug: status?.slug ?? "",
               toSlug: next.slug,
               toName: next.name,
-              undoable: next.progress !== null,
+              // Undo is the hook's call, from the target: Delivered gets none.
             })
           }
         >

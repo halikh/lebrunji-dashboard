@@ -5,7 +5,14 @@ import { getObject } from "@/lib/storage/bucket";
 /**
  * Serves a stored picture to anyone, with no session.
  *
- * ## Why this route exists at all
+ * ## Why this route still exists
+ *
+ * New pictures are not served from here: since 2026-10-11 they live in
+ * Cloudflare R2 and are stored as `https://img.lebrunji.com/<key>` (see
+ * `imageUrlFor`). This route is for addresses written before that — rows not
+ * yet moved by `move_images_to_host`, and copies of old answers cached on
+ * phones — and it serves them from the same bucket the new ones are in, so
+ * neither shape breaks. What follows is why it was built.
  *
  * `stores.image_url`, `menu_items.image_url` and `artworks.image_url` hold
  * plain URLs the **customer app** hands to an

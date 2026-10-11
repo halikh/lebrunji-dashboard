@@ -55,10 +55,9 @@ export type BucketConfig = {
   accessKeyId: string;
   secretAccessKey: string;
   /**
-   * Where the objects are readable from without a signature, if anywhere.
-   *
-   * Empty for this bucket today — see `imageUrlFor` — and read from the
-   * environment so that pointing at a CDN later is a variable, not a release.
+   * Where the objects are readable from without a signature —
+   * `https://img.lebrunji.com` and its staging and dev siblings, each a
+   * Cloudflare R2 bucket on its own address. See `imageUrlFor`.
    */
   publicBaseUrl: string;
   /**
@@ -195,30 +194,29 @@ export async function deleteObject(key: string): Promise<void> {
 /**
  * The URL that goes in an `image_url` column.
  *
- * ## Why this is not simply the storage host
+ * ## Normally: the image host, straight from Cloudflare
  *
- * This bucket has **no public read**. Objects return 403 unsigned; the S3
- * bucket-policy API answers `NotImplemented`, and a `public-read` ACL on a
- * `PutObject` is accepted and then ignored. Only a signed request succeeds, and
- * a signed URL expires — which makes it exactly the wrong thing to store in a
- * column the app reads months later. `0065` chose a public bucket for that
- * reason, and it is still the reason.
+ * The pictures live in Cloudflare R2, one bucket per environment, each on its
+ * own address — `https://img.lebrunji.com`, `img-staging.…`, `img-dev.…` —
+ * set as `S3_PUBLIC_BASE_URL`. A stored address is that host and the key, so
+ * the customer app loads it from Cloudflare's network and asks Cloudflare to
+ * resize it (`/cdn-cgi/image/…`) — this deployment is not in the path at all.
  *
- * So the dashboard serves them: `/i/<key>` streams the object behind a
- * signature the customer never sees. The trade is stated rather than buried —
- * the app's pictures now depend on this deployment being up, where before they
- * depended on Supabase's CDN. The route caches hard at the edge to keep that
- * from meaning a function invocation per image.
+ * That is the address worth storing because it never expires and never moves:
+ * a signed URL would 403 a fortnight later, and the dashboard's own address is
+ * the admin tool, which customer images should not depend on.
  *
- * ## And the way out is one variable
+ * ## Before 2026-10-11: `/i/<key>`
  *
- * If the storage account later exposes a public or CDN domain for this bucket,
- * set `S3_PUBLIC_BASE_URL` and new uploads get a direct URL with no code
- * change. Rows already written keep working either way, because `/i/<key>`
- * stays a valid route — which is the whole reason the key is recoverable from
- * the URL rather than the URL being opaque.
+ * The pictures used to sit in a Railway bucket with no public read, so the
+ * dashboard streamed each one itself at `/i/<key>`, and that is what older
+ * rows were written as (`move_images_to_host` in the app repo's `0168` moves
+ * them onto the image host). Without `S3_PUBLIC_BASE_URL` this still writes
+ * one — the fallback below — and the route still serves it, from whichever
+ * bucket is configured, so an address of either shape keeps working.
  *
- * `requestOrigin` is the fallback, not the preference — see `canonicalUrl`.
+ * `requestOrigin` is the fallback's fallback, not the preference — see
+ * `canonicalUrl`.
  *
  * ## In production it refuses rather than guessing
  *

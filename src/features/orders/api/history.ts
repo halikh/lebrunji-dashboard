@@ -47,11 +47,32 @@ export async function fetchAmendments(orderId: string): Promise<Amendment[]> {
   }));
 }
 
+/**
+ * How many amendments the order has — the version `api_v1_amend_order` checks
+ * (`0175`). A head count rather than the rows: the amend form needs the number
+ * and nothing else, and needs it fresh rather than from whatever the history
+ * tab cached.
+ */
+export async function countAmendments(orderId: string): Promise<number> {
+  const { count, error } = await getClient()
+    .from("order_amendments")
+    .select("id", { count: "exact", head: true })
+    .eq("order_id", orderId);
+
+  if (error) throw new Error(`Could not read the changes: ${error.message}`);
+  return count ?? 0;
+}
+
 export type Handover = {
   id: string;
   dispatchedAt: string;
   courierId: string;
   courierName: string;
+  /**
+   * Digits, international, no `+` — what `wa.me` takes. Carried so a
+   * cancelled order can tell whoever holds it, in the thread it went out in.
+   */
+  courierPhone: string;
 };
 
 /**
@@ -65,7 +86,7 @@ export type Handover = {
 export async function fetchHandovers(orderId: string): Promise<Handover[]> {
   const { data, error } = await getClient()
     .from("order_dispatches")
-    .select("id, dispatched_at, courier_id, couriers ( name )")
+    .select("id, dispatched_at, courier_id, couriers ( name, phone )")
     .eq("order_id", orderId)
     .order("dispatched_at", { ascending: false });
 
@@ -81,6 +102,8 @@ export async function fetchHandovers(orderId: string): Promise<Handover[]> {
       courierId: row.courier_id as string,
       courierName:
         ((courier as { name?: string } | null)?.name as string) ?? "",
+      courierPhone:
+        ((courier as { phone?: string } | null)?.phone as string) ?? "",
     };
   });
 }

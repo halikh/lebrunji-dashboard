@@ -5,7 +5,7 @@ import { formatPhone } from "@/lib/phone";
 import { unitLabel } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
-import type { Order, OrderLine } from "./api/orders";
+import { roundingOf, type Order, type OrderLine } from "./api/orders";
 
 /**
  * Handing an order to a driver, over WhatsApp.
@@ -55,11 +55,29 @@ export function whatsappLink(phone: string, message: string): string {
  * hundred — the amounts are left out and the message says the total is on the
  * screen. A dispatch that quietly understates what to collect is worse than one
  * that admits it is incomplete.
+ *
+ * ## The lines as they now stand
+ *
+ * `fulfilledQuantity ?? quantity`, as `kitchenMessage` does. A driver handed
+ * the ordered quantities of an amended order collects a bag that does not
+ * match the message, and the priced lines no longer add up to the subtotal
+ * beneath them. A line at zero is left out: it is not in the bag.
+ *
+ * ## The other currency, and the rounding
+ *
+ * `convert` says the total in the other currency, at the same rate the
+ * receipt's second line is read at (`Order.shopRate`) — so the driver and the
+ * operator quote one figure at the door. Absent, the line is left out rather
+ * than guessed. And when the server rounded a lira total to its cash step
+ * (`0173`), the message says by how much, so the lines above the total add up
+ * to it.
  */
 export function dispatchMessage(
   order: Order & { lines: OrderLine[] },
   currency: Currency | undefined,
   clock24h: boolean,
+  /** The total in the other currency, or null when it cannot be said. */
+  convert?: (minor: number) => string | null,
 ): string {
   const money = (minor: number) =>
     currency ? formatMoney(minor, currency) : null;
@@ -84,9 +102,9 @@ export function dispatchMessage(
   }
   lines.push(`*${t("dispatch.address", { address: order.addressLine })}*`);
 
-  // The pin, where there is one. `latitude`/`longitude` come from `addresses`
-  // and are null for a one-time address — see the note on the `Order` type — so
-  // this is a help in finding the door, never a substitute for the line above.
+  // The pin, where there is one — the order's own, snapshotted at placement
+  // (`0131`), or for an older order the saved address's. See `Order.latitude`.
+  // A help in finding the door, never a substitute for the line above.
   if (order.latitude !== null && order.longitude !== null) {
     lines.push(
       t("dispatch.map", {
@@ -109,18 +127,22 @@ export function dispatchMessage(
     for (const line of order.lines.filter(
       (one) => one.orderStoreId === store.id,
     )) {
+      // What is coming, not what was ordered — see above.
+      const quantity = line.fulfilledQuantity ?? line.quantity;
+      if (quantity === 0) continue;
+
       const amount = money(
         linePrice(
           line.unitPrice,
           line.optionsPrice,
           itemUnit(line),
-          line.quantity,
+          quantity,
         ),
       );
       // "2 × Kafta" for a counted dish, "1.5 kg Kafta" for one sold by weight.
       // The `×` goes with the count: it belongs in front of a number of things
       // and reads as a multiplication in front of an amount. See `0122`.
-      const much = unitLabel(line, line.quantity);
+      const much = unitLabel(line, quantity);
       const size = itemUnit(line)?.step == null ? `${much} × ` : `${much} `;
       lines.push(`• ${size}${line.name}${amount ? ` — ${amount}` : ""}`);
       // Indented under the dish, because an option on its own line at the same
@@ -141,8 +163,18 @@ export function dispatchMessage(
     lines.push(t("dispatch.subtotal", { amount: money(order.subtotal) ?? "" }));
     if (delivery) lines.push(t("dispatch.delivery", { amount: delivery }));
     if (discount) lines.push(t("dispatch.discount", { amount: discount }));
+    const rounding = roundingOf(order);
+    if (rounding !== 0) {
+      lines.push(
+        t("dispatch.rounding", {
+          amount: `${rounding > 0 ? "+" : "-"}${money(Math.abs(rounding)) ?? ""}`,
+        }),
+      );
+    }
     // The one number the driver acts on.
     lines.push(`*${t("dispatch.collect", { amount: total })}*`);
+    const other = convert?.(order.total) ?? null;
+    if (other) lines.push(t("dispatch.collectOther", { amount: other }));
   } else {
     lines.push(t("dispatch.amountUnknown"));
   }
@@ -233,5 +265,26 @@ export function kitchenMessage(
     lines.push(t("dispatch.kitchenFooter", { store: portion.storeName }));
   }
 
+  return lines.join("\n");
+}
+
+/**
+ * Standing a driver down: the order they were handed has been cancelled.
+ *
+ * Short, because the only thing it has to do is stop a trip. The code and the
+ * customer's name are what the driver will recognise from the message before
+ * it; the address is left out — they have it already, and repeating it in a
+ * message whose point is "do not go there" only invites going there.
+ */
+export function cancellationMessage(
+  order: Pick<Order, "code" | "customerName">,
+): string {
+  const lines: string[] = [];
+  lines.push(`*${t("dispatch.cancelHeading", { code: order.code })}*`);
+  if (order.customerName) {
+    lines.push(t("dispatch.customer", { name: order.customerName }));
+  }
+  lines.push("");
+  lines.push(t("dispatch.cancelBody"));
   return lines.join("\n");
 }

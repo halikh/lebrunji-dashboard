@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import { Button, Field, cx } from "@/components/ui";
@@ -22,7 +22,14 @@ import { itemUnit, linePrice } from "@/lib/units";
 import { formatMoney } from "@/lib/money";
 
 import { amendOrder, type LineChange, type Substitution } from "./api/amend";
-import type { Order, OrderLine } from "./api/orders";
+import { countAmendments } from "./api/history";
+import {
+  roundingOf,
+  roundToCash,
+  type Order,
+  type OrderLine,
+} from "./api/orders";
+import { OrderRefusal } from "./api/refusal";
 import { Thumbnail } from "./order-detail";
 import { orderKeys } from "./use-orders";
 
@@ -108,6 +115,39 @@ export function AmendOrder({
   const [note, setNote] = useState("");
   const guarded = useGuardedAction();
 
+  /**
+   * The total this form was opened against, held for the life of the form.
+   *
+   * State, not the prop: realtime refetches the order under an open form, and
+   * a prop would quietly move the baseline to whatever somebody else saved —
+   * which is the very change `p_expected_total` exists to catch.
+   */
+  const [openedAt] = useState(order.total);
+
+  /**
+   * How many amendments the order had when this form opened — the version
+   * `p_expected_amendments` checks (`0175`). The total alone cannot be the
+   * check: two different amendments can round to the same lira total.
+   *
+   * Read fresh (`gcTime: 0`, so a reopened form never starts from the last
+   * one's figure) and then frozen in state the first time it arrives, for the
+   * same reason as `openedAt` — realtime invalidates everything under
+   * `orders`, and a refetch must not move the baseline. Adjusted during render
+   * rather than in an effect, so there is no frame where the count is known
+   * and the form does not hold it.
+   */
+  const seen = useQuery({
+    queryKey: [...orderKeys.amendments(order.id), "count"],
+    queryFn: () => countAmendments(order.id),
+    gcTime: 0,
+  });
+  const [amendmentsAtOpen, setAmendmentsAtOpen] = useState<number | null>(
+    null,
+  );
+  if (amendmentsAtOpen === null && seen.data !== undefined) {
+    setAmendmentsAtOpen(seen.data);
+  }
+
   // Absent keys mean unchanged, so an amendment that has been opened and not
   // touched is not unsaved work. `swapOptions` and `swapPrices` are left out:
   // neither can be set without a swap, which is counted.
@@ -121,7 +161,17 @@ export function AmendOrder({
   // not editable: a substitute has already been agreed, and amending an
   // amendment through the same form would need the operator to hold two
   // versions of the order in their head.
-  const editable = lines.filter((line) => line.amendmentReason === null);
+  //
+  // Nor is a line that already has a substitute (`0175`): the function refuses
+  // any change to it with LINEX, because a count set on it beside its
+  // replacement would charge for both. Known by the substitute pointing back
+  // at it, since its own reason is the operator's ("out of stock"), not
+  // "replaced".
+  const editable = lines.filter(
+    (line) =>
+      line.amendmentReason === null &&
+      !lines.some((other) => other.replacesLineId === line.id),
+  );
 
   const amend = useMutation({
     mutationFn: () =>
@@ -154,6 +204,10 @@ export function AmendOrder({
           },
         ),
         note,
+        expectedTotal: openedAt,
+        // Null only when the count could not be read; the total check then
+        // stands alone, as it did before `0175`.
+        expectedAmendments: amendmentsAtOpen,
       }),
 
     onSuccess: () => {
@@ -161,10 +215,28 @@ export function AmendOrder({
       toast.success(t("amend.done", { code: order.code }));
       onClose();
     },
-    onError: (error) =>
+    onError: (error) => {
+      // Whatever the refusal, the receipt behind this form may be out of date
+      // — refetch it, so what the operator reads next is the order as it is.
+      void queryClient.invalidateQueries({ queryKey: orderKeys.all });
       toast.danger(
         error instanceof Error ? error.message : t("common.somethingWentWrong"),
-      ),
+      );
+      // The refusals that mean *this form* is stale: somebody else amended
+      // it (`MOVED`), a line here was already replaced (`LINEX`), or it has
+      // left the kitchen (`check_violation`). Saving again from the same form
+      // would be refused the same way, so it closes and the operator reopens
+      // it on the order as it now stands. Anything else — a dropped
+      // connection — leaves it open to retry.
+      if (
+        error instanceof OrderRefusal &&
+        (error.code === "MOVED" ||
+          error.code === "LINEX" ||
+          error.code === "23514")
+      ) {
+        onClose();
+      }
+    },
   });
 
   /**
@@ -198,7 +270,19 @@ export function AmendOrder({
 
     return sum + kept + swapped;
   }, 0);
-  const total = Math.max(subtotal + order.deliveryFee - order.discount, 0);
+  // Rounded to the cash step the way `round_to_cash` rounds the saved total
+  // (`0173`) — a lira total to the nearest 1,000. Without it the operator read
+  // out 1,234,500 and the order came back at 1,235,000.
+  const total = roundToCash(
+    subtotal + order.deliveryFee - order.discount,
+    order.currencyCode,
+  );
+  const rounding = roundingOf({
+    subtotal,
+    deliveryFee: order.deliveryFee,
+    discount: order.discount,
+    total,
+  });
 
   const touched =
     Object.keys(counts).length > 0 || Object.keys(swaps).length > 0;
@@ -305,12 +389,27 @@ export function AmendOrder({
         </div>
 
         <div className="flex shrink-0 flex-col gap-md border-t border-border p-xxl">
+          {/* The receipt's rounding line, so the new total reads as the lines
+              plus the cash step rather than as a figure that does not add
+              up. Only once something is changed — before that, the receipt
+              behind the form already shows it. */}
+          {touched && rounding !== 0 && (
+            <div className="flex items-baseline justify-between gap-lg text-[13px] text-text-soft">
+              <span>{t("orders.rounding")}</span>
+              <Price
+                value={rounding}
+                code={order.currencyCode}
+                shopRate={order.shopRate}
+                align="end"
+              />
+            </div>
+          )}
           <div className="flex items-baseline justify-between gap-lg">
             <span className="text-[15px] font-semibold">
               {t("amend.newTotal")}
             </span>
             <div className="flex items-baseline gap-md">
-              {total !== order.total && (
+              {touched && total !== order.total && (
                 // The old figure, struck through beside the new one. On the
                 // phone the operator is saying "it was X, it is now Y", and
                 // both halves of that sentence should be readable at once.
@@ -342,7 +441,9 @@ export function AmendOrder({
             </Button>
             <Button
               onClick={() => amend.mutate()}
-              disabled={!touched}
+              // Not until the amendment count is in: saving without it would
+              // drop back to the total check this form is meant to outgrow.
+              disabled={!touched || seen.isPending}
               pending={amend.isPending}
             >
               {t("amend.confirm")}

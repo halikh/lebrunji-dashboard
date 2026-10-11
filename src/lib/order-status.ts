@@ -65,7 +65,8 @@ export type OrderStatus = {
 
 /**
  * Position on the delivery path. Mirrors the database's own map, which
- * `api_v1_advance_order` and `api_v1_admin_stats` read.
+ * `api_v1_advance_order` and `api_v1_admin_stats` read. The end of the path is
+ * as final as being off it — see `isUndoableMove`.
  */
 const PROGRESS: Record<OrderStatusSlug, number | null> = {
   ordered: 1,
@@ -137,14 +138,15 @@ export function statusTone(slug: string): StatusTone {
 }
 
 /**
- * Whether a status can still be moved off.
+ * Whether a move *onto* this status can be offered an undo.
  *
- * `progress: null` is off the path — cancelled. The furthest step on the path is
- * the end of it. `api_v1_set_order_status` refuses both, so this is the UI
- * agreeing with the database rather than a second opinion: it decides whether
- * an undo is offered, and an undo that the server would refuse is worse than
- * none.
+ * Not "is it off the path". `api_v1_advance_order` never moves a portion off
+ * `delivered` or `cancelled` — it skips them and reports nothing moved — so an
+ * undo offered after either would do nothing, and an undo that does not undo
+ * is worse than none. Delivered is on the path (`progress` 4) and is exactly
+ * as final as cancelled, which is why this reads the slug rather than
+ * `progress`: testing `progress !== null` offered Undo on Delivered.
  */
-export function isTerminal(progress: number | null): boolean {
-  return progress === null;
+export function isUndoableMove(toSlug: string): boolean {
+  return isOrderStatusSlug(toSlug) && !isFinishedSlug(toSlug);
 }

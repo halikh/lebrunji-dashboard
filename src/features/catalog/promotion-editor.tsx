@@ -440,7 +440,9 @@ function Form({
       kind,
       value: takesValue ? parsed : 0,
       minSubtotal: optionalNumber(minSubtotal),
-      maxDiscount: optionalNumber(maxDiscount),
+      // Only a percentage has a ceiling; the field is hidden for the rest, and
+      // a value left in it from before the kind changed is not an answer.
+      maxDiscount: kind === "percentage" ? optionalNumber(maxDiscount) : null,
       maxRedemptionsPerUser: optionalNumber(perUser),
       maxRedemptionsTotal: optionalNumber(total),
       isFirstOrderOnly: firstOrderOnly,

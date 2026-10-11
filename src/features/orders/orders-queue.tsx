@@ -272,7 +272,8 @@ export function OrdersQueue() {
           fromSlug: status.slug,
           toSlug: next.slug,
           toName: next.name,
-          undoable: next.progress !== null,
+          // No `undoable`: the hook withholds it from Delivered and Cancelled
+          // itself — see `isUndoableMove`.
         });
       }
     }
@@ -420,10 +421,9 @@ export function OrdersQueue() {
                   fromSlug: status?.slug ?? "",
                   toSlug: to.slug,
                   toName: to.name,
-                  // A move onto a terminal status cannot be undone — the
-                  // function refuses to come back off `delivered` or
-                  // `cancelled`, and an undo that fails is worse than none.
-                  undoable: to.progress !== null,
+                  // A move onto `delivered` or `cancelled` gets no undo — the
+                  // hook decides that from the target, see `isUndoableMove`.
+                  // Testing `progress !== null` here offered one on Delivered.
                 });
               }}
             />

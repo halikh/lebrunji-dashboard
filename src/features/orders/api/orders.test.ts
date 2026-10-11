@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { orderStatuses } from "@/lib/order-status";
+import { t } from "@/i18n/translations";
+import { isUndoableMove, orderStatuses } from "@/lib/order-status";
 
-import { liveStatusSlugs, searchTerm, type OrderStatus } from "./orders";
+import {
+  liveStatusSlugs,
+  roundingOf,
+  roundToCash,
+  searchTerm,
+  type OrderStatus,
+} from "./orders";
+import { OrderRefusal, orderRefusal } from "./refusal";
 
 /** The path, hardcoded — the database constrains `order_stores.status` to it. */
 const PATH: OrderStatus[] = [
@@ -45,5 +53,92 @@ describe("searchTerm", () => {
 
   it("leaves a bare tail alone, which is how people read a code out", () => {
     expect(searchTerm("00042")).toBe("00042");
+  });
+});
+
+describe("isUndoableMove", () => {
+  it("offers undo on a move along the path", () => {
+    expect(isUndoableMove("confirmed")).toBe(true);
+    expect(isUndoableMove("driverSent")).toBe(true);
+  });
+
+  it("never offers it onto delivered or cancelled", () => {
+    // `progress !== null` used to decide this and offered Undo on Delivered,
+    // which the RPC will not move off.
+    expect(isUndoableMove("delivered")).toBe(false);
+    expect(isUndoableMove("cancelled")).toBe(false);
+    expect(isUndoableMove("nonsense")).toBe(false);
+  });
+});
+
+describe("roundingOf", () => {
+  it("is the gap between the lines and the charged total", () => {
+    expect(
+      roundingOf({
+        subtotal: 1_234_500,
+        deliveryFee: 0,
+        discount: 0,
+        total: 1_235_000,
+      }),
+    ).toBe(500);
+  });
+
+  it("is zero when nothing was rounded or the sum is not positive", () => {
+    expect(
+      roundingOf({ subtotal: 10, deliveryFee: 5, discount: 3, total: 12 }),
+    ).toBe(0);
+    expect(
+      roundingOf({ subtotal: 10, deliveryFee: 0, discount: 20, total: 0 }),
+    ).toBe(0);
+  });
+});
+
+describe("orderRefusal", () => {
+  it("reads the code, not the sentence", () => {
+    const moved = orderRefusal({ code: "MOVED", message: "x" }, "advance");
+    expect(moved).toBeInstanceOf(OrderRefusal);
+    expect(moved.code).toBe("MOVED");
+    expect(moved.message).toBe(t("orders.movedElsewhere"));
+    expect(orderRefusal({ code: "MOVED", message: "x" }, "amend").message).toBe(
+      t("amend.changedElsewhere"),
+    );
+  });
+
+  it("names a too-late amendment but not a table CHECK", () => {
+    expect(
+      orderRefusal(
+        { code: "23514", message: "This order is on its way" },
+        "amend",
+      ).message,
+    ).toBe(t("amend.tooLate"));
+    expect(
+      orderRefusal(
+        { code: "23514", message: 'violates check constraint "x"' },
+        "amend",
+      ).message,
+    ).toBe('violates check constraint "x"');
+  });
+
+  it("keeps the database's words for a code it does not know", () => {
+    expect(
+      orderRefusal({ code: "P0001", message: "odd" }, "dispatch").message,
+    ).toBe("odd");
+  });
+});
+
+describe("roundToCash", () => {
+  it("rounds lira to the nearest 1,000, half away from zero", () => {
+    expect(roundToCash(1_234_499, "LBP")).toBe(1_234_000);
+    expect(roundToCash(1_234_500, "LBP")).toBe(1_235_000);
+    expect(roundToCash(499, "LBP")).toBe(0);
+  });
+
+  it("never goes below zero", () => {
+    expect(roundToCash(-1_500, "LBP")).toBe(0);
+    expect(roundToCash(-5, "USD")).toBe(0);
+  });
+
+  it("leaves a currency without a cash step alone", () => {
+    expect(roundToCash(1_875, "USD")).toBe(1_875);
   });
 });

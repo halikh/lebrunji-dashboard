@@ -10,7 +10,7 @@ import { useCallback, useMemo } from "react";
 
 import { useToasts } from "@/components/ui/toast";
 import { t } from "@/i18n/translations";
-import { orderStatuses } from "@/lib/order-status";
+import { isUndoableMove, orderStatuses } from "@/lib/order-status";
 
 import {
   advanceOrder,
@@ -22,6 +22,7 @@ import {
   type OrderStatus,
   type Scope,
 } from "./api/orders";
+import { OrderRefusal } from "./api/refusal";
 
 /**
  * Cache keys, in one place.
@@ -36,6 +37,13 @@ export const orderKeys = {
   list: (scope: Scope, statusSlug: string | null, search: string) =>
     ["orders", "list", scope, statusSlug, search] as const,
   detail: (id: string) => ["orders", "detail", id] as const,
+  /**
+   * Who this order was handed to. Under `orders` like everything else, so a
+   * status move invalidates it with the rest — the dispatch dialog and the
+   * history tab read the same key.
+   */
+  handovers: (id: string) => ["orders", id, "handovers"] as const,
+  amendments: (id: string) => ["orders", id, "amendments"] as const,
 };
 
 /**
@@ -211,9 +219,23 @@ export function orderStatus(
  *
  * The row moves before the server has answered, which is normally a way of
  * lying to somebody. It is not here, because the server is still the authority:
- * `api_v1_set_order_status` decides, and a refusal rolls the row back and says
+ * `api_v1_advance_order` decides, and a refusal rolls the row back and says
  * why. What optimism buys is an operator working a rush who is not waiting on a
  * round trip between each order.
+ *
+ * ## Every press says what it saw
+ *
+ * `expectedFrom` is the status on the operator's screen when they pressed, and
+ * the function refuses with `MOVED` if the order is somewhere else by then
+ * (`0173`). Without it, two operators pressing Confirm and Cancel on the same
+ * order a second apart both "succeeded", and whichever landed second won
+ * silently. An undo passes the status it is undoing *from*, so undoing a move
+ * somebody else has since built on is refused rather than rewinding theirs.
+ *
+ * And **nothing moved is not success.** The function skips finished portions
+ * and returns how many it moved; zero means the order was delivered or
+ * cancelled under the operator's feet, and saying "moved to Confirmed" over it
+ * is the toast `0171` was written to stop.
  *
  * ## Why undo rather than a confirmation
  *
@@ -222,17 +244,32 @@ export function orderStatus(
  * protecting anything. Undo calls the same RPC in reverse, so it is a real
  * reversal rather than a hidden second confirmation.
  *
- * The terminal moves are the exception and keep a real confirm, because the RPC
- * refuses to move off `delivered` or `cancelled` — an undo offered there would
- * fail, and an undo that does not undo is worse than no undo.
+ * The terminal moves are the exception and are never offered an undo, because
+ * the RPC will not move off `delivered` or `cancelled` — see `isUndoableMove`.
+ * That is decided here, from the target, rather than trusted to each caller.
  */
 export function useAdvanceOrder(statuses?: OrderStatus[]) {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
   const mutation = useMutation({
-    mutationFn: (input: { orderId: string; toSlug: string }) =>
-      advanceOrder(input.orderId, input.toSlug),
+    mutationFn: async (input: {
+      orderId: string;
+      toSlug: string;
+      expectedFrom: string | null;
+    }) => {
+      const moved = await advanceOrder(
+        input.orderId,
+        input.toSlug,
+        input.expectedFrom,
+      );
+      // Zero is somebody else having finished it first — see above. Thrown so
+      // the rollback and the refetch below run exactly as for a refusal.
+      if (moved === 0) {
+        throw new OrderRefusal(t("orders.movedElsewhere"), "MOVED");
+      }
+      return moved;
+    },
 
     onMutate: async (input) => {
       // Stop any list refetch from landing mid-flight and overwriting the
@@ -286,6 +323,9 @@ export function useAdvanceOrder(statuses?: OrderStatus[]) {
       );
     },
 
+    // Every key under `orders` — the lists, the counts, the receipt beside the
+    // queue and its handovers. After a refusal the screen was wrong about where
+    // this order is, and the receipt is the part the operator is reading.
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: orderKeys.all });
     },
@@ -299,22 +339,45 @@ export function useAdvanceOrder(statuses?: OrderStatus[]) {
       fromSlug: string;
       toSlug: string;
       toName: string;
-      /** Terminal moves cannot be undone — the RPC refuses to come back. */
+      /**
+       * A caller may withhold the undo; it cannot grant one. Moves onto
+       * `delivered` or `cancelled` never get it whatever this says — the RPC
+       * will not come back off them. See `isUndoableMove`.
+       */
       undoable?: boolean;
     }) => {
+      const undoable = input.undoable !== false && isUndoableMove(input.toSlug);
+
       mutation.mutate(
-        { orderId: input.orderId, toSlug: input.toSlug },
+        {
+          orderId: input.orderId,
+          toSlug: input.toSlug,
+          // What the screen showed. Empty means the caller could not tell —
+          // an order with no portions — and asks for no check rather than a
+          // check against nothing.
+          expectedFrom: input.fromSlug || null,
+        },
         {
           onSuccess: () => {
             toast.success(
               t("orders.moved", { code: input.code, status: input.toName }),
-              input.undoable === false
+              !undoable || !input.fromSlug
                 ? undefined
                 : () =>
-                    new Promise<void>((resolve, reject) => {
+                    // Resolves either way. A refused undo has already said
+                    // why in its own toast (`onError` above), and rejecting
+                    // here only became an unhandled rejection in the toast.
+                    new Promise<void>((resolve) => {
                       mutation.mutate(
-                        { orderId: input.orderId, toSlug: input.fromSlug },
-                        { onSuccess: () => resolve(), onError: reject },
+                        {
+                          orderId: input.orderId,
+                          toSlug: input.fromSlug,
+                          // Undoing *from* where this move put it. If
+                          // somebody has moved it on since, the undo is
+                          // refused rather than rewinding their move too.
+                          expectedFrom: input.toSlug,
+                        },
+                        { onSettled: () => resolve() },
                       );
                     }),
             );

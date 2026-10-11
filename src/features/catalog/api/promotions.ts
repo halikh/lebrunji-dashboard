@@ -232,18 +232,29 @@ export type PromotionDraft = {
  * unique index refusing it rather than by checking first — checking and then
  * inserting is two round trips with a gap, and the gap is where two tabs both
  * decide `ramadan-2026` is free.
+ *
+ * ## Born hidden, switched on last
+ *
+ * The row goes in with `is_active` off whatever the form says, then its
+ * scopes, and only then is it switched on. A promotion with no scope rows is
+ * **order-wide**, so one inserted live and scoped a request later spent that
+ * gap — or for ever, if the scope write failed — taking 30% off every basket
+ * in the catalogue. In this order every failure leaves a hidden promotion the
+ * operator can see in the list and fix, never a live one wider than intended.
  */
 export async function createPromotion(
   draft: PromotionDraft,
   priority: number,
 ): Promise<void> {
-  const { data, error } = await getClient()
+  const client = getClient();
+
+  const { data, error } = await client
     .from("discounts")
     .insert({
       slug: slugify(draft.name),
       starts_at: draft.startsAt,
       ends_at: draft.endsAt,
-      is_active: draft.isActive,
+      is_active: false,
       priority,
       ...moneyColumns(draft),
       ...linkColumns(draft.link),
@@ -252,11 +263,20 @@ export async function createPromotion(
     .single();
 
   if (error) throw new Error(friendly(error.message));
+  const id = data.id as string;
 
   // An empty list on a create writes nothing and means the same thing — no
   // scope rows is order-wide. `null` is the separate case: leave them alone.
   if (draft.scopes && draft.scopes.length > 0) {
-    await writeScopes(data.id as string, draft.scopes);
+    await writeScopes(id, draft.scopes);
+  }
+
+  if (draft.isActive) {
+    const { error: liveError } = await client
+      .from("discounts")
+      .update({ is_active: true })
+      .eq("id", id);
+    if (liveError) throw new Error(friendly(liveError.message));
   }
 }
 
@@ -278,7 +298,13 @@ export async function updatePromotion(
   if (patch.kind !== undefined) row.kind = patch.kind;
   if (patch.value !== undefined) row.value = valueFor(patch.kind, patch.value);
   if (patch.minSubtotal !== undefined) row.min_subtotal = patch.minSubtotal;
-  if (patch.maxDiscount !== undefined) row.max_discount = patch.maxDiscount;
+  // A ceiling only means something on a percentage — see `maxDiscountFor`. A
+  // switch of kind clears it even when the patch did not mention it.
+  if (patch.kind !== undefined && patch.kind !== "percentage") {
+    row.max_discount = null;
+  } else if (patch.maxDiscount !== undefined) {
+    row.max_discount = patch.maxDiscount;
+  }
   if (patch.maxRedemptionsPerUser !== undefined) {
     row.max_redemptions_per_user = patch.maxRedemptionsPerUser;
   }
@@ -310,31 +336,52 @@ export async function updatePromotion(
 /**
  * Puts a promotion's scopes exactly where the form says they should be.
  *
- * ## Why it reads first rather than clearing and re-inserting
+ * ## One call, one transaction
  *
- * Clearing first is one request shorter and wrong in a way that only appears on
- * a bad connection: an empty `discount_scopes` means **order-wide**, so a
- * promotion caught between the delete and the insert is not broken — it is
- * briefly applying to *everything*. A 30%-off meant for one shop, live across
- * the whole catalogue, is the most expensive failure this screen can have, and
- * it would be invisible until the day's takings came in.
+ * `api_v1_set_discount_scopes` (`0173`) replaces the set atomically, so no
+ * reader ever sees it half-written. That matters more here than on most
+ * tables: an empty `discount_scopes` means **order-wide**, so a promotion caught
+ * with its old scopes gone and its new ones not yet written is not broken — it
+ * is briefly applying to *everything*. A 30%-off meant for one shop, live
+ * across the whole catalogue, is the most expensive failure this screen can
+ * have, and it would be invisible until the day's takings came in.
  *
- * Reading first and writing only the difference makes every failure case a
- * subset of the intent instead: nothing to remove is no request, nothing to add
- * is no request, and a half-applied change is narrower than asked for rather
- * than wider. It is also idempotent, which matters because saving a form twice
- * is something people do.
+ * ## The fallback, for a database without the function
+ *
+ * Until `0173` is applied everywhere, a missing function (`PGRST202`) falls
+ * back to writing the difference row by row — **adding before removing**,
+ * never the other way round. The previous version deleted first, and moving a
+ * promotion from shop A to shop B passed through "no scopes": order-wide.
+ * Adding first passes through "A and B" instead, which is wider than asked for
+ * a moment but bounded by what the operator chose. It is also idempotent,
+ * which matters because saving a form twice is something people do.
  *
  * The key is the pair, not the id: `0067` made
  * `(discount_id, scope_type, target_id)` unique with `nulls not distinct`, so
  * two "whole order" rows cannot both exist and a scope is identified by what it
- * says rather than by which row happens to say it.
+ * says rather than by which row happens to say it. That index is also why the
+ * fallback inserts only what is not already there.
  */
 async function writeScopes(
   discountId: string,
   scopes: readonly Scope[],
 ): Promise<void> {
   const client = getClient();
+
+  const { error: rpcError } = await client.rpc("api_v1_set_discount_scopes", {
+    p_discount_id: discountId,
+    // Deduplicated: the unique index would refuse a repeat, and the form can
+    // produce one if a target is picked twice.
+    p_scopes: [...new Map(scopes.map((scope) => [keyOf(scope), scope])).values()]
+      .map((scope) => ({
+        scope_type: scope.scopeType,
+        target_id: scope.targetId,
+      })),
+  });
+
+  if (!rpcError) return;
+  // Anything but "no such function" is a real refusal and is said as one.
+  if (rpcError.code !== "PGRST202") throw new Error(friendly(rpcError.message));
 
   const { data, error } = await client
     .from("discount_scopes")
@@ -360,14 +407,7 @@ async function writeScopes(
     .filter(([key]) => !held.has(key))
     .map(([, scope]) => scope);
 
-  if (removeIds.length > 0) {
-    const { error: removeError } = await client
-      .from("discount_scopes")
-      .delete()
-      .in("id", removeIds);
-    if (removeError) throw new Error(friendly(removeError.message));
-  }
-
+  // Add first — see above. Never delete first.
   if (added.length > 0) {
     const { error: addError } = await client.from("discount_scopes").insert(
       added.map((scope) => ({
@@ -377,6 +417,14 @@ async function writeScopes(
       })),
     );
     if (addError) throw new Error(friendly(addError.message));
+  }
+
+  if (removeIds.length > 0) {
+    const { error: removeError } = await client
+      .from("discount_scopes")
+      .delete()
+      .in("id", removeIds);
+    if (removeError) throw new Error(friendly(removeError.message));
   }
 }
 
@@ -533,7 +581,7 @@ function moneyColumns(draft: PromotionDraft): Record<string, unknown> {
     kind: draft.kind,
     value: valueFor(draft.kind, draft.value),
     min_subtotal: draft.minSubtotal,
-    max_discount: draft.maxDiscount,
+    max_discount: maxDiscountFor(draft.kind, draft.maxDiscount),
     max_redemptions_per_user: draft.maxRedemptionsPerUser,
     max_redemptions_total: draft.maxRedemptionsTotal,
     is_first_order_only: draft.isFirstOrderOnly,
@@ -551,6 +599,21 @@ function moneyColumns(draft: PromotionDraft): Record<string, unknown> {
  */
 function valueFor(kind: PromotionKind | undefined, value: number): number {
   return kind === "freeDelivery" ? 0 : value;
+}
+
+/**
+ * `max_discount`, only where it can bite.
+ *
+ * A ceiling on a fixed amount is the same number twice, and on free delivery
+ * it would cap a fee nobody sets here. The form hides the field for both, but
+ * a value typed before the kind was switched stayed in state and was saved —
+ * an unread column that becomes a bug the day the kind is switched back.
+ */
+function maxDiscountFor(
+  kind: PromotionKind,
+  maxDiscount: number | null,
+): number | null {
+  return kind === "percentage" ? maxDiscount : null;
 }
 
 function countOf(value: unknown): number {

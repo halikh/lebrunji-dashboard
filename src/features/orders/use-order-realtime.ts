@@ -12,6 +12,13 @@ import { t } from "@/i18n/translations";
 import { orderKeys } from "./use-orders";
 
 /**
+ * How long a burst of order events is gathered into one refresh. Long enough
+ * to cover one order's handful of events, short enough that a new order is on
+ * screen before anyone looks up from the chime.
+ */
+const COALESCE_MS = 500;
+
+/**
  * Keeps the queue live.
  *
  * ## Nothing new was needed in the database
@@ -95,13 +102,52 @@ export function useOrderRealtime() {
   useEffect(() => {
     const supabase = getClient();
 
+    /**
+     * One refresh per burst, and none while nobody is looking.
+     *
+     * Every change to an order used to invalidate everything under
+     * `['orders']` at once — the list and every page scrolled into it, the
+     * five status counts, the open order — in every tab. One two-shop order
+     * is three or four events within milliseconds (the order, a portion per
+     * shop, then each status change), so at a launch rush that was the whole
+     * queue re-read several times over per order, per tab: hundreds of
+     * requests a second for screens showing the same thing.
+     *
+     * Now the first event of a burst schedules one refresh `COALESCE_MS`
+     * later and the rest ride on it. A hidden tab refreshes nothing; it
+     * remembers that something changed and catches up once, when it is
+     * looked at again. The chime and the toast are not delayed — they are
+     * the part a person is waiting for.
+     */
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let missed = false;
+
+    const refresh = () => {
+      if (document.visibilityState === "hidden") {
+        missed = true;
+        return;
+      }
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        void queryClient.invalidateQueries({ queryKey: orderKeys.all });
+      }, COALESCE_MS);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible" || !missed) return;
+      missed = false;
+      refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     const channel = supabase
       .channel("dashboard-orders")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
         () => {
-          void queryClient.invalidateQueries({ queryKey: orderKeys.all });
+          refresh();
           chime(soundRef.current);
           toastRef.current.info(t("orders.arrived"));
         },
@@ -109,22 +155,20 @@ export function useOrderRealtime() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: orderKeys.all });
-        },
+        refresh,
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "order_stores" },
-        () => {
-          // Where the status lives, so this is the one that fires when another
-          // device advances an order.
-          void queryClient.invalidateQueries({ queryKey: orderKeys.all });
-        },
+        // Where the status lives, so this is the one that fires when another
+        // device advances an order.
+        refresh,
       )
       .subscribe();
 
     return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
       void supabase.removeChannel(channel);
     };
   }, [queryClient]);

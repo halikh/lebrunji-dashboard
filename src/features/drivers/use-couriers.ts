@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToasts } from "@/components/ui/toast";
+import { orderKeys } from "@/features/orders/use-orders";
 import { t } from "@/i18n/translations";
 
 import {
@@ -11,7 +12,7 @@ import {
   fetchCourier,
   fetchCouriers,
   fetchDispatches,
-  recordDispatch,
+  dispatchOrder,
   updateCourier,
   type CourierDraft,
 } from "./api/couriers";
@@ -66,28 +67,35 @@ export function useDispatches(courierId: string) {
 }
 
 /**
- * Records a hand-off.
+ * Hands an order to a driver — see `dispatchOrder`.
  *
- * No toast on success — the operator is already looking at a WhatsApp window
- * opening, which is a louder confirmation than anything this could show. And
- * none on failure either: see `recordDispatch`. Losing the record is bad;
- * interrupting a dispatch to say so is worse.
+ * No toast either way. On success the operator is watching a WhatsApp window
+ * open, which is a louder confirmation than anything this could show; on
+ * failure the dialog says why in place, beside the driver it was about, and
+ * offers what to do next (reassign, or close). A toast would be a second copy
+ * of that sentence somewhere the eye is not.
+ *
+ * Invalidates the driver's own list, and everything under `orders`: the order
+ * just moved to "On the way", and its handovers changed.
  */
-export function useRecordDispatch() {
+export function useDispatchOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({
       orderId,
       courierId,
+      reassign = false,
     }: {
       orderId: string;
       courierId: string;
-    }) => recordDispatch(orderId, courierId),
-    onSuccess: (_result, variables) => {
+      reassign?: boolean;
+    }) => dispatchOrder(orderId, courierId, reassign),
+    onSettled: (_result, _error, variables) => {
       void queryClient.invalidateQueries({
         queryKey: courierKeys.dispatches(variables.courierId),
       });
+      void queryClient.invalidateQueries({ queryKey: orderKeys.all });
     },
   });
 }
