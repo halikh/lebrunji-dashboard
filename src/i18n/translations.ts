@@ -299,8 +299,7 @@ const en = {
     kitchenAllDone: "All chats opened",
     popupHelpTitle: "How to open all chats in one click",
     popupStep1: "In a new Chrome tab, navigate to",
-    popupStep2:
-      "Under “Allowed to send pop-ups and use redirects”, click Add.",
+    popupStep2: "Under “Allowed to send pop-ups and use redirects”, click Add.",
     popupStep3: "Enter this dashboard’s address and click Add:",
     popupStep4: "Come back to this tab and refresh the page.",
     popupNote:
@@ -331,15 +330,12 @@ const en = {
     reassignConfirm: "Hand it to {name}",
     // The record landed but the browser would not open a window for the chat.
     openChat: "Open the chat with {name}",
-    finished:
-      "This order is finished — there is nothing to hand to a driver.",
+    finished: "This order is finished — there is nothing to hand to a driver.",
 
     // Refusals from api_v1_dispatch_order (0173).
     alreadyDelivered: "This order has already been delivered.",
-    alreadyTaken:
-      "Somebody has just handed this order to another driver.",
-    driverGone:
-      "That driver is no longer on the books. Choose somebody else.",
+    alreadyTaken: "Somebody has just handed this order to another driver.",
+    driverGone: "That driver is no longer on the books. Choose somebody else.",
 
     // Standing a driver down when an order they hold is cancelled.
     tellDriver: "Tell {name}",
@@ -1141,6 +1137,13 @@ const en = {
     // wraps. The hours it copies are listed in "The week" right under it.
     copyToAll: "Apply to all open days",
     incomplete: "Every open day needs an opening and a closing time.",
+    // For a shop that shuts for the afternoon: 07:00–15:00, then 19:00–01:00.
+    addShift: "Add a shift",
+    removeShift: "Remove",
+    overlap:
+      "Two of the hours on {day} overlap. A shift has to end before the next one starts.",
+    // The database's refusal, when the editor's own check missed it.
+    overlapSaved: "Two of these shifts overlap, so the hours were not saved.",
     save: "Save hours",
     saved: "Hours saved",
     failedTitle: "Could not load the hours",
@@ -2738,7 +2741,7 @@ const en = {
     // Says which controls are whose: the rows are the shop's, the strips are
     // the branch's.
     intro:
-      "Names, photos, prices and Live apply to every branch. The \"At {name}\" lines apply to {name} only: turn off what it does not serve, and fill in a price only where it charges something different.",
+      'Names, photos, prices and Live apply to every branch. The "At {name}" lines apply to {name} only: turn off what it does not serve, and fill in a price only where it charges something different.',
     // Heads each branch strip and the section's branch switch.
     at: "At {name}",
     served: "Served",

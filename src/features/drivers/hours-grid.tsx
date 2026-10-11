@@ -229,7 +229,12 @@ export function WeekSummary({
                 }
               >
                 {span.open
-                  ? `${clock.hhmm(span.opensAt)}–${clock.hhmm(span.closesAt)}`
+                  ? span.windows
+                      .map(
+                        (w) =>
+                          `${clock.hhmm(w.opensAt)}–${clock.hhmm(w.closesAt)}`,
+                      )
+                      .join(", ")
                   : t("hours.closed")}
               </span>
             </li>

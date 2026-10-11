@@ -44,11 +44,54 @@ export function isOpenAt(
   const now = minutes(time);
   if (now === null) return false;
 
-  const today = week.find((day) => day.dayOfWeek === dayOfWeek);
-  if (today && within(today, now, false)) return true;
+  // A day can hold more than one window — a shop open 07:00–15:00 and again
+  // 19:00–01:00 (`0189`) — so every one of them is asked.
+  const yesterday = (dayOfWeek + 6) % 7;
+  return week.some(
+    (day) =>
+      (day.dayOfWeek === dayOfWeek && within(day, now, false)) ||
+      (day.dayOfWeek === yesterday && within(day, now, true)),
+  );
+}
 
-  const yesterday = week.find((day) => day.dayOfWeek === (dayOfWeek + 6) % 7);
-  return yesterday ? within(yesterday, now, true) : false;
+/**
+ * The first day, Sunday-first, on which two windows cover the same minute —
+ * counting an overnight window's tail into the next morning, and Saturday's
+ * into Sunday's — or null when none do.
+ *
+ * The database refuses such a week (`0189`, `branch_hours_refuse_overlap`);
+ * asking here first is what lets the editor say which day, before Save.
+ * Back to back — 15:00 closing, 15:00 opening — is not an overlap.
+ */
+export function overlappingDay(week: DayWindow[]): number | null {
+  const WEEK = 7 * 1440;
+  const laid: { start: number; end: number; index: number }[] = [];
+
+  week.forEach((day, index) => {
+    const opens = minutes(day.opensAt);
+    const closes = minutes(day.closesAt);
+    if (opens === null || closes === null) return;
+    const start = day.dayOfWeek * 1440 + opens;
+    const end =
+      start + (closes > opens ? closes - opens : closes + 1440 - opens);
+    laid.push({ start, end, index });
+    // Saturday night runs off the end of the week into Sunday morning.
+    if (end > WEEK) laid.push({ start: start - WEEK, end: end - WEEK, index });
+  });
+
+  let found: number | null = null;
+  for (const a of laid) {
+    for (const b of laid) {
+      if (a.index < b.index && a.start < b.end && b.start < a.end) {
+        // The day the clash starts on.
+        const day = Math.floor(
+          (((Math.max(a.start, b.start) % WEEK) + WEEK) % WEEK) / 1440,
+        );
+        found = found === null ? day : Math.min(found, day);
+      }
+    }
+  }
+  return found;
 }
 
 function within(day: DayWindow, now: number, spilled: boolean): boolean {
@@ -74,8 +117,11 @@ function minutes(time: string): number | null {
   return hours * 60 + value;
 }
 
+/** One window of a day, without the day. */
+export type Shift = { opensAt: string; closesAt: string };
+
 export type Span =
-  | { open: true; from: number; to: number; opensAt: string; closesAt: string }
+  | { open: true; from: number; to: number; windows: Shift[] }
   | { open: false; from: number; to: number };
 
 /**
@@ -89,30 +135,27 @@ export type Span =
  *
  * Runs are only joined when the hours match exactly, so "Mon–Thu 11:00–23:00"
  * and "Fri–Sat 11:00–23:59" stay apart — a half-hour difference on a Friday is
- * exactly the kind of thing somebody is checking for.
+ * exactly the kind of thing somebody is checking for. A day with two shifts
+ * joins only another day with the same two.
  */
 export function summarise(week: DayWindow[], order: readonly number[]): Span[] {
   const spans: Span[] = [];
 
   for (const day of order) {
-    const found = week.find((one) => one.dayOfWeek === day);
+    const windows: Shift[] = week
+      .filter((one) => one.dayOfWeek === day)
+      .sort((a, b) => (minutes(a.opensAt) ?? 0) - (minutes(b.opensAt) ?? 0))
+      .map(({ opensAt, closesAt }) => ({ opensAt, closesAt }));
     const last = spans[spans.length - 1];
 
-    if (found) {
+    if (windows.length > 0) {
       if (
         last?.open === true &&
-        last.opensAt === found.opensAt &&
-        last.closesAt === found.closesAt
+        JSON.stringify(last.windows) === JSON.stringify(windows)
       ) {
         last.to = day;
       } else {
-        spans.push({
-          open: true,
-          from: day,
-          to: day,
-          opensAt: found.opensAt,
-          closesAt: found.closesAt,
-        });
+        spans.push({ open: true, from: day, to: day, windows });
       }
     } else if (last?.open === false) {
       last.to = day;

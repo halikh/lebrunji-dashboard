@@ -14,7 +14,13 @@ import { t } from "@/i18n/translations";
 
 import { useClock } from "@/features/settings/use-clock";
 import { businessTimezone, toWallClock } from "@/lib/time";
-import { isOpenAt, summarise, type DayWindow } from "@/lib/week";
+import {
+  isOpenAt,
+  overlappingDay,
+  summarise,
+  type DayWindow,
+  type Shift,
+} from "@/lib/week";
 
 import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -41,9 +47,17 @@ import { useBranches } from "./use-branches";
  *
  * ## Closed is the absence of a row
  *
- * The switch does not write "closed"; it removes the day. `store_hours` has one
- * row per day a shop opens and the app reads a missing day as shut, so this
+ * The switch does not write "closed"; it removes the day. `branch_hours` has a
+ * row per window a shop opens and the app reads a missing day as shut, so this
  * grid's job is to decide which rows should exist.
+ *
+ * ## A day can be two shifts
+ *
+ * Some shops shut for the afternoon — 07:00 to 15:00, then 19:00 to 01:00.
+ * Each day holds up to three windows (`0189`), added with "Add a shift". One
+ * is what nearly every shop has, so one is what a day starts with and the
+ * extra control stays small. Windows may not overlap, across midnight
+ * included; the check below names the day before the database refuses it.
  *
  * ## Overnight is normal
  *
@@ -82,7 +96,10 @@ const DAY_KEYS = [
   "hours.saturday",
 ] as const;
 
-type Draft = { open: boolean; opensAt: string; closesAt: string };
+type Draft = { open: boolean; windows: Shift[] };
+
+/** As many as the database takes (`api_v1_set_branch_hours`, `0189`). */
+const MAX_SHIFTS = 3;
 
 /**
  * The tab: which branch, then that branch's week.
@@ -190,9 +207,8 @@ function BranchHours({ branchId }: { branchId: string }) {
       );
     },
     onSettled: () => {
-      // On failure as well as success, so a half-applied week — which is
-      // possible, see `saveBranchHours` — shows what actually landed rather than
-      // what was asked for.
+      // On failure as well as success, so the grid shows what the database
+      // holds rather than what was asked for.
       void queryClient.invalidateQueries({
         queryKey: ["branch-hours", branchId],
       });
@@ -309,27 +325,40 @@ export type WeekDraft = Draft[];
  */
 export function draftWeek(saved: DayHours[] = []): WeekDraft {
   return WEEK.map((day) => {
-    const row = saved.find((one) => one.dayOfWeek === day);
-    return row
-      ? { open: true, opensAt: row.opensAt, closesAt: row.closesAt }
-      : { open: false, opensAt: "09:00", closesAt: "22:00" };
+    const windows = saved
+      .filter((one) => one.dayOfWeek === day)
+      .sort((a, b) => a.opensAt.localeCompare(b.opensAt))
+      .map(({ opensAt, closesAt }) => ({ opensAt, closesAt }));
+    return windows.length > 0
+      ? { open: true, windows }
+      : { open: false, windows: [{ opensAt: "09:00", closesAt: "22:00" }] };
   });
 }
 
-/** The rows to write: one per open day. */
+/** The rows to write: one per window of each open day. */
 export function weekToHours(week: WeekDraft): DayHours[] {
   return week.flatMap((day, index) =>
-    day.open
-      ? [{ dayOfWeek: index, opensAt: day.opensAt, closesAt: day.closesAt }]
-      : [],
+    day.open ? day.windows.map((one) => ({ dayOfWeek: index, ...one })) : [],
   );
 }
 
-/** What is wrong with a week, if anything — an open day missing a time. */
+/**
+ * What is wrong with a week, if anything — an open day missing a time, or two
+ * windows covering the same minute.
+ */
 export function checkWeek(week: WeekDraft): string | null {
-  return week.some((day) => day.open && (!day.opensAt || !day.closesAt))
-    ? t("hours.incomplete")
-    : null;
+  if (
+    week.some(
+      (day) =>
+        day.open && day.windows.some((one) => !one.opensAt || !one.closesAt),
+    )
+  ) {
+    return t("hours.incomplete");
+  }
+  const clash = overlappingDay(weekToHours(week));
+  return clash === null
+    ? null
+    : t("hours.overlap", { day: t(DAY_KEYS[clash]) });
 }
 
 /**
@@ -351,11 +380,39 @@ export function WeekEditor({
   /** Whether to tell the read-back panel the week has unsaved changes. */
   dirty?: boolean;
 }) {
-
   function update(day: number, patch: Partial<Draft>) {
     onChange(
       week.map((one, index) => (index === day ? { ...one, ...patch } : one)),
     );
+  }
+
+  function updateShift(day: number, shift: number, patch: Partial<Shift>) {
+    update(day, {
+      windows: week[day].windows.map((one, index) =>
+        index === shift ? { ...one, ...patch } : one,
+      ),
+    });
+  }
+
+  /**
+   * A second shift starts four hours after the last one closes and runs four
+   * hours: the afternoon gap a split day usually has, and clear of the shift
+   * before it, so adding one does not put an error on screen before anything
+   * is typed.
+   */
+  function addShift(day: number) {
+    const windows = week[day].windows;
+    const last = windows[windows.length - 1];
+    const [h, m] = (last?.closesAt || "15:00").split(":").map(Number);
+    const at = (hours: number) =>
+      `${String((h + hours) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    update(day, { windows: [...windows, { opensAt: at(4), closesAt: at(8) }] });
+  }
+
+  function removeShift(day: number, shift: number) {
+    update(day, {
+      windows: week[day].windows.filter((_, index) => index !== shift),
+    });
   }
 
   /**
@@ -374,7 +431,7 @@ export function WeekEditor({
     onChange(
       week.map((day) =>
         day.open
-          ? { ...day, opensAt: template.opensAt, closesAt: template.closesAt }
+          ? { ...day, windows: template.windows.map((one) => ({ ...one })) }
           : day,
       ),
     );
@@ -415,26 +472,56 @@ export function WeekEditor({
                 />
 
                 {day.open ? (
-                  <div className="flex items-center gap-sm">
-                    <TimeField
-                      value={day.opensAt}
-                      onChange={(value) => update(index, { opensAt: value })}
-                    />
-                    <span className="text-[14px] text-text-soft">
-                      {t("hours.to")}
-                    </span>
-                    <TimeField
-                      value={day.closesAt}
-                      onChange={(value) => update(index, { closesAt: value })}
-                    />
+                  <div className="flex flex-col gap-sm">
+                    {day.windows.map((shift, at) => (
+                      <div key={at} className="flex items-center gap-sm">
+                        <TimeField
+                          value={shift.opensAt}
+                          onChange={(value) =>
+                            updateShift(index, at, { opensAt: value })
+                          }
+                        />
+                        <span className="text-[14px] text-text-soft">
+                          {t("hours.to")}
+                        </span>
+                        <TimeField
+                          value={shift.closesAt}
+                          onChange={(value) =>
+                            updateShift(index, at, { closesAt: value })
+                          }
+                        />
 
-                    {/* Said out loud, because a closing time earlier than an
-                        opening one looks like a mistake and is not — a
-                        kitchen open until two in the morning is ordinary, and
-                        without this the operator would "fix" it. */}
-                    {crossesMidnight(day) && (
-                      <span className="text-[12px] text-text-faint">
-                        {t("hours.overnight")}
+                        {/* Said out loud, because a closing time earlier than
+                            an opening one looks like a mistake and is not — a
+                            kitchen open until two in the morning is ordinary,
+                            and without this the operator would "fix" it. */}
+                        {crossesMidnight(shift) && (
+                          <span className="text-[12px] text-text-faint">
+                            {t("hours.overnight")}
+                          </span>
+                        )}
+
+                        {day.windows.length > 1 && (
+                          <Button
+                            variant="quiet"
+                            size="sm"
+                            onClick={() => removeShift(index, at)}
+                          >
+                            {t("hours.removeShift")}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+
+                    {day.windows.length < MAX_SHIFTS && (
+                      <span>
+                        <Button
+                          variant="quiet"
+                          size="sm"
+                          onClick={() => addShift(index)}
+                        >
+                          {t("hours.addShift")}
+                        </Button>
                       </span>
                     )}
                   </div>
@@ -470,19 +557,17 @@ export function WeekEditor({
   );
 }
 
-function crossesMidnight(day: Draft): boolean {
+function crossesMidnight(shift: Shift): boolean {
   return (
-    day.opensAt !== "" && day.closesAt !== "" && day.closesAt <= day.opensAt
+    shift.opensAt !== "" &&
+    shift.closesAt !== "" &&
+    shift.closesAt <= shift.opensAt
   );
 }
 
 /** The draft, in the shape the readers in `lib/week.ts` take. */
 function toWindows(week: Draft[]): DayWindow[] {
-  return week.flatMap((day, index) =>
-    day.open && day.opensAt && day.closesAt
-      ? [{ dayOfWeek: index, opensAt: day.opensAt, closesAt: day.closesAt }]
-      : [],
-  );
+  return weekToHours(week).filter((one) => one.opensAt && one.closesAt);
 }
 
 /**
@@ -585,7 +670,12 @@ function Summary({
                 }
               >
                 {span.open
-                  ? `${clock.hhmm(span.opensAt)}–${clock.hhmm(span.closesAt)}`
+                  ? span.windows
+                      .map(
+                        (one) =>
+                          `${clock.hhmm(one.opensAt)}–${clock.hhmm(one.closesAt)}`,
+                      )
+                      .join(", ")
                   : t("hours.closed")}
               </span>
             </li>

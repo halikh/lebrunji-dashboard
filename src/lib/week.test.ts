@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { isOpenAt, isOpenNow, summarise, type DayWindow } from "./week";
+import {
+  isOpenAt,
+  isOpenNow,
+  overlappingDay,
+  summarise,
+  type DayWindow,
+} from "./week";
 
 /** Monday first, as the dashboard reads a week. */
 const READING_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
@@ -65,7 +71,12 @@ describe("summarise", () => {
   it("joins consecutive days with identical hours", () => {
     const week = READING_ORDER.map((d) => day(d, "11:00", "23:00"));
     expect(summarise(week, READING_ORDER)).toEqual([
-      { open: true, from: 1, to: 0, opensAt: "11:00", closesAt: "23:00" },
+      {
+        open: true,
+        from: 1,
+        to: 0,
+        windows: [{ opensAt: "11:00", closesAt: "23:00" }],
+      },
     ]);
   });
 
@@ -76,8 +87,18 @@ describe("summarise", () => {
       ...[5, 6].map((d) => day(d, "11:00", "23:59")),
     ];
     expect(summarise(week, READING_ORDER)).toEqual([
-      { open: true, from: 1, to: 4, opensAt: "11:00", closesAt: "23:00" },
-      { open: true, from: 5, to: 6, opensAt: "11:00", closesAt: "23:59" },
+      {
+        open: true,
+        from: 1,
+        to: 4,
+        windows: [{ opensAt: "11:00", closesAt: "23:00" }],
+      },
+      {
+        open: true,
+        from: 5,
+        to: 6,
+        windows: [{ opensAt: "11:00", closesAt: "23:59" }],
+      },
       { open: false, from: 0, to: 0 },
     ]);
   });
@@ -95,7 +116,12 @@ describe("summarise", () => {
   it("runs closed days together too", () => {
     const week = [day(1, "11:00", "23:00")];
     expect(summarise(week, READING_ORDER)).toEqual([
-      { open: true, from: 1, to: 1, opensAt: "11:00", closesAt: "23:00" },
+      {
+        open: true,
+        from: 1,
+        to: 1,
+        windows: [{ opensAt: "11:00", closesAt: "23:00" }],
+      },
       { open: false, from: 2, to: 0 },
     ]);
   });
@@ -128,5 +154,68 @@ describe("isOpenNow", () => {
   it("is on during the evening itself", () => {
     // 17:00Z Friday is 19:00 in Beirut.
     expect(isOpenNow(friday, new Date("2026-01-16T17:00:00Z"))).toBe(true);
+  });
+});
+
+/** A shop that shuts for the afternoon: 07:00–15:00, then 19:00–01:00 (0189). */
+describe("two shifts a day", () => {
+  const split = [day(1, "07:00", "15:00"), day(1, "19:00", "01:00")];
+
+  it("is open in either shift and shut between them", () => {
+    expect(isOpenAt(split, 1, "10:00")).toBe(true);
+    expect(isOpenAt(split, 1, "17:00")).toBe(false);
+    expect(isOpenAt(split, 1, "22:00")).toBe(true);
+    expect(isOpenAt(split, 2, "00:30")).toBe(true);
+    expect(isOpenAt(split, 2, "01:00")).toBe(false);
+  });
+
+  it("summarises a day as both its shifts, earliest first", () => {
+    const week = [day(1, "19:00", "01:00"), day(1, "07:00", "15:00")];
+    expect(summarise(week, READING_ORDER)[0]).toEqual({
+      open: true,
+      from: 1,
+      to: 1,
+      windows: [
+        { opensAt: "07:00", closesAt: "15:00" },
+        { opensAt: "19:00", closesAt: "01:00" },
+      ],
+    });
+  });
+
+  it("joins days only when every shift matches", () => {
+    const week = [...split, day(2, "07:00", "15:00")];
+    expect(summarise(week, READING_ORDER).slice(0, 2)).toMatchObject([
+      { from: 1, to: 1 },
+      { from: 2, to: 2 },
+    ]);
+  });
+});
+
+describe("overlappingDay", () => {
+  it("passes a split day and back-to-back windows", () => {
+    expect(
+      overlappingDay([day(1, "07:00", "15:00"), day(1, "19:00", "01:00")]),
+    ).toBeNull();
+    expect(
+      overlappingDay([day(1, "07:00", "15:00"), day(1, "15:00", "20:00")]),
+    ).toBeNull();
+  });
+
+  it("names the day two windows overlap on", () => {
+    expect(
+      overlappingDay([day(3, "07:00", "15:00"), day(3, "14:00", "20:00")]),
+    ).toBe(3);
+  });
+
+  it("catches an overnight window running into the next morning", () => {
+    expect(
+      overlappingDay([day(1, "19:00", "02:00"), day(2, "01:00", "09:00")]),
+    ).toBe(2);
+  });
+
+  it("catches Saturday night running into Sunday morning", () => {
+    expect(
+      overlappingDay([day(6, "22:00", "03:00"), day(0, "02:00", "10:00")]),
+    ).toBe(0);
   });
 });

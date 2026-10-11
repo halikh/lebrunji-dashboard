@@ -1,3 +1,4 @@
+import { t } from "@/i18n/translations";
 import { getClient } from "@/lib/supabase/client";
 
 /**
@@ -5,8 +6,9 @@ import { getClient } from "@/lib/supabase/client";
  *
  * ## A missing row means closed, and that is the design
  *
- * `branch_hours` holds one window per weekday a branch opens. A day with no row
- * is a day it does not open — `src/lib/store-hours.ts` in the app reads it
+ * `branch_hours` holds the windows a branch opens in — usually one a day, two
+ * for a shop that shuts for the afternoon (07:00–15:00, 19:00–01:00; `0189`).
+ * A day with no row is a day it does not open — `src/lib/store-hours.ts` in the app reads it
  * exactly that way, so "closed on Monday" is expressed by there being no
  * Monday, not by a row saying `00:00`–`00:00`.
  *
@@ -42,7 +44,8 @@ export async function fetchBranchHours(branchId: string): Promise<DayHours[]> {
     .from("branch_hours")
     .select("day_of_week, opens_at, closes_at")
     .eq("branch_id", branchId)
-    .order("day_of_week", { ascending: true });
+    .order("day_of_week", { ascending: true })
+    .order("opens_at", { ascending: true });
 
   if (error) throw new Error(error.message);
 
@@ -54,29 +57,6 @@ export async function fetchBranchHours(branchId: string): Promise<DayHours[]> {
 }
 
 /**
- * Replaces one branch's whole week.
- *
- * ## Why the whole week and not the day that changed
- *
- * The seven days are edited together on one grid with one Save, because they
- * are read together — "when is this shop open" is a question about the week.
- * Sending the whole thing also makes the write **idempotent**: the same call
- * twice leaves the same seven rows, which matters because it is more than one
- * request and any of them can be retried.
- *
- * The days that are open are upserted on `(branch_id, day_of_week)`, which is
- * unique — `branch_hours_branch_day_idx`, added in `0105` for this call and no
- * other reason: an upsert with nothing to conflict on inserts a second Tuesday
- * rather than replacing the first. The days that are closed are deleted in one statement — including the
- * ones that were already closed, which is a no-op and cheaper than working out
- * which of them changed.
- *
- * Not atomic, for the reason `setSortOrder` gives at length: PostgREST has no
- * transaction, and a `security definer` function taking arbitrary rows is a
- * wider hole than this fixes. A half-applied week is a wrong timetable rather
- * than a broken one, the caller refetches on success *and* failure so the
- * screen shows whatever actually landed, and running it again fixes it.
- */
 /**
  * A new shop's week, written to the branch it was created with.
  *
@@ -105,36 +85,48 @@ export async function saveFirstBranchHours(
   await saveBranchHours(branchId, week);
 }
 
+/**
+ * Replaces one branch's whole week.
+ *
+ * ## Why the whole week and not the day that changed
+ *
+ * The seven days are edited together on one grid with one Save, because they
+ * are read together — "when is this shop open" is a question about the week.
+ * Sending the whole thing also makes the write **idempotent**: the same call
+ * twice leaves the same rows.
+ *
+ * ## One call, one transaction
+ *
+ * `api_v1_set_branch_hours` (`0189`) deletes the week and writes the new one
+ * together. This used to be a delete of the closed days and an upsert of the
+ * open ones on `(branch_id, day_of_week)` — which stopped being possible the
+ * moment a day could hold two windows, since the day is no longer unique. And
+ * delete-everything-then-insert as two requests would leave the branch with
+ * *no* hours between them, which the app reads as open around the clock.
+ *
+ * The database refuses overlapping windows (`HOURS`); the editor checks first
+ * (`overlappingDay`), so meeting that here means the check and the trigger
+ * disagree, and the message says so plainly rather than being swallowed.
+ */
 export async function saveBranchHours(
   branchId: string,
   week: DayHours[],
 ): Promise<void> {
-  const client = getClient();
-
-  const open = week.filter((day) => day.opensAt && day.closesAt);
-  const closed = [0, 1, 2, 3, 4, 5, 6].filter(
-    (day) => !open.some((one) => one.dayOfWeek === day),
-  );
-
-  if (closed.length > 0) {
-    const { error } = await client
-      .from("branch_hours")
-      .delete()
-      .eq("branch_id", branchId)
-      .in("day_of_week", closed);
-    if (error) throw new Error(error.message);
-  }
-
-  if (open.length > 0) {
-    const { error } = await client.from("branch_hours").upsert(
-      open.map((day) => ({
-        branch_id: branchId,
+  const { error } = await getClient().rpc("api_v1_set_branch_hours", {
+    p_branch_id: branchId,
+    p_week: week
+      .filter((day) => day.opensAt && day.closesAt)
+      .map((day) => ({
         day_of_week: day.dayOfWeek,
         opens_at: day.opensAt,
         closes_at: day.closesAt,
       })),
-      { onConflict: "branch_id,day_of_week" },
+  });
+  if (error) {
+    throw new Error(
+      error.message.startsWith("HOURS: opening hours overlap")
+        ? t("hours.overlapSaved")
+        : error.message,
     );
-    if (error) throw new Error(error.message);
   }
 }
