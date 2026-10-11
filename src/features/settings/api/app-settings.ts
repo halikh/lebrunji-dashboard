@@ -104,3 +104,110 @@ export async function updateAppSettings(
 
   if (error) throw new Error(error.message);
 }
+
+// ---------------------------------------------------------------------------
+// The customer app: the oldest version still served, and where to update it
+// ---------------------------------------------------------------------------
+
+/**
+ * The four columns migration 0178 adds.
+ *
+ * A customer app older than the minimum for its platform shows a blocking
+ * "Update the app" screen, whose button opens the store URL. Null is "no
+ * minimum" and "no link" respectively — never an empty string, which the
+ * database's checks would refuse.
+ */
+export type CustomerAppSettings = {
+  minVersionIos: string | null;
+  minVersionAndroid: string | null;
+  iosStoreUrl: string | null;
+  androidStoreUrl: string | null;
+};
+
+const CUSTOMER_APP_COLUMNS =
+  "min_app_version_ios, min_app_version_android, ios_store_url, android_store_url";
+
+/** The database's own check on both version columns (0178). */
+export const APP_VERSION_PATTERN = /^[0-9]+(\.[0-9]+){0,2}$/;
+
+/** Empty means "no minimum", so only a typed value can be wrong. */
+export function isValidAppVersion(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed === "" || APP_VERSION_PATTERN.test(trimmed);
+}
+
+/** Empty means "no link"; anything else must be `https://` and have a host. */
+export function isValidStoreUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === "") return true;
+  if (!trimmed.startsWith("https://")) return false;
+  try {
+    return new URL(trimmed).hostname !== "";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether an error is the database saying a column is not there.
+ *
+ * `42703` is Postgres's `undefined_column`, which PostgREST passes through on
+ * a read naming one. The message is checked as well because a proxy or an older
+ * PostgREST can drop the code and keep the words.
+ */
+export function isMissingColumn(error: {
+  code?: string;
+  message?: string;
+}): boolean {
+  return (
+    error.code === "42703" ||
+    /column .* does not exist/i.test(error.message ?? "")
+  );
+}
+
+/**
+ * Read separately from `fetchAppSettings`, and `null` when the columns are not
+ * there yet.
+ *
+ * The dashboard can be deployed ahead of migration 0178. Folding these into
+ * `COLUMNS` would make that read fail outright — and every screen that shows a
+ * time reads it — so a missing column here hides one section instead of
+ * breaking the dashboard.
+ */
+export async function fetchCustomerAppSettings(): Promise<CustomerAppSettings | null> {
+  const { data, error } = await getClient()
+    .from("app_settings")
+    .select(CUSTOMER_APP_COLUMNS)
+    .single();
+
+  if (error) {
+    if (isMissingColumn(error)) return null;
+    throw new Error(`Could not read the settings: ${error.message}`);
+  }
+
+  const row = data as Record<string, unknown>;
+  return {
+    minVersionIos: (row.min_app_version_ios as string | null) ?? null,
+    minVersionAndroid: (row.min_app_version_android as string | null) ?? null,
+    iosStoreUrl: (row.ios_store_url as string | null) ?? null,
+    androidStoreUrl: (row.android_store_url as string | null) ?? null,
+  };
+}
+
+/** Saves all four together — they are one form with one Save. */
+export async function updateCustomerAppSettings(
+  next: CustomerAppSettings,
+): Promise<void> {
+  const { error } = await getClient()
+    .from("app_settings")
+    .update({
+      min_app_version_ios: next.minVersionIos,
+      min_app_version_android: next.minVersionAndroid,
+      ios_store_url: next.iosStoreUrl,
+      android_store_url: next.androidStoreUrl,
+    })
+    // The single row; see `updateAppSettings`.
+    .eq("id", true);
+
+  if (error) throw new Error(error.message);
+}

@@ -15,6 +15,7 @@ import { SOUND } from "@/lib/limits";
 import { BUSINESS_TIMEZONE } from "@/lib/time";
 
 import { updateAppSettings, type AppSettings } from "./api/app-settings";
+import { CustomerAppSection } from "./customer-app-section";
 import { appSettingsKey, useAppSettings, useClock } from "./use-clock";
 
 /**
@@ -201,6 +202,9 @@ export function GeneralTab() {
           pending={save.isPending}
         />
       </section>
+
+      {/* ---- the customer app ------------------------------------------- */}
+      <CustomerAppSection />
     </div>
   );
 }

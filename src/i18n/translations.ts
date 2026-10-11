@@ -568,6 +568,23 @@ const en = {
     soundCustom: "Using your own sound",
     soundBuiltIn: "Using the built-in chime",
     soundLimits: "MP3, under {size} KB and {seconds} seconds",
+
+    // The oldest customer app still served (0178), and where it updates from.
+    customerAppTitle: "Customer app",
+    customerAppBlurb:
+      "A phone running an older version than the minimum sees an “Update the app” screen and cannot order until it updates. Its Update button opens the store link below.",
+    minVersionIos: "Oldest iPhone version",
+    minVersionAndroid: "Oldest Android version",
+    minVersionHint: "Like 1.4.0. Empty means no minimum.",
+    minVersionInvalid: "Numbers and dots only, like 1.4.0",
+    // The consequence, said before the Save rather than discovered after it.
+    minVersionWarning:
+      "Raising a minimum blocks everyone on an older version straight away. Publish the new build in both stores first, and wait until it is live.",
+    iosStoreUrl: "App Store link",
+    androidStoreUrl: "Google Play link",
+    storeUrlInvalid: "Must be a full link starting with https://",
+    saveCustomerApp: "Save app settings",
+    savedCustomerApp: "Customer app settings saved",
   },
 
   /**
