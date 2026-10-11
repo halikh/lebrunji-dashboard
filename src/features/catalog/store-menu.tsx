@@ -8,6 +8,7 @@ import { useGuardedAction } from "@/components/unsaved-changes";
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, cx } from "@/components/ui";
 import { SearchInput } from "@/components/ui/search-input";
+import { Select } from "@/components/ui/select";
 import { useRowFocus } from "@/components/ui/row-focus";
 import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
 import { Collapse } from "@/components/ui/collapse";
@@ -26,6 +27,7 @@ import { itemUnit, pricePerUnit, unitKey } from "@/lib/units";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
+import { BranchMenuPanel } from "./branch-menu-panel";
 import { BulkForm } from "./bulk-form";
 import { ItemTags } from "./tag-chip";
 import {
@@ -42,6 +44,7 @@ import {
 } from "./use-menu";
 import { useLanguages } from "@/features/reference/use-languages";
 import { useStore } from "./use-stores";
+import { useBranches } from "./use-branches";
 
 /**
  * One shop's menu.
@@ -98,7 +101,77 @@ function rememberOpen(storeId: string, sectionId: string, open: boolean) {
   else opened.delete(sectionId);
 }
 
+/**
+ * The Menu tab: the shared menu, or what one branch does differently to it.
+ *
+ * ## One tab, a picker over it
+ *
+ * A branch's differences used to be a page of their own, reached from a
+ * "Menu here" button on the Branches tab. That put the question "what does
+ * Jounieh serve" one tab away from the menu it is a question about, behind a
+ * button on a row whose every other click opened the branch's form. The picker
+ * is the same one the Hours tab has, for the same reason: a chain's places
+ * share one shop page, and the tab is where you choose which one you mean.
+ *
+ * It hides itself on a shop with one branch — there is nothing for a branch
+ * to differ from, so every override would apply everywhere the shop trades,
+ * which is what the shared menu already edits.
+ *
+ * ## The shared menu stays mounted under a branch
+ *
+ * Hidden rather than unmounted, like the tab panes around it: its scroll
+ * position, its open sections and any half-typed section name are still there
+ * when the picker goes back to it. The branch view is cheap to rebuild — it
+ * reads the same cached menu plus one query of overrides — so it is mounted
+ * only while shown, keyed on the branch so nothing carries from one to the
+ * next.
+ */
 export function StoreMenu({ storeId }: { storeId: string }) {
+  const branches = useBranches(storeId);
+  const rows = branches.data ?? [];
+  // `""` is the shared menu. A branch that has since been closed falls back to
+  // it rather than to a page of switches for a place that no longer trades.
+  const [branchId, setBranchId] = useState("");
+  const branch =
+    rows.length > 1 ? (rows.find((row) => row.id === branchId) ?? null) : null;
+
+  return (
+    <div className="flex h-full flex-col">
+      {rows.length > 1 && (
+        <div className="flex shrink-0 items-center gap-md border-b border-border bg-surface px-xxl py-lg">
+          <span className="shrink-0 text-[13px] font-semibold text-text-soft">
+            {t("menu.forBranch")}
+          </span>
+          <span className="w-[280px]">
+            <Select
+              value={branch?.id ?? ""}
+              onChange={setBranchId}
+              options={[
+                { value: "", label: t("menu.everyBranch") },
+                ...rows.map((one) => ({
+                  value: one.id,
+                  label: pickLocalized(one.name),
+                })),
+              ]}
+            />
+          </span>
+        </div>
+      )}
+
+      <div className={cx("min-h-0 flex-1", branch && "hidden")}>
+        <SharedMenu storeId={storeId} />
+      </div>
+
+      {branch && (
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-hint p-xxl">
+          <BranchMenuPanel key={branch.id} branch={branch} storeId={storeId} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SharedMenu({ storeId }: { storeId: string }) {
   const router = useRouter();
   const store = useStore(storeId);
   const menu = useMenu(storeId);

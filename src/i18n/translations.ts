@@ -2485,6 +2485,10 @@ const en = {
 
   menu: {
     title: "Menu",
+    // The picker over the Menu tab, on a shop with more than one branch. The
+    // first choice is the menu itself; a branch shows what it does differently.
+    forBranch: "Showing",
+    everyBranch: "Every branch (the shared menu)",
     back: "All shops",
     itemNotFound: "That item is not here any more.",
     sectionNotFound: "That section is not here any more.",
@@ -2719,9 +2723,6 @@ const en = {
     // charges. One warning, one wording, on both screens that show it.
     count: "{count} branches",
     countOne: "1 branch",
-    // Opens the panel below. Named for the question it answers rather than for
-    // the tables behind it.
-    menuHere: "Menu here",
     // A shop always has at least one after `0101`, so this is a schema that
     // has not been migrated rather than an empty state to design for.
     noneYet: "This shop has no branches yet.",
@@ -2735,7 +2736,6 @@ const en = {
    * at the airport.
    */
   branchMenu: {
-    title: "Menu at {name}",
     intro:
       "The menu belongs to the shop and every branch serves it. Turn off what this branch does not, and fill in a price only where it charges something different.",
     served: "Served",

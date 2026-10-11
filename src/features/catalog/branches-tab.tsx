@@ -163,13 +163,6 @@ export function BranchesTab({ storeId }: { storeId: string }) {
                   : `/catalogue/${storeId}/branches/${branch.id}`,
               ),
             )}
-            /* Its own page rather than a tab on the editor: the editor is a
-                 form with a Save, and this is a list of switches that write as
-                 they are flipped. One header over both would make the Save look
-                 as though it governed them. */
-            onShowMenu={guarded(() =>
-              router.push(`/catalogue/${storeId}/branches/${branch.id}/menu`),
-            )}
             onClose={async () => {
               await archive.mutateAsync({
                 id: branch.id,
@@ -183,28 +176,25 @@ export function BranchesTab({ storeId }: { storeId: string }) {
              * A shop that has never been thought about as a chain has exactly
              * the one branch migration `0101` gave it, named after itself —
              * which is what the merchant sees here, and it reads as the store
-             * rather than as a place the store trades from. Neither action on
-             * the row means anything in that state:
+             * rather than as a place the store trades from. **Close** means
+             * nothing in that state: a shop with no branches is listed, has a
+             * menu, and has nowhere for an order to arrive, so the button was
+             * rendered at 40% and swallowed its own clicks — a control whose
+             * only job was to look unavailable.
              *
-             * - **Close** was already impossible. A shop with no branches is
-             *   listed, has a menu, and has nowhere for an order to arrive, so
-             *   the button was rendered at 40% and swallowed its own clicks —
-             *   a control whose only job was to look unavailable.
-             * - **Menu here** offers to hide items and override prices *at
-             *   this branch*, and there is nothing to differ from. Every
-             *   override would apply everywhere the shop trades, which is what
-             *   the Menu tab already edits.
-             *
-             * Both come back the moment a second branch exists, including on
+             * It comes back the moment a second branch exists, including on
              * this row: once there are two places, the first one is a place
-             * like any other and its menu really can differ.
+             * like any other and can close.
+             *
+             * What a branch serves and charges is not on this row: it is the
+             * Menu tab's branch picker, beside the menu it differs from.
              *
              * `archiveBranch` still refuses the last branch on its own — a
              * stale list is the one case a hidden button does not cover.
              */
             /* Never while searching: `rows.length` is then how many
-               *matched*, and one match in a chain of nine would hide Close and
-               Menu here on a branch that is not the shop's only one. Unfiltered
+               *matched*, and one match in a chain of nine would hide Close on
+               a branch that is not the shop's only one. Unfiltered
                it is the count it has always been. */
             soleBranch={!searching && rows.length === 1}
           />
@@ -220,7 +210,6 @@ function BranchRow({
   categoryName,
   anchor,
   onEdit,
-  onShowMenu,
   onClose,
   soleBranch,
 }: {
@@ -231,7 +220,6 @@ function BranchRow({
   categoryName: string;
   anchor: (node: HTMLElement | null) => void;
   onEdit: () => void;
-  onShowMenu: () => void;
   onClose: () => Promise<void>;
   /** The shop's only branch — see the call site. Renders no actions. */
   soleBranch: boolean;
@@ -305,28 +293,22 @@ function BranchRow({
         {!pinned && <NoPinWarning />}
       </button>
 
-      {/* Nothing on a one-branch shop — the row is the store, and both of these
-          are answers to questions only a chain can ask. See the call site. */}
+      {/* Nothing on a one-branch shop — the row is the store, and closing it is
+          a question only a chain can ask. See the call site. */}
       {!soleBranch && (
-        <>
-          <Button variant="primary-quiet" size="sm" onClick={onShowMenu}>
-            {t("branches.menuHere")}
-          </Button>
-
-          <ConfirmButton
-            className={ROW_ABOVE}
-            onConfirm={onClose}
-            titleKey="branches.closeTitle"
-            bodyKey="branches.closeBody"
-            confirmKey="branches.closeConfirm"
-            params={{ name }}
-            variant="danger"
-            triggerVariant="danger-quiet"
-            size="sm"
-          >
-            {t("branches.closeConfirm")}
-          </ConfirmButton>
-        </>
+        <ConfirmButton
+          className={ROW_ABOVE}
+          onConfirm={onClose}
+          titleKey="branches.closeTitle"
+          bodyKey="branches.closeBody"
+          confirmKey="branches.closeConfirm"
+          params={{ name }}
+          variant="danger"
+          triggerVariant="danger-quiet"
+          size="sm"
+        >
+          {t("branches.closeConfirm")}
+        </ConfirmButton>
       )}
     </div>
   );
