@@ -459,6 +459,9 @@ function MenuEditor({ storeId }: { storeId: string }) {
                   </span>
 
                   <div className="ms-auto flex items-center gap-sm">
+                    {/* The branch's switch, as on the section's heading in
+                        the list. */}
+                    <BranchSectionControls sectionId={section.id} />
                     <Button
                       variant="primary-quiet"
                       size="sm"
@@ -1357,11 +1360,15 @@ function SearchResult({
 }) {
   /** The line under the name — see `ItemRow` on why it is not always drawn. */
   const detail = [unitSize(item), sectionTitle].filter(Boolean).join(" · ");
+  // A result is the same dish found a different way, so on a chain it carries
+  // the same branch strip its row in the list does — see `ItemRow`.
+  const atBranch = useBranchMenu() !== null;
 
   return (
     <div
       className={cx(
         ROW,
+        atBranch && "flex-wrap",
         !item.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
         item.isActive && "border-transparent",
       )}
@@ -1441,6 +1448,8 @@ function SearchResult({
       >
         {t("menu.archive")}
       </ConfirmButton>
+
+      <BranchItemStrip item={item} sectionId={item.sectionId} />
     </div>
   );
 }
