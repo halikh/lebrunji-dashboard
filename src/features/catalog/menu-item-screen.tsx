@@ -33,6 +33,10 @@ import { useCreateMenuItem, useMenu, useUpdateMenuItem } from "./use-menu";
  * section whose Add button was pressed, and it is in the URL rather than in
  * state so that a reload or a pasted link still lands in the right part of the
  * menu instead of at the top of it.
+ *
+ * It is only where the form *opens*. The section is a field on the form, so a
+ * dish can be filed somewhere else before it is saved, or moved later — which
+ * lands it at the end of the section it joins, the same place a new one goes.
  */
 export function MenuItemScreen({
   storeId,
@@ -74,6 +78,7 @@ export function MenuItemScreen({
     : (params.get("section") ?? "");
 
   const section = sections.find((one) => one.id === sectionId);
+  const sectionById = (id: string) => sections.find((one) => one.id === id);
 
   const menuHref = `/catalogue/${storeId}`;
   const backHref = itemId ? `${menuHref}?focus=${itemId}` : menuHref;
@@ -116,9 +121,10 @@ export function MenuItemScreen({
       itemId={itemId}
       sectionId={sectionId}
       initial={initial}
-      // The overline says where in the menu this lands. The title below cannot
-      // — "Falafel" says nothing about which section it is in.
-      overline={pickLocalized(section?.title ?? {})}
+      // For the picker, and for the overline that says where in the menu this
+      // lands. The title cannot — "Falafel" says nothing about which section it
+      // is in.
+      sections={sections}
       imageUrl={initial?.imageUrl ?? null}
       title={initial ? pickLocalized(initial.name) : t("menu.newItem")}
       backHref={backHref}
@@ -127,12 +133,29 @@ export function MenuItemScreen({
       error={error}
       onSave={(draft) => {
         if (itemId) {
-          update.mutate({ id: itemId, patch: draft }, { onSuccess: leave });
+          const { sectionId: target, ...fields } = draft;
+          update.mutate(
+            {
+              id: itemId,
+              // Only a move carries the section and a new position. Sent on
+              // every save, the position would throw away wherever the dish was
+              // dragged to within the section it never left.
+              patch:
+                target !== sectionId
+                  ? {
+                      ...fields,
+                      sectionId: target,
+                      sortOrder: nextSortOrder(sectionById(target)),
+                    }
+                  : fields,
+            },
+            { onSuccess: leave },
+          );
         } else {
           create.mutate(
             {
-              draft: { ...draft, storeId, sectionId },
-              sortOrder: nextSortOrder(section),
+              draft: { ...draft, storeId },
+              sortOrder: nextSortOrder(sectionById(draft.sectionId)),
             },
             { onSuccess: leave },
           );
@@ -146,14 +169,26 @@ export function MenuItemScreen({
           : (draft) =>
               create.mutate(
                 {
-                  draft: { ...draft, storeId, sectionId },
+                  draft: { ...draft, storeId },
                   // At the end of the section it was added to. The column has
                   // no default, and "where does it go" is a question the caller
                   // can answer and the database cannot.
-                  sortOrder: nextSortOrder(section),
+                  sortOrder: nextSortOrder(sectionById(draft.sectionId)),
                 },
-                // The blank form is the reward for a save that landed.
-                { onSuccess: () => setAdded((count) => count + 1) },
+                {
+                  onSuccess: () => {
+                    // The next blank form opens in the section this one was
+                    // filed under, not the one whose Add was first pressed —
+                    // the operator who changed it is working down that one.
+                    if (draft.sectionId !== sectionId) {
+                      router.replace(
+                        `/catalogue/${storeId}/items/new?section=${draft.sectionId}`,
+                      );
+                    }
+                    // The blank form is the reward for a save that landed.
+                    setAdded((count) => count + 1);
+                  },
+                },
               )
       }
       onCancel={leave}

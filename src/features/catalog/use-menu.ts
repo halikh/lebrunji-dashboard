@@ -115,13 +115,36 @@ export function useUpdateMenuItem(storeId: string) {
 
       queryClient.setQueryData<MenuSection[]>(
         menuKeys.store(storeId),
-        (sections) =>
-          sections?.map((section) => ({
+        (sections) => {
+          const target = input.patch.sectionId;
+          const moving = target
+            ? sections
+                ?.flatMap((section) => section.items)
+                .find((item) => item.id === input.id)
+            : undefined;
+
+          // A move takes the row out of one section and puts it at the end of
+          // another, rather than patching it where it stands — patched in place
+          // it would carry the new section's id while still drawn under the
+          // old heading until the refetch.
+          if (target && moving && moving.sectionId !== target) {
+            const moved = { ...moving, ...input.patch, sectionId: target };
+            return sections?.map((section) => ({
+              ...section,
+              items:
+                section.id === target
+                  ? [...section.items, moved]
+                  : section.items.filter((item) => item.id !== input.id),
+            }));
+          }
+
+          return sections?.map((section) => ({
             ...section,
             items: section.items.map((item) =>
               item.id === input.id ? { ...item, ...input.patch } : item,
             ),
-          })),
+          }));
+        },
       );
 
       return { snapshot };

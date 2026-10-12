@@ -38,6 +38,13 @@ import {
 } from "@/lib/validation";
 
 export type ItemDraft = {
+  /**
+   * The section it sits in. Picked on the form, so a dish filed under the
+   * wrong heading moves without being archived and typed again — and so the
+   * "move them first" that archiving a full section asks for is something the
+   * operator can actually do.
+   */
+  sectionId: string;
   name: Localized;
   description: Localized;
   /** Minor units, as an integer. Never a float — see `lib/money.ts`. */
@@ -87,7 +94,8 @@ export type ItemDraft = {
  * menu**, and that is kept without the row growing: the page returns
  * `?focus=<id>` and the list scrolls that dish back into view. The section this
  * dish belongs to is named in the overline, which is the context that says
- * whether the thing being added belongs there, and "save and add another" keeps
+ * whether the thing being added belongs there — and is a field on the form, so a
+ * dish in the wrong place can be moved from here. "Save and add another" keeps
  * the operator on the form rather than sending them round the loop again.
  *
  * See `MenuItemScreen`, which is what supplies all of that.
@@ -109,8 +117,8 @@ export function MenuItemEditor({
   itemId,
   sectionId,
   initial,
+  sections,
   title,
-  overline,
   imageUrl: pictureUrl,
   backHref,
   backLabel,
@@ -121,10 +129,10 @@ export function MenuItemEditor({
   onCancel,
 }: {
   initial?: Partial<ItemDraft>;
+  /** The shop's sections, for the picker and the overline. */
+  sections: { id: string; title: Localized }[];
   /** The dish's name, or "New item". */
   title: string;
-  /** Which section it lands in — see the note on `MenuItemScreen`. */
-  overline: string;
   /** The dish's own picture, drawn beside the title. */
   imageUrl?: string | null;
   backHref: string;
@@ -137,6 +145,10 @@ export function MenuItemEditor({
   /** Where this dish lives, so the options link can open on it. */
   storeId: string;
   itemId: string | null;
+  /**
+   * The section it is in now, or the one whose Add was pressed — what the
+   * picker opens on. See the note on `MenuItemScreen`.
+   */
   sectionId: string;
   onCancel: () => void;
 }) {
@@ -162,6 +174,7 @@ export function MenuItemEditor({
    */
   const shopLine = store.data ? <ShopLine store={store.data} /> : null;
 
+  const [section, setSection] = useState(sectionId);
   const [name, setName] = useState<Localized>(initial?.name ?? {});
   const [description, setDescription] = useState<Localized>(
     initial?.description ?? {},
@@ -190,6 +203,7 @@ export function MenuItemEditor({
   useUnsavedChanges(
     changed(
       {
+        section,
         name,
         description,
         price,
@@ -201,6 +215,7 @@ export function MenuItemEditor({
         unitStep,
       },
       {
+        section: sectionId,
         name: initial?.name ?? {},
         description: initial?.description ?? {},
         price: String(initial?.price ?? ""),
@@ -390,6 +405,7 @@ export function MenuItemEditor({
       return null;
     }
     return {
+      sectionId: section,
       name,
       description,
       price: parsed,
@@ -435,7 +451,9 @@ export function MenuItemEditor({
          uppercased: it is the operator's own section title, shown as written. */
       aside={
         <span className="text-[11px] font-bold tracking-wide text-text-faint">
-          {overline}
+          {pickLocalized(
+            sections.find((one) => one.id === section)?.title ?? {},
+          )}
         </span>
       }
       footer={
@@ -553,6 +571,25 @@ export function MenuItemEditor({
         </div>
 
         <div className="flex min-w-0 flex-col gap-lg">
+          {/* First of the facts, because it is the one that says where every
+            other answer on this side will be read: the same price and picture
+            under a different heading are a different place on the menu. */}
+          <Field label={t("menu.section")} hint={t("menu.sectionHint")}>
+            <Select
+              value={section}
+              onChange={(value) => {
+                // Not clearable, but a select can still hand back "" — and a
+                // dish with no section is not a state the column allows.
+                if (value) setSection(value);
+              }}
+              disabled={pending}
+              options={sections.map((one) => ({
+                value: one.id,
+                label: pickLocalized(one.title),
+              }))}
+            />
+          </Field>
+
           <Field
             label={t("menu.price")}
             hint={t("menu.priceHint")}

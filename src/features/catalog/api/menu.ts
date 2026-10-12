@@ -404,9 +404,7 @@ export async function createMenuItems(
   if (error) throw new Error(friendly(error.message));
 }
 
-export type MenuItemPatch = Partial<
-  Omit<MenuItemDraft, "storeId" | "sectionId">
-> & {
+export type MenuItemPatch = Partial<Omit<MenuItemDraft, "storeId">> & {
   sortOrder?: number;
 };
 
@@ -435,6 +433,11 @@ export async function updateMenuItem(
   // turns a stepped item back into a counted one.
   if (patch.unitStep !== undefined) row.unit_step = patch.unitStep;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+  // Moving a dish to another section of the same shop. The caller sends a
+  // `sortOrder` with it — the end of the section it is joining — because the
+  // position it had is a position among its old neighbours, and kept as it is
+  // it would land wherever that number happens to fall among the new ones.
+  if (patch.sectionId !== undefined) row.menu_section_id = patch.sectionId;
 
   // A patch may be tags only — a reorder is not, and neither is a switch — so
   // an empty row is a valid update with nothing to write rather than a bug.

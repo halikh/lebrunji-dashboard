@@ -2596,6 +2596,11 @@ const en = {
     // so stops it looking like a field that ignores what you type.
     slugHint: "Used by imports. Filled in from the name.",
     formLabel: "Item details",
+    // The picker on an item's page — how a dish moves from one section to
+    // another.
+    section: "Section",
+    sectionHint:
+      "Where it sits on the menu. Moving it puts it at the end of that section.",
     visibility: "Visibility",
     // Every helper says something the field does not already say. A hint that
     // repeats the label is noise, and noise is what teaches people to stop
