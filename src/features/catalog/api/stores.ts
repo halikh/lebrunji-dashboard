@@ -478,6 +478,9 @@ async function ensureFirstBranch(
         // to "Hamra" is the operator's first job on a shop that turns out to be
         // a chain.
         name: titleLocalized(draft.name),
+        // None — the shop form does not ask for one, and the branch's own
+        // editor is where it is written (0194).
+        address: null,
         latitude: draft.latitude,
         longitude: draft.longitude,
         prepMinMinutes: draft.prepMinMinutes,

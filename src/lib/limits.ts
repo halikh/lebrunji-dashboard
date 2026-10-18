@@ -32,6 +32,15 @@ export const TEXT = {
   name: 80,
   /** `menu_items.description`. */
   description: 500,
+  /**
+   * `branches.address` — a short street address under the shop (`0194`).
+   *
+   * The dashboard's limit only: `0194` checks the shape (an object) and no
+   * length, so there is no `_len` constraint for `check:limits` to compare
+   * this with. A line under a shop's name on a phone; a paragraph is not an
+   * address.
+   */
+  address: 120,
   /** `menu_sections.title`, `option_groups.title`. */
   title: 80,
   /**

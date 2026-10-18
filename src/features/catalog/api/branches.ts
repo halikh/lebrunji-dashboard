@@ -3,7 +3,7 @@ import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
 import { digitsOf } from "@/lib/phone";
 import { likeAny, searchTerm } from "@/lib/search";
-import type { Localized } from "@/lib/validation";
+import { localizedOrNull, type Localized } from "@/lib/validation";
 
 /**
  * Branches — the places a shop trades from.
@@ -45,6 +45,15 @@ export type Branch = {
   slug: string;
   /** "Hamra", "Jounieh" — the place, not the brand. The brand is on the store. */
   name: Localized;
+  /**
+   * A short street address — "Hamra St., near the AUB gate" — which the app
+   * prints under the shop (`0194`).
+   *
+   * Optional, unlike the name: most branches have none yet, and a card with no
+   * address line is the card it was before. Null when blank, never `{}` — the
+   * same encoding `localizedOrNull` gives every optional translated column.
+   */
+  address: Localized | null;
   /**
    * Where this branch is.
    *
@@ -95,7 +104,7 @@ export type Branch = {
  */
 const BRANCH_SEARCH = ["name->>en", "name->>ar", "slug"] as const;
 
-const COLUMNS = `id, store_id, slug, name, latitude, longitude,
+const COLUMNS = `id, store_id, slug, name, address, latitude, longitude,
   prep_min_minutes, prep_max_minutes, whatsapp_phone, image_url, currency_code,
   is_active, sort_order`;
 
@@ -105,6 +114,7 @@ function toBranch(row: Record<string, unknown>): Branch {
     storeId: row.store_id as string,
     slug: row.slug as string,
     name: (row.name as Localized) ?? {},
+    address: (row.address as Localized | null) ?? null,
     latitude: (row.latitude as number | null) ?? null,
     longitude: (row.longitude as number | null) ?? null,
     prepMinMinutes: row.prep_min_minutes as number,
@@ -282,6 +292,8 @@ function requireTradeable(draft: {
 
 export type BranchDraft = {
   name: Localized;
+  /** Optional — blank in every language is saved as null. See `Branch`. */
+  address: Localized | null;
   latitude: number | null;
   longitude: number | null;
   prepMinMinutes: number;
@@ -306,6 +318,8 @@ export async function createBranch(
     .insert({
       store_id: storeId,
       name: draft.name,
+      // Null when blank, never `{}` — see `localizedOrNull`.
+      address: localizedOrNull(draft.address),
       // Both or neither — half a pin passes every column check and means
       // nothing. `branches_pin_whole` refuses it; this keeps the refusal from
       // being the first anybody hears of it.
@@ -351,6 +365,9 @@ export async function updateBranch(
 
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
+  if (patch.address !== undefined) {
+    row.address = localizedOrNull(patch.address);
+  }
   if (patch.latitude !== undefined) row.latitude = patch.latitude;
   if (patch.longitude !== undefined) row.longitude = patch.longitude;
   if (patch.prepMinMinutes !== undefined)

@@ -158,6 +158,7 @@ function BranchEditor({
   const { currencies } = useMoney();
 
   const [name, setName] = useState<Localized>(initial?.name ?? {});
+  const [address, setAddress] = useState<Localized>(initial?.address ?? {});
   const [whatsapp, setWhatsapp] = useState(initial?.whatsappPhone ?? "");
   const [prepMin, setPrepMin] = useState(String(initial?.prepMinMinutes ?? 10));
   const [prepMax, setPrepMax] = useState(String(initial?.prepMaxMinutes ?? 20));
@@ -184,6 +185,7 @@ function BranchEditor({
 
   const [errors, setErrors] = useState<{
     name?: string;
+    address?: string;
     prep?: string;
     whatsapp?: string;
     pin?: string;
@@ -193,6 +195,7 @@ function BranchEditor({
     changed(
       {
         name,
+        address,
         whatsapp,
         prepMin,
         prepMax,
@@ -203,6 +206,7 @@ function BranchEditor({
       },
       {
         name: initial?.name ?? {},
+        address: initial?.address ?? {},
         whatsapp: initial?.whatsappPhone ?? "",
         prepMin: String(initial?.prepMinMinutes ?? 10),
         prepMax: String(initial?.prepMaxMinutes ?? 20),
@@ -225,11 +229,17 @@ function BranchEditor({
     const max = Number(prepMax);
 
     const nameCheck = validateLocalizedText(name, codes, TEXT.name);
+    const addressCheck = validateLocalizedText(address, codes, TEXT.address, {
+      optional: true,
+    });
     const prepCheck = validatePrepWindow(min, max);
     const phoneCheck = validatePhone(digitsOf(whatsapp));
 
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
+      address: addressCheck.ok
+        ? undefined
+        : t(addressCheck.key, addressCheck.params),
       prep: prepCheck.ok ? undefined : t(prepCheck.key, prepCheck.params),
       /*
        * Required now, where it used to be optional.
@@ -275,6 +285,8 @@ function BranchEditor({
     // for where that is enforced on every path.
     onSave({
       name,
+      // Blank in every language is null — the api's `localizedOrNull`.
+      address,
       latitude: coordinates?.latitude ?? null,
       longitude: coordinates?.longitude ?? null,
       prepMinMinutes: min,
@@ -353,6 +365,20 @@ function BranchEditor({
               placeholder={{ en: t("branches.namePlaceholder"), ar: "الحمرا" }}
               error={errors.name}
               maxLength={TEXT.name}
+            />
+
+            <LocalizedField
+              label={t("branches.address")}
+              hint={t("branches.addressHint")}
+              value={address}
+              onChange={setAddress}
+              placeholder={{
+                en: t("branches.addressPlaceholder"),
+                ar: "شارع الحمرا، قرب بوابة الجامعة الأميركية",
+              }}
+              optional
+              error={errors.address}
+              maxLength={TEXT.address}
             />
 
             <FieldPair>

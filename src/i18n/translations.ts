@@ -2684,6 +2684,12 @@ const en = {
     // The place, not the brand — the shop's name is already above.
     nameHint: "The area or street, not the shop's name.",
     namePlaceholder: "Hamra",
+    // Optional (0194). Printed under the shop in the app, so the hint says
+    // where it shows rather than repeating the label.
+    address: "Address",
+    addressHint:
+      "A short street address the app shows under the shop. Leave empty if the name says it.",
+    addressPlaceholder: "Hamra St., near the AUB gate",
     pin: "Where it is",
     pinHint:
       "Delivery is charged from here. Without a pin every order from this branch is charged at the top distance band.",

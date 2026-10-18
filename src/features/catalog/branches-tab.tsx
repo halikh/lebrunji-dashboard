@@ -225,6 +225,7 @@ function BranchRow({
   soleBranch: boolean;
 }) {
   const name = pickLocalized(branch.name);
+  const address = pickLocalized(branch.address);
   const pinned = branch.latitude !== null && branch.longitude !== null;
 
   return (
@@ -274,6 +275,12 @@ function BranchRow({
             </span>
           )}
         </span>
+
+        {/* Where it is, in words — what the app prints under the shop (0194).
+            Optional, so a branch without one keeps the row it had. */}
+        {address && (
+          <span className="truncate text-[12px] text-text-soft">{address}</span>
+        )}
 
         {/* The shops list's meta line, with the half that is now the branch's.
             The category is the brand's and repeats; the prep window is this
