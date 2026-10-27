@@ -78,7 +78,15 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
       )}
     >
       <div className="hidden md:mb-xl md:flex md:shrink-0 md:justify-center short:mb-sm">
-        <Logo width={56} />
+        {/* The wide lockup on a tablet, the stacked one from `lg` — the same
+            split the phone's top bar makes. Both rendered, one hidden, because
+            which fits is a question for the stylesheet, not for React. */}
+        <span className="lg:hidden">
+          <Logo variant="wide" width={96} />
+        </span>
+        <span className="hidden lg:block">
+          <Logo width={56} />
+        </span>
       </div>
 
       {SECTIONS.map((section) => {

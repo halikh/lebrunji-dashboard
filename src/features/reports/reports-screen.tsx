@@ -202,7 +202,7 @@ export function ReportsScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-lg py-lg md:px-xxl">
-        <h1 className="flex-grow text-[30px]">{t("reports.title")}</h1>
+        <h1 className="flex-grow text-[26px] md:text-[30px]">{t("reports.title")}</h1>
       </div>
 
       <div className="min-h-0 flex-grow overflow-y-auto scroll-hint">
@@ -457,34 +457,36 @@ export function ReportsScreen() {
                     that cannot narrow would widen the column past the page. */}
                 <div className="grid gap-xxl xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                   <Card title={t("reports.chartRevenue")}>
-                    {/* Scrolls inside the card if it ever must. A bar per day
-                        with a fixed gap between them is 89 gaps on the 90-day
-                        range — more than a phone's card is wide before a single
-                        bar is drawn — and the overflow belongs to the chart's
-                        box, not to the page. */}
-                    <div className="min-w-0 overflow-x-auto">
-                      <BarChart
-                        height={160}
-                        // Money is `accent` — the palette's "going well" — and
-                        // the tallest bar is drawn at full strength, so "our best
-                        // day" is answered without comparing heights by eye.
-                        tone="accent"
-                        title={t("reports.chartRevenueAria")}
-                        bars={stats.data.daily.map((day, index) => ({
-                          key: day.day,
-                          // Every third label, or thirty of them overlap into a
-                          // grey smear that reads as noise.
-                          label: index % 3 === 0 ? day.day.slice(8) : "",
-                          value: day.revenue,
-                          ghost: prior.data?.daily[index]?.revenue,
-                          title: t("reports.chartRevenueTitle", {
-                            day: day.day,
-                            orders: day.orders,
-                            amount: format(day.revenue, code),
-                          }),
-                        }))}
-                      />
-                    </div>
+                    {/* No scroll box: the bars' gaps shrink with their count
+                        (see `BarChart`), so ninety days fit a phone's card, and
+                        a box would clip the first and last labels, which sit
+                        centred on bars at the very edge. */}
+                    <BarChart
+                      height={160}
+                      // Money is `accent` — the palette's "going well" — and
+                      // the tallest bar is drawn at full strength, so "our best
+                      // day" is answered without comparing heights by eye.
+                      tone="accent"
+                      title={t("reports.chartRevenueAria")}
+                      bars={stats.data.daily.map((day, index) => ({
+                        key: day.day,
+                        // About ten labels whatever the range — every day for
+                        // a week, every third for a month, every ninth for a
+                        // quarter. More overlap into a grey smear, and on a
+                        // phone ten is what fits across the card.
+                        label:
+                          index % labelStride(stats.data.daily.length) === 0
+                            ? day.day.slice(8)
+                            : "",
+                        value: day.revenue,
+                        ghost: prior.data?.daily[index]?.revenue,
+                        title: t("reports.chartRevenueTitle", {
+                          day: day.day,
+                          orders: day.orders,
+                          amount: format(day.revenue, code),
+                        }),
+                      }))}
+                    />
                     {prior.isSuccess && (
                       <p className="text-[12px] text-text-faint">
                         {t("reports.ghostNote")}
@@ -704,4 +706,9 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 /** Nothing to draw is a sentence, never an empty box that looks broken. */
 function Empty() {
   return <EmptyState titleKey="reports.nothingYet" mood="waiting" />;
+}
+
+/** Every how-many-th day carries a label, so a range gets about ten of them. */
+function labelStride(days: number) {
+  return Math.max(1, Math.ceil(days / 10));
 }

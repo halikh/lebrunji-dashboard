@@ -444,8 +444,11 @@ export function WeekEditor({
        Seven rows of switches and pickers is the right shape for *setting* a
        week and the wrong one for *checking* it — "Mon–Fri 11:00–23:00,
        closed Sunday" is the same information in the form a person actually
-       holds it in, and it is what catches the day left shut by accident. */
-    <div className="flex flex-col gap-xxl lg:flex-row lg:items-start">
+       holds it in, and it is what catches the day left shut by accident.
+
+       Stacked, the panel follows the days at their own `gap-sm`, so it reads
+       as the end of the list rather than as a separate block. */
+    <div className="flex flex-col gap-sm lg:flex-row lg:items-start lg:gap-xxl">
       <div className="flex flex-1 flex-col gap-lg">
         <div className="flex flex-col gap-sm">
           {DISPLAY_ORDER.map((index) => {

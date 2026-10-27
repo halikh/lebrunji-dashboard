@@ -33,7 +33,11 @@ export function railItemClass(
     // A short window: see `short` in `globals.css`. Half the padding is what
     // brings the rail's nine items under the height it is used at.
     "short:py-[6px]",
-    active && "bg-active-fill text-on-active shadow-selected",
+    // The dark pill on the rail only. In the bottom bar the active item is
+    // just black type against the others' soft grey — a filled block there
+    // was the heaviest thing on a phone's screen.
+    active &&
+      "text-text max-md:font-semibold md:bg-active-fill md:text-on-active md:shadow-selected",
     !active && tone === "default" && "text-text-soft hover:bg-neutral-fill",
     // Danger is never the "active" state — there is no page to be on — so it
     // only has the two. Muted until hovered, because a permanently red item in

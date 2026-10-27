@@ -346,8 +346,13 @@ function MenuEditor({ storeId }: { storeId: string }) {
                 header does not scroll, so this is reachable on a menu of any
                 length — which is what the pinned bar used to be for. */}
             {menu.isSuccess && adding === "none" && (
-              <>
-                <Button onClick={() => setAddingMode("one")}>
+              // Grouped so they wrap as a pair: on a phone they share the line
+              // under the search equally rather than stacking one per line.
+              <div className="flex items-center gap-lg max-md:basis-full max-md:gap-sm">
+                <Button
+                  onClick={() => setAddingMode("one")}
+                  className="max-md:flex-1"
+                >
                   {t("menu.addSection")}
                 </Button>
                 {/* Beside the one-at-a-time button, because they are two ways
@@ -356,10 +361,11 @@ function MenuEditor({ storeId }: { storeId: string }) {
                 <Button
                   variant="secondary"
                   onClick={() => setAddingMode("bulk")}
+                  className="max-md:flex-1"
                 >
                   {t("menu.bulkSections")}
                 </Button>
-              </>
+              </div>
             )}
             {searching && (
               <>
@@ -1044,7 +1050,13 @@ function Section({
               {t("menu.addItem", { section: title })}
             </button>
 
-            <Button variant="secondary" onClick={() => setPasting(true)}>
+            {/* Full width once it has wrapped under the dashed row on a phone,
+                so the two read as one block rather than a stray button. */}
+            <Button
+              variant="secondary"
+              onClick={() => setPasting(true)}
+              className="max-md:w-full"
+            >
               {t("menu.bulkItems")}
             </Button>
           </div>
@@ -1134,8 +1146,12 @@ function ItemRow({
         // `ROW_TARGET` stretches this button's hit area over the whole row —
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
         className={cx(
+          // On a phone the name takes the rest of its line — the picture (44px)
+          // and a 16px gap are the 60px; the grip sits on the line above, see
+          // `handleProps` — and the price drops to the next, at the start of
+          // the controls' line. Beside the price a name had about 100px.
           ROW_TARGET,
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-0",
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-[calc(100%-60px)]",
         )}
       >
         <span
@@ -1168,7 +1184,7 @@ function ItemRow({
       {/* Set in the shop's own currency, shown in both: the price the merchant
           typed on top, what a customer thinking in the other one would hear
           underneath. */}
-      <div className="flex shrink-0 flex-col items-end">
+      <div className="flex shrink-0 flex-col items-end max-md:items-start">
         <Price
           value={item.price}
           code={currencyCode}
@@ -1193,9 +1209,10 @@ function ItemRow({
           row never did. */}
       {!carried && (
         <>
-          {/* Grouped so that on a phone they wrap together, to the end of a
-              line of their own — see the row's `max-md:flex-wrap`. */}
-          <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">
+          {/* Grouped so that on a phone they wrap together, to the end of
+              the second line, with the price at its start — see the name's
+              basis above. */}
+          <div className="flex shrink-0 items-center gap-lg max-md:ms-auto">
             <ConfirmToggle
               on={item.isActive}
               onChange={onToggle}
@@ -1429,7 +1446,7 @@ function SearchResult({
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
         className={cx(
           ROW_TARGET,
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-0",
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-[calc(100%-60px)]",
         )}
       >
         <span
@@ -1446,7 +1463,7 @@ function SearchResult({
         <ItemTags ids={item.tagIds} />
       </button>
 
-      <div className="flex shrink-0 flex-col items-end">
+      <div className="flex shrink-0 flex-col items-end max-md:items-start">
         <Price
           value={item.price}
           code={currencyCode}
@@ -1460,7 +1477,7 @@ function SearchResult({
       </div>
 
       {/* Together, for the same wrap as an `ItemRow`'s. */}
-      <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">
+      <div className="flex shrink-0 items-center gap-lg max-md:ms-auto">
         <ConfirmToggle
           on={item.isActive}
           onChange={onToggle}

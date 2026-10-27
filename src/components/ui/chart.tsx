@@ -175,7 +175,11 @@ export function BarChart({
           <span
             key={bar.key}
             aria-hidden
-            className="flex-1 truncate text-center text-[10px] text-text-faint"
+            // Centred on its bar and allowed to spill past it, not truncated.
+            // At ninety bars on a phone a bar is about 3px — a truncated label
+            // was an ellipsis — and callers keep the labels sparse enough
+            // that the empty neighbours give it the room.
+            className="flex min-w-0 flex-1 justify-center overflow-visible whitespace-nowrap text-[10px] text-text-faint"
           >
             {bar.label}
           </span>

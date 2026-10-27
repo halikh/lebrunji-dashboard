@@ -96,14 +96,19 @@ export function BranchesTab({ storeId }: { storeId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-lg md:px-xxl py-lg">
+      {/* On a phone the title and the button share the first line and the
+          search takes the whole of the second, as `ListHeader` does — between
+          them it was squeezed to an icon. */}
+      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-lg md:px-xxl py-lg max-md:flex-wrap max-md:gap-y-md">
         <h2 className="shrink-0 text-[19px]">{t("branches.tab")}</h2>
         <SearchInput
           value={search}
           onChange={setSearch}
           placeholder={t("branches.searchPlaceholder")}
+          className="max-md:order-last max-md:basis-full"
         />
         <Button
+          className="max-md:ms-auto"
           onClick={guarded(() =>
             router.push(`/catalogue/${storeId}/branches/new`),
           )}

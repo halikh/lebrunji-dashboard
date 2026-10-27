@@ -67,9 +67,13 @@ type ButtonSize = "lg" | "md" | "sm";
 // The app's control sizes (`theme/sizing.ts`) at its 440pt reference: `lg` 54
 // for the one action a screen exists for, `md` 48, `sm` 40 for actions that
 // repeat down a list.
+//
+// A step down on a phone, where 48px beside a 26px heading was the heaviest
+// thing on the screen: `lg` takes `md`'s 48, `md` takes `sm`'s 40, and `sm`
+// stays at 40 — the floor a thumb needs, so it has nowhere lower to go.
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  lg: "h-[54px] rounded-md px-lg text-[16px]",
-  md: "h-[48px] rounded-md px-lg text-[15px]",
+  lg: "h-[48px] rounded-md px-lg text-[15px] md:h-[54px] md:text-[16px]",
+  md: "h-[40px] rounded-md px-md text-[14px] md:h-[48px] md:px-lg md:text-[15px]",
   sm: "h-[40px] rounded-xs px-md text-[14px]",
 };
 

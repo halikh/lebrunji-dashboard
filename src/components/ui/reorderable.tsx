@@ -975,6 +975,12 @@ export function useReorder({
         // and `touch-none` covers it too; the 28px square that shows stays put,
         // and no row grows. (`ROW_ABOVE` below supplies the `relative`.)
         "before:absolute before:-inset-[8px] md:before:hidden",
+        // On a phone the grip sits on a line of its own, above the row's
+        // contents rather than before them: a margin that fills the rest of
+        // the line pushes everything after it to the next. Beside the picture
+        // it cost the name 44px it could not spare. Every list that renders a
+        // handle wraps its rows below `md` for this.
+        "max-md:me-[calc(100%-28px)]",
         moving === id ? "cursor-grabbing" : "cursor-grab",
         // Above the row's stretched hit area — see `ROW_TARGET` in `row.ts`.
         // Set here for the same reason `hidden` above is: every list renders

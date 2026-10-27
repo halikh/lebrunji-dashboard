@@ -89,7 +89,7 @@ export function TodoScreen() {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-lg py-lg md:px-xxl">
         <div className="flex flex-col gap-xxs">
-          <h1 className="text-[30px]">{t("todo.title")}</h1>
+          <h1 className="text-[26px] md:text-[30px]">{t("todo.title")}</h1>
           <p className="text-[14px] text-text-soft">{t("todo.blurb")}</p>
         </div>
         <SearchInput

@@ -99,12 +99,17 @@ export function SignOutButton({
         <button
           type="button"
           onClick={onClick}
+          title={variant === "bar" ? t("common.signOut") : undefined}
           className={
             variant === "bar" ? barItemClass : railItemClass({ tone: "danger" })
           }
         >
           <Icon name="sign-out" size={variant === "bar" ? 18 : undefined} />
-          {t("common.signOut")}
+          {/* The bar shows the icon alone; the words stay for a screen
+              reader, and as the tooltip. */}
+          <span className={variant === "bar" ? "sr-only" : undefined}>
+            {t("common.signOut")}
+          </span>
         </button>
       )}
     >
@@ -114,9 +119,11 @@ export function SignOutButton({
 }
 
 /**
- * One control in the phone's top bar: icon and label side by side, 40px tall
- * for a thumb. Exported for the account link beside it, so the two are the
- * same shape for the same reason `railItemClass` is shared.
+ * One control in the phone's top bar: an icon in a 40px square, for a thumb.
+ * Icon only — the bar is a strip beside the logo, and two words in it read as
+ * a second navigation competing with the one at the bottom. The label goes in
+ * an `sr-only` span at the call site. Exported for the account link beside it,
+ * so the two are the same shape for the same reason `railItemClass` is shared.
  */
 export const barItemClass =
-  "flex h-[40px] items-center gap-xs rounded-md px-sm text-[13px] font-medium text-text-soft hover:bg-neutral-fill hover:text-text";
+  "flex size-[40px] items-center justify-center rounded-md text-text-soft hover:bg-neutral-fill hover:text-text";

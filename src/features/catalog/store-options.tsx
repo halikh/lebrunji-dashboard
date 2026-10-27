@@ -165,7 +165,7 @@ export function StoreOptions({ storeId }: { storeId: string }) {
           The box searches the choices as well as the titles: a question is
           called "Size", which repeats across a shop, and what anybody remembers
           is "Half kilo". */}
-      <div className="flex shrink-0 flex-wrap items-end gap-lg px-lg md:px-xxl py-lg">
+      <div className="flex shrink-0 flex-wrap items-end gap-lg px-lg md:px-xxl py-lg max-md:items-center max-md:gap-sm">
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -183,7 +183,9 @@ export function StoreOptions({ storeId }: { storeId: string }) {
             section" is the same word twice, and the second one costs a line of
             a screen with none to spare. `aria-label` keeps it named for a
             screen reader, which is what the label was really doing. */}
-        <span className="w-full md:w-[320px] md:max-w-full">
+        {/* On a phone it shares its line with "New question", taking what
+            the button leaves; the item, once there is one, goes under both. */}
+        <span className="min-w-0 flex-1 md:w-[320px] md:max-w-full md:flex-none">
           <Select
             aria-label={t("options.section")}
             value={sectionId ?? ""}
@@ -198,7 +200,7 @@ export function StoreOptions({ storeId }: { storeId: string }) {
         </span>
 
         {section && (
-          <span className="w-full md:w-[320px] md:max-w-full">
+          <span className="w-full max-md:order-last md:w-[320px] md:max-w-full">
             <Select
               aria-label={t("options.item")}
               value={itemId ?? ""}

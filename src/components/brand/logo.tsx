@@ -3,11 +3,12 @@
  *
  * - **`stacked`** — the running pin in its tarboush over "leb" set above
  *   "Runji". Page 2 of "LebRunji Logo-final.pdf". Taller than wide, so it holds
- *   up in the narrow rail and the phone top bar, where a wide logo would shrink
- *   to nothing.
+ *   up at the top of the desktop rail.
  * - **`wide`** — the pin over "LebRunji" on one line. `lebrunji-1.svg` from the
  *   designer's SVG set. For the sign-in screens, where the logo has the width
- *   to itself and is the first thing anybody sees.
+ *   to itself and is the first thing anybody sees — and for the phone's top
+ *   bar and the tablet rail, where the name reads at a size the stacked
+ *   lockup's two short lines do not.
  *
  * Both are exported with the yellow presentation ground removed and the view
  * box cropped to the art, on their white sticker edge, so they stand on any

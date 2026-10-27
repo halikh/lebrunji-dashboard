@@ -74,7 +74,7 @@ export function PricingScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pt-lg md:px-xxl">
-        <h1 className="text-[30px]">{t("pricing.title")}</h1>
+        <h1 className="text-[26px] md:text-[30px]">{t("pricing.title")}</h1>
 
         <div role="tablist" className="-mb-px flex gap-lg">
           {TABS.map(({ key, labelKey }) => (

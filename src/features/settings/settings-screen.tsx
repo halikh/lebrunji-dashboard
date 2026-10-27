@@ -110,7 +110,7 @@ export function SettingsScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pt-lg md:px-xxl">
-        <h1 className="text-[30px]">{t("content.title")}</h1>
+        <h1 className="text-[26px] md:text-[30px]">{t("content.title")}</h1>
 
         {/* Scrolls sideways rather than wrapping on a phone. Four chapters fit
             at 360px in English, but a translation or a larger text setting can
@@ -337,8 +337,8 @@ function HelpRow({
     topic.id,
     cx(
       ROW,
-      // Two lines on a phone: the grip and the question on the first, the
-      // switch and Remove on the second. On one line the 104px switch and the
+      // Three lines on a phone: the grip, then the question, then the switch
+      // and Remove. On one line the 104px switch and the
       // button left the question about six characters, which is not enough
       // to tell one FAQ from the next.
       "max-md:flex-wrap max-md:gap-x-sm max-md:gap-y-xs max-md:px-md",
@@ -362,9 +362,9 @@ function HelpRow({
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
         className={cx(
           ROW_TARGET,
-          // The rest of the line after the 28px grip and its gap, so the
-          // controls are pushed onto the second line rather than squeezing it.
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-[calc(100%-36px)]",
+          // A line of its own on a phone, under the grip, so the controls are
+          // pushed onto the next rather than squeezing it.
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-full",
         )}
       >
         <span className="truncate text-[15px] font-semibold">{name}</span>
@@ -592,7 +592,9 @@ function PolicyRow({
       // Tighter on a phone, where the four fixed things in this row — grip,
       // number, Remove and the gaps between them — would otherwise take
       // half its width from the title.
-      "max-md:gap-sm max-md:px-md",
+      // Wrapping, so the grip can take its own line above — see
+      // `handleProps`.
+      "max-md:flex-wrap max-md:gap-sm max-md:px-md",
       open ? "border-active shadow-selected" : "border-transparent",
     ),
   );

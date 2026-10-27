@@ -293,14 +293,15 @@ export function AmendOrder({
       open
       onClose={guarded(onClose)}
       labelledBy={titleId}
-      className="w-[min(640px,92vw)]"
+      width={640}
+      flush
     >
       {/* `dvh` on a phone, where `vh` is the height with the address bar
           gone and a dialog sized to it runs its footer under the bar. Less
-          the dialog's own padding and the UA's margin, so the body scrolls
-          inside and the dialog itself never does. */}
+          the UA's margin, so the body scrolls inside and the dialog itself
+          never does. */}
       <div className="flex max-h-[calc(100dvh-6rem)] flex-col md:max-h-[80vh]">
-        <div className="flex flex-col gap-xxs border-b border-border p-lg pe-huge md:p-xxl">
+        <div className="flex flex-col gap-xxs border-b border-border p-lg pe-[60px] md:p-xxl md:pe-[60px]">
           <h2 id={titleId} className="text-[20px]">
             {t("amend.title", { code: order.code })}
           </h2>

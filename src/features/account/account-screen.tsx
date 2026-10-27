@@ -83,7 +83,7 @@ export function AccountScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pt-lg md:px-xxl">
-        <h1 className="text-[30px]">{t("account.title")}</h1>
+        <h1 className="text-[26px] md:text-[30px]">{t("account.title")}</h1>
         <p className="text-[13px] text-text-soft">{t("account.blurb")}</p>
 
         {/* Chapters of one screen, so `SectionTab` — the same underline the

@@ -332,11 +332,14 @@ export function OrdersQueue() {
 
           {/* The scope switch sits beside the title rather than among the status
             tabs, because it is a different question: the tabs ask "at which
-            step", this asks "which orders are we even looking at". */}
+            step", this asks "which orders are we even looking at".
+
+            On a phone it runs the full width, the same as the search box
+            under it, its three choices sharing it equally. */}
           <div
             role="group"
             aria-label={t("orders.title")}
-            className="flex h-[40px] shrink-0 items-center gap-xxs rounded-md bg-neutral-fill p-xxs"
+            className="flex h-[40px] shrink-0 items-center max-md:basis-full gap-xxs rounded-md bg-neutral-fill p-xxs"
           >
             <ScopeButton
               label={t("orders.scopeLive")}
@@ -536,8 +539,10 @@ function ScopeButton({
       aria-pressed={active}
       onClick={onClick}
       className={cx(
-        "flex h-full items-center rounded-sm px-md text-[14px] font-medium whitespace-nowrap",
-        active ? "bg-surface text-text shadow-selected" : "text-text-soft hover:text-text",
+        "flex h-full items-center justify-center rounded-sm max-md:flex-1 px-md text-[14px] font-medium whitespace-nowrap",
+        active
+          ? "bg-surface text-text shadow-selected"
+          : "text-text-soft hover:text-text",
       )}
     >
       {label}
@@ -592,7 +597,9 @@ function Tab({
         <span
           className={cx(
             "flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-[6px] text-[12px] tabular-nums",
-            active ? "bg-active-fill text-on-active" : "bg-neutral-fill text-text",
+            active
+              ? "bg-active-fill text-on-active"
+              : "bg-neutral-fill text-text",
           )}
         >
           {count}
@@ -621,10 +628,7 @@ function Skeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-sm">
       {[0, 1, 2, 3, 4].map((row) => (
-        <div
-          key={row}
-          className="h-[72px] rounded-lg bg-line-soft"
-        />
+        <div key={row} className="h-[72px] rounded-lg bg-line-soft" />
       ))}
     </div>
   );

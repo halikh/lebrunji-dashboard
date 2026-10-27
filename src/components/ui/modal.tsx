@@ -43,6 +43,8 @@ export function Modal({
   describedBy,
   children,
   className,
+  width = 420,
+  flush = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -50,6 +52,21 @@ export function Modal({
   describedBy?: string;
   children: ReactNode;
   className?: string;
+  /**
+   * The widest it gets, in px; a phone always gets the screen less a margin.
+   *
+   * A prop rather than a `w-[…]` in `className`, because `cx` only joins and
+   * two widths on one element are settled by stylesheet order — the dialog's
+   * own 420px won or lost depending on which class Tailwind happened to emit
+   * last.
+   */
+  width?: number;
+  /**
+   * No padding of its own, for a dialog whose header, body and footer each pad
+   * themselves and rule themselves off edge to edge. Padded as well, those
+   * rules stopped short of the dialog's sides and the content sat 48px in.
+   */
+  flush?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -67,6 +84,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
+      style={{ "--modal-width": `${width}px` } as React.CSSProperties}
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
       onCancel={(event) => {
@@ -89,7 +107,8 @@ export function Modal({
         // `globals.css`, on `dialog` — so every overlay added later gets them
         // without having to remember, and there is one place they are tuned.
         // `relative`, so the close button above can sit in its corner.
-        "relative m-auto w-[min(420px,calc(100vw-2rem))] rounded-xxl bg-surface p-xxl shadow-overlay",
+        "relative m-auto w-[min(var(--modal-width),calc(100vw-2rem))] rounded-xxl bg-surface shadow-overlay",
+        !flush && "p-lg md:p-xxl",
         "text-text",
         className,
       )}

@@ -88,11 +88,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         it below `md` — without this the page was unreachable on a phone.
       */}
           <header className="flex shrink-0 items-center justify-between gap-sm border-b border-border bg-surface px-lg py-xs md:hidden">
-            <Logo width={24} />
+            <Logo variant="wide" width={56} />
             <div className="flex items-center gap-xxs">
-              <Link href="/account" className={barItemClass}>
+              <Link
+                href="/account"
+                title={t("nav.account")}
+                className={barItemClass}
+              >
                 <Icon name="customers" size={18} />
-                {t("nav.account")}
+                <span className="sr-only">{t("nav.account")}</span>
               </Link>
               <SignOutButton variant="bar" />
             </div>
