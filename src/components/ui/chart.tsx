@@ -111,13 +111,19 @@ export function BarChart({
     ...bars.map((bar) => bar.value),
     ...bars.map((bar) => bar.ghost ?? 0),
   );
+  // The gutter between bars shrinks as they multiply. A fixed 4px is right
+  // for a week and wrong for a quarter: ninety bars spend 356px on gaps alone,
+  // which is a whole phone, and leave the bars themselves nothing. The labels
+  // use the same gap so each one stays under its own bar.
+  const gap =
+    bars.length > 48 ? "gap-0" : bars.length > 16 ? "gap-px" : "gap-xs";
 
   return (
     <figure className={cx("flex flex-col gap-xs", className)}>
       <div
         role="img"
         aria-label={title}
-        className="flex items-end gap-xs"
+        className={cx("flex items-end", gap)}
         style={{ height }}
       >
         {bars.map((bar) => {
@@ -164,7 +170,7 @@ export function BarChart({
         })}
       </div>
 
-      <div className="flex gap-xs">
+      <div className={cx("flex", gap)}>
         {bars.map((bar) => (
           <span
             key={bar.key}

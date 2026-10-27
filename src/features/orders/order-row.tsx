@@ -69,7 +69,16 @@ export function OrderRow({
         // so choosing a row never shifts its contents by a pixel. A border and
         // not a box-shadow ring: the hover shadow would replace a ring, and the
         // open order would lose its outline exactly while the pointer is on it.
-        "relative flex cursor-pointer items-center gap-lg rounded-lg border-2 bg-surface py-md pl-xl pr-md shadow-card",
+        "relative cursor-pointer rounded-lg border-2 bg-surface py-md pl-xl pr-md shadow-card",
+        // Two shapes, by the width of the queue's column (it is the
+        // `@container`), not the window's. Wide: one line, five columns, as
+        // it was. Narrow — a phone, or the queue squeezed beside the docked
+        // receipt — the three fixed columns alone are wider than the room, so
+        // it becomes a small card: code and total on top, who and where under
+        // them, status and the button at the foot. The placements only bite
+        // in the grid; in the flex row they are ignored.
+        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-lg gap-y-sm",
+        "@[42rem]:flex @[42rem]:gap-lg",
         "transition-[box-shadow,border-color] duration-[var(--duration-control)] hover:shadow-selected",
         // Chosen is ink, as it is in the app — the order open in the receipt.
         selected
@@ -89,7 +98,7 @@ export function OrderRow({
         />
       )}
 
-      <div className="flex w-[132px] shrink-0 flex-col gap-xxs">
+      <div className="col-start-1 row-start-1 flex flex-col gap-xxs @[42rem]:w-[132px] @[42rem]:shrink-0">
         <span className="text-[15px] font-medium tabular-nums">{order.code}</span>
         <span
           className={cx(
@@ -101,7 +110,7 @@ export function OrderRow({
         </span>
       </div>
 
-      <div className="flex min-w-0 flex-[1.2] flex-col gap-xxs">
+      <div className="col-span-2 row-start-2 flex min-w-0 flex-col gap-xxs @[42rem]:flex-[1.2]">
         {order.customerName ? (
           <span className="truncate text-[15px] font-medium">
             {order.customerName}
@@ -118,7 +127,7 @@ export function OrderRow({
         </span>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-xs">
+      <div className="col-start-1 row-start-3 flex min-w-0 flex-col items-start gap-xs @[42rem]:flex-1 @[42rem]:items-stretch">
         {status && (
           <StatusPill slug={status.slug} name={status.name} size="md" />
         )}
@@ -128,11 +137,11 @@ export function OrderRow({
         </span>
       </div>
 
-      <span className="w-[110px] shrink-0 text-right text-[15px] font-medium tabular-nums">
+      <span className="col-start-2 row-start-1 self-start text-right text-[15px] font-medium tabular-nums @[42rem]:w-[110px] @[42rem]:shrink-0 @[42rem]:self-auto">
         {money(order.total, order.currencyCode)}
       </span>
 
-      <div className="w-[140px] shrink-0">
+      <div className="col-start-2 row-start-3 @[42rem]:w-[140px] @[42rem]:shrink-0">
         {next && (
           <Button
             fullWidth

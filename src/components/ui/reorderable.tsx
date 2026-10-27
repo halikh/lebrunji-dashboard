@@ -970,6 +970,11 @@ export function useReorder({
       className: cx(
         "flex size-[28px] shrink-0 touch-none items-center justify-center rounded-sm text-text-faint",
         "hover:bg-neutral-fill hover:text-text-soft",
+        // A 44px target for a thumb below `md`, drawn as nothing. The pseudo
+        // element is part of the handle, so a press on it starts the same drag
+        // and `touch-none` covers it too; the 28px square that shows stays put,
+        // and no row grows. (`ROW_ABOVE` below supplies the `relative`.)
+        "before:absolute before:-inset-[8px] md:before:hidden",
         moving === id ? "cursor-grabbing" : "cursor-grab",
         // Above the row's stretched hit area — see `ROW_TARGET` in `row.ts`.
         // Set here for the same reason `hidden` above is: every list renders

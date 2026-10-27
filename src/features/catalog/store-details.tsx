@@ -99,7 +99,7 @@ export function StoreDetails({ storeId }: { storeId: string }) {
 
   if (store.isPending || branches.isPending) {
     return (
-      <div aria-hidden className="flex flex-col gap-lg p-xxl">
+      <div aria-hidden className="flex flex-col gap-lg p-lg md:p-xxl">
         {[0, 1, 2, 3].map((row) => (
           <div key={row} className="h-[64px] rounded-md bg-neutral-fill" />
         ))}
@@ -569,7 +569,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
       never gets a bound and the Save bar goes below the fold.
      */
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
         {/* Says whose answers these are before any of them is changed. The
             branch editor is one click away and looks similar, and the whole
             point of this tab is that the two are different rows. */}
@@ -940,7 +940,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
+      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-lg md:p-xxl">
         <Button onClick={() => void save()} pending={pending}>
           {t("store.save")}
         </Button>

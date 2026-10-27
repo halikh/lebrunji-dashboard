@@ -235,8 +235,15 @@ export function BranchItemStrip({
         "flex basis-full flex-col gap-sm border-t border-border pt-sm",
       )}
     >
-      <div className={cx("flex items-center gap-md", off && "opacity-60")}>
-        <span className="min-w-0 flex-grow truncate text-[12px] font-semibold text-text-faint">
+      {/* Wraps on a phone, the branch's name on its own line above the four
+          controls, which do not fit beside it there. */}
+      <div
+        className={cx(
+          "flex flex-wrap items-center gap-md",
+          off && "opacity-60",
+        )}
+      >
+        <span className="min-w-0 flex-grow truncate text-[12px] font-semibold text-text-faint max-md:basis-full">
           {t("branchMenu.at", { name: menu.name })}
         </span>
 
@@ -411,11 +418,12 @@ function ItemOptionsAtBranch({
                 <div
                   key={option.id}
                   className={cx(
-                    "flex items-center gap-md ps-lg",
+                    "flex flex-wrap items-center gap-md ps-lg",
                     (groupOff || optionOff) && "opacity-60",
                   )}
                 >
-                  <span className="min-w-0 flex-grow truncate text-[13px]">
+                  {/* Its own line on a phone, as the strip's name is. */}
+                  <span className="min-w-0 flex-grow truncate text-[13px] max-md:basis-full">
                     {name}
                   </span>
 

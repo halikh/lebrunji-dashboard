@@ -132,7 +132,7 @@ export function StoreHours({ storeId }: { storeId: string }) {
 
   if (branches.isPending) {
     return (
-      <div aria-hidden className="flex flex-col gap-sm p-xxl">
+      <div aria-hidden className="flex flex-col gap-sm p-lg md:p-xxl">
         {WEEK.map((day) => (
           <div key={day} className="h-[52px] rounded-lg bg-line-soft" />
         ))}
@@ -159,11 +159,13 @@ export function StoreHours({ storeId }: { storeId: string }) {
      */
     <div className="flex h-full min-h-0 flex-col">
       {rows.length > 1 && (
-        <div className="flex shrink-0 items-center gap-md border-b border-border bg-surface px-xxl py-lg">
+        <div className="flex shrink-0 items-center gap-md border-b border-border bg-surface px-lg md:px-xxl py-lg">
           <span className="shrink-0 text-[13px] font-semibold text-text-soft">
             {t("hours.forBranch")}
           </span>
-          <span className="w-[240px]">
+          {/* The rest of the line on a phone — see the same picker on the
+              Menu tab. */}
+          <span className="min-w-0 flex-1 md:w-[240px] md:flex-none">
             <Select
               value={branchId}
               onChange={setChosen}
@@ -217,7 +219,7 @@ function BranchHours({ branchId }: { branchId: string }) {
 
   if (hours.isPending) {
     return (
-      <div aria-hidden className="flex flex-col gap-sm p-xxl">
+      <div aria-hidden className="flex flex-col gap-sm p-lg md:p-xxl">
         {WEEK.map((day) => (
           <div key={day} className="h-[52px] rounded-lg bg-line-soft" />
         ))}
@@ -294,7 +296,7 @@ function Grid({
      * bottom of the screen. `flex-1` takes what is left instead.
      */
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-grow flex-col overflow-y-auto scroll-hint p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col overflow-y-auto scroll-hint p-lg md:p-xxl">
         <WeekEditor
           week={week}
           onChange={(next) => {
@@ -306,7 +308,7 @@ function Grid({
         />
       </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-xxl">
+      <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border p-lg md:p-xxl">
         <Button onClick={submit} pending={pending}>
           {t("hours.save")}
         </Button>
@@ -472,9 +474,14 @@ export function WeekEditor({
                 />
 
                 {day.open ? (
-                  <div className="flex flex-col gap-sm">
+                  <div className="flex min-w-0 flex-col gap-sm">
                     {day.windows.map((shift, at) => (
-                      <div key={at} className="flex items-center gap-sm">
+                      // Wraps on a phone, where two time boxes and the
+                      // shift's buttons are wider than the row.
+                      <div
+                        key={at}
+                        className="flex flex-wrap items-center gap-sm"
+                      >
                         <TimeField
                           value={shift.opensAt}
                           onChange={(value) =>

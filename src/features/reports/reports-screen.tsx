@@ -201,21 +201,19 @@ export function ReportsScreen() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
+      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-lg py-lg md:px-xxl">
         <h1 className="flex-grow text-[30px]">{t("reports.title")}</h1>
       </div>
 
       <div className="min-h-0 flex-grow overflow-y-auto scroll-hint">
-        <div className="flex flex-col gap-xxl p-xxl">
+        <div className="flex flex-col gap-xxl p-lg md:p-xxl">
           {/* ---- What still needs somebody ---------------------------------
               First, and above the range, because it is the thing that cannot
               wait — and because putting it below would imply the range applies
               to it. */}
           <section className="flex flex-col gap-md">
-            <div className="flex items-baseline justify-between gap-md">
-              <h2 className="text-[19px]">
-                {t("reports.needsYou")}
-              </h2>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-md gap-y-xxs">
+              <h2 className="text-[19px]">{t("reports.needsYou")}</h2>
               <span className="text-[12px] text-text-faint">
                 {t("reports.needsYouNote")}
               </span>
@@ -263,9 +261,7 @@ export function ReportsScreen() {
           {/* ---- How we are doing ----------------------------------------- */}
           <section className="flex flex-col gap-lg border-t border-border pt-xxl">
             <div className="flex flex-wrap items-center justify-between gap-md">
-              <h2 className="text-[19px]">
-                {t("reports.performance")}
-              </h2>
+              <h2 className="text-[19px]">{t("reports.performance")}</h2>
 
               <div className="flex flex-wrap items-center gap-lg">
                 <div role="tablist" className="-mb-px flex gap-lg">
@@ -297,7 +293,9 @@ export function ReportsScreen() {
                     calendar day — which day an instant falls on has a different
                     answer in every timezone, and this is a report about a shop
                     in Lebanon. */}
-                <div className="flex items-center gap-sm">
+                {/* Wraps as well: the field is 260px, which with Clear beside
+                    it is wider than a phone's content column. */}
+                <div className="flex flex-wrap items-center gap-sm">
                   <DateRangeField from={from} to={to} onChange={pick} />
                   {picked && (
                     <Button
@@ -375,10 +373,7 @@ export function ReportsScreen() {
                 className="grid gap-md sm:grid-cols-2 xl:grid-cols-4"
               >
                 {[0, 1, 2, 3].map((one) => (
-                  <div
-                    key={one}
-                    className="h-[76px] rounded-lg bg-line-soft"
-                  />
+                  <div key={one} className="h-[76px] rounded-lg bg-line-soft" />
                 ))}
               </div>
             )}
@@ -457,29 +452,39 @@ export function ReportsScreen() {
                   </span>
                 </p>
 
-                <div className="grid gap-xxl xl:grid-cols-[3fr_2fr]">
+                {/* `minmax(0, …)`, not bare `fr`: a bare `fr` track will not
+                    shrink below its content, so one long store name or a chart
+                    that cannot narrow would widen the column past the page. */}
+                <div className="grid gap-xxl xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                   <Card title={t("reports.chartRevenue")}>
-                    <BarChart
-                      height={160}
-                      // Money is `accent` — the palette's "going well" — and
-                      // the tallest bar is drawn at full strength, so "our best
-                      // day" is answered without comparing heights by eye.
-                      tone="accent"
-                      title={t("reports.chartRevenueAria")}
-                      bars={stats.data.daily.map((day, index) => ({
-                        key: day.day,
-                        // Every third label, or thirty of them overlap into a
-                        // grey smear that reads as noise.
-                        label: index % 3 === 0 ? day.day.slice(8) : "",
-                        value: day.revenue,
-                        ghost: prior.data?.daily[index]?.revenue,
-                        title: t("reports.chartRevenueTitle", {
-                          day: day.day,
-                          orders: day.orders,
-                          amount: format(day.revenue, code),
-                        }),
-                      }))}
-                    />
+                    {/* Scrolls inside the card if it ever must. A bar per day
+                        with a fixed gap between them is 89 gaps on the 90-day
+                        range — more than a phone's card is wide before a single
+                        bar is drawn — and the overflow belongs to the chart's
+                        box, not to the page. */}
+                    <div className="min-w-0 overflow-x-auto">
+                      <BarChart
+                        height={160}
+                        // Money is `accent` — the palette's "going well" — and
+                        // the tallest bar is drawn at full strength, so "our best
+                        // day" is answered without comparing heights by eye.
+                        tone="accent"
+                        title={t("reports.chartRevenueAria")}
+                        bars={stats.data.daily.map((day, index) => ({
+                          key: day.day,
+                          // Every third label, or thirty of them overlap into a
+                          // grey smear that reads as noise.
+                          label: index % 3 === 0 ? day.day.slice(8) : "",
+                          value: day.revenue,
+                          ghost: prior.data?.daily[index]?.revenue,
+                          title: t("reports.chartRevenueTitle", {
+                            day: day.day,
+                            orders: day.orders,
+                            amount: format(day.revenue, code),
+                          }),
+                        }))}
+                      />
+                    </div>
                     {prior.isSuccess && (
                       <p className="text-[12px] text-text-faint">
                         {t("reports.ghostNote")}
@@ -668,9 +673,11 @@ function Tile({
   change?: { text: string; up: boolean };
 }) {
   return (
-    <div className="flex flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
+    <div className="flex min-w-0 flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
       <span className="text-[12px] text-text-faint">{label}</span>
-      <span className="text-[22px] font-semibold tabular-nums">{value}</span>
+      <span className="break-words text-[22px] font-semibold tabular-nums">
+        {value}
+      </span>
       {delta && (
         <span
           className={cx(
@@ -687,7 +694,7 @@ function Tile({
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-md rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
+    <section className="flex min-w-0 flex-col gap-md rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
       <h3 className="text-[13px] font-semibold">{title}</h3>
       {children}
     </section>

@@ -96,7 +96,7 @@ export function OrderScreen({ id }: { id: string }) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-lg text-center">
         <h1 className="text-[18px]">{t("orders.detailFailed")}</h1>
-        <div className="flex gap-sm">
+        <div className="flex flex-wrap justify-center gap-sm">
           <Button variant="secondary" onClick={() => void order.refetch()}>
             {t("common.retry")}
           </Button>
@@ -113,7 +113,7 @@ export function OrderScreen({ id }: { id: string }) {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <header className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-xxl py-lg">
+      <header className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-lg py-lg md:px-xxl">
         {/* Back to the queue **with this order still open**. Returning to a
             bare list would mean hunting for the row again — in a list that has
             moved since, because orders arrive and advance while you read. The
@@ -124,7 +124,7 @@ export function OrderScreen({ id }: { id: string }) {
 
         <div className="flex flex-wrap items-center gap-lg">
           <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-            <h1 className="flex items-center gap-sm text-[30px]">
+            <h1 className="flex items-center gap-sm text-[24px] md:text-[30px]">
               <Copyable value={order.data.code} label={t("orders.copyCode")} />
             </h1>
             <span className="text-[13px] text-text-faint">

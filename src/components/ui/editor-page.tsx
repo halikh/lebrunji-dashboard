@@ -96,7 +96,9 @@ export function EditorPage({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-xxl py-lg">
+      {/* `px-lg` below `md`, here and on the scroller and the footer: a
+          phone has no width to spend on a 24px gutter each side. */}
+      <div className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-lg py-lg md:px-xxl">
         <BackLink href={backHref}>{backLabel}</BackLink>
 
         <div className="flex min-w-0 items-center gap-lg">
@@ -104,7 +106,7 @@ export function EditorPage({
 
           <div className="flex min-w-0 flex-col gap-xxs">
             {meta}
-            <h1 className="truncate text-[26px]">{title}</h1>
+            <h1 className="truncate text-[22px] md:text-[26px]">{title}</h1>
             {aside}
           </div>
         </div>
@@ -119,7 +121,7 @@ export function EditorPage({
         on the first field is sliced down its edge. The same reason
         `store-brand.tsx` records for its own column.
       */}
-      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto scroll-hint p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto scroll-hint p-lg md:p-xxl">
         {/* See `width`: capped to a readable measure, or handed the whole
             width for an editor that divides it into columns of its own. */}
         <div
@@ -136,7 +138,9 @@ export function EditorPage({
         /* `py-md` against the sides' `px-xxl`. The bar is pinned, so its height
            is height the form never gets back — and a row of buttons needs the
            gutter beside them far more than it needs air above and below. */
-        <div className="flex shrink-0 items-center justify-end gap-sm border-t border-border bg-surface px-xxl py-md">
+        /* Wraps, for the editor whose footer is a delete, a preview and Save
+           on a 360px screen — the end of the row stays the end. */
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-sm border-t border-border bg-surface px-lg py-md md:px-xxl">
           {footer}
         </div>
       )}

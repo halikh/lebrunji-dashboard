@@ -111,7 +111,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           // which for a toast every few minutes is hostile.
           role="status"
           aria-live="polite"
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-sm p-lg"
+          // Lifted clear of the bottom bar below `md`, where the rail lives at
+          // the foot of the screen — a toast over the nav hides the very
+          // section links somebody reaches for after an action. 64px is the
+          // bar's height; it has no variable of its own to read.
+          className="pointer-events-none fixed inset-x-0 bottom-[64px] z-50 flex flex-col items-center gap-sm p-lg md:bottom-0"
         >
           {toasts.map((toast) => (
             <ToastRow
@@ -168,7 +172,7 @@ function ToastRow({
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
       className={cx(
-        "pointer-events-auto flex items-center gap-lg rounded-xl border px-lg py-md shadow-overlay",
+        "pointer-events-auto flex max-w-full items-center gap-lg rounded-xl border px-lg py-md shadow-overlay",
         KIND_STYLES[toast.kind],
       )}
     >

@@ -61,7 +61,7 @@ export function EmptyState({
   return (
     <div
       className={cx(
-        "flex h-full flex-col items-center justify-center gap-lg px-xxl py-huge text-center",
+        "flex h-full flex-col items-center justify-center gap-lg px-lg py-huge text-center md:px-xxl",
         className,
       )}
     >

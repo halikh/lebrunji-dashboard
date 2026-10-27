@@ -136,7 +136,9 @@ export function CustomerAppSection() {
       </p>
 
       <div className="flex flex-wrap items-start gap-lg">
-        <div className="w-[180px]">
+        {/* Full width on a phone, where the two would stack anyway and a
+            180px field under a full-width hint looks like a mistake. */}
+        <div className="w-full sm:w-[180px]">
           <Field
             label={t("general.minVersionIos")}
             hint={t("general.minVersionHint")}
@@ -153,7 +155,7 @@ export function CustomerAppSection() {
           </Field>
         </div>
 
-        <div className="w-[180px]">
+        <div className="w-full sm:w-[180px]">
           <Field
             label={t("general.minVersionAndroid")}
             hint={t("general.minVersionHint")}

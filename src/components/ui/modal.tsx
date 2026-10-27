@@ -116,6 +116,10 @@ export function Modal({
           "absolute end-lg top-lg z-10 flex size-[30px] items-center justify-center",
           "rounded-full border border-border bg-surface text-text-soft",
           "transition-colors hover:border-active hover:text-text",
+          // A 30px circle is a small thing to hit with a thumb, and growing it
+          // would push every dialog's heading. So the target grows instead,
+          // invisibly, to 42px around the same circle.
+          "before:absolute before:-inset-[6px] before:rounded-full",
         )}
       >
         <svg

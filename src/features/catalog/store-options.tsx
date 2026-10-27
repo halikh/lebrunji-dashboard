@@ -165,7 +165,7 @@ export function StoreOptions({ storeId }: { storeId: string }) {
           The box searches the choices as well as the titles: a question is
           called "Size", which repeats across a shop, and what anybody remembers
           is "Half kilo". */}
-      <div className="flex shrink-0 flex-wrap items-end gap-lg px-xxl py-lg">
+      <div className="flex shrink-0 flex-wrap items-end gap-lg px-lg md:px-xxl py-lg">
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -173,14 +173,17 @@ export function StoreOptions({ storeId }: { storeId: string }) {
           // A floor under the flex-grow, so on a middling width it shrinks to a
           // box words still fit in rather than to a stub between two selects
           // that will not give any ground.
-          className="min-w-[220px]"
+          //
+          // A line of its own on a phone, where the floor and a select beside
+          // it are already wider than the screen.
+          className="min-w-[220px] max-md:basis-full"
         />
 
         {/* No `Field` label: "Section" over a box that already reads "Choose a
             section" is the same word twice, and the second one costs a line of
             a screen with none to spare. `aria-label` keeps it named for a
             screen reader, which is what the label was really doing. */}
-        <span className="w-[320px] max-w-full">
+        <span className="w-full md:w-[320px] md:max-w-full">
           <Select
             aria-label={t("options.section")}
             value={sectionId ?? ""}
@@ -195,7 +198,7 @@ export function StoreOptions({ storeId }: { storeId: string }) {
         </span>
 
         {section && (
-          <span className="w-[320px] max-w-full">
+          <span className="w-full md:w-[320px] md:max-w-full">
             <Select
               aria-label={t("options.item")}
               value={itemId ?? ""}
@@ -330,7 +333,7 @@ function ItemQuestions({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto scroll-hint px-xxl pb-xxl pt-lg">
+      <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto scroll-hint px-lg md:px-xxl pb-lg md:pb-xxl pt-lg">
         {/*
           Only when it says something new.
           

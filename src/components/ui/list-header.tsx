@@ -69,20 +69,34 @@ export function ListHeader({
   action?: ReactNode;
 }) {
   return (
-    <div
-      className={[
-        "grid shrink-0 border-b border-border bg-surface px-xxl py-lg",
-        // Heading, box, action. The middle column takes the slack; `minmax(0,…)`
-        // rather than a bare `1fr` so a long value in the box shrinks it instead
-        // of pushing the action off the end.
-        "grid-cols-[auto_minmax(0,1fr)_auto]",
-        // Two rows: the controls, then the hint. Sized to their contents, so a
-        // screen without a hint has no second row to leave a gap.
-        "grid-rows-[auto_auto]",
-        "gap-x-lg gap-y-xxs",
-      ].join(" ")}
-    >
-      {/*
+    /*
+      ## Narrow, it stacks
+
+      Measured on the bar's own width (`@container`) rather than the window's,
+      since a list can sit in a column beside something else. Under 36rem the
+      three cells do not fit one row — a title and a button leave a search box
+      a few characters wide — so the heading and the action share the first
+      row and the box takes the whole of the second, with its hint under it.
+      The placements below are written for both shapes; the hint still lives
+      in the box's column in each, so the rule above still holds.
+    */
+    <div className="@container shrink-0 border-b border-border bg-surface px-lg py-lg md:px-xxl">
+      <div
+        className={[
+          "grid",
+          // Narrow: heading and action, then the box across both.
+          "grid-cols-[minmax(0,1fr)_auto]",
+          // Heading, box, action. The middle column takes the slack; `minmax(0,…)`
+          // rather than a bare `1fr` so a long value in the box shrinks it instead
+          // of pushing the action off the end.
+          "@[36rem]:grid-cols-[auto_minmax(0,1fr)_auto]",
+          // Two rows: the controls, then the hint. Sized to their contents, so a
+          // screen without a hint has no second row to leave a gap.
+          "@[36rem]:grid-rows-[auto_auto]",
+          "gap-x-lg gap-y-xxs",
+        ].join(" ")}
+      >
+        {/*
         Every cell is placed by hand rather than left to auto-placement.
 
         The row each item sits in is the whole point of this component — the
@@ -95,31 +109,34 @@ export function ListHeader({
         things sharing row one, and setting it on the container would also
         apply to the hint, which has no one to be centred against.
       */}
-      <h1 className="col-start-1 row-start-1 self-center text-[30px]">
-        {title}
-      </h1>
+        <h1 className="col-start-1 row-start-1 min-w-0 self-center text-[26px] @[36rem]:text-[30px]">
+          {title}
+        </h1>
 
-      {search && (
-        <SearchInput
-          className="col-start-2 row-start-1 self-center"
-          value={search.value}
-          onChange={search.onChange}
-          placeholder={search.placeholder}
-        />
-      )}
+        {search && (
+          <SearchInput
+            className="col-span-2 col-start-1 row-start-2 mt-md self-center @[36rem]:col-span-1 @[36rem]:col-start-2 @[36rem]:row-start-1 @[36rem]:mt-0"
+            value={search.value}
+            onChange={search.onChange}
+            placeholder={search.placeholder}
+          />
+        )}
 
-      {action && (
-        <div className="col-start-3 row-start-1 self-center">{action}</div>
-      )}
+        {action && (
+          <div className="col-start-2 row-start-1 self-center @[36rem]:col-start-3">
+            {action}
+          </div>
+        )}
 
-      {hint && (
-        // Under the box, in the box's own column — the inset matches the one
-        // `Field` uses, so the sentence lines up with the text a person types
-        // rather than with the border around it.
-        <span className="col-start-2 row-start-2 ps-md text-[12px] text-text-faint">
-          {hint}
-        </span>
-      )}
+        {hint && (
+          // Under the box, in the box's own column — the inset matches the one
+          // `Field` uses, so the sentence lines up with the text a person types
+          // rather than with the border around it.
+          <span className="col-span-2 col-start-1 row-start-3 ps-md text-[12px] text-text-faint @[36rem]:col-span-1 @[36rem]:col-start-2 @[36rem]:row-start-2">
+            {hint}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

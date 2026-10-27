@@ -96,7 +96,7 @@ export function BranchesTab({ storeId }: { storeId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-xxl py-lg">
+      <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-lg md:px-xxl py-lg">
         <h2 className="shrink-0 text-[19px]">{t("branches.tab")}</h2>
         <SearchInput
           value={search}
@@ -112,7 +112,7 @@ export function BranchesTab({ storeId }: { storeId: string }) {
         </Button>
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
         {/* Says why the tab exists on a shop with one branch, which is the
               first question it gets. */}
         <p className="ps-md text-[13px] text-text-faint">
@@ -265,7 +265,7 @@ function BranchRow({
           "flex min-w-0 flex-grow flex-col items-start gap-xxs text-left",
         )}
       >
-        <span className="flex items-center gap-sm">
+        <span className="flex max-w-full min-w-0 items-center gap-sm">
           <span className="truncate text-[15px] font-semibold">{name}</span>
           {/* Said in words, not only in colour — the same badge the shops list
               puts on a shop that is off the storefront. */}

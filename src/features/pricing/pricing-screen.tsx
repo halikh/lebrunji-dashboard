@@ -73,7 +73,7 @@ export function PricingScreen() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-lg">
+      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pt-lg md:px-xxl">
         <h1 className="text-[30px]">{t("pricing.title")}</h1>
 
         <div role="tablist" className="-mb-px flex gap-lg">
@@ -168,7 +168,7 @@ function Rate() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto scroll-hint lg:flex-row lg:overflow-hidden">
-      <section className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto scroll-hint">
+      <section className="flex flex-col gap-lg p-lg md:p-xxl lg:flex-1 lg:overflow-y-auto scroll-hint">
         <div className="flex flex-col gap-xs">
           <h2 className="ps-md text-[19px]">{t("pricing.rateTitle")}</h2>
           <p className="ps-md text-[14px] text-text-soft">
@@ -261,6 +261,9 @@ function Rate() {
   );
 }
 
+/** One figure column of the conversions table; see the note on the card. */
+const COLUMN = "w-[30%] shrink-0 break-words text-end @sm:w-[140px]";
+
 /**
  * What the rate does to real amounts.
  *
@@ -324,7 +327,7 @@ function Conversions({
     formatMoney(convertMoney(minor, from, { ...to, rate }), to);
 
   return (
-    <aside className="flex flex-col gap-lg p-xxl lg:flex-1 lg:overflow-y-auto scroll-hint">
+    <aside className="flex flex-col gap-lg p-lg md:p-xxl lg:flex-1 lg:overflow-y-auto scroll-hint">
       <div className="flex flex-col gap-xs">
         <h3 className="ps-md text-[15px] font-semibold">
           {t("pricing.whatItMeans")}
@@ -334,12 +337,17 @@ function Conversions({
         </p>
       </div>
 
-      <div className="flex max-w-[520px] flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
+      {/* A size container, so the columns can narrow with the card. Two
+          140px columns beside the amount is 300px before a single gap, which
+          is the whole of the card on a phone — the amounts were pushed out of
+          it. Below `@sm` each column is a share of the row instead, and a long
+          figure breaks at its space rather than leaving the card. */}
+      <div className="@container flex max-w-[520px] flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
         <div className="flex items-baseline gap-md border-b border-line pb-sm text-[12px] font-medium tracking-[0.05em] text-text-faint">
-          <span className="flex-grow">{t("pricing.amount")}</span>
-          <span className="w-[140px] text-end">{t("pricing.atCurrent")}</span>
+          <span className="min-w-0 flex-grow">{t("pricing.amount")}</span>
+          <span className={COLUMN}>{t("pricing.atCurrent")}</span>
           {changed && (
-            <span className="w-[140px] text-end text-active-deep">
+            <span className={cx(COLUMN, "text-active-deep")}>
               {t("pricing.atNew")}
             </span>
           )}
@@ -356,14 +364,19 @@ function Conversions({
               key={amount}
               className="flex items-baseline gap-md py-xs text-[14px]"
             >
-              <span className="flex-grow tabular-nums">
+              <span className="min-w-0 flex-grow tabular-nums">
                 {formatMoney(minor, from)}
               </span>
-              <span className="w-[140px] text-end tabular-nums text-text-soft">
+              <span className={cx(COLUMN, "tabular-nums text-text-soft")}>
                 {at(minor, current)}
               </span>
               {changed && (
-                <span className="w-[140px] text-end font-semibold tabular-nums text-active-deep">
+                <span
+                  className={cx(
+                    COLUMN,
+                    "font-semibold tabular-nums text-active-deep",
+                  )}
+                >
                   {at(minor, next)}
                 </span>
               )}
@@ -501,7 +514,7 @@ function Ladder() {
     // distance, a fee, and what the last one means — so it uses the window
     // rather than sharing it.
     <div className="flex h-full min-h-0 flex-col">
-      <section className="flex min-h-0 flex-1 flex-col gap-lg overflow-y-auto scroll-hint p-xxl">
+      <section className="flex min-h-0 flex-1 flex-col gap-lg overflow-y-auto scroll-hint p-lg md:p-xxl">
         <div className="flex flex-col gap-xs">
           <h2 className="ps-md text-[19px]">{t("pricing.ladderTitle")}</h2>
           <p className="ps-md text-[14px] text-text-soft">

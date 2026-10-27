@@ -90,7 +90,7 @@ export function CatalogueScreen() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-lg">
+      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg md:px-xxl pt-lg">
         <h1 className="text-[30px]">{t("catalogue.title")}</h1>
 
         {/*
@@ -101,7 +101,14 @@ export function CatalogueScreen() {
           meant this strip and the store screen's were two copies of the same
           twenty lines, free to drift in size. They had, by two pixels.
         */}
-        <div role="tablist" className="-mb-px flex gap-lg">
+        {/* Scrolls sideways rather than wrapping when the strip outgrows a
+            phone. A second row of tabs would put two underlines on two
+            baselines, and which one is chosen stops being obvious. The tabs
+            keep their width so a label never breaks across two lines. */}
+        <div
+          role="tablist"
+          className="-mb-px flex gap-lg overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap"
+        >
           {TABS.map(({ key, labelKey }) => (
             <SectionTab
               key={key}

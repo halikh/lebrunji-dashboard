@@ -137,8 +137,8 @@ export function ImageUploader({
           className="size-[96px] rounded-md border border-border"
         />
 
-        <div className="flex flex-col items-start gap-sm">
-          <div className="flex items-center gap-sm">
+        <div className="flex min-w-0 flex-col items-start gap-sm">
+          <div className="flex flex-wrap items-center gap-sm">
             <Button
               variant="secondary"
               size="sm"

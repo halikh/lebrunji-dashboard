@@ -82,7 +82,7 @@ export function AccountScreen() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-lg">
+      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pt-lg md:px-xxl">
         <h1 className="text-[30px]">{t("account.title")}</h1>
         <p className="text-[13px] text-text-soft">{t("account.blurb")}</p>
 
@@ -92,7 +92,12 @@ export function AccountScreen() {
             Only the operator's own sign-in. The shop's clock, hours and sound
             used to be a General tab here; they are the business's, not this
             person's, and now live on Settings. */}
-        <div role="tablist" className="-mb-px flex gap-lg">
+        <div
+          role="tablist"
+          // Scrolls rather than wraps if a translation outgrows a phone —
+          // the same strip Settings draws. See the note there.
+          className="-mb-px flex gap-lg overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap"
+        >
           {TABS.map(({ key, labelKey }) => (
             <SectionTab
               key={key}
@@ -109,12 +114,14 @@ export function AccountScreen() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
         {/* Full width and first: which account these two forms are about is
             the thing to establish before either of them is filled in. */}
         <section className="flex flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
           <h2 className="text-[19px]">{t("account.signedInAs")}</h2>
-          <p className="text-[17px] font-semibold">
+          {/* `break-all`: an address is one unbroken word, and a long one
+              would otherwise push the card wider than a phone. */}
+          <p className="break-all text-[17px] font-semibold">
             {account.data?.email ?? t("common.loading")}
           </p>
         </section>

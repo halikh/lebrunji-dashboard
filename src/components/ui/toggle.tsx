@@ -56,6 +56,12 @@ export function Toggle({
       onClick={onChange}
       className={cx(
         "flex shrink-0 items-center gap-sm text-[13px] font-semibold",
+        // A 40px target on a touch screen, without a 40px switch. The pill is
+        // drawn 22px tall and stays so; an invisible strip above and below it
+        // takes the thumb instead, so no form that lays switches in a row grows
+        // by a pixel. Off from `md`, where a pointer aims and the extra reach
+        // would only overlap the row beside it.
+        "relative before:absolute before:inset-x-0 before:-inset-y-[9px] md:before:hidden",
         // Lined up with the label above it.
         //
         // A `Field` insets its label and hint by the padding an *input* puts

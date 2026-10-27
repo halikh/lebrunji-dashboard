@@ -121,7 +121,7 @@ export function PromotionsList() {
           }
         />
 
-        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("promotions.searchHint")}
           </p>
@@ -217,6 +217,7 @@ function Row({
     promotion.id,
     cx(
       ROW,
+      "max-md:flex-wrap",
       !promotion.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
       promotion.isActive && "border-transparent",
       promotion.isActive && open && "border-active",
@@ -251,7 +252,7 @@ function Row({
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
         className={cx(
           ROW_TARGET,
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-0",
         )}
       >
         <span className="truncate text-[15px] font-semibold">
@@ -267,50 +268,55 @@ function Row({
         </span>
       </button>
 
-      {/* The count is the only thing on the screen that says whether it is
-          working. A cap means nothing without it, and a promotion nobody has
-          redeemed is usually one whose scope or minimum is wrong. */}
-      <span className="shrink-0 tabular-nums text-[12px] text-text-faint">
-        {promotion.maxRedemptionsTotal
-          ? t("promotions.redeemedOf", {
-              count: promotion.redeemed,
-              cap: promotion.maxRedemptionsTotal,
-            })
-          : t("promotions.redeemed", { count: promotion.redeemed })}
-      </span>
+      {/* On a phone the controls take a line of their own under the name.
+          Beside it they left the name a few pixels, or none — and the name
+          is what the row is for. */}
+      <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">
+        {/* The count is the only thing on the screen that says whether it is
+            working. A cap means nothing without it, and a promotion nobody has
+            redeemed is usually one whose scope or minimum is wrong. */}
+        <span className="shrink-0 tabular-nums text-[12px] text-text-faint max-md:me-auto">
+          {promotion.maxRedemptionsTotal
+            ? t("promotions.redeemedOf", {
+                count: promotion.redeemed,
+                cap: promotion.maxRedemptionsTotal,
+              })
+            : t("promotions.redeemed", { count: promotion.redeemed })}
+        </span>
 
-      <ConfirmToggle
-        on={promotion.isActive}
-        onChange={onToggleActive}
-        labelOn={t("promotions.live")}
-        labelOff={t("promotions.hidden")}
-        params={{ name: promotion.slug }}
-        whenTurningOn={{
-          titleKey: "promotions.showTitle",
-          bodyKey: "promotions.showBody",
-          confirmKey: "promotions.showConfirm",
-        }}
-        whenTurningOff={{
-          titleKey: "promotions.hideTitle",
-          bodyKey: "promotions.hideBody",
-          confirmKey: "promotions.hideConfirm",
-        }}
-        className={cx(ROW_ABOVE, "w-[104px]")}
-      />
+        <ConfirmToggle
+          on={promotion.isActive}
+          onChange={onToggleActive}
+          labelOn={t("promotions.live")}
+          labelOff={t("promotions.hidden")}
+          params={{ name: promotion.slug }}
+          whenTurningOn={{
+            titleKey: "promotions.showTitle",
+            bodyKey: "promotions.showBody",
+            confirmKey: "promotions.showConfirm",
+          }}
+          whenTurningOff={{
+            titleKey: "promotions.hideTitle",
+            bodyKey: "promotions.hideBody",
+            confirmKey: "promotions.hideConfirm",
+          }}
+          className={cx(ROW_ABOVE, "w-[104px]")}
+        />
 
-      <ConfirmButton
-        className={ROW_ABOVE}
-        onConfirm={onArchive}
-        titleKey="promotions.archiveTitle"
-        bodyKey="promotions.archiveBody"
-        confirmKey="promotions.archiveConfirm"
-        params={{ name: promotion.slug }}
-        variant="danger"
-        triggerVariant="danger"
-        size="sm"
-      >
-        {t("promotions.archive")}
-      </ConfirmButton>
+        <ConfirmButton
+          className={ROW_ABOVE}
+          onConfirm={onArchive}
+          titleKey="promotions.archiveTitle"
+          bodyKey="promotions.archiveBody"
+          confirmKey="promotions.archiveConfirm"
+          params={{ name: promotion.slug }}
+          variant="danger"
+          triggerVariant="danger"
+          size="sm"
+        >
+          {t("promotions.archive")}
+        </ConfirmButton>
+      </div>
     </div>
   );
 }

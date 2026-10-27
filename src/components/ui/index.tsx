@@ -265,7 +265,9 @@ export function Card({
   return (
     <div
       className={cx(
-        "rounded-lg bg-surface p-xxl shadow-card",
+        // `p-lg` on a phone, where the page around it already has a gutter
+        // and the two together left a sign-in field barely 260px wide.
+        "rounded-lg bg-surface p-lg shadow-card md:p-xxl",
         className,
       )}
     >

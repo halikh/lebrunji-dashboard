@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 
+import Link from "next/link";
+
 import { Logo } from "@/components/brand/logo";
-import { SignOutButton } from "@/components/sign-out-button";
+import { SignOutButton, barItemClass } from "@/components/sign-out-button";
+import { Icon } from "@/components/shell/icons";
 import { EnvBanner } from "@/components/shell/env-banner";
 import { LiveRail } from "@/components/shell/live-rail";
 import { ScrollCues } from "@/components/ui/scroll-cues";
@@ -76,14 +79,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
           {/*
         A top bar on a phone only. The rail becomes a bottom bar there and
-        carries the six sections; adding sign-out as a seventh would crowd them
-        and put a destructive-ish action a thumb-width from Orders. So it moves
-        up here, where the logo also does the job of saying which app this
-        is on a screen too narrow for the rail to show it.
+        carries the sections; adding sign-out to them would crowd them and put
+        a destructive-ish action a thumb-width from Orders. So it moves up
+        here, where the logo also does the job of saying which app this is on
+        a screen too narrow for the rail to show it.
+
+        Account comes with it, for the same reason and because the rail hides
+        it below `md` — without this the page was unreachable on a phone.
       */}
-          <header className="flex items-center justify-between border-b border-border bg-surface px-lg py-sm md:hidden">
+          <header className="flex shrink-0 items-center justify-between gap-sm border-b border-border bg-surface px-lg py-xs md:hidden">
             <Logo width={24} />
-            <SignOutButton />
+            <div className="flex items-center gap-xxs">
+              <Link href="/account" className={barItemClass}>
+                <Icon name="customers" size={18} />
+                {t("nav.account")}
+              </Link>
+              <SignOutButton variant="bar" />
+            </div>
           </header>
 
           <LiveRail />

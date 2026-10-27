@@ -113,7 +113,7 @@ export function CategoriesList() {
           }
         />
 
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
           {categories.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (
@@ -206,6 +206,7 @@ function Row({
     category.id,
     cx(
       ROW,
+      "max-md:flex-wrap",
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
       !category.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
@@ -233,7 +234,7 @@ function Row({
         // the control, so the accessible name is the category's and there is
         // one tab stop. See `row.ts`.
         className={cx(
-          "flex min-w-0 flex-grow items-center gap-md text-left",
+          "flex min-w-0 flex-grow items-center gap-md text-left max-md:basis-0",
           ROW_TARGET,
         )}
       >
@@ -252,46 +253,51 @@ function Row({
         </span>
       </button>
 
-      {/* Under each other, so a row stays one line high whatever the labels
-          say — the same arrangement the shop list uses. `ROW_ABOVE` keeps them
-          above the name's stretched hit area. */}
-      <div className={cx(ROW_ABOVE, "flex shrink-0 flex-col gap-xs")}>
-        <ConfirmToggle
-          on={category.isActive}
-          onChange={onToggleActive}
-          labelOn={t("categories.live")}
-          labelOff={t("categories.hidden")}
-          params={{ name: pickLocalized(category.name) }}
-          whenTurningOn={{
-            titleKey: "categories.showTitle",
-            bodyKey: "categories.showBody",
-            confirmKey: "categories.showConfirm",
-          }}
-          whenTurningOff={{
-            titleKey: "categories.hideTitle",
-            bodyKey: "categories.hideBody",
-            confirmKey: "categories.hideConfirm",
-          }}
-          className="w-[104px]"
-        />
-      </div>
+      {/* On a phone the controls take a line of their own under the name.
+          Beside it they left the name a few pixels, or none — and the name
+          is what the row is for. */}
+      <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">
+        {/* Under each other, so a row stays one line high whatever the labels
+            say — the same arrangement the shop list uses. `ROW_ABOVE` keeps them
+            above the name's stretched hit area. */}
+        <div className={cx(ROW_ABOVE, "flex shrink-0 flex-col gap-xs")}>
+          <ConfirmToggle
+            on={category.isActive}
+            onChange={onToggleActive}
+            labelOn={t("categories.live")}
+            labelOff={t("categories.hidden")}
+            params={{ name: pickLocalized(category.name) }}
+            whenTurningOn={{
+              titleKey: "categories.showTitle",
+              bodyKey: "categories.showBody",
+              confirmKey: "categories.showConfirm",
+            }}
+            whenTurningOff={{
+              titleKey: "categories.hideTitle",
+              bodyKey: "categories.hideBody",
+              confirmKey: "categories.hideConfirm",
+            }}
+            className="w-[104px]"
+          />
+        </div>
 
-      {/* Above the stretched target as well — archiving is the one action on
-          this row that must never be reached by a stray click on the row. */}
-      <span className={ROW_ABOVE}>
-        <ConfirmButton
-          onConfirm={onArchive}
-          titleKey="categories.archiveTitle"
-          bodyKey="categories.archiveBody"
-          confirmKey="categories.archiveConfirm"
-          params={{ name: pickLocalized(category.name) }}
-          variant="danger"
-          triggerVariant="danger"
-          size="sm"
-        >
-          {t("categories.archive")}
-        </ConfirmButton>
-      </span>
+        {/* Above the stretched target as well — archiving is the one action on
+            this row that must never be reached by a stray click on the row. */}
+        <span className={ROW_ABOVE}>
+          <ConfirmButton
+            onConfirm={onArchive}
+            titleKey="categories.archiveTitle"
+            bodyKey="categories.archiveBody"
+            confirmKey="categories.archiveConfirm"
+            params={{ name: pickLocalized(category.name) }}
+            variant="danger"
+            triggerVariant="danger"
+            size="sm"
+          >
+            {t("categories.archive")}
+          </ConfirmButton>
+        </span>
+      </div>
     </div>
   );
 }

@@ -111,14 +111,14 @@ export function GeneralTab() {
 
   if (settings.isError) {
     return (
-      <p role="alert" className="p-xxl text-[13px] font-medium text-danger">
+      <p role="alert" className="p-lg text-[13px] md:p-xxl font-medium text-danger">
         {t("content.failed")}
       </p>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
+    <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
       {/* ---- clock ------------------------------------------------------ */}
       <section className="flex flex-col gap-sm">
         <h2 className="text-[17px]">{t("general.clockTitle")}</h2>
@@ -136,7 +136,9 @@ export function GeneralTab() {
         {/* Hidden until 0183 is applied: no list, nothing to choose. */}
         {(zones.data?.length ?? 0) > 0 && (
           <Field label={t("general.zoneLabel")} hint={t("general.zoneHint")}>
-            <div className="w-[260px]">
+            {/* Capped rather than fixed, so it gives way on a phone — a zone
+                label with its IANA name beside it is long. */}
+            <div className="w-full max-w-[260px]">
               <Select
                 value={current?.timezone ?? businessTimezone()}
                 onChange={(timezone) => {

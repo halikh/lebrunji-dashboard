@@ -329,8 +329,12 @@ export function DispatchModal({
       labelledBy={titleId}
       className="w-[min(520px,92vw)]"
     >
-      <div className="flex max-h-[80vh] flex-col">
-        <div className="flex flex-col gap-xxs border-b border-border p-xxl">
+      {/* `dvh` on a phone, where `vh` is the height with the address bar
+          gone and a dialog sized to it runs its footer under the bar. Less
+          the dialog's own padding and the UA's margin, so the body scrolls
+          inside and the dialog itself never does. */}
+      <div className="flex max-h-[calc(100dvh-6rem)] flex-col md:max-h-[80vh]">
+        <div className="flex flex-col gap-xxs border-b border-border p-lg pe-huge md:p-xxl">
           <h2 id={titleId} className="text-[20px]">
             {t("dispatch.title", { code: order.code })}
           </h2>
@@ -350,7 +354,7 @@ export function DispatchModal({
           )}
         </div>
 
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
           {/* The kitchen first, because it is the earlier step: a shop that has
               not been told what to cook has nothing for a driver to collect.
 
@@ -360,7 +364,7 @@ export function DispatchModal({
               and once it is in a WhatsApp thread it is on somebody's phone for
               good. */}
           <section className="flex flex-col gap-sm">
-            <div className="flex items-center justify-between gap-md">
+            <div className="flex flex-wrap items-center justify-between gap-md">
               <h3 className="text-[17px]">
                 {t("dispatch.kitchenTab")}
               </h3>
@@ -630,7 +634,7 @@ export function DispatchModal({
           ))}
         </div>
 
-        <div className="flex shrink-0 items-center justify-between gap-lg border-t border-border p-xxl">
+        <div className="flex shrink-0 items-center justify-between gap-lg border-t border-border p-lg md:p-xxl">
           <p className="min-w-0 text-[12px] text-text-faint">
             {t("dispatch.opensWhatsApp")}
           </p>

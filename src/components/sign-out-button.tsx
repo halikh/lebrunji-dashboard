@@ -44,7 +44,16 @@ import { forgetAccessToken } from "@/lib/supabase/client";
  * be valid, so the operator would believe they had signed out of a machine they
  * had not.
  */
-export function SignOutButton() {
+export function SignOutButton({
+  variant = "rail",
+}: {
+  /**
+   * `rail` is the stacked nav item. `bar` is the phone's top bar, where a
+   * rail item — `flex-1`, icon over label, 70px tall — stretched across the
+   * header and doubled its height; there it is one short row instead.
+   */
+  variant?: "rail" | "bar";
+} = {}) {
   const router = useRouter();
   // Not a second dialog stacked on this one: signing out already asks, so the
   // unsaved work becomes a sentence in the question that is being asked anyway.
@@ -90,9 +99,11 @@ export function SignOutButton() {
         <button
           type="button"
           onClick={onClick}
-          className={railItemClass({ tone: "danger" })}
+          className={
+            variant === "bar" ? barItemClass : railItemClass({ tone: "danger" })
+          }
         >
-          <Icon name="sign-out" />
+          <Icon name="sign-out" size={variant === "bar" ? 18 : undefined} />
           {t("common.signOut")}
         </button>
       )}
@@ -101,3 +112,11 @@ export function SignOutButton() {
     </ConfirmButton>
   );
 }
+
+/**
+ * One control in the phone's top bar: icon and label side by side, 40px tall
+ * for a thumb. Exported for the account link beside it, so the two are the
+ * same shape for the same reason `railItemClass` is shared.
+ */
+export const barItemClass =
+  "flex h-[40px] items-center gap-xs rounded-md px-sm text-[13px] font-medium text-text-soft hover:bg-neutral-fill hover:text-text";

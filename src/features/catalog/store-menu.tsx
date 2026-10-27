@@ -146,11 +146,13 @@ export function StoreMenu({ storeId }: { storeId: string }) {
   return (
     <div className="flex h-full flex-col">
       {branch && (
-        <div className="flex shrink-0 items-center gap-md border-b border-border bg-surface px-xxl py-lg">
+        <div className="flex shrink-0 items-center gap-md border-b border-border bg-surface px-lg md:px-xxl py-lg">
           <span className="shrink-0 text-[13px] font-semibold text-text-soft">
             {t("menu.forBranch")}
           </span>
-          <span className="w-[280px]">
+          {/* The rest of the line on a phone, where 280px and the label
+              between them are wider than the screen. */}
+          <span className="min-w-0 flex-1 md:w-[280px] md:flex-none">
             <Select
               value={branch.id}
               onChange={setChosen}
@@ -329,12 +331,16 @@ function MenuEditor({ storeId }: { storeId: string }) {
             the list up by a line on the first keystroke, and the sentence is
             most worth reading at exactly the moment somebody has searched and
             found less than they expected. */}
-        <div className="flex shrink-0 flex-col gap-xs px-xxl pt-lg">
-          <div className="flex items-center gap-lg">
+        <div className="flex shrink-0 flex-col gap-xs px-lg md:px-xxl pt-lg">
+          {/* Wraps on a phone, the box on a line of its own and the buttons
+              under it. Kept on one line, two buttons left the box too narrow
+              to show what was typed in it. */}
+          <div className="flex flex-wrap items-center gap-lg max-md:gap-md">
             <SearchInput
               value={search}
               onChange={setSearch}
               placeholder={t("menu.search")}
+              className="max-md:basis-full"
             />
             {/* Beside the search rather than at the end of the list. The
                 header does not scroll, so this is reachable on a menu of any
@@ -390,7 +396,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
               rememberScroll(storeId, event.currentTarget.scrollTop);
             }
           }}
-          className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl"
+          className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl"
         >
           {menu.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
@@ -449,7 +455,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
               {matches.data?.sections.map((section) => (
                 <div
                   key={section.id}
-                  className="flex items-center gap-md rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card"
+                  className="flex flex-wrap items-center gap-md rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card"
                 >
                   <span className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
                     {t("menu.sectionLabel")}
@@ -461,7 +467,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
                     {t("menu.itemCount", { count: section.itemCount })}
                   </span>
 
-                  <div className="ms-auto flex items-center gap-sm">
+                  <div className="ms-auto flex flex-wrap items-center justify-end gap-sm max-md:w-full">
                     {/* The branch's switch, as on the section's heading in
                         the list. */}
                     <BranchSectionControls sectionId={section.id} />
@@ -815,7 +821,11 @@ function Section({
         // `relative`, so the toggle's stretched hit area below has something to
         // be absolute against. The item rows get this from `ROW`; a section
         // heading is not a `ROW` and has to say it itself.
-        <div className="relative flex items-center gap-md">
+        //
+        // It wraps on a phone: the controls take the second line, so the
+        // section's name keeps the first rather than being squeezed to nothing
+        // between a handle and three buttons.
+        <div className="relative flex items-center gap-md max-md:flex-wrap">
           <button {...handleProps(section.id)}>
             <GripIcon />
           </button>
@@ -840,7 +850,7 @@ function Section({
             aria-expanded={open}
             className={cx(
               ROW_TARGET,
-              "flex min-w-0 items-center gap-md text-left",
+              "flex min-w-0 items-center gap-md text-left max-md:flex-1",
             )}
           >
             <svg
@@ -890,7 +900,7 @@ function Section({
           <div
             className={cx(
               ROW_ABOVE,
-              "ms-auto flex items-center gap-sm",
+              "ms-auto flex items-center gap-sm max-md:w-full max-md:flex-wrap max-md:justify-end",
               carried && "hidden",
             )}
           >
@@ -1082,7 +1092,9 @@ function ItemRow({
     item.id,
     cx(
       ROW,
-      atBranch && "flex-wrap",
+      // On a phone too, whatever the shop: the toggle and Archive take a
+      // line of their own there, under the name and the price.
+      atBranch ? "flex-wrap" : "max-md:flex-wrap",
       // Marked, not dimmed — fading a row takes its controls with it, and a
       // faded button reads as a disabled one.
       !item.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
@@ -1123,7 +1135,7 @@ function ItemRow({
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
         className={cx(
           ROW_TARGET,
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-0",
         )}
       >
         <span
@@ -1181,37 +1193,41 @@ function ItemRow({
           row never did. */}
       {!carried && (
         <>
-          <ConfirmToggle
-            on={item.isActive}
-            onChange={onToggle}
-            labelOn={t("menu.live")}
-            labelOff={t("menu.hidden")}
-            params={{ name: pickLocalized(item.name) }}
-            whenTurningOn={{
-              titleKey: "menu.showTitle",
-              bodyKey: "menu.showBody",
-              confirmKey: "menu.showConfirm",
-            }}
-            whenTurningOff={{
-              titleKey: "menu.hideTitle",
-              bodyKey: "menu.hideBody",
-              confirmKey: "menu.hideConfirm",
-            }}
-            className={cx(ROW_ABOVE, "w-[92px]")}
-          />
+          {/* Grouped so that on a phone they wrap together, to the end of a
+              line of their own — see the row's `max-md:flex-wrap`. */}
+          <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">
+            <ConfirmToggle
+              on={item.isActive}
+              onChange={onToggle}
+              labelOn={t("menu.live")}
+              labelOff={t("menu.hidden")}
+              params={{ name: pickLocalized(item.name) }}
+              whenTurningOn={{
+                titleKey: "menu.showTitle",
+                bodyKey: "menu.showBody",
+                confirmKey: "menu.showConfirm",
+              }}
+              whenTurningOff={{
+                titleKey: "menu.hideTitle",
+                bodyKey: "menu.hideBody",
+                confirmKey: "menu.hideConfirm",
+              }}
+              className={cx(ROW_ABOVE, "w-[92px]")}
+            />
 
-          <ConfirmButton
-            className={ROW_ABOVE}
-            onConfirm={onArchive}
-            titleKey="menu.archiveTitle"
-            bodyKey="menu.archiveBody"
-            confirmKey="menu.archiveConfirm"
-            variant="danger"
-            triggerVariant="danger"
-            size="sm"
-          >
-            {t("menu.archive")}
-          </ConfirmButton>
+            <ConfirmButton
+              className={ROW_ABOVE}
+              onConfirm={onArchive}
+              titleKey="menu.archiveTitle"
+              bodyKey="menu.archiveBody"
+              confirmKey="menu.archiveConfirm"
+              variant="danger"
+              triggerVariant="danger"
+              size="sm"
+            >
+              {t("menu.archive")}
+            </ConfirmButton>
+          </div>
 
           <BranchItemStrip item={item} sectionId={sectionId} />
         </>
@@ -1339,7 +1355,7 @@ function SectionForm({
           disabled={pending}
         />
       </Field>
-      <div className="flex items-center gap-sm">{buttons}</div>
+      <div className="flex flex-wrap items-center gap-sm">{buttons}</div>
     </div>
   );
 }
@@ -1394,7 +1410,8 @@ function SearchResult({
     <div
       className={cx(
         ROW,
-        atBranch && "flex-wrap",
+        // As an `ItemRow` does on a phone — see there.
+        atBranch ? "flex-wrap" : "max-md:flex-wrap",
         !item.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
         item.isActive && "border-transparent",
       )}
@@ -1412,7 +1429,7 @@ function SearchResult({
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
         className={cx(
           ROW_TARGET,
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-0",
         )}
       >
         <span
@@ -1442,38 +1459,41 @@ function SearchResult({
         <PerUnit item={item} code={currencyCode} />
       </div>
 
-      <ConfirmToggle
-        on={item.isActive}
-        onChange={onToggle}
-        labelOn={t("menu.live")}
-        labelOff={t("menu.hidden")}
-        params={{ name: pickLocalized(item.name) }}
-        whenTurningOn={{
-          titleKey: "menu.showTitle",
-          bodyKey: "menu.showBody",
-          confirmKey: "menu.showConfirm",
-        }}
-        whenTurningOff={{
-          titleKey: "menu.hideTitle",
-          bodyKey: "menu.hideBody",
-          confirmKey: "menu.hideConfirm",
-        }}
-        className={cx(ROW_ABOVE, "w-[92px]")}
-      />
+      {/* Together, for the same wrap as an `ItemRow`'s. */}
+      <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">
+        <ConfirmToggle
+          on={item.isActive}
+          onChange={onToggle}
+          labelOn={t("menu.live")}
+          labelOff={t("menu.hidden")}
+          params={{ name: pickLocalized(item.name) }}
+          whenTurningOn={{
+            titleKey: "menu.showTitle",
+            bodyKey: "menu.showBody",
+            confirmKey: "menu.showConfirm",
+          }}
+          whenTurningOff={{
+            titleKey: "menu.hideTitle",
+            bodyKey: "menu.hideBody",
+            confirmKey: "menu.hideConfirm",
+          }}
+          className={cx(ROW_ABOVE, "w-[92px]")}
+        />
 
-      <ConfirmButton
-        className={ROW_ABOVE}
-        onConfirm={onArchive}
-        titleKey="menu.archiveTitle"
-        bodyKey="menu.archiveBody"
-        confirmKey="menu.archiveConfirm"
-        params={{ name: pickLocalized(item.name) }}
-        variant="danger"
-        triggerVariant="danger"
-        size="sm"
-      >
-        {t("menu.archive")}
-      </ConfirmButton>
+        <ConfirmButton
+          className={ROW_ABOVE}
+          onConfirm={onArchive}
+          titleKey="menu.archiveTitle"
+          bodyKey="menu.archiveBody"
+          confirmKey="menu.archiveConfirm"
+          params={{ name: pickLocalized(item.name) }}
+          variant="danger"
+          triggerVariant="danger"
+          size="sm"
+        >
+          {t("menu.archive")}
+        </ConfirmButton>
+      </div>
 
       <BranchItemStrip item={item} sectionId={item.sectionId} />
     </div>

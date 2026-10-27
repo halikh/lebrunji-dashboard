@@ -67,18 +67,10 @@ export function OrderPanel({
       onClose={onClose}
       label={t("orders.panelLabel")}
     >
-      {/* Nothing in the queue, so nothing to show. Said, rather than left as a
-          skeleton that never resolves — a disabled query reads as pending. */}
-      {orderId === null && (
-        <p className="p-xxl text-[14px] text-text-faint">
-          {t("orders.panelEmpty")}
-        </p>
-      )}
-
       {orderId !== null && order.isPending && <PanelSkeleton />}
 
       {order.isError && (
-        <div className="flex flex-col gap-lg p-xxl">
+        <div className="flex flex-col gap-lg p-lg md:p-xxl">
           <p role="alert" className="text-[14px] font-medium text-danger">
             {t("orders.detailFailed")}
           </p>
@@ -107,8 +99,9 @@ export function OrderPanel({
                 </span>
               </div>
               {status && <StatusPill slug={status.slug} name={status.name} />}
-              {!docked && (
-                <button
+              {/* Docked too: the queue's column can be put away for room, and
+                  picking a row brings it back. */}
+              <button
                   type="button"
                   onClick={onClose}
                   aria-label={t("common.close")}
@@ -127,7 +120,6 @@ export function OrderPanel({
                     <path d="M6 6l12 12M18 6L6 18" />
                   </svg>
                 </button>
-              )}
             </div>
 
             {/* The ways out, as two quiet chips on one line. They leave the

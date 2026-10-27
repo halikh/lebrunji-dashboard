@@ -87,7 +87,7 @@ export function ArtworkEditor({
   // read from it, and guessing zero would put it first.
   if (!id && artworks.isPending) {
     return (
-      <div className="flex flex-1 items-center justify-center p-xxl text-[13px] text-text-faint">
+      <div className="flex flex-1 items-center justify-center p-lg md:p-xxl text-[13px] text-text-faint">
         {t("common.loading")}
       </div>
     );

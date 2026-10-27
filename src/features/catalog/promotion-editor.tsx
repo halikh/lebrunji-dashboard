@@ -188,7 +188,7 @@ function WithDishes({
   // there being something to wait for rather than on the query's own state.
   if (dishIds.length > 0 && dishes.isPending) {
     return (
-      <div className="flex flex-1 items-center justify-center p-xxl text-[13px] text-text-faint">
+      <div className="flex flex-1 items-center justify-center p-lg md:p-xxl text-[13px] text-text-faint">
         {t("common.loading")}
       </div>
     );

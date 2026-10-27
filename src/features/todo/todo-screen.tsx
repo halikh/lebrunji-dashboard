@@ -87,7 +87,7 @@ export function TodoScreen() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-xxl py-lg">
+      <div className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-lg py-lg md:px-xxl">
         <div className="flex flex-col gap-xxs">
           <h1 className="text-[30px]">{t("todo.title")}</h1>
           <p className="text-[14px] text-text-soft">{t("todo.blurb")}</p>
@@ -107,7 +107,7 @@ export function TodoScreen() {
           drawn whenever the pane is scrolled, which here is always under a
           sticky heading — a shadow beneath a heading that is not raised. */}
       <div className="flex min-h-0 flex-grow flex-col overflow-y-auto bg-background">
-        <div className="flex flex-col gap-lg px-xxl pb-xxl pt-sm">
+        <div className="flex flex-col gap-lg px-lg pb-lg pt-sm md:px-xxl md:pb-xxl">
           <TodoSection
             titleKey="todo.hoursTitle"
             bodyKey="todo.hoursBody"
@@ -445,7 +445,11 @@ function TodoRow({
         )}
       </div>
       <span className="flex shrink-0 items-center gap-xs text-[14px] font-medium text-text">
-        {t(actionKey)}
+        {/* The words go on a phone and the chevron stays. The whole row is
+            the link and each section's heading already says what the fix is,
+            so "Add a picture" beside every row there was only taking width
+            from the name it is about. */}
+        <span className="max-sm:sr-only">{t(actionKey)}</span>
         <svg
           width="16"
           height="16"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import DatePicker from "react-datepicker";
 
 import { useClock } from "@/features/settings/use-clock";
@@ -166,6 +167,7 @@ export function DateRangeField({
   className?: string;
 }) {
   const field = useFieldWiring();
+  const wide = useWide();
 
   return (
     <div className="flex flex-col gap-xxs">
@@ -183,16 +185,20 @@ export function DateRangeField({
           onChange(toStartOfDay(start), toStartOfDay(end));
         }}
         disabled={disabled}
-        monthsShown={2}
+        // Two months side by side is about 480px of popup — wider than a
+        // phone. One month below `md`; the arrows still walk to the next.
+        monthsShown={wide ? 2 : 1}
         dateFormat="dd MMM yyyy"
         placeholderText={t("reports.rangePlaceholder")}
         isClearable
         aria-describedby={field?.describedBy}
         className={cx(
-          "w-[260px] rounded-md border border-line bg-cream px-md py-sm text-[14px] tabular-nums focus:bg-field-focus",
+          "w-full rounded-md border border-line bg-cream px-md py-sm text-[14px] tabular-nums focus:bg-field-focus",
           className,
         )}
-        wrapperClassName="shrink-0"
+        // The wrapper carries the width, so the input can be `w-full` of it
+        // and give way on a phone instead of holding 260px.
+        wrapperClassName="w-full max-w-[260px]"
         popperPlacement="bottom-start"
       />
       <span className="ps-md text-[11px] text-text-faint">
@@ -210,4 +216,25 @@ function toStartOfDay(date: Date | null): string | null {
     month: date.getMonth() + 1,
     day: date.getDate(),
   }).toISOString();
+}
+
+/**
+ * Whether the window is at least `md` wide.
+ *
+ * `useSyncExternalStore` rather than an effect and a state, so it is right on
+ * the first client render and follows a resize. The server says "wide": the
+ * popup only ever renders after a click, so nothing drawn on the server
+ * depends on the answer.
+ */
+const WIDE = "(min-width: 48rem)";
+function useWide() {
+  return useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia(WIDE);
+      query.addEventListener("change", onChange);
+      return () => query.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(WIDE).matches,
+    () => true,
+  );
 }

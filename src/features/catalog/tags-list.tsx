@@ -86,7 +86,7 @@ export function TagsList() {
           }
         />
 
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
           {/* What the list is for, said once at the top. A vocabulary screen
               with no explanation reads as a settings table; the sentence is
               what makes "Popular" here and a chip on a phone the same thing. */}
@@ -167,6 +167,7 @@ function Row({
 
   const className = cx(
     ROW,
+    "max-md:flex-wrap",
     // Marked, not dimmed — fading a row takes its controls with it, and a
     // faded button reads as a disabled one.
     !tag.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
@@ -183,7 +184,7 @@ function Row({
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
         className={cx(
           ROW_TARGET,
-          "flex min-w-0 flex-grow items-center gap-md text-left",
+          "flex min-w-0 flex-grow items-center gap-md text-left max-md:basis-0",
         )}
       >
         {/* The tag itself, drawn the way a dish shows it — icon, then the name
@@ -198,38 +199,43 @@ function Row({
         </span>
       </button>
 
-      <ConfirmToggle
-        on={tag.isActive}
-        onChange={onToggleActive}
-        labelOn={t("tags.live")}
-        labelOff={t("tags.hidden")}
-        params={{ name, count: tag.usedBy }}
-        whenTurningOn={{
-          titleKey: "tags.showTitle",
-          bodyKey: "tags.showBody",
-          confirmKey: "tags.showConfirm",
-        }}
-        whenTurningOff={{
-          titleKey: "tags.hideTitle",
-          bodyKey: "tags.hideBody",
-          confirmKey: "tags.hideConfirm",
-        }}
-        className={cx(ROW_ABOVE, "w-[104px]")}
-      />
+      {/* On a phone the controls take a line of their own under the name.
+          Beside it they left the name a few pixels, or none — and the name
+          is what the row is for. */}
+      <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">
+        <ConfirmToggle
+          on={tag.isActive}
+          onChange={onToggleActive}
+          labelOn={t("tags.live")}
+          labelOff={t("tags.hidden")}
+          params={{ name, count: tag.usedBy }}
+          whenTurningOn={{
+            titleKey: "tags.showTitle",
+            bodyKey: "tags.showBody",
+            confirmKey: "tags.showConfirm",
+          }}
+          whenTurningOff={{
+            titleKey: "tags.hideTitle",
+            bodyKey: "tags.hideBody",
+            confirmKey: "tags.hideConfirm",
+          }}
+          className={cx(ROW_ABOVE, "w-[104px]")}
+        />
 
-      <ConfirmButton
-        className={ROW_ABOVE}
-        onConfirm={onArchive}
-        titleKey="tags.archiveTitle"
-        bodyKey="tags.archiveBody"
-        confirmKey="tags.archiveConfirm"
-        params={{ name, count: tag.usedBy }}
-        variant="danger"
-        triggerVariant="danger"
-        size="sm"
-      >
-        {t("tags.archive")}
-      </ConfirmButton>
+        <ConfirmButton
+          className={ROW_ABOVE}
+          onConfirm={onArchive}
+          titleKey="tags.archiveTitle"
+          bodyKey="tags.archiveBody"
+          confirmKey="tags.archiveConfirm"
+          params={{ name, count: tag.usedBy }}
+          variant="danger"
+          triggerVariant="danger"
+          size="sm"
+        >
+          {t("tags.archive")}
+        </ConfirmButton>
+      </div>
     </div>
   );
 }

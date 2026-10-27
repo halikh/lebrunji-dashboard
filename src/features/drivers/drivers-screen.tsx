@@ -169,11 +169,16 @@ export function DriversScreen() {
       {/* The same strip the queue and the customers list use — same shape,
             same place, same keyboard behaviour — because these are the same
             kind of control and two spellings of it would be two things to
-            learn. */}
+            learn.
+
+            Including how it behaves on a phone: it scrolls sideways rather
+            than wrapping, and its rule is an inset shadow rather than a border
+            so the scroller does not clip the tabs' underlines — see the note on
+            the customers list. */}
       <div
         role="tablist"
         aria-label={t("drivers.title")}
-        className="flex shrink-0 gap-xxs border-b border-border bg-surface px-xxl"
+        className="flex shrink-0 gap-xxs overflow-x-auto bg-surface px-lg pb-px shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] md:px-xxl"
       >
         {TABS.map(({ key, labelKey, tone }) => (
           <FilterTab
@@ -192,7 +197,9 @@ export function DriversScreen() {
         ))}
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+      {/* A size container: whether a row's controls fit beside the name is a
+          question about the list's width, not the window's. */}
+      <div className="@container flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
         <p className="ps-md pb-sm text-[13px] text-text-soft">
           {t("drivers.blurb")}
         </p>
@@ -301,7 +308,16 @@ function DriverRow({
   const overridden = isOverridden(courier);
 
   return (
-    <div ref={anchor} className={cx(ROW, open ? FOCUS_RING : "border-transparent")}>
+    <div
+      ref={anchor}
+      className={cx(
+        ROW,
+        // Wraps on a narrow list so the controls can drop under the name; see
+        // the group below.
+        "flex-wrap gap-y-sm @2xl:flex-nowrap",
+        open ? FOCUS_RING : "border-transparent",
+      )}
+    >
       <Avatar id={courier.id} name={courier.name} />
 
       <div className="flex min-w-0 flex-grow flex-col gap-xxs">
@@ -332,65 +348,76 @@ function DriverRow({
 
           An override is invisible from the outside — the badge reads the same
           either way — so the row says when one is in force and offers to stop.
-          An override left behind is the failure the rota was meant to end. */}
-      {courier.isActive && (
-        <span className="relative z-10 flex shrink-0 flex-col items-end gap-xxs">
-          <Toggle
-            on={taking}
-            onChange={() => onOverride(!taking)}
-            labelOn={t("drivers.onShift")}
-            labelOff={t("drivers.offShift")}
-            className="w-[124px]"
-          />
-          {overridden && (
-            <button
-              type="button"
-              onClick={() => onOverride(null)}
-              className="text-[11px] font-semibold text-primary hover:underline"
+          An override left behind is the failure the rota was meant to end.
+
+          The switch and the buttons are one group, which on a narrow list is a
+          line of its own under the name and on a wide one is `contents` — its
+          children back in the row as they always were. A switch and two
+          buttons beside a name in 300px left the name a letter or two wide. */}
+      <span className="flex basis-full flex-wrap items-center justify-between gap-sm @2xl:contents">
+        {courier.isActive && (
+          <span className="relative z-10 flex shrink-0 flex-col items-start gap-xxs @2xl:items-end">
+            <Toggle
+              on={taking}
+              onChange={() => onOverride(!taking)}
+              labelOn={t("drivers.onShift")}
+              labelOff={t("drivers.offShift")}
+              className="w-[124px]"
+            />
+            {overridden && (
+              <button
+                type="button"
+                onClick={() => onOverride(null)}
+                className="text-[11px] font-semibold text-primary hover:underline"
+              >
+                {t("drivers.followRota")}
+              </button>
+            )}
+          </span>
+        )}
+
+        <span className="relative z-10 ms-auto flex items-center gap-sm @2xl:ms-0">
+          <Button variant="secondary" size="sm" onClick={onEdit}>
+            {t("drivers.edit")}
+          </Button>
+
+          {/* There is no delete. A driver who has left still appears on every
+              order they carried, and removing the row would leave that history
+              pointing at a name nobody can look up.
+
+              Switching off asks first — it takes somebody out of dispatch, and
+              from this side of the screen nothing looks different afterwards.
+              Switching back on does not: it restores, and a confirmation on a
+              reversal is a question with one sensible answer. */}
+          {courier.isActive ? (
+            <ConfirmButton
+              onConfirm={onDeactivate}
+              titleKey="drivers.deactivateTitle"
+              bodyKey="drivers.deactivateBody"
+              confirmKey="drivers.deactivateConfirm"
+              params={{ name: courier.name }}
+              variant="danger"
+              // Filled, like every other destructive control on a row. `quiet`
+              // is transparent, so beside a filled Edit it read as text rather
+              // than as a button — and the one control here with a consequence
+              // should not be the one that looks least like a control.
+              triggerVariant="danger"
+              size="sm"
             >
-              {t("drivers.followRota")}
-            </button>
+              {t("drivers.deactivate")}
+            </ConfirmButton>
+          ) : (
+            // Mint, the theme's "going well". Grey beside a red Deactivate said
+            // the two were peers; this one puts somebody back on the rota.
+            <Button
+              variant="accent"
+              size="sm"
+              onClick={() => onSetActive(true)}
+            >
+              {t("drivers.reactivate")}
+            </Button>
           )}
         </span>
-      )}
-
-      <span className="relative z-10 flex items-center gap-sm">
-        <Button variant="secondary" size="sm" onClick={onEdit}>
-          {t("drivers.edit")}
-        </Button>
-
-        {/* There is no delete. A driver who has left still appears on every
-            order they carried, and removing the row would leave that history
-            pointing at a name nobody can look up.
-
-            Switching off asks first — it takes somebody out of dispatch, and
-            from this side of the screen nothing looks different afterwards.
-            Switching back on does not: it restores, and a confirmation on a
-            reversal is a question with one sensible answer. */}
-        {courier.isActive ? (
-          <ConfirmButton
-            onConfirm={onDeactivate}
-            titleKey="drivers.deactivateTitle"
-            bodyKey="drivers.deactivateBody"
-            confirmKey="drivers.deactivateConfirm"
-            params={{ name: courier.name }}
-            variant="danger"
-            // Filled, like every other destructive control on a row. `quiet`
-            // is transparent, so beside a filled Edit it read as text rather
-            // than as a button — and the one control here with a consequence
-            // should not be the one that looks least like a control.
-            triggerVariant="danger"
-            size="sm"
-          >
-            {t("drivers.deactivate")}
-          </ConfirmButton>
-        ) : (
-          // Mint, the theme's "going well". Grey beside a red Deactivate said
-          // the two were peers; this one puts somebody back on the rota.
-          <Button variant="accent" size="sm" onClick={() => onSetActive(true)}>
-            {t("drivers.reactivate")}
-          </Button>
-        )}
       </span>
     </div>
   );

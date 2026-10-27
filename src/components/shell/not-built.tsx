@@ -26,7 +26,7 @@ export function NotBuilt({
   phase: number;
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-sm px-xxl py-huge text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-sm px-lg py-huge text-center md:px-xxl">
       <PoseStage pose="packing" height={176} className="mb-md" />
       <p className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
         {t(sectionKey)}

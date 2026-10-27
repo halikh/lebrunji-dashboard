@@ -18,7 +18,7 @@ import { UnusedPicturesSection } from "./unused-pictures-section";
  */
 export function AdvancedTab() {
   return (
-    <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl [&>section:first-child]:border-t-0 [&>section:first-child]:pt-0">
+    <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl [&>section:first-child]:border-t-0 [&>section:first-child]:pt-0">
       <CustomerAppSection />
       <UnusedPicturesSection />
     </div>

@@ -191,12 +191,24 @@ export function OrdersQueue() {
   // the Live tab) stays up, because the operator was in the middle of it.
   const shownOrderId = openOrderId ?? rows[active]?.id ?? null;
 
+  // Put away with its close button, or by dragging its edge shut, for the room.
+  // Not in the URL: it is a preference about this screen's layout, not part of
+  // the view a link would share. Picking a row brings it back — at its default
+  // width, since the panel unmounts while hidden and forgets the drag.
+  const [panelHidden, setPanelHidden] = useState(false);
+
+  const closePanel = useCallback(() => {
+    setPanelHidden(true);
+    setOpenOrderId(null);
+  }, [setOpenOrderId]);
+
   /** Move the highlight, and the receipt with it. */
   const select = useCallback(
     (index: number) => {
       const order = rows[index];
       if (!order) return;
       setFocused(index);
+      setPanelHidden(false);
       setOpenOrderId(order.id);
     },
     [rows, setOpenOrderId],
@@ -229,7 +241,7 @@ export function OrdersQueue() {
 
       if (event.key === "Escape" && openOrderId) {
         event.preventDefault();
-        setOpenOrderId(null);
+        closePanel();
         return;
       }
       if (event.key === "/") {
@@ -244,6 +256,7 @@ export function OrdersQueue() {
         const order = rows[active];
         if (!order) return;
         event.preventDefault();
+        setPanelHidden(false);
         setOpenOrderId(order.id);
         return;
       }
@@ -288,6 +301,7 @@ export function OrdersQueue() {
     advance,
     openOrderId,
     setOpenOrderId,
+    closePanel,
     undoLast,
   ]);
 
@@ -306,8 +320,15 @@ export function OrdersQueue() {
         that should absorb the overflow; it already says so with `flex-grow`
         and `overflow-y-auto`, and this is the other half of that statement.
       */}
-        <div className="flex shrink-0 items-center gap-lg bg-surface px-xxl pb-md pt-lg">
-          <h1 className="text-[30px] tracking-[-0.01em]">{t("orders.title")}</h1>
+        {/* Wraps rather than squeezes. Beside the docked receipt at `lg` the
+            queue is barely 460px, and on a phone less than that — so the search
+            box asks for a basis of its own and drops to a full line under the
+            title and scopes when it cannot have it, instead of shrinking to a
+            stub nobody can read a pasted code back out of. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-lg gap-y-md bg-surface px-lg pb-md pt-lg md:px-xxl">
+          <h1 className="text-[26px] tracking-[-0.01em] md:text-[30px]">
+            {t("orders.title")}
+          </h1>
 
           {/* The scope switch sits beside the title rather than among the status
             tabs, because it is a different question: the tabs ask "at which
@@ -339,6 +360,7 @@ export function OrdersQueue() {
               width rather than a strut and a fixed number that disagree. */}
           <SearchInput
             ref={searchRef}
+            className="basis-[16rem]"
             value={search}
             onChange={setSearch}
             placeholder={t("orders.searchPlaceholder")}
@@ -348,9 +370,13 @@ export function OrdersQueue() {
         <div
           role="tablist"
           aria-label={t("orders.title")}
-          // No scroll: six tabs fit any screen the queue is used on, and a
-          // scrollbar under them was chrome with nothing to reveal.
-          className="flex shrink-0 gap-xs border-b border-border bg-surface px-xxl"
+          // Scrolls sideways, with no bar. Six tabs fit a desktop, but not a
+          // phone and not the queue's column beside the docked receipt, and
+          // wrapping them onto two lines would break the underline. The rule
+          // under them is an inset shadow rather than a border, because a
+          // scroller clips to its padding box and the tabs' `-mb-px` overlap
+          // would become a one-pixel vertical scroll — see `scrollbar-none`.
+          className="flex shrink-0 gap-xs overflow-x-auto scrollbar-none bg-surface px-lg shadow-[inset_0_-1px_0_var(--color-border)] md:px-xxl"
         >
           <Tab
             label={t("orders.all")}
@@ -375,7 +401,11 @@ export function OrdersQueue() {
         {/* The one part that scrolls. `min-h-0` for the same reason as the
           layout's main — without it this grows to its content and the header
           and tabs get squeezed instead. */}
-        <div className="flex min-h-0 flex-grow flex-col gap-md overflow-y-auto scroll-hint bg-background px-xxl py-lg">
+        {/* `@container`, so each row lays itself out by the width of this
+            column rather than of the window: the same 1440px screen gives the
+            queue 800px with the receipt docked and 1300px without it, and the
+            receipt can be dragged wider still. */}
+        <div className="@container flex min-h-0 flex-grow flex-col gap-md overflow-y-auto scroll-hint bg-background px-lg py-lg md:px-xxl">
           {orders.isPending && <Skeleton />}
 
           {orders.isError && (
@@ -438,7 +468,12 @@ export function OrdersQueue() {
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-xl border-t border-border bg-surface px-xxl py-md text-[12px] text-text-faint">
+        {/* Keys on a screen that may have none. Below `md` it is a phone or a
+            tablet held in the hand, so the bar is dropped rather than spending
+            a line of a short screen on shortcuts nobody can press. It wraps
+            above that, because beside the docked receipt the six hints are
+            wider than the column. */}
+        <div className="hidden shrink-0 flex-wrap items-center gap-x-xl gap-y-xs border-t border-border bg-surface px-xxl py-md text-[12px] text-text-faint md:flex">
           <Key label="J" /> <Key label="K" /> {t("orders.keyboardMove")}
           <span className="flex items-center gap-sm">
             <Key label="Enter" /> {t("orders.keyboardAdvance")}
@@ -459,12 +494,16 @@ export function OrdersQueue() {
         </div>
       </div>
 
-      <OrderPanel
-        orderId={shownOrderId}
-        docked
-        opened={openOrderId !== null}
-        onClose={() => setOpenOrderId(null)}
-      />
+      {/* No panel at all with nothing to show — an empty column saying so
+          only takes room from the empty state the queue already draws. */}
+      {shownOrderId !== null && !panelHidden && (
+        <OrderPanel
+          orderId={shownOrderId}
+          docked
+          opened={openOrderId !== null}
+          onClose={closePanel}
+        />
+      )}
     </div>
   );
 }
@@ -533,7 +572,9 @@ function Tab({
       // Chosen is an ink underline and ink type, as a chosen thing is in the
       // app; the count beside it turns to an ink badge with it.
       className={cx(
-        "-mb-px flex h-[44px] shrink-0 items-center gap-sm whitespace-nowrap border-b-2 px-md text-[14px] font-medium",
+        // No `-mb-px`: the row scrolls, so the rule under it is drawn inside
+        // it rather than as a border to overlap. See the tablist.
+        "flex h-[44px] shrink-0 items-center gap-sm whitespace-nowrap border-b-2 px-md text-[14px] font-medium",
         active
           ? "border-active text-text"
           : "border-transparent text-text-soft hover:text-text",

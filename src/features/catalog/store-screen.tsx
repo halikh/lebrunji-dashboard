@@ -162,7 +162,7 @@ export function StoreScreen({ storeId }: { storeId: string }) {
         {/* `gap-md`, not `gap-xs`. The header used to be three single lines and
             is now a button, a two-line identity block and the tabs — at the
             old spacing they touched. */}
-        <div className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-xxl pt-lg">
+        <div className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-lg md:px-xxl pt-lg">
           <BackLink href="/catalogue">{t("menu.back")}</BackLink>
 
           {/*
@@ -205,7 +205,14 @@ export function StoreScreen({ storeId }: { storeId: string }) {
             is in the tab order — which is what stops a two-tab strip costing two
             stops on the way to the content every time.
           */}
-          <div role="tablist" className="-mb-px flex gap-lg">
+          {/* Scrolls sideways rather than wrapping when the strip outgrows a
+              phone. A second row of tabs would put two underlines on two
+              baselines, and which one is chosen stops being obvious. The tabs
+              keep their width so a label never breaks across two lines. */}
+          <div
+            role="tablist"
+            className="-mb-px flex gap-lg overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap"
+          >
             {TABS.map(({ key, labelKey }) => (
               <SectionTab
                 key={key}

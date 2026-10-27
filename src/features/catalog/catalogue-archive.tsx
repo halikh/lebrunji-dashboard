@@ -121,8 +121,8 @@ export function CatalogueArchive() {
   // neither is drawn on numbers nobody has yet — see the note in the header.
   if (counts.isPending || counts.data === undefined) {
     return (
-      <div aria-hidden className="flex flex-col gap-sm p-xxl">
-        <div className="h-[36px] w-[320px] rounded-md bg-neutral-fill" />
+      <div aria-hidden className="flex flex-col gap-sm p-lg md:p-xxl">
+        <div className="h-[36px] w-[320px] max-w-full rounded-md bg-neutral-fill" />
         <div className="h-[64px] rounded-md bg-neutral-fill" />
         <div className="h-[64px] rounded-md bg-neutral-fill" />
       </div>
@@ -154,7 +154,7 @@ export function CatalogueArchive() {
       {/* Above the scroller. A filter strip that scrolls away leaves the
           operator looking at a filtered list with no visible sign that a filter
           is on — and the same is true of the search box beside it. */}
-      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-sm">
+      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg md:px-xxl pt-sm">
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -183,7 +183,7 @@ export function CatalogueArchive() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
         <p className="max-w-[560px] text-[13px] text-text-soft">
           {t("archive.catalogueHint")}
         </p>
@@ -392,7 +392,9 @@ function Thumbnail({ url, name }: { url: string | null; name: string }) {
  */
 function Blocked({ children }: { children: ReactNode }) {
   return (
-    <span className="max-w-[280px] shrink-0 text-end text-[12px] text-text-soft">
+    // A share of the row on a phone rather than 280px of it, which is most of
+    // the screen there and would leave the name nothing.
+    <span className="max-w-[45%] shrink-0 text-end text-[12px] text-text-soft md:max-w-[280px]">
       {children}
     </span>
   );

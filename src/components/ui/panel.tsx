@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { t } from "@/i18n/translations";
 
@@ -55,6 +55,9 @@ export function Panel({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
+  // `null` is the breakpoint's own default; a number is what the operator
+  // dragged it to.
+  const [width, setWidth] = useState<number | null>(null);
   const opener = useRef<Element | null>(null);
 
   // Held in a ref so the effect below runs on open and close only. Callers pass
@@ -99,12 +102,75 @@ export function Panel({
 
   if (!open && !docked) return null;
 
+  /**
+   * Dragging the left edge, from `lg` up.
+   *
+   * Measured from the panel's own width at the moment of the press rather than
+   * from a stored number, so the first drag starts from whichever of the two
+   * default widths the breakpoint picked. Let go narrower than `MIN_WIDTH` and
+   * the panel closes — the gesture people make when they want it gone — and
+   * since the width lives in this component, the next open starts at the
+   * default again rather than at a sliver.
+   */
+  function onResizeStart(event: React.PointerEvent<HTMLDivElement>) {
+    const panel = ref.current;
+    if (!panel) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = panel.offsetWidth;
+    let last = startWidth;
+
+    function onMove(move: PointerEvent) {
+      last = startWidth + (startX - move.clientX);
+      setWidth(clampWidth(Math.max(last, COLLAPSE_WIDTH)));
+    }
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.removeProperty("cursor");
+      document.body.style.removeProperty("user-select");
+      if (last < MIN_WIDTH) {
+        setWidth(null);
+        close.current();
+      } else {
+        setWidth(clampWidth(last));
+      }
+    }
+    // On the body as well as the handle: the pointer leaves a 6px strip within
+    // a frame, and the text it crosses should not light up as a selection.
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  function onResizeKey(event: React.KeyboardEvent<HTMLDivElement>) {
+    const step = event.shiftKey ? 64 : 16;
+    const current = ref.current?.offsetWidth ?? MIN_WIDTH;
+    // Keys never collapse it: closing is the button's job, and a held arrow
+    // should stop at the narrowest usable width rather than make it vanish.
+    const next =
+      event.key === "ArrowLeft"
+        ? current + step
+        : event.key === "ArrowRight"
+          ? current - step
+          : null;
+    if (next === null) return;
+    setWidth(Math.max(MIN_WIDTH, clampWidth(next)));
+    event.preventDefault();
+  }
+
   return (
     <aside
       ref={ref}
       role="complementary"
       aria-label={label}
       tabIndex={-1}
+      style={
+        width === null
+          ? undefined
+          : ({ "--panel-width": `${width}px` } as React.CSSProperties)
+      }
       className={cx(
         // `overflow-hidden` so a child that misjudges its own height is
         // clipped by the panel rather than spilling past it — the panel owns
@@ -117,15 +183,30 @@ export function Panel({
         // Full width on a phone, a column beside the queue from `lg` up. Below
         // that there is not enough room for both, and a 380px panel next to a
         // 200px queue serves neither.
-        "absolute inset-0 z-10 lg:relative lg:z-auto lg:w-[440px] lg:border-l xl:w-[500px]",
+        "absolute inset-0 z-10 lg:relative lg:z-auto lg:border-l",
+        width === null
+          ? "lg:w-[440px] xl:w-[500px]"
+          : "lg:w-(--panel-width)",
         "animate-[panel-in_var(--duration-fade)_var(--ease-arrive)]",
       )}
     >
-      <div className="flex shrink-0 items-center justify-end border-b border-border px-lg py-sm lg:hidden">
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t("common.resize")}
+        tabIndex={0}
+        onPointerDown={onResizeStart}
+        onKeyDown={onResizeKey}
+        onDoubleClick={() => setWidth(null)}
+        className="absolute inset-y-0 left-0 z-20 hidden w-[6px] cursor-col-resize outline-none hover:bg-accent/30 focus-visible:bg-accent/40 lg:block"
+      />
+      <div className="flex shrink-0 items-center justify-end border-b border-border px-sm py-xxs lg:hidden">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md px-md py-xs text-[14px] font-semibold text-text"
+          // 40px tall: this is the only way out on a phone, where it is
+          // pressed with a thumb rather than aimed at with a pointer.
+          className="flex min-h-[40px] items-center rounded-md px-md text-[14px] font-semibold text-text"
         >
           {t("common.close")}
         </button>
@@ -133,4 +214,15 @@ export function Panel({
       {children}
     </aside>
   );
+}
+
+/** Narrower than this and the receipt's lines start breaking mid-word. */
+const MIN_WIDTH = 340;
+/** How far the drag follows below `MIN_WIDTH` before it reads as "close". */
+const COLLAPSE_WIDTH = 240;
+
+/** Never so wide that the queue beside it is squeezed out of use. */
+function clampWidth(width: number) {
+  const max = Math.max(MIN_WIDTH, Math.min(960, window.innerWidth - 520));
+  return Math.round(Math.min(Math.max(width, COLLAPSE_WIDTH), max));
 }

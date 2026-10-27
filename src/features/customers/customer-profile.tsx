@@ -253,7 +253,7 @@ export function CustomerProfile({ id }: { id: string }) {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <header className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-xxl py-lg">
+      <header className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-lg py-lg md:px-xxl">
         {/* The same back control the store and the order carry — one
             component now, because "two spellings of go up a level are two
             things to recognise" was written here first and then copied three
@@ -274,8 +274,13 @@ export function CustomerProfile({ id }: { id: string }) {
               operator is usually already dialling — and a fact you have to
               change tabs for is one the tabs have hidden. The preferences sit
               last and small: they qualify everything above without being
-              something anybody came for. */}
-          <div className="flex min-w-0 flex-grow flex-col items-start gap-xs">
+              something anybody came for.
+
+              A floor of 12rem on a zero basis, so the column takes the slack
+              on a wide header and, on a phone, the two actions are what wrap
+              to a line of their own — not the identity, which would otherwise
+              leave the avatar alone on the first line. */}
+          <div className="flex min-w-[12rem] grow basis-0 flex-col items-start gap-xs">
             <h1
               className={cx(
                 "truncate text-[24px]",
@@ -335,7 +340,9 @@ export function CustomerProfile({ id }: { id: string }) {
         // The customer's own name, not a generic "tabs": a screen reader
         // announcing "Rami Haddad, tab list" says which record these belong to.
         aria-label={name}
-        className="-mb-px flex shrink-0 gap-lg border-b border-border bg-surface px-xxl"
+        // Scrolls sideways when four chapter names outrun a phone, without a
+        // visible scrollbar — the tab half under the edge says there is more.
+        className="-mb-px flex shrink-0 gap-lg overflow-x-auto border-b border-border bg-surface px-lg [scrollbar-width:none] md:px-xxl"
       >
         {TABS.map(({ key, labelKey }) => (
           <SectionTab
@@ -358,8 +365,10 @@ export function CustomerProfile({ id }: { id: string }) {
           were just reading — and on this page it would do that to an infinite
           list they had scrolled a long way down. */}
       <div className="min-h-0 flex-grow overflow-y-auto scroll-hint">
-        <div className={cx("p-xxl", tab !== "overview" && "hidden")}>
-          <div className="flex flex-col gap-xxl">
+        <div className={cx("p-lg md:p-xxl", tab !== "overview" && "hidden")}>
+          {/* A size container: the tiles and the charts lay themselves out by
+              the pane's width rather than the window's. */}
+          <div className="@container flex flex-col gap-xxl">
             {closed && (
               <p className="rounded-md border border-border bg-neutral-fill px-lg py-md text-[13px] text-text-soft">
                 {t("customers.closedNote", {
@@ -381,7 +390,9 @@ export function CustomerProfile({ id }: { id: string }) {
               )}
               {stats.isSuccess && (
                 <>
-                  <div className="grid grid-cols-2 gap-md xl:grid-cols-4">
+                  {/* One column on a phone, where half of 330px cannot hold a
+                      spend figure in a long currency at this size. */}
+                  <div className="grid grid-cols-1 gap-md @sm:grid-cols-2 @5xl:grid-cols-4">
                     <Tile
                       label={t("customers.tileOrders")}
                       value={String(stats.data.orderCount)}
@@ -450,7 +461,7 @@ export function CustomerProfile({ id }: { id: string }) {
                 who stopped in March is four flat bars, which no total on this
                 page would ever reveal. */}
             {stats.isSuccess && stats.data.orderCount > 0 && (
-              <div className="grid gap-xxl xl:grid-cols-[3fr_2fr]">
+              <div className="grid gap-xxl @5xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                 <Block
                   title={
                     stats.data.seriesCurrency
@@ -515,15 +526,13 @@ export function CustomerProfile({ id }: { id: string }) {
           </div>
         </div>
 
-        <div className={cx("p-xxl", tab !== "orders" && "hidden")}>
-          <div className="flex flex-col gap-sm">
+        <div className={cx("p-lg md:p-xxl", tab !== "orders" && "hidden")}>
+          {/* A size container, for the rows' own wrapping. */}
+          <div className="@container flex flex-col gap-sm">
             {orders.isPending && (
               <div aria-hidden className="flex flex-col gap-sm">
                 {[0, 1, 2, 3].map((one) => (
-                  <div
-                    key={one}
-                    className="h-[62px] rounded-lg bg-line-soft"
-                  />
+                  <div key={one} className="h-[62px] rounded-lg bg-line-soft" />
                 ))}
               </div>
             )}
@@ -552,7 +561,7 @@ export function CustomerProfile({ id }: { id: string }) {
           </div>
         </div>
 
-        <div className={cx("p-xxl", tab !== "addresses" && "hidden")}>
+        <div className={cx("p-lg md:p-xxl", tab !== "addresses" && "hidden")}>
           {row.addresses.length === 0 ? (
             <EmptyState titleKey="customers.noAddresses" mood="waiting" />
           ) : (
@@ -566,7 +575,7 @@ export function CustomerProfile({ id }: { id: string }) {
           )}
         </div>
 
-        <div className={cx("p-xxl", tab !== "promotions" && "hidden")}>
+        <div className={cx("p-lg md:p-xxl", tab !== "promotions" && "hidden")}>
           <div className="flex flex-col gap-sm">
             {redemptions.isPending && (
               <p className="text-[13px] text-text-faint">
@@ -678,7 +687,13 @@ function OrderRow({
   onOpen: (id: string) => void;
 }) {
   return (
-    <li className={cx(ROW, "border-transparent")}>
+    <li
+      className={cx(
+        ROW,
+        // Wraps on a narrow list; see the group below.
+        "flex-wrap gap-y-sm border-transparent @xl:flex-nowrap",
+      )}
+    >
       <span className="flex min-w-0 flex-grow flex-col gap-xxs">
         {/* Opens the receipt **over this page**, rather than sending the
             operator to the queue. They are already looking at this customer's
@@ -704,44 +719,56 @@ function OrderRow({
           green as "Delivered" in the queue. Grey chips would have made a
           cancelled order and a delivered one look alike on the one screen where
           somebody is scanning a history for the odd one out — and a status
-          colour that is defined twice is a status colour that will differ. */}
-      <span className="flex shrink-0 flex-wrap items-center gap-xs">
-        {order.statuses.map((status) => {
-          const tone = statusTone(status.slug);
-          return (
-            <span
-              key={status.slug}
-              // A dot as well as the ground, for the reason the queue's tabs
-              // carry one: colour alone is not a distinction a colour-blind
-              // operator can rely on.
-              style={{ background: tone.wash, color: tone.ink }}
-              className="flex items-center gap-xs rounded-sm px-sm py-[1px] text-[11px] font-semibold"
-            >
+          colour that is defined twice is a status colour that will differ.
+
+          The chips, the date and the total are one group: a line of their own
+          under the code on a narrow list, and `contents` — the row's own items,
+          as before — once there is room beside it. */}
+      <span className="flex basis-full flex-wrap items-center gap-x-lg gap-y-sm @xl:contents">
+        <span className="flex shrink-0 flex-wrap items-center gap-xs">
+          {order.statuses.map((status) => {
+            const tone = statusTone(status.slug);
+            return (
               <span
-                aria-hidden
-                className="size-[6px] shrink-0 rounded-full"
-                style={{ background: tone.dot }}
-              />
-              {status.name}
-            </span>
-          );
-        })}
-      </span>
+                key={status.slug}
+                // A dot as well as the ground, for the reason the queue's tabs
+                // carry one: colour alone is not a distinction a colour-blind
+                // operator can rely on.
+                style={{ background: tone.wash, color: tone.ink }}
+                className="flex items-center gap-xs rounded-sm px-sm py-[1px] text-[11px] font-semibold"
+              >
+                <span
+                  aria-hidden
+                  className="size-[6px] shrink-0 rounded-full"
+                  style={{ background: tone.dot }}
+                />
+                {status.name}
+              </span>
+            );
+          })}
+        </span>
 
-      <span className="shrink-0 text-[12px] text-text-faint">
-        {formatDate(order.placedAt)}
-      </span>
+        <span className="shrink-0 text-[12px] text-text-faint">
+          {formatDate(order.placedAt)}
+        </span>
 
-      {/* This one order's own shop rate — `0120`. The tiles above deliberately
-          do not take one: a lifetime total spans shops, and no single shop's
-          rate is right for a sum of other shops' money. */}
-      <Price
-        value={order.total}
-        code={order.currencyCode}
-        shopRate={order.shopRate}
-        align="end"
-        className="text-[13px] font-semibold"
-      />
+        {/* This one order's own shop rate — `0120`. The tiles above
+            deliberately do not take one: a lifetime total spans shops, and no
+            single shop's rate is right for a sum of other shops' money.
+
+            Wrapped, because `Price` hands its class to the figure inside it
+            and the margin has to be on the box: it holds the total to the end
+            of the line when the group has one to itself. */}
+        <span className="ms-auto shrink-0 @xl:ms-0">
+          <Price
+            value={order.total}
+            code={order.currencyCode}
+            shopRate={order.shopRate}
+            align="end"
+            className="text-[13px] font-semibold"
+          />
+        </span>
+      </span>
     </li>
   );
 }
@@ -810,11 +837,9 @@ function Block({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-md">
-      <div className="flex items-baseline justify-between gap-md">
-        <h2 className="text-[19px]">
-          {title}
-        </h2>
+    <section className="flex min-w-0 flex-col gap-md">
+      <div className="flex flex-wrap items-baseline justify-between gap-md">
+        <h2 className="text-[19px]">{title}</h2>
         {aside}
       </div>
       {children}
@@ -824,9 +849,11 @@ function Block({
 
 function Tile({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
+    <div className="flex min-w-0 flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
       <span className="text-[12px] text-text-faint">{label}</span>
-      <span className="text-[20px] font-semibold tabular-nums">{value}</span>
+      <span className="break-words text-[20px] font-semibold tabular-nums">
+        {value}
+      </span>
     </div>
   );
 }

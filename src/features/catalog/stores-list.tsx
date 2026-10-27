@@ -113,7 +113,7 @@ export function StoresList() {
         }
       />
 
-      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
         {stores.isPending && (
           <div aria-hidden className="flex flex-col gap-sm">
             {[0, 1, 2, 3].map((row) => (
@@ -214,6 +214,7 @@ function StoreRow({
         rowProps.className,
         // `relative`, so the name's stretched hit area is bounded by the row.
         ROW,
+        "max-md:flex-wrap",
         // A hidden shop is marked, not dimmed.
         //
         // Fading the whole row was wrong: it took the controls with it, and a
@@ -256,7 +257,7 @@ function StoreRow({
         <ImagePlaceholder className="size-[46px] rounded-md" />
       )}
 
-      <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+      <div className="flex min-w-0 flex-grow flex-col gap-xxs max-md:basis-0">
         <div className="flex items-center gap-sm">
           {/*
             The row is the link, by way of this one.
@@ -303,64 +304,69 @@ function StoreRow({
         {store.latitude === null && <NoPinWarning />}
       </div>
 
-      {/* Stacked, not side by side. They are two properties of the same shop
-          rather than a choice between them, and in a row they read as a pair of
-          competing controls — worse, the second one pushed the actions around
-          on every row where a name was long. */}
-      {/* `relative z-10` puts these above the name's stretched hit area — see
-          the note on the link. Without it they would be unclickable, which is
-          how this pattern fails when it is copied without its second half. */}
-      <div className="relative z-10 flex shrink-0 flex-col gap-xs">
-        <ConfirmToggle
-          on={store.isActive}
-          onChange={onToggleActive}
-          labelOn={t("catalogue.active")}
-          labelOff={t("catalogue.inactive")}
-          params={{ name: pickLocalized(store.name) }}
-          whenTurningOn={{
-            titleKey: "catalogue.openTitle",
-            bodyKey: "catalogue.openBody",
-            confirmKey: "catalogue.openConfirm",
-          }}
-          whenTurningOff={{
-            titleKey: "catalogue.closeTitle",
-            bodyKey: "catalogue.closeBody",
-            confirmKey: "catalogue.closeConfirm",
-          }}
-          className="w-[104px]"
-        />
-        <ConfirmToggle
-          on={store.isFeatured}
-          onChange={onToggleFeatured}
-          labelOn={t("catalogue.featured")}
-          params={{ name: pickLocalized(store.name) }}
-          whenTurningOn={{
-            titleKey: "catalogue.featureTitle",
-            bodyKey: "catalogue.featureBody",
-            confirmKey: "catalogue.featureConfirm",
-          }}
-          whenTurningOff={{
-            titleKey: "catalogue.unfeatureTitle",
-            bodyKey: "catalogue.unfeatureBody",
-            confirmKey: "catalogue.unfeatureConfirm",
-          }}
-          className="w-[104px]"
-        />
-      </div>
+      {/* On a phone the controls take a line of their own under the name.
+          Beside it they left the name a few pixels, or none — and the name
+          is what the row is for. */}
+      <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">
+        {/* Stacked, not side by side. They are two properties of the same shop
+            rather than a choice between them, and in a row they read as a pair of
+            competing controls — worse, the second one pushed the actions around
+            on every row where a name was long. */}
+        {/* `relative z-10` puts these above the name's stretched hit area — see
+            the note on the link. Without it they would be unclickable, which is
+            how this pattern fails when it is copied without its second half. */}
+        <div className="relative z-10 flex shrink-0 flex-col gap-xs">
+          <ConfirmToggle
+            on={store.isActive}
+            onChange={onToggleActive}
+            labelOn={t("catalogue.active")}
+            labelOff={t("catalogue.inactive")}
+            params={{ name: pickLocalized(store.name) }}
+            whenTurningOn={{
+              titleKey: "catalogue.openTitle",
+              bodyKey: "catalogue.openBody",
+              confirmKey: "catalogue.openConfirm",
+            }}
+            whenTurningOff={{
+              titleKey: "catalogue.closeTitle",
+              bodyKey: "catalogue.closeBody",
+              confirmKey: "catalogue.closeConfirm",
+            }}
+            className="w-[104px]"
+          />
+          <ConfirmToggle
+            on={store.isFeatured}
+            onChange={onToggleFeatured}
+            labelOn={t("catalogue.featured")}
+            params={{ name: pickLocalized(store.name) }}
+            whenTurningOn={{
+              titleKey: "catalogue.featureTitle",
+              bodyKey: "catalogue.featureBody",
+              confirmKey: "catalogue.featureConfirm",
+            }}
+            whenTurningOff={{
+              titleKey: "catalogue.unfeatureTitle",
+              bodyKey: "catalogue.unfeatureBody",
+              confirmKey: "catalogue.unfeatureConfirm",
+            }}
+            className="w-[104px]"
+          />
+        </div>
 
-      <ConfirmButton
-        onConfirm={onArchive}
-        titleKey="catalogue.archiveTitle"
-        bodyKey="catalogue.archiveBody"
-        confirmKey="catalogue.archiveConfirm"
-        params={{ name }}
-        variant="danger"
-        triggerVariant="danger"
-        size="sm"
-        className="relative z-10"
-      >
-        {t("catalogue.archive")}
-      </ConfirmButton>
+        <ConfirmButton
+          onConfirm={onArchive}
+          titleKey="catalogue.archiveTitle"
+          bodyKey="catalogue.archiveBody"
+          confirmKey="catalogue.archiveConfirm"
+          params={{ name }}
+          variant="danger"
+          triggerVariant="danger"
+          size="sm"
+          className="relative z-10"
+        >
+          {t("catalogue.archive")}
+        </ConfirmButton>
+      </div>
     </div>
   );
 }

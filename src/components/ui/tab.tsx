@@ -172,7 +172,13 @@ export function SectionTab({
         // The same bump `FilterTab` took, and it has to be the same: the two
         // idioms sit on different screens but a customer profile and a store
         // page should not disagree about how big a tab is.
-        "border-b-2 pb-md text-[15px] font-semibold",
+        // `shrink-0` and `whitespace-nowrap`, as `FilterTab` has: a strip of
+        // these that scrolls sideways on a phone must scroll, not squeeze each
+        // label onto two lines.
+        "shrink-0 whitespace-nowrap border-b-2 pb-md text-[15px] font-semibold",
+        // At least 40px for a thumb below `md`. Grown at the top, so the label
+        // keeps its distance from the underline it sits on.
+        "min-h-[40px] pt-xs md:min-h-0 md:pt-0",
         active
           ? "border-active text-text"
           : "border-transparent text-text-soft hover:text-text",

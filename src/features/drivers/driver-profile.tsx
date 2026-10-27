@@ -65,7 +65,7 @@ export function DriverProfile({ id }: { id: string }) {
 
   if (courier.isSuccess && !driver) {
     return (
-      <div className="flex h-full flex-col gap-lg p-xxl">
+      <div className="flex h-full flex-col gap-lg p-lg md:p-xxl">
         <Back />
         <EmptyState titleKey="drivers.notFound" mood="lost" />
       </div>
@@ -125,15 +125,20 @@ export function DriverProfile({ id }: { id: string }) {
   return (
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
-        <div className="flex shrink-0 flex-col gap-lg border-b border-border bg-surface px-xxl py-lg">
+        <div className="flex shrink-0 flex-col gap-lg border-b border-border bg-surface px-lg py-lg md:px-xxl">
           <Back />
 
           {driver && (
             <div className="flex flex-wrap items-center gap-lg">
               <Avatar id={driver.id} name={driver.name} size={48} />
 
-              <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-                <h1 className="truncate text-[30px]">{driver.name}</h1>
+              {/* A floor of 12rem on a zero basis: it takes the slack on a
+                  wide header, and on a phone it is Edit that wraps under the
+                  name rather than the name wrapping away from its avatar. */}
+              <div className="flex min-w-[12rem] grow basis-0 flex-col gap-xxs">
+                <h1 className="truncate text-[24px] md:text-[30px]">
+                  {driver.name}
+                </h1>
                 {/* Copy, not dial. This number's job is to be pasted into
                     WhatsApp, and a `tel:` link on a desktop hands it to
                     whatever the machine thinks handles calls — usually
@@ -175,7 +180,7 @@ export function DriverProfile({ id }: { id: string }) {
             page's own ground carries the content — the same separation every
             other screen has between the bar that identifies a record and the
             record itself. */}
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
           <div className="flex flex-wrap gap-lg">
             <Stat label={t("drivers.statToday")} value={String(today)} />
             <Stat label={t("drivers.statThisWeek")} value={String(thisWeek)} />
@@ -318,7 +323,11 @@ function Stat({
   note?: string;
 }) {
   return (
-    <div className="flex min-w-[140px] flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
+    // Grows on a phone, where the five wrap two to a line: left at their own
+    // width they leave a ragged gap at the end of every line. Not from `md`,
+    // where they sit in one row and stretching would spread four digits
+    // across a third of the screen.
+    <div className="flex min-w-[140px] flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card max-md:grow">
       <span className="text-[24px] font-bold tabular-nums">{value}</span>
       <span className="text-[12px] text-text-faint">{label}</span>
       {/* What the average is over. An average with no denominator on screen is

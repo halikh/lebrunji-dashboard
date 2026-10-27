@@ -23,7 +23,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
 
   if (environment === "production") {
     return (
-      <main className="flex min-h-full flex-1 items-center justify-center p-xxl">
+      <main className="flex min-h-full flex-1 items-center justify-center p-lg md:p-xxl">
         <div className="flex w-full max-w-[380px] flex-col gap-xxxl">
           {children}
         </div>
@@ -34,14 +34,14 @@ export function AuthFrame({ children }: { children: ReactNode }) {
   return (
     <main
       className={
-        "flex min-h-full flex-1 flex-col items-center justify-center gap-lg p-xxl " +
+        "flex min-h-full flex-1 flex-col items-center justify-center gap-lg p-lg md:p-xxl " +
         (environment === "staging" ? "bg-env-staging" : "bg-env-development")
       }
     >
       <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-on-env">
         {t(`environment.${environment}`)}
       </p>
-      <div className="flex w-full max-w-[428px] flex-col gap-xxxl rounded-lg bg-surface p-xxl">
+      <div className="flex w-full max-w-[428px] flex-col gap-xxl rounded-lg bg-surface p-lg md:gap-xxxl md:p-xxl">
         {children}
       </div>
     </main>

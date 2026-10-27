@@ -799,7 +799,7 @@ function Steps({ step, onStep }: { step: Step; onStep: (step: Step) => void }) {
             {index > 0 && (
               <span
                 aria-hidden
-                className="h-[2px] w-[40px] rounded-full bg-line"
+                className="h-[2px] w-[16px] rounded-full bg-line md:w-[40px]"
               />
             )}
             <button
@@ -834,10 +834,14 @@ function Steps({ step, onStep }: { step: Step; onStep: (step: Step) => void }) {
                   n
                 )}
               </span>
+              {/* Only the current step is named on a phone — three labels and
+                  the rules between them are wider than the screen there. The
+                  others keep their names for a screen reader, and their
+                  numbers say where they are. */}
               <span
                 className={cx(
                   "text-[15px] font-medium",
-                  current ? "text-text" : "text-text-soft",
+                  current ? "text-text" : "text-text-soft max-md:sr-only",
                 )}
               >
                 {label}

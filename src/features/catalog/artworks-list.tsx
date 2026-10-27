@@ -63,7 +63,7 @@ export function ArtworksList() {
           }
         />
 
-        <div className="flex min-h-0 flex-grow flex-col gap-xl overflow-y-auto scroll-hint p-xxl">
+        <div className="flex min-h-0 flex-grow flex-col gap-xl overflow-y-auto scroll-hint p-lg md:p-xxl">
           {artworks.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1].map((row) => (
@@ -207,6 +207,7 @@ function Row({
     artwork.id,
     cx(
       ROW,
+      "max-md:flex-wrap",
       !artwork.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
       artwork.isActive && "border-transparent",
       artwork.isActive && open && "border-active",
@@ -215,8 +216,13 @@ function Row({
 
   // The shape it is in the app, so the row shows what a customer sees rather
   // than the middle of it: 21:9 for a banner, square for a tile.
+  //
+  // A banner is smaller on a phone, at the same 21:9. At full size it took
+  // half the row's width before the name had any.
   const frame =
-    artwork.format === "banner" ? "h-[64px] w-[149px]" : "size-[64px]";
+    artwork.format === "banner"
+      ? "h-[44px] w-[103px] md:h-[64px] md:w-[149px]"
+      : "size-[64px]";
 
   return (
     <div {...row} ref={anchor}>
@@ -243,7 +249,7 @@ function Row({
         onClick={onEdit}
         className={cx(
           ROW_TARGET,
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-0",
         )}
       >
         <span className="flex min-w-0 items-center gap-sm">
@@ -274,38 +280,43 @@ function Row({
         </span>
       </button>
 
-      <ConfirmToggle
-        on={artwork.isActive}
-        onChange={onToggleActive}
-        labelOn={t("artworks.live")}
-        labelOff={t("artworks.hidden")}
-        params={{ name }}
-        whenTurningOn={{
-          titleKey: "artworks.showTitle",
-          bodyKey: "artworks.showBody",
-          confirmKey: "artworks.showConfirm",
-        }}
-        whenTurningOff={{
-          titleKey: "artworks.hideTitle",
-          bodyKey: "artworks.hideBody",
-          confirmKey: "artworks.hideConfirm",
-        }}
-        className={cx(ROW_ABOVE, "w-[104px]")}
-      />
+      {/* On a phone the controls take a line of their own under the name.
+          Beside it they left the name a few pixels, or none — and the name
+          is what the row is for. */}
+      <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">
+        <ConfirmToggle
+          on={artwork.isActive}
+          onChange={onToggleActive}
+          labelOn={t("artworks.live")}
+          labelOff={t("artworks.hidden")}
+          params={{ name }}
+          whenTurningOn={{
+            titleKey: "artworks.showTitle",
+            bodyKey: "artworks.showBody",
+            confirmKey: "artworks.showConfirm",
+          }}
+          whenTurningOff={{
+            titleKey: "artworks.hideTitle",
+            bodyKey: "artworks.hideBody",
+            confirmKey: "artworks.hideConfirm",
+          }}
+          className={cx(ROW_ABOVE, "w-[104px]")}
+        />
 
-      <ConfirmButton
-        className={ROW_ABOVE}
-        onConfirm={onDelete}
-        titleKey="artworks.deleteTitle"
-        bodyKey="artworks.deleteBody"
-        confirmKey="artworks.deleteConfirm"
-        params={{ name }}
-        variant="danger"
-        triggerVariant="danger"
-        size="sm"
-      >
-        {t("artworks.delete")}
-      </ConfirmButton>
+        <ConfirmButton
+          className={ROW_ABOVE}
+          onConfirm={onDelete}
+          titleKey="artworks.deleteTitle"
+          bodyKey="artworks.deleteBody"
+          confirmKey="artworks.deleteConfirm"
+          params={{ name }}
+          variant="danger"
+          triggerVariant="danger"
+          size="sm"
+        >
+          {t("artworks.delete")}
+        </ConfirmButton>
+      </div>
     </div>
   );
 }

@@ -109,10 +109,19 @@ export function SettingsScreen() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-lg">
+      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pt-lg md:px-xxl">
         <h1 className="text-[30px]">{t("content.title")}</h1>
 
-        <div role="tablist" className="-mb-px flex gap-lg">
+        {/* Scrolls sideways rather than wrapping on a phone. Four chapters fit
+            at 360px in English, but a translation or a larger text setting can
+            push the last one over, and a second row of tabs reads as a second,
+            unrelated strip. `shrink-0` and `nowrap` on each tab because
+            `SectionTab` sets neither — in a strip that cannot scroll it never
+            needed to. */}
+        <div
+          role="tablist"
+          className="-mb-px flex gap-lg overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap"
+        >
           {TABS.map(({ key, labelKey }) => (
             <SectionTab
               key={key}
@@ -210,7 +219,7 @@ function HelpTab() {
             button beside it. The header does not scroll, so this is the one
             copy of "add one" — no in-list button and no pinned bar, which were
             two more ways to reach an action that is now always visible. */}
-        <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
+        <div className="flex shrink-0 items-start gap-sm border-b border-border bg-surface px-lg py-lg md:gap-lg md:px-xxl">
           {/* The field takes the slack. These two bars have no title to hold
               it — unlike the catalogue's, where the heading grows — so a fixed
               width left a stretch of empty white between the search and the
@@ -235,7 +244,7 @@ function HelpTab() {
           </Button>
         </div>
 
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("content.helpBlurb")}
           </p>
@@ -328,6 +337,11 @@ function HelpRow({
     topic.id,
     cx(
       ROW,
+      // Two lines on a phone: the grip and the question on the first, the
+      // switch and Remove on the second. On one line the 104px switch and the
+      // button left the question about six characters, which is not enough
+      // to tell one FAQ from the next.
+      "max-md:flex-wrap max-md:gap-x-sm max-md:gap-y-xs max-md:px-md",
       !topic.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
       open && "shadow-selected",
       topic.isActive && !open && "border-transparent",
@@ -348,7 +362,9 @@ function HelpRow({
         // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
         className={cx(
           ROW_TARGET,
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
+          // The rest of the line after the 28px grip and its gap, so the
+          // controls are pushed onto the second line rather than squeezing it.
+          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-[calc(100%-36px)]",
         )}
       >
         <span className="truncate text-[15px] font-semibold">{name}</span>
@@ -373,11 +389,17 @@ function HelpRow({
           bodyKey: "content.hideBody",
           confirmKey: "content.hideConfirm",
         }}
-        className={cx(ROW_ABOVE, "w-[104px]")}
+        // Indented under the question on a phone, and 40px tall there: the
+        // switch is drawn 22px high, which is a fine target for a pointer and
+        // a poor one for a thumb.
+        className={cx(
+          ROW_ABOVE,
+          "w-[104px] max-md:ms-[36px] max-md:min-h-[40px]",
+        )}
       />
 
       <ConfirmButton
-        className={ROW_ABOVE}
+        className={cx(ROW_ABOVE, "max-md:ms-auto")}
         onConfirm={onRemove}
         titleKey="content.removeTopicTitle"
         // Says "cannot be undone" and means it: `help_topics` has no
@@ -449,8 +471,11 @@ function LegalTab() {
   return (
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-grow flex-col">
-        <div className="flex shrink-0 items-start gap-lg border-b border-border bg-surface px-xxl py-lg">
-          <div className="w-[240px] shrink-0">
+        {/* Wraps on a phone: the document picker takes a line of its own and
+            the search and the add button share the next. Three controls in
+            one row leave the search a few characters wide at 360px. */}
+        <div className="flex shrink-0 flex-wrap items-start gap-sm border-b border-border bg-surface px-lg py-lg md:flex-nowrap md:gap-lg md:px-xxl">
+          <div className="w-full shrink-0 md:w-[240px]">
             <Select
               value={document}
               onChange={(next) => {
@@ -467,7 +492,7 @@ function LegalTab() {
             />
           </div>
 
-          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+          <div className="flex min-w-0 flex-grow basis-0 flex-col gap-xxs">
             <SearchInput
               value={search}
               onChange={setSearch}
@@ -490,7 +515,7 @@ function LegalTab() {
           </Button>
         </div>
 
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
           <p className="ps-md pb-sm text-[13px] text-text-soft">
             {t("content.legalBlurb")}
           </p>
@@ -562,7 +587,14 @@ function PolicyRow({
 
   const row = rowProps(
     section.id,
-    cx(ROW, open ? "border-active shadow-selected" : "border-transparent"),
+    cx(
+      ROW,
+      // Tighter on a phone, where the four fixed things in this row — grip,
+      // number, Remove and the gaps between them — would otherwise take
+      // half its width from the title.
+      "max-md:gap-sm max-md:px-md",
+      open ? "border-active shadow-selected" : "border-transparent",
+    ),
   );
 
   return (

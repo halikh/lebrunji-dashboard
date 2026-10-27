@@ -38,7 +38,7 @@ export function PanelHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex shrink-0 items-start gap-md border-b border-border p-xxl">
+    <div className="flex shrink-0 items-start gap-md border-b border-border p-lg md:p-xxl">
       <div className="flex min-w-0 flex-grow flex-col gap-xxs">
         {typeof title === "string" ? (
           <h2 className="truncate text-[22px]">{title}</h2>

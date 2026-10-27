@@ -27,6 +27,9 @@ export function railItemClass(
     // here means the item looks the same wherever it is put.
     "group relative flex w-full flex-1 flex-col items-center gap-xxs rounded-md px-xs py-sm",
     "text-[11px] font-medium md:flex-none md:py-md md:text-[12px]",
+    // The bottom bar's minimum: see the rail. `shrink-0` so the bar scrolls
+    // rather than crushing the items below it.
+    "min-w-[64px] shrink-0 whitespace-nowrap md:min-w-0",
     // A short window: see `short` in `globals.css`. Half the padding is what
     // brings the rail's nine items under the height it is used at.
     "short:py-[6px]",

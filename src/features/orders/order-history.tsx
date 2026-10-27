@@ -127,7 +127,7 @@ export function OrderHistory({ order }: { order: Order }) {
   const loading = amendments.isPending || handovers.isPending;
 
   return (
-    <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto scroll-hint p-xxl">
+    <div className="flex min-h-0 flex-grow flex-col gap-lg overflow-y-auto scroll-hint p-lg md:p-xxl">
       {(amendments.isError || handovers.isError) && (
         <p role="alert" className="text-[13px] font-medium text-danger">
           {t("content.failed")}

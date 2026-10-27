@@ -152,11 +152,19 @@ export function CustomersScreen() {
           Counts come from `head` requests, so a tab says how many rows are in a
           set the screen has not loaded. Counting what was fetched would make
           every tab read "50", which is worse than no number: it looks like an
-          answer. */}
+          answer.
+
+          It scrolls sideways when four tabs and their counts outrun a phone,
+          with no visible scrollbar — the last tab half under the edge already
+          says there is more, as it does on the rail. The rule under the strip
+          is an inset shadow plus a pixel of padding rather than a border,
+          because a scroller clips at its padding edge: a real border would cut
+          off the pixel of each tab's underline that is meant to sit over it,
+          and the overhang would give the strip a one-pixel vertical scroll. */}
       <div
         role="tablist"
         aria-label={t("customers.title")}
-        className="flex shrink-0 gap-xxs border-b border-border bg-surface px-xxl"
+        className="flex shrink-0 gap-xxs overflow-x-auto bg-surface px-lg pb-px shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] md:px-xxl"
       >
         {TABS.map(({ key, labelKey, tone }) => (
           <FilterTab
@@ -175,14 +183,13 @@ export function CustomersScreen() {
         ))}
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-xxl">
+      {/* A size container, so each row can decide by the list's width — not
+          the window's — whether its facts fit beside the name. */}
+      <div className="@container flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
         {customers.isPending && (
           <div aria-hidden className="flex flex-col gap-sm">
             {[0, 1, 2, 3].map((row) => (
-              <div
-                key={row}
-                className="h-[58px] rounded-lg bg-line-soft"
-              />
+              <div key={row} className="h-[58px] rounded-lg bg-line-soft" />
             ))}
           </div>
         )}
@@ -242,6 +249,10 @@ function Row({ customer }: { customer: Customer }) {
     <div
       className={cx(
         ROW,
+        // Wraps on a narrow list so the facts can drop under the name — see
+        // the group below. Never wraps once they fit, so a long name truncates
+        // rather than pushing the row onto two lines on a desktop.
+        "flex-wrap gap-y-sm @2xl:flex-nowrap",
         // Marked rather than dimmed. A faded row reads as disabled, and these
         // are the rows most likely to be the one somebody is looking for.
         closed || !customer.isActive
@@ -272,21 +283,35 @@ function Row({ customer }: { customer: Customer }) {
         <StatusChip customer={customer} />
       </span>
 
-      <span className="shrink-0 text-[12px] text-text-faint">
-        {customer.orderCount === 0
-          ? t("customers.noOrders")
-          : t("customers.orderCount", { count: customer.orderCount })}
-      </span>
+      {/* The facts and the actions, as one group on a narrow list and as
+          nothing at all on a wide one.
 
-      <span className="w-[110px] shrink-0 text-[12px] text-text-faint">
-        {t("customers.joined", { when: formatDate(customer.createdAt) })}
-      </span>
+          Below `@2xl` it is a full-width line of its own under the identity —
+          the name, the count, the date and two buttons do not share 300px, and
+          squeezing them truncated the name to a letter or two, which is the one
+          thing on the row somebody is looking for. From `@2xl` it is
+          `contents`, so its children are the row's own items again and the
+          desktop row is exactly what it was. */}
+      <span className="flex basis-full flex-wrap items-center gap-x-lg gap-y-sm @2xl:contents">
+        <span className="shrink-0 text-[12px] text-text-faint">
+          {customer.orderCount === 0
+            ? t("customers.noOrders")
+            : t("customers.orderCount", { count: customer.orderCount })}
+        </span>
 
-      {/* `relative z-10`, above the stretched link that covers the row — the
-          second half of that pattern, and the half whose absence looks like a
-          broken button rather than a misplaced layer. */}
-      <span className="relative z-10">
-        <AccountActions customer={customer} />
+        {/* The fixed width is a column, and columns only mean something when
+            the rows line up — which they do not once they wrap. */}
+        <span className="shrink-0 text-[12px] text-text-faint @2xl:w-[110px]">
+          {t("customers.joined", { when: formatDate(customer.createdAt) })}
+        </span>
+
+        {/* `relative z-10`, above the stretched link that covers the row — the
+            second half of that pattern, and the half whose absence looks like
+            a broken button rather than a misplaced layer. `ms-auto` holds the
+            buttons to the end when the group is a line of its own. */}
+        <span className="relative z-10 ms-auto @2xl:ms-0">
+          <AccountActions customer={customer} />
+        </span>
       </span>
     </div>
   );

@@ -20,6 +20,26 @@
  */
 @custom-variant short (@media (min-width: 48rem) and (max-height: 860px));
 
+/**
+ * `scrollbar-none` — a row that scrolls sideways without drawing a bar for it.
+ *
+ * For a strip of tabs or chips that fits on a desktop and not on a phone. The
+ * bar would sit under the tabs' own underline and read as a second one; the
+ * last tab cut off at the edge already says there is more. Both spellings,
+ * because Safari only learned `scrollbar-width` recently.
+ *
+ * A tab row that uses this should not pull its tabs over its own border with
+ * `-mb-px`: a scroller clips to its padding box, so that last pixel becomes a
+ * one-pixel vertical scroll. Draw the rule as an inset shadow instead — see
+ * the queue's status tabs.
+ */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 html,
 body {
   height: 100%;

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 import { Logo } from "@/components/brand/logo";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -36,15 +37,37 @@ import { railItemClass } from "./rail-item";
 export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
   const pathname = usePathname();
   const active = activeSection(pathname);
+  const ref = useRef<HTMLElement>(null);
+
+  // The bar scrolls on a phone (see below), so the section you are on may be
+  // past the edge — and a nav whose current item is off screen is one that
+  // does not say where you are. `nearest` is a no-op when it is already in
+  // view, which is always on the desktop rail.
+  useEffect(() => {
+    ref.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [pathname]);
 
   return (
     <nav
+      ref={ref}
       aria-label={t("nav.label")}
       className={cx(
         "flex shrink-0 gap-xs border-border bg-surface",
         // Bottom bar on a phone, left rail from `md` up. One component, because
         // two would be two things to keep in step.
-        "order-last w-full flex-row justify-around border-t px-sm py-xs",
+        //
+        // Eight sections at 360px is 45px each, and "Customers" at eleven
+        // pixels is wider than that — so on the narrowest phones the bar
+        // scrolls sideways (each item keeps a 64px minimum, in `railItemClass`)
+        // rather than letting the labels run into each other. From about 520px
+        // they all fit and it is an ordinary bar again.
+        // No `justify-around`: the items grow to share the width themselves,
+        // and once they overflow it would centre them and push the first
+        // past the start edge, where a scroller cannot reach.
+        "order-last w-full flex-row border-t px-xxs py-xs",
+        "overflow-x-auto scrollbar-none",
         "md:order-first md:h-full md:w-[124px] md:flex-col md:justify-start md:border-r md:border-t-0 md:px-sm md:py-lg",
         // Never cut off. On a short window the spacing tightens (`short:`, in
         // the items too); on one shorter still the rail scrolls rather than
@@ -100,9 +123,9 @@ export function Rail({ liveOrders = 0 }: { liveOrders?: number }) {
         );
       })}
 
-      {/* Below `md` the rail is a bottom bar and sign-out lives in the top bar
-          instead — a seventh item there would crowd the six and put it a
-          thumb-width from Orders. */}
+      {/* Below `md` the rail is a bottom bar and these two live in the top
+          bar instead — another item there would crowd the sections and put
+          sign-out a thumb-width from Orders. */}
       <div className="hidden w-full md:mt-auto md:block">
         {/* Account-level, like sign-out beneath it — not a seventh section.
             The rail's six are the business; these two are the operator. */}

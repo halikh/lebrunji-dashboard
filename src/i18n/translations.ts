@@ -56,6 +56,8 @@ const en = {
     signOut: "Sign out",
     somethingWentWrong: "Something went wrong. Try again.",
     close: "Close",
+    /** The drag handle on a side panel's edge, for a screen reader. */
+    resize: "Resize panel",
     undo: "Undo",
     retry: "Try again",
     loading: "Loading",
@@ -669,7 +671,6 @@ const en = {
     openPage: "Open the full page",
     backToQueue: "All orders",
     panelLabel: "Order detail",
-    panelEmpty: "No orders here — the receipt shows once one arrives.",
     placed: "Placed",
     customer: "Customer",
     address: "Address",

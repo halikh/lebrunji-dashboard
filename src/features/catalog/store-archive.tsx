@@ -132,8 +132,8 @@ export function StoreArchive({ storeId }: { storeId: string }) {
    */
   if (archive.isPending || data === undefined) {
     return (
-      <div aria-hidden className="flex flex-col gap-sm p-xxl">
-        <div className="h-[36px] w-[320px] rounded-md bg-neutral-fill" />
+      <div aria-hidden className="flex flex-col gap-sm p-lg md:p-xxl">
+        <div className="h-[36px] w-[320px] max-w-full rounded-md bg-neutral-fill" />
         <div className="h-[64px] rounded-md bg-neutral-fill" />
         <div className="h-[64px] rounded-md bg-neutral-fill" />
       </div>
@@ -175,7 +175,7 @@ export function StoreArchive({ storeId }: { storeId: string }) {
       {/* Above the scroller, not inside it. A filter strip that scrolls away
           leaves the operator looking at a filtered list with no visible sign
           that a filter is on. */}
-      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-xxl pt-sm">
+      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg md:px-xxl pt-sm">
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -204,7 +204,7 @@ export function StoreArchive({ storeId }: { storeId: string }) {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-xxl">
+      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
         <p className="max-w-[560px] text-[13px] text-text-soft">
           {t("archive.hint")}
         </p>
@@ -286,7 +286,9 @@ export function StoreArchive({ storeId }: { storeId: string }) {
                 explanation next to it still invites the press. What is needed
                 here is the next step, which is the section. */}
               {item.sectionArchived ? (
-                <span className="max-w-[260px] shrink-0 text-end text-[12px] text-text-soft">
+                // A share of the row on a phone — see `Blocked` in the
+                // catalogue's archive.
+                <span className="max-w-[45%] shrink-0 text-end text-[12px] text-text-soft md:max-w-[260px]">
                   {t("archive.sectionGoneFirst", {
                     name: pickLocalized(item.sectionTitle),
                   })}
