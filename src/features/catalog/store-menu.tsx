@@ -1062,6 +1062,29 @@ function Section({
             <GripIcon />
           </button>
 
+          {/* The tile's picture, on an Aisles shop where the customer sees it —
+            or wherever one has been set. Beside the toggle rather than in it: a
+            picture is a button of its own, and one cannot sit inside another. */}
+          {(layout === "aisles" || section.imageUrl) &&
+            (section.imageUrl ? (
+              <PreviewImage
+                src={section.imageUrl}
+                name={title}
+                className={cx(
+                  ROW_ABOVE,
+                  "rounded-md",
+                  isSub ? "size-[36px]" : "size-[44px]",
+                )}
+              />
+            ) : (
+              <ImagePlaceholder
+                className={cx(
+                  "rounded-md",
+                  isSub ? "size-[36px]" : "size-[44px]",
+                )}
+              />
+            ))}
+
           {/* The heading opens the section, not a chevron beside it — the same
             call `store-options` makes for its groups: the line an operator
             reads to decide whether this is the section they meant should also
