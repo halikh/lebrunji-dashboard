@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { useGuardedAction } from "@/components/unsaved-changes";
 
@@ -27,7 +33,15 @@ import { SEARCH, TEXT } from "@/lib/limits";
 import { itemUnit, pricePerUnit, unitKey } from "@/lib/units";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
-import { applyOrder, type MenuItem, type MenuSection } from "./api/menu";
+import {
+  applyOrder,
+  applySectionOrder,
+  canHoldProducts,
+  menuTree,
+  sectionPath,
+  type MenuItem,
+  type MenuSection,
+} from "./api/menu";
 import {
   BranchItemStrip,
   BranchMenuProvider,
@@ -38,6 +52,7 @@ import {
 import { BulkForm } from "./bulk-form";
 import { ItemTags } from "./tag-chip";
 import {
+  useAisles,
   useArchiveMenuItem,
   useArchiveMenuSection,
   useUpdateMenuSection,
@@ -191,9 +206,17 @@ function MenuEditor({ storeId }: { storeId: string }) {
   const reorder = useReorderMenu(storeId);
 
   const sections = menu.data ?? [];
+  const layout = store.data?.menuLayout ?? "list";
+  /**
+   * The aisles, each holding its sub-aisles (0196). A restaurant's menu is
+   * the same tree with nothing on the second level, so it draws as before.
+   */
+  const tree = menuTree(sections);
+  const aisles = useAisles(storeId);
 
+  /** Either level — the aisles, or one aisle's sub-aisles. */
   function reorderSections(ids: string[]) {
-    const { next, updates } = applyOrder(sections, ids);
+    const { next, updates } = applySectionOrder(sections, ids);
     reorder.mutate({ table: "menu_sections", updates, next });
   }
 
@@ -216,7 +239,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
   }
 
   const sectionOrder = useReorder({
-    ids: sections.map((section) => section.id),
+    ids: tree.map((section) => section.id),
     onReorder: reorderSections,
     labelOf: (id) =>
       pickLocalized(sections.find((section) => section.id === id)?.title ?? {}),
@@ -291,6 +314,161 @@ function MenuEditor({ storeId }: { storeId: string }) {
    * the bar so the action is not several screens away. Never both at once.
    */
   const matches = useMenuSearch(storeId, search);
+
+  /**
+   * One section, at either level — an aisle, or one of its sub-aisles (0196).
+   *
+   * A function rather than a second component, so the sub-aisles an aisle
+   * draws inside itself get exactly the props, handlers and branch strips the
+   * aisles do: the two levels are one thing a step apart, and two call sites
+   * would drift. `subAisles` is null for a sub-aisle, which has none.
+   */
+  function renderSection(
+    section: MenuSection,
+    subAisles: MenuSection[] | null,
+    order: ReorderProps & { carried: boolean },
+  ): ReactNode {
+    const isSub = subAisles === null;
+    const holdsProducts = canHoldProducts(section, sections, layout);
+    // One level deep, so an aisle that has sub-aisles goes nowhere; anything
+    // else may go under any other aisle.
+    const movable = isSub || subAisles.length === 0;
+    const targets = tree
+      .filter(
+        (aisle) => aisle.id !== section.id && aisle.id !== section.parentId,
+      )
+      .map((aisle) => ({ id: aisle.id, title: aisle.title }));
+
+    return (
+      <Section
+        key={section.id}
+        section={section}
+        level={isSub ? "sub" : "aisle"}
+        layout={layout}
+        subAisles={subAisles ?? []}
+        holdsProducts={holdsProducts}
+        currencyCode={store.data?.currencyCode ?? ""}
+        shopRate={store.data?.exchangeRate ?? null}
+        focus={focus}
+        initiallyOpen={menuView(storeId).open.has(section.id)}
+        onOpenChange={(open) => rememberOpen(storeId, section.id, open)}
+        carried={order.carried}
+        rowProps={order.rowProps}
+        handleProps={order.handleProps}
+        renaming={renamingId === section.id}
+        renamingWithin={
+          subAisles?.some((sub) => sub.id === renamingId) ?? false
+        }
+        renamePending={renameSection.isPending}
+        onRename={guarded(() => setRenamingId(section.id))}
+        onRenameSave={(fields) =>
+          renameSection.mutate(
+            { id: section.id, ...fields },
+            { onSuccess: () => setRenamingId(null) },
+          )
+        }
+        onRenameCancel={guarded(() => setRenamingId(null))}
+        onArchiveSection={async () => {
+          await archiveSection.mutateAsync({
+            id: section.id,
+            name: section.title,
+          });
+        }}
+        onReorderItems={(ids) => reorderItems(section.id, ids)}
+        onEdit={(itemId: string) =>
+          guarded(() => router.push(`/catalogue/${storeId}/items/${itemId}`))()
+        }
+        onAdd={guarded(() =>
+          // Which section it joins, so a reload or a pasted link
+          // still lands in the right part of the menu.
+          router.push(`/catalogue/${storeId}/items/new?section=${section.id}`),
+        )}
+        decimals={decimalsOf(store.data?.currencyCode ?? "")}
+        bulk={{
+          pending: createItems.isPending,
+          add: (sectionId, items, sortOrder) =>
+            createItems.mutate({ sectionId, items, sortOrder }),
+        }}
+        onToggle={(item) =>
+          update.mutate({
+            id: item.id,
+            patch: { isActive: !item.isActive },
+          })
+        }
+        onArchive={async (item) => {
+          await archive.mutateAsync({ id: item.id, name: item.name });
+        }}
+        renderSubAisle={(sub, subOrder) => renderSection(sub, null, subOrder)}
+        onReorderSubAisles={reorderSections}
+        subAisleAdd={{
+          pending: createSection.isPending || createSections.isPending,
+          add: (fields, done) =>
+            createSection.mutate(
+              {
+                draft: { storeId, ...fields, parentId: section.id },
+                sortOrder: nextSectionSort(subAisles ?? []),
+              },
+              { onSuccess: done },
+            ),
+          paste: (titles, done) =>
+            createSections.mutate(
+              {
+                titles,
+                sortOrder: nextSectionSort(subAisles ?? []),
+                parentId: section.id,
+              },
+              { onSuccess: done },
+            ),
+        }}
+        moves={
+          movable
+            ? {
+                targets,
+                // An aisle may be gathered into a new one; a sub-aisle may come
+                // back out to an aisle of its own — refused on an aisles shop
+                // while it holds products, so not offered there.
+                canGroup: !isSub,
+                canUnnest:
+                  isSub && (layout === "list" || section.items.length === 0),
+                pending: aisles.move.isPending || aisles.group.isPending,
+                move: (target, done) =>
+                  aisles.move.mutate(
+                    {
+                      id: section.id,
+                      name: section.title,
+                      parentId: target,
+                      sortOrder: target
+                        ? nextSectionSort(
+                            tree.find((aisle) => aisle.id === target)
+                              ?.subAisles ?? [],
+                          )
+                        : nextSectionSort(tree),
+                    },
+                    { onSuccess: done },
+                  ),
+                group: (title, done) =>
+                  aisles.group.mutate(
+                    { title, sectionIds: [section.id] },
+                    { onSuccess: done },
+                  ),
+              }
+            : null
+        }
+        gather={
+          !holdsProducts && section.items.length > 0
+            ? {
+                pending: aisles.gather.isPending,
+                run: () =>
+                  aisles.gather.mutate({
+                    sectionId: section.id,
+                    name: section.title,
+                  }),
+              }
+            : null
+        }
+      />
+    );
+  }
 
   /**
    * Put the list back where it was left — once, as soon as the rows it was
@@ -464,10 +642,14 @@ function MenuEditor({ storeId }: { storeId: string }) {
                   className="flex flex-wrap items-center gap-md rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card"
                 >
                   <span className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
-                    {t("menu.sectionLabel")}
+                    {section.parentId
+                      ? t("menu.subAisleLabel")
+                      : t("menu.sectionLabel")}
                   </span>
                   <span className="text-[16px] font-semibold">
-                    {pickLocalized(section.title)}
+                    {/* "Dairy › Milk": a bare "Milk" could be under any
+                        aisle. */}
+                    {pickLocalized(sectionPath(section, sections))}
                   </span>
                   <span className="text-[13px] text-text-faint">
                     {t("menu.itemCount", { count: section.itemCount })}
@@ -480,11 +662,14 @@ function MenuEditor({ storeId }: { storeId: string }) {
                     <Button
                       variant="primary-quiet"
                       size="sm"
-                      onClick={guarded(() =>
-                        router.push(
-                          `/catalogue/${storeId}/sections/${section.id}`,
-                        ),
-                      )}
+                      // In the list, where the section is — see `renamingId`.
+                      // There is no page for a section: clearing the search
+                      // brings the list back, and the form, opening in the
+                      // section's heading, scrolls itself into view.
+                      onClick={guarded(() => {
+                        setSearch("");
+                        setRenamingId(section.id);
+                      })}
                     >
                       {t("menu.renameSection")}
                     </Button>
@@ -516,8 +701,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
                   currencyCode={store.data?.currencyCode ?? ""}
                   shopRate={store.data?.exchangeRate ?? null}
                   sectionTitle={pickLocalized(
-                    sections.find((one) => one.id === item.sectionId)?.title ??
-                      {},
+                    sectionPathOf(item.sectionId, sections),
                   )}
                   onEdit={guarded(() =>
                     router.push(`/catalogue/${storeId}/items/${item.id}`),
@@ -540,67 +724,14 @@ function MenuEditor({ storeId }: { storeId: string }) {
 
           {!searching &&
             sectionOrder
-              .ordered(sections, (section) => section.id)
-              .map((section) => (
-                <Section
-                  key={section.id}
-                  section={section}
-                  currencyCode={store.data?.currencyCode ?? ""}
-                  shopRate={store.data?.exchangeRate ?? null}
-                  focus={focus}
-                  initiallyOpen={menuView(storeId).open.has(section.id)}
-                  onOpenChange={(open) =>
-                    rememberOpen(storeId, section.id, open)
-                  }
-                  carried={sectionOrder.movingId === section.id}
-                  rowProps={sectionOrder.rowProps}
-                  handleProps={sectionOrder.handleProps}
-                  renaming={renamingId === section.id}
-                  renamePending={renameSection.isPending}
-                  onRename={guarded(() => setRenamingId(section.id))}
-                  onRenameSave={(fields) =>
-                    renameSection.mutate(
-                      { id: section.id, ...fields },
-                      { onSuccess: () => setRenamingId(null) },
-                    )
-                  }
-                  onRenameCancel={guarded(() => setRenamingId(null))}
-                  onArchiveSection={async () => {
-                    await archiveSection.mutateAsync({
-                      id: section.id,
-                      name: section.title,
-                    });
-                  }}
-                  onReorderItems={(ids) => reorderItems(section.id, ids)}
-                  onEdit={(itemId: string) =>
-                    guarded(() =>
-                      router.push(`/catalogue/${storeId}/items/${itemId}`),
-                    )()
-                  }
-                  onAdd={guarded(() =>
-                    // Which section it joins, so a reload or a pasted link
-                    // still lands in the right part of the menu.
-                    router.push(
-                      `/catalogue/${storeId}/items/new?section=${section.id}`,
-                    ),
-                  )}
-                  decimals={decimalsOf(store.data?.currencyCode ?? "")}
-                  bulk={{
-                    pending: createItems.isPending,
-                    add: (sectionId, items, sortOrder) =>
-                      createItems.mutate({ sectionId, items, sortOrder }),
-                  }}
-                  onToggle={(item) =>
-                    update.mutate({
-                      id: item.id,
-                      patch: { isActive: !item.isActive },
-                    })
-                  }
-                  onArchive={async (item) => {
-                    await archive.mutateAsync({ id: item.id, name: item.name });
-                  }}
-                />
-              ))}
+              .ordered(tree, (section) => section.id)
+              .map((section) =>
+                renderSection(section, section.subAisles, {
+                  rowProps: sectionOrder.rowProps,
+                  handleProps: sectionOrder.handleProps,
+                  carried: sectionOrder.movingId === section.id,
+                }),
+              )}
 
           {/* Adding a section is the bottom of the menu, because that is where
               a new one goes and where the eye already is after reading it.
@@ -674,8 +805,37 @@ type ReorderProps = {
   handleProps: (id: string) => Record<string, unknown>;
 };
 
+/**
+ * What an aisle can have done to it as part of the tree (0196) — moved under
+ * another aisle, gathered into a new one, or, for a sub-aisle, brought back
+ * out. Null where it cannot move at all: an aisle that has sub-aisles of its
+ * own, since the tree is one level deep.
+ */
+type SectionMoves = {
+  /** The aisles it can go under. */
+  targets: { id: string; title: Localized }[];
+  /** Offer "a new aisle" — an aisle only. */
+  canGroup: boolean;
+  /** Offer "an aisle of its own" — a sub-aisle the database will let out. */
+  canUnnest: boolean;
+  pending: boolean;
+  /** Under `target`, or out to an aisle of its own when null. */
+  move: (target: string | null, done: () => void) => void;
+  /** Into a new aisle called `title`. */
+  group: (title: Localized, done: () => void) => void;
+} | null;
+
 function Section({
   section,
+  level,
+  layout,
+  subAisles,
+  holdsProducts,
+  renderSubAisle,
+  onReorderSubAisles,
+  subAisleAdd,
+  moves,
+  gather,
   currencyCode,
   shopRate,
   focus,
@@ -685,6 +845,7 @@ function Section({
   handleProps,
   carried,
   renaming,
+  renamingWithin,
   renamePending,
   onRename,
   onRenameSave,
@@ -699,6 +860,30 @@ function Section({
   onArchive,
 }: {
   section: MenuSection;
+  /** An aisle, or one of its sub-aisles — see `renderSection`. */
+  level: "aisle" | "sub";
+  layout: "list" | "aisles";
+  /** Its sub-aisles, in order; always empty on a sub-aisle. */
+  subAisles: MenuSection[];
+  /** Whether a product may be added here — `canHoldProducts`. */
+  holdsProducts: boolean;
+  renderSubAisle: (
+    sub: MenuSection,
+    order: ReorderProps & { carried: boolean },
+  ) => ReactNode;
+  onReorderSubAisles: (ids: string[]) => void;
+  /** Adding sub-aisles to this aisle, one at a time or pasted. */
+  subAisleAdd: {
+    pending: boolean;
+    add: (fields: SectionFields, done: () => void) => void;
+    paste: (titles: Localized[], done: () => void) => void;
+  };
+  moves: SectionMoves;
+  /**
+   * Products sitting directly on an aisle that may not hold them any more —
+   * placed before 0196 — and the one call that moves them into a sub-aisle.
+   */
+  gather: { pending: boolean; run: () => void } | null;
   currencyCode: string;
   /** This shop's own rate — see `ItemRow`. */
   shopRate: number | null;
@@ -708,6 +893,8 @@ function Section({
   initiallyOpen: boolean;
   /** Told of every open and close, so the menu can remember them. */
   onOpenChange: (open: boolean) => void;
+  /** One of its sub-aisles is being renamed, so it opens to show the form. */
+  renamingWithin: boolean;
   /** This section's name is being edited, in place of its heading. */
   renaming: boolean;
   renamePending: boolean;
@@ -739,6 +926,23 @@ function Section({
   /** Whether this section's paste box is open. Per section, not per menu. */
   const [pasting, setPasting] = useState(false);
   const guarded = useGuardedAction();
+  const isSub = level === "sub";
+
+  /** How a sub-aisle is being added here — the menu's own three states. */
+  const [subAdding, setSubAdding] = useState<"none" | "one" | "bulk">("none");
+  /** Whether the Move panel is open under the heading. */
+  const [moving, setMoving] = useState(false);
+
+  /**
+   * The sub-aisle block shows on an aisles shop, where every aisle needs one,
+   * and wherever there already are some. A restaurant's headings never grow
+   * an empty "sub-aisles" area they have no use for.
+   */
+  const showsSubAisles =
+    !isSub && (layout === "aisles" || subAisles.length > 0);
+  const totalItems =
+    section.items.length +
+    subAisles.reduce((sum, sub) => sum + sub.items.length, 0);
 
   /**
    * Whether this section's items are showing. **Closed to begin with.**
@@ -769,7 +973,9 @@ function Section({
     () =>
       initiallyOpen ||
       focus.isFocused(section.id) ||
-      section.items.some((item) => focus.isFocused(item.id)),
+      section.items.some((item) => focus.isFocused(item.id)) ||
+      holdsFocus(subAisles, focus) ||
+      renamingWithin,
   );
   function setOpen(next: boolean) {
     setOpenState(next);
@@ -784,10 +990,15 @@ function Section({
    * rather than in an effect, which is the pattern `StoreScreen` uses for the
    * same kind of state and for the same reason: an effect would paint the
    * section closed once and then open, which is a flash on every return.
+   *
+   * Opened for a sub-aisle being renamed, too: Rename on a search result puts
+   * the form in that sub-aisle's heading, which is inside this collapse.
    */
   const focused =
     focus.isFocused(section.id) ||
-    section.items.some((item) => focus.isFocused(item.id));
+    section.items.some((item) => focus.isFocused(item.id)) ||
+    holdsFocus(subAisles, focus) ||
+    renamingWithin;
   const [wasFocused, setWasFocused] = useState(focused);
   if (focused !== wasFocused) {
     setWasFocused(focused);
@@ -806,9 +1017,24 @@ function Section({
     lifted: "relative z-10 shadow-raised ring-2 ring-active",
   });
 
+  /** The sub-aisles' own order, dragged within this aisle only. */
+  const subOrder = useReorder({
+    ids: subAisles.map((sub) => sub.id),
+    onReorder: onReorderSubAisles,
+    labelOf: (id) =>
+      pickLocalized(subAisles.find((sub) => sub.id === id)?.title ?? {}),
+    lifted: "relative z-10 rounded-md bg-surface shadow-raised",
+  });
+
   const row = rowProps(
     section.id,
-    cx("flex flex-col gap-sm", carried && "px-md py-sm"),
+    cx(
+      "flex flex-col gap-sm",
+      carried && "px-md py-sm",
+      // Inside its aisle, on a tint of its own, so where one sub-aisle ends
+      // and the next begins is visible without reading the headings.
+      isSub && "rounded-md bg-neutral-fill/40 p-md",
+    ),
   );
 
   return (
@@ -883,14 +1109,20 @@ function Section({
             <h2
               ref={focus.attach(section.id)}
               className={cx(
-                "truncate text-[18px]",
+                "truncate",
+                isSub ? "text-[16px]" : "text-[18px]",
                 focus.isFocused(section.id) && "text-active",
               )}
             >
               {title}
             </h2>
             <span className="shrink-0 text-[13px] text-text-faint">
-              {t("menu.itemCount", { count: section.items.length })}
+              {subAisles.length > 0
+                ? t("menu.aisleCount", {
+                    subAisles: subAisles.length,
+                    items: totalItems,
+                  })
+                : t("menu.itemCount", { count: section.items.length })}
             </span>
           </button>
 
@@ -923,6 +1155,16 @@ function Section({
             <Button variant="primary-quiet" size="sm" onClick={onRename}>
               {t("menu.renameSection")}
             </Button>
+            {moves && (
+              <Button
+                variant="primary-quiet"
+                size="sm"
+                onClick={() => setMoving(!moving)}
+                aria-expanded={moving}
+              >
+                {t("menu.move")}
+              </Button>
+            )}
             <ConfirmButton
               onConfirm={onArchiveSection}
               titleKey="menu.sectionArchiveTitle"
@@ -938,6 +1180,15 @@ function Section({
         </div>
       )}
 
+      {moving && moves && !carried && (
+        <MovePanel
+          isSub={isSub}
+          moves={moves}
+          onDone={() => setMoving(false)}
+          onCancel={guarded(() => setMoving(false))}
+        />
+      )}
+
       <BranchSectionNote sectionId={section.id} />
 
       {itemOrder.instructions}
@@ -950,10 +1201,34 @@ function Section({
         items do not animate open the moment a drag ends. */}
       <Collapse open={open && !carried}>
         <div className="flex flex-col gap-sm">
-          {section.items.length === 0 && (
+          {holdsProducts && section.items.length === 0 && (
             <p className="rounded-md border border-dashed border-border px-lg py-md text-[13px] text-text-faint">
               {t("menu.sectionEmpty")}
             </p>
+          )}
+
+          {/* Products placed directly on the aisle before 0196. They keep
+              selling where they are; this is the way out for them, above the
+              rows it is about. */}
+          {gather && (
+            <div className="flex flex-wrap items-center gap-md rounded-md border border-dashed border-border px-lg py-md">
+              <div className="flex min-w-0 flex-1 flex-col gap-xxs">
+                <span className="text-[14px] font-semibold">
+                  {t("menu.looseTitle", { count: section.items.length })}
+                </span>
+                <span className="text-[13px] text-text-soft">
+                  {t("menu.looseBody")}
+                </span>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                pending={gather.pending}
+                onClick={gather.run}
+              >
+                {t("menu.looseGather")}
+              </Button>
+            </div>
           )}
 
           {/* ## Carried, a section is only its heading
@@ -995,6 +1270,73 @@ function Section({
                 onArchive={() => onArchive(item)}
               />
             ))}
+
+          {showsSubAisles && (
+            <div className="flex flex-col gap-sm">
+              {subOrder.instructions}
+              {subOrder
+                .ordered(subAisles, (sub) => sub.id)
+                .map((sub) =>
+                  renderSubAisle(sub, {
+                    rowProps: subOrder.rowProps,
+                    handleProps: subOrder.handleProps,
+                    carried: subOrder.movingId === sub.id,
+                  }),
+                )}
+
+              {/* On an aisles shop, an aisle with nothing under it yet says
+                  what it is waiting for: products go in a sub-aisle. */}
+              {layout === "aisles" &&
+                subAisles.length === 0 &&
+                section.items.length === 0 && (
+                  <p className="rounded-md border border-dashed border-border px-lg py-md text-[13px] text-text-faint">
+                    {t("menu.aisleNeedsSubAisle")}
+                  </p>
+                )}
+
+              {subAdding === "one" ? (
+                <SectionForm
+                  pending={subAisleAdd.pending}
+                  placeholder={{ en: "Milk", ar: "حليب" }}
+                  onSave={(fields) =>
+                    subAisleAdd.add(fields, () => setSubAdding("none"))
+                  }
+                  onCancel={guarded(() => setSubAdding("none"))}
+                />
+              ) : subAdding === "bulk" ? (
+                <BulkForm
+                  kind="sections"
+                  price="none"
+                  decimals={null}
+                  pending={subAisleAdd.pending}
+                  onCancel={guarded(() => setSubAdding("none"))}
+                  onSubmit={(rows) =>
+                    subAisleAdd.paste(
+                      rows.map((one) => one.name),
+                      () => setSubAdding("none"),
+                    )
+                  }
+                />
+              ) : (
+                <div className="flex flex-wrap items-center gap-sm">
+                  <Button
+                    variant="primary-quiet"
+                    size="sm"
+                    onClick={() => setSubAdding("one")}
+                  >
+                    {t("menu.addSubAisle")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSubAdding("bulk")}
+                  >
+                    {t("menu.bulkSubAisles")}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Collapse>
 
@@ -1006,6 +1348,7 @@ function Section({
           one, where opening it showed nothing but this. Gone while carried —
           a carried section is only its heading. */}
       {!carried &&
+        holdsProducts &&
         (pasting ? (
           <BulkForm
             kind="items"
@@ -1293,11 +1636,14 @@ type SectionFields = { title: Localized; imageUrl: string | null };
 function SectionForm({
   initial,
   pending,
+  placeholder = { en: "Starters", ar: "المقبلات" },
   onSave,
   onCancel,
 }: {
   initial?: SectionFields;
   pending: boolean;
+  /** The example in the field — a sub-aisle's is "Milk", not "Starters". */
+  placeholder?: Localized;
   onSave: (fields: SectionFields) => void;
   onCancel: () => void;
 }) {
@@ -1341,7 +1687,7 @@ function SectionForm({
       hint={t("menu.sectionTitleHint")}
       error={error}
       filter="title"
-      placeholder={{ en: "Starters", ar: "المقبلات" }}
+      placeholder={placeholder}
     />
   );
 
@@ -1373,6 +1719,130 @@ function SectionForm({
         />
       </Field>
       <div className="flex flex-wrap items-center gap-sm">{buttons}</div>
+    </div>
+  );
+}
+
+/** The end of one level of the tree — where a new or moved section lands. */
+function nextSectionSort(level: { sortOrder: number }[]): number {
+  return level.reduce((highest, one) => Math.max(highest, one.sortOrder + 1), 0);
+}
+
+/** Whether a row being returned to is in one of these sub-aisles. */
+function holdsFocus(
+  subAisles: MenuSection[],
+  focus: ReturnType<typeof useRowFocus>,
+): boolean {
+  return subAisles.some(
+    (sub) =>
+      focus.isFocused(sub.id) ||
+      sub.items.some((item) => focus.isFocused(item.id)),
+  );
+}
+
+/** A section's "Aisle › Sub-aisle" name by id, or nothing for an unknown one. */
+function sectionPathOf(id: string, sections: MenuSection[]): Localized {
+  const section = sections.find((one) => one.id === id);
+  return section ? sectionPath(section, sections) : {};
+}
+
+/** The Move panel's two choices that are not an existing aisle. */
+const NEW_AISLE = "new";
+const OWN_AISLE = "own";
+
+/**
+ * Moving a section around the aisles tree, under its heading.
+ *
+ * One picker of where it can go: any other aisle, plus — for an aisle — a new
+ * aisle to gather it into, which asks for that aisle's name, and — for a
+ * sub-aisle the database will let out — an aisle of its own. Inline for the
+ * reason renaming is: it is one choice, and a page of its own would cost the
+ * operator their place in the menu.
+ */
+function MovePanel({
+  isSub,
+  moves,
+  onDone,
+  onCancel,
+}: {
+  isSub: boolean;
+  moves: NonNullable<SectionMoves>;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const languages = useLanguages();
+  const codes = languages.data?.map((language) => language.code) ?? [];
+  const form = useRevealOnMount<HTMLDivElement>({ focus: true });
+
+  const [target, setTarget] = useState("");
+  const [title, setTitle] = useState<Localized>({});
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  const options = [
+    ...(moves.canGroup ? [{ value: NEW_AISLE, label: t("menu.moveNewAisle") }] : []),
+    ...(moves.canUnnest ? [{ value: OWN_AISLE, label: t("menu.moveOwnAisle") }] : []),
+    ...moves.targets.map((aisle) => ({
+      value: aisle.id,
+      label: pickLocalized(aisle.title),
+    })),
+  ];
+
+  function submit() {
+    if (!target) {
+      setError(t("menu.moveChoose"));
+      return;
+    }
+    if (target === NEW_AISLE) {
+      const result = validateLocalizedText(title, codes, TEXT.title);
+      if (!result.ok) {
+        setError(t(result.key, result.params));
+        return;
+      }
+      setError(undefined);
+      moves.group(title, onDone);
+      return;
+    }
+    setError(undefined);
+    moves.move(target === OWN_AISLE ? null : target, onDone);
+  }
+
+  return (
+    <div
+      ref={form}
+      className="flex flex-col gap-lg rounded-md border border-active bg-surface p-lg"
+    >
+      <Field
+        label={isSub ? t("menu.moveSubAisleTo") : t("menu.moveAisleInto")}
+        hint={t("menu.moveHint")}
+        error={target === NEW_AISLE ? undefined : error}
+      >
+        <Select
+          value={target}
+          onChange={setTarget}
+          options={options}
+          disabled={moves.pending}
+          placeholder={t("menu.moveChoose")}
+        />
+      </Field>
+      {target === NEW_AISLE && (
+        <LocalizedField
+          label={t("menu.newAisleName")}
+          value={title}
+          onChange={setTitle}
+          maxLength={TEXT.title}
+          error={error}
+          filter="title"
+          placeholder={{ en: "Dairy & Eggs", ar: "ألبان وبيض" }}
+        />
+      )}
+      <div className="flex flex-wrap items-center gap-sm">
+        <Button variant="secondary" onClick={onCancel} disabled={moves.pending}>
+          {t("common.cancel")}
+        </Button>
+        <Button onClick={submit} pending={moves.pending}>
+          {t("menu.moveConfirm")}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -75,9 +75,85 @@ export type MenuSection = {
    * `menu_sections.image_url`, 0190. Null shows its first pictured item.
    */
   imageUrl: string | null;
+  /**
+   * The aisle this is a sub-aisle of — `menu_sections.parent_id`, 0196. Null
+   * for an aisle, and for every section of a restaurant. One level only: a
+   * section with a parent never has sub-aisles of its own.
+   */
+  parentId: string | null;
   sortOrder: number;
   items: MenuItem[];
 };
+
+/**
+ * An aisle and its sub-aisles, as the editor draws them.
+ *
+ * `fetchMenu` stays flat — every section, aisle or sub-aisle, in one list —
+ * because most of what reads it (the item editor's picker, the branch strips,
+ * the search's section titles) asks about *a* section by id and does not care
+ * which level it is on. This is the one view that does.
+ */
+export type MenuAisle = MenuSection & { subAisles: MenuSection[] };
+
+/**
+ * The flat menu as aisles holding sub-aisles, each level in its own order.
+ *
+ * A sub-aisle whose aisle is not in the list — archived under it, which 0196
+ * refuses but a row written around the trigger could still be — is drawn as an
+ * aisle of its own rather than dropped: shown in the wrong place is a thing
+ * somebody can see and fix, and not shown at all is not.
+ */
+export function menuTree(sections: MenuSection[]): MenuAisle[] {
+  const ids = new Set(sections.map((section) => section.id));
+  const bySort = (a: MenuSection, b: MenuSection) => a.sortOrder - b.sortOrder;
+  return sections
+    .filter((section) => !section.parentId || !ids.has(section.parentId))
+    .sort(bySort)
+    .map((aisle) => ({
+      ...aisle,
+      subAisles: sections
+        .filter((section) => section.parentId === aisle.id)
+        .sort(bySort),
+    }));
+}
+
+/**
+ * Whether a product may be placed in this section — the rule 0196 enforces,
+ * asked here so the screens offer only what the database will take.
+ *
+ * Never on a section that has sub-aisles (there would be no pill to find it
+ * under), and on an aisles shop never directly on an aisle. A product already
+ * sitting somewhere this says no to stays there — the rule is for placements
+ * from now on, not a sweep of what was there before it.
+ */
+export function canHoldProducts(
+  section: MenuSection,
+  sections: MenuSection[],
+  layout: "list" | "aisles",
+): boolean {
+  if (sections.some((other) => other.parentId === section.id)) return false;
+  return !(layout === "aisles" && !section.parentId);
+}
+
+/**
+ * A section's name with its aisle's in front — "Dairy › Milk" — in every
+ * language it has, for a picker where a bare "Milk" could be under any aisle.
+ */
+export function sectionPath(
+  section: Pick<MenuSection, "title" | "parentId">,
+  sections: MenuSection[],
+): Localized {
+  const parent = section.parentId
+    ? sections.find((other) => other.id === section.parentId)
+    : undefined;
+  if (!parent) return section.title;
+  const path: Localized = {};
+  for (const [code, text] of Object.entries(section.title)) {
+    const above = parent.title[code] ?? parent.title.en ?? "";
+    path[code] = above ? `${above} › ${text}` : text;
+  }
+  return path;
+}
 
 /**
  * One store's whole menu.
@@ -91,7 +167,7 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
   const { data, error } = await getClient()
     .from("menu_sections")
     .select(
-      `id, slug, title, image_url, sort_order,
+      `id, slug, title, image_url, parent_id, sort_order,
        menu_items ( id, menu_section_id, slug, name, description, price,
                     image_url, is_active, sort_order, deleted_at,
                     price_unit, unit_quantity, unit_step,
@@ -114,6 +190,8 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
     slug: section.slug as string,
     title: (section.title as Localized) ?? {},
     imageUrl: (section.image_url as string | null) ?? null,
+    // Absent on a database before 0196, which is every section an aisle.
+    parentId: (section.parent_id as string | null) ?? null,
     sortOrder: section.sort_order as number,
     items: asArray(section.menu_items)
       // Filtered here rather than in the query: a `deleted_at` filter on an
@@ -149,7 +227,13 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
  * position within a set of matches is not a position in the menu.
  */
 export type MenuMatches = {
-  sections: { id: string; title: Localized; itemCount: number }[];
+  sections: {
+    id: string;
+    title: Localized;
+    itemCount: number;
+    /** Set on a sub-aisle — the result says which aisle it is in. */
+    parentId: string | null;
+  }[];
   items: MenuItem[];
 };
 
@@ -225,7 +309,7 @@ async function searchMenuSections(
     // The count comes back with the row, because a heading on its own says
     // nothing about whether it is the one you meant — "Cold mezze, 6 items" is
     // recognisable in a way "Cold mezze" is not.
-    .select("id, title, menu_items(count)")
+    .select("id, title, parent_id, menu_items(count)")
     .eq("store_id", storeId)
     .is("deleted_at", null)
     // Quoted — a section called "Mezze, cold" would otherwise end the
@@ -241,6 +325,7 @@ async function searchMenuSections(
     id: row.id as string,
     title: (row.title as Localized) ?? {},
     itemCount: countOf(row.menu_items),
+    parentId: (row.parent_id as string | null) ?? null,
   }));
 }
 
@@ -476,6 +561,8 @@ export type MenuSectionDraft = {
   title: Localized;
   /** Optional; the bulk add never asks for one. */
   imageUrl?: string | null;
+  /** The aisle it is a sub-aisle of; absent for an aisle (0196). */
+  parentId?: string | null;
 };
 
 /**
@@ -495,6 +582,7 @@ export async function createMenuSection(
       store_id: draft.storeId,
       title: titleLocalized(draft.title),
       image_url: draft.imageUrl ?? null,
+      parent_id: draft.parentId ?? null,
       sort_order: sortOrder,
     });
 
@@ -533,6 +621,8 @@ export async function createMenuSections(
   storeId: string,
   titles: Localized[],
   sortOrder: number,
+  /** Pasted under an aisle, as its sub-aisles (0196). */
+  parentId: string | null = null,
 ): Promise<void> {
   if (titles.length === 0) return;
 
@@ -542,6 +632,7 @@ export async function createMenuSections(
       titles.map((title, index) => ({
         store_id: storeId,
         title: titleLocalized(title),
+        parent_id: parentId,
         sort_order: sortOrder + index,
       })),
     );
@@ -576,12 +667,96 @@ export async function archiveMenuSection(id: string): Promise<void> {
     throw new Error(t("menu.sectionNotEmpty", { count }));
   }
 
+  // The same for sub-aisles, which 0196's guard refuses for the same reason:
+  // archived out from under them, they would be live and nowhere.
+  const { count: subs, error: subError } = await client
+    .from("menu_sections")
+    .select("id", { count: "exact", head: true })
+    .eq("parent_id", id)
+    .is("deleted_at", null);
+
+  if (subError) throw new Error(subError.message);
+  if (subs && subs > 0) {
+    throw new Error(t("menu.aisleNotEmpty", { count: subs }));
+  }
+
   const { error } = await client
     .from("menu_sections")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
 
   if (error) throw new Error(friendly(error.message));
+}
+
+// ---------------------------------------------------------------------------
+// Aisles and sub-aisles (0196)
+// ---------------------------------------------------------------------------
+
+/**
+ * Puts a section under another aisle, or — `parentId` null — makes it an aisle
+ * of its own, at `sortOrder` among its new neighbours.
+ *
+ * A plain update: the triggers from 0196 are what decide whether it may go —
+ * one level deep, one shop, and on an aisles shop no sub-aisle with products
+ * turned back into a bare aisle — and `friendly` turns their refusals into
+ * sentences.
+ */
+export async function moveMenuSection(
+  id: string,
+  parentId: string | null,
+  sortOrder: number,
+): Promise<void> {
+  const { error } = await getClient()
+    .from("menu_sections")
+    .update({ parent_id: parentId, sort_order: sortOrder })
+    .eq("id", id);
+
+  if (error) throw new Error(friendly(error.message));
+}
+
+/**
+ * A new aisle, with the given aisles moved under it as its sub-aisles,
+ * products and all — `menu_group_aisles`, in one transaction.
+ *
+ * How a shop that already has Milk, Cheese and Eggs as aisles of their own
+ * gathers them under Dairy & Eggs. The new aisle takes the place of the first
+ * of them. Returns its id.
+ */
+export async function groupAisles(
+  storeId: string,
+  title: Localized,
+  sectionIds: string[],
+): Promise<string> {
+  const { data, error } = await getClient().rpc("menu_group_aisles", {
+    p_store_id: storeId,
+    p_title: titleLocalized(title),
+    p_section_ids: sectionIds,
+  });
+
+  if (error) throw new Error(friendly(error.message));
+  return data as string;
+}
+
+/**
+ * A new sub-aisle under an aisle, holding every product that sat directly on
+ * it — `menu_gather_loose_products`. Titled as the aisle is unless told
+ * otherwise; split it further from there. Returns its id.
+ *
+ * What the products placed before 0196 need: they keep selling where they
+ * are, but nothing new can join them, and a shop cannot be switched to the
+ * Aisles layout while any are left.
+ */
+export async function gatherLooseProducts(
+  sectionId: string,
+  title?: Localized,
+): Promise<string> {
+  const { data, error } = await getClient().rpc("menu_gather_loose_products", {
+    p_section_id: sectionId,
+    p_title: title ? titleLocalized(title) : null,
+  });
+
+  if (error) throw new Error(friendly(error.message));
+  return data as string;
 }
 
 // ---------------------------------------------------------------------------
@@ -640,6 +815,28 @@ export function applyOrder<T extends { id: string; sortOrder: number }>(
   });
 
   return { next, updates };
+}
+
+/**
+ * `applyOrder` for one level of the menu — the aisles, or one aisle's
+ * sub-aisles — with the rest of the flat list carried through untouched.
+ *
+ * `applyOrder` returns only the rows it was given, which is right for one
+ * section's items and wrong here: the optimistic update replaces the whole
+ * menu, and a reorder of the aisles that returned only the aisles would drop
+ * every sub-aisle off the screen until the refetch.
+ */
+export function applySectionOrder(
+  sections: MenuSection[],
+  ids: string[],
+): { next: MenuSection[]; updates: SortUpdate[] } {
+  const level = sections.filter((section) => ids.includes(section.id));
+  const { next, updates } = applyOrder(level, ids);
+  const moved = new Map(next.map((section) => [section.id, section]));
+  return {
+    next: sections.map((section) => moved.get(section.id) ?? section),
+    updates,
+  };
 }
 
 /**
@@ -706,6 +903,28 @@ function friendly(message: string): string {
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("price_positive")) return t("dbError.priceNegative");
   if (message.includes("_len")) return t("dbError.tooLong");
+  // The refusals 0196 raises, matched on their own wording.
+  if (message.includes("holds sub-aisles; put the product")) {
+    return t("dbError.sectionHasSubAisles");
+  }
+  if (message.includes("goes in a sub-aisle, not directly")) {
+    return t("dbError.needsSubAisle");
+  }
+  if (
+    message.includes("is itself a sub-aisle") ||
+    message.includes("has sub-aisles of its own")
+  ) {
+    return t("dbError.oneLevel");
+  }
+  if (message.includes("cannot become an aisle of its own")) {
+    return t("dbError.subAisleHoldsProducts");
+  }
+  if (message.includes("restore it before putting a live sub-aisle")) {
+    return t("dbError.aisleArchived");
+  }
+  if (message.includes("still holds") && message.includes("sub-aisle")) {
+    return t("dbError.aisleHoldsSubAisles");
+  }
 
   // Unrecognised. The raw Postgres message is ugly and *true*; a friendly
   // translation of an error nobody has read would be worse — it would say

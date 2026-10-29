@@ -7,9 +7,10 @@ import { EditorPage } from "@/components/ui/editor-page";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
-import type { MenuSection } from "./api/menu";
+import { canHoldProducts, sectionPath, type MenuSection } from "./api/menu";
 import { MenuItemEditor } from "./menu-item-editor";
 import { useCreateMenuItem, useMenu, useUpdateMenuItem } from "./use-menu";
+import { useStore } from "./use-stores";
 
 /**
  * One dish, on a page of its own.
@@ -50,6 +51,8 @@ export function MenuItemScreen({
 
   const menu = useMenu(storeId);
   const sections = menu.data ?? [];
+  const store = useStore(storeId);
+  const layout = store.data?.menuLayout ?? "list";
 
   const create = useCreateMenuItem(storeId);
   const update = useUpdateMenuItem(storeId);
@@ -124,7 +127,18 @@ export function MenuItemScreen({
       // For the picker, and for the overline that says where in the menu this
       // lands. The title cannot — "Falafel" says nothing about which section it
       // is in.
-      sections={sections}
+      //
+      // Only where a product may go (0196) — a sub-aisle on an aisles shop,
+      // never a section that has sub-aisles — named "Dairy › Milk", since a
+      // bare "Milk" could be under any aisle. The section it sits in now stays
+      // listed even when it no longer qualifies: a product placed before the
+      // rule keeps its place until it is moved.
+      sections={sections
+        .filter(
+          (one) =>
+            one.id === sectionId || canHoldProducts(one, sections, layout),
+        )
+        .map((one) => ({ id: one.id, title: sectionPath(one, sections) }))}
       imageUrl={initial?.imageUrl ?? null}
       title={initial ? pickLocalized(initial.name) : t("menu.newItem")}
       backHref={backHref}

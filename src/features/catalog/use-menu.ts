@@ -25,6 +25,9 @@ import {
   createMenuItems,
   createMenuSections,
   fetchArchive,
+  gatherLooseProducts,
+  groupAisles,
+  moveMenuSection,
   restoreMenuItem,
   restoreMenuSection,
   type MenuSectionDraft,
@@ -244,8 +247,18 @@ export function useCreateMenuSections(storeId: string) {
   const toast = useToasts();
 
   return useMutation({
-    mutationFn: (input: { titles: Localized[]; sortOrder: number }) =>
-      createMenuSections(storeId, input.titles, input.sortOrder),
+    mutationFn: (input: {
+      titles: Localized[];
+      sortOrder: number;
+      /** Pasted under an aisle, as its sub-aisles. */
+      parentId?: string | null;
+    }) =>
+      createMenuSections(
+        storeId,
+        input.titles,
+        input.sortOrder,
+        input.parentId ?? null,
+      ),
     onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
       toast.success(t("bulk.addedSections", { count: input.titles.length }));
@@ -312,6 +325,74 @@ export function useArchiveMenuSection(storeId: string) {
       );
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Aisles and sub-aisles (0196)
+// ---------------------------------------------------------------------------
+
+/**
+ * Moving a section between levels — under another aisle, or out to one of its
+ * own — and the two ways of making sub-aisles out of what a shop already has.
+ *
+ * One hook, like `useRestore`: they share an invalidation and a failure path,
+ * and the interesting outcome of each is often the refusal — a sub-aisle with
+ * products that cannot become a bare aisle — which has to reach the operator
+ * as a sentence. Not optimistic: each one rearranges the tree, and drawing a
+ * guess at the new tree for the length of a round trip is a guess that can be
+ * wrong in more ways than a toggle.
+ */
+export function useAisles(storeId: string) {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  const settle = {
+    onError: (error: unknown) => {
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      );
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
+    },
+  };
+
+  const move = useMutation({
+    mutationFn: (input: {
+      id: string;
+      name: Localized;
+      parentId: string | null;
+      sortOrder: number;
+    }) => moveMenuSection(input.id, input.parentId, input.sortOrder),
+    onSuccess: (_result, input) => {
+      toast.success(t("menu.sectionMoved", { name: pickLocalized(input.name) }));
+    },
+    ...settle,
+  });
+
+  const group = useMutation({
+    mutationFn: (input: { title: Localized; sectionIds: string[] }) =>
+      groupAisles(storeId, input.title, input.sectionIds),
+    onSuccess: (_result, input) => {
+      toast.success(
+        t("menu.aislesGrouped", { name: pickLocalized(input.title) }),
+      );
+    },
+    ...settle,
+  });
+
+  const gather = useMutation({
+    mutationFn: (input: { sectionId: string; name: Localized }) =>
+      gatherLooseProducts(input.sectionId),
+    onSuccess: (_result, input) => {
+      toast.success(
+        t("menu.looseGathered", { name: pickLocalized(input.name) }),
+      );
+    },
+    ...settle,
+  });
+
+  return { move, group, gather };
 }
 
 // ---------------------------------------------------------------------------

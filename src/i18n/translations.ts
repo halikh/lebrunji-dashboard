@@ -781,6 +781,18 @@ const en = {
     missingLanguage: "Every language needs a value before this can be saved.",
     priceNegative: "A price cannot be negative.",
     tooLong: "That is longer than the field allows.",
+    // The refusals 0196 raises — aisles and sub-aisles.
+    needsSubAisle:
+      "On an aisles shop a product goes in a sub-aisle, not directly on an aisle.",
+    sectionHasSubAisles:
+      "This aisle has sub-aisles. Put the product in one of them.",
+    oneLevel: "Aisles go one level deep: an aisle, then its sub-aisles.",
+    subAisleHoldsProducts:
+      "This sub-aisle holds products, so on an aisles shop it cannot become an aisle of its own. Move it under another aisle instead.",
+    aisleArchived:
+      "Its aisle is archived. Restore the aisle first, then this.",
+    aisleHoldsSubAisles:
+      "This aisle still holds sub-aisles. Move or archive them first.",
   },
 
   form: {
@@ -1041,7 +1053,10 @@ const en = {
     menuLayoutListHint:
       "A restaurant's menu: each section a list of items, one under the other.",
     menuLayoutAislesHint:
-      "A supermarket's: a row of aisle pictures, and each section a shelf customers swipe, with See all for the whole aisle.",
+      "A supermarket's: a row of aisle pictures, and each section a shelf customers swipe, with See all for the whole aisle. Products go in sub-aisles — Milk and Cheese under Dairy.",
+    // The switch refused by 0196 while products sit directly on an aisle.
+    menuLayoutNeedsSubAisles:
+      "Some products sit directly on a section. On the aisles layout every product is in a sub-aisle — on the Menu tab, use Move to group sections under an aisle first, then switch.",
     hiddenHintNew:
       "Recommended for now — it has no menu or opening hours yet. Turn it on from the shops list when it is ready.",
 
@@ -2587,6 +2602,33 @@ const en = {
     // what to do — not that the action was unavailable.
     sectionNotEmpty:
       "This section still holds {count} live item(s). Move or archive them first, or they would disappear from the app without being deleted.",
+    // Sub-aisles — 0196. An aisle holds sub-aisles, and on an aisles shop the
+    // products live in those.
+    aisleNotEmpty:
+      "This aisle still holds {count} sub-aisle(s). Move or archive them first, or they would disappear from the app without being deleted.",
+    aisleCount: "{subAisles} sub-aisles · {items} items",
+    subAisleLabel: "Sub-aisle",
+    addSubAisle: "Add a sub-aisle",
+    bulkSubAisles: "Paste sub-aisles",
+    aisleNeedsSubAisle:
+      "Products on an aisles shop go in a sub-aisle. Add one — Milk, Cheese — to start stocking this aisle.",
+    looseTitle: "{count} product(s) sit directly on this aisle",
+    looseBody:
+      "They keep selling, but new products cannot join them. Move them into a sub-aisle of their own, then split it further if you like.",
+    looseGather: "Move into a sub-aisle",
+    looseGathered: "{name}'s products moved into a sub-aisle",
+    move: "Move",
+    moveAisleInto: "Move this section into",
+    moveSubAisleTo: "Move this sub-aisle to",
+    moveHint:
+      "Under another aisle it becomes a sub-aisle, with its products. A new aisle is made here and this goes inside it.",
+    moveChoose: "Choose where it goes",
+    moveNewAisle: "A new aisle…",
+    moveOwnAisle: "An aisle of its own",
+    newAisleName: "New aisle name",
+    moveConfirm: "Move",
+    sectionMoved: "{name} moved",
+    aislesGrouped: "{name} made, with this inside it",
     sectionEmpty: "No items yet",
     saveSection: "Save",
     emptyTitle: "No menu yet",

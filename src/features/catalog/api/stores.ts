@@ -939,6 +939,10 @@ function friendly(message: string): string {
   if (message.includes("store_categories_main_category")) {
     return t("store.mainCategoryKept");
   }
+  // 0196: the switch to Aisles, refused while a product sits on a bare aisle.
+  if (message.includes("every product is in a sub-aisle")) {
+    return t("store.menuLayoutNeedsSubAisles");
+  }
   if (message.includes("slug")) return t("dbError.duplicateSlug");
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("_len")) return t("dbError.tooLong");

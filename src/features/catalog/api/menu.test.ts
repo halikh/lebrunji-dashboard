@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { applyOrder } from "./menu";
+import {
+  applyOrder,
+  applySectionOrder,
+  canHoldProducts,
+  menuTree,
+  sectionPath,
+  type MenuSection,
+} from "./menu";
 
 /**
  * Reordering is exactly the shape of thing this project tests: it fails
@@ -99,5 +106,89 @@ describe("applyOrder", () => {
     // the refetch, rather than being written to a position nobody chose.
     const { next } = applyOrder(rows, ["a", "b", "c"]);
     expect(next.map((row) => row.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+/**
+ * Sub-aisles (0196). The tree is drawn from a flat list, and the ways it goes
+ * wrong are quiet too: a sub-aisle drawn as an aisle, a reorder of the aisles
+ * that drops every sub-aisle off the screen, a picker offering a section the
+ * database will refuse.
+ */
+function section(
+  id: string,
+  sortOrder: number,
+  parentId: string | null = null,
+  title = id,
+): MenuSection {
+  return {
+    id,
+    slug: id,
+    title: { en: title },
+    imageUrl: null,
+    parentId,
+    sortOrder,
+    items: [],
+  };
+}
+
+const flat = [
+  section("milk", 1, "dairy", "Milk"),
+  section("bakery", 1),
+  section("dairy", 0, null, "Dairy"),
+  section("cheese", 0, "dairy", "Cheese"),
+];
+
+describe("menuTree", () => {
+  it("puts sub-aisles under their aisle, each level in its own order", () => {
+    const tree = menuTree(flat);
+    expect(tree.map((aisle) => aisle.id)).toEqual(["dairy", "bakery"]);
+    expect(tree[0].subAisles.map((sub) => sub.id)).toEqual(["cheese", "milk"]);
+    expect(tree[1].subAisles).toEqual([]);
+  });
+
+  it("draws a sub-aisle whose aisle is missing as an aisle, not nowhere", () => {
+    const tree = menuTree([section("orphan", 0, "gone")]);
+    expect(tree.map((aisle) => aisle.id)).toEqual(["orphan"]);
+  });
+});
+
+describe("canHoldProducts", () => {
+  it("refuses a section that has sub-aisles, on any layout", () => {
+    expect(canHoldProducts(flat[2], flat, "list")).toBe(false);
+    expect(canHoldProducts(flat[2], flat, "aisles")).toBe(false);
+  });
+
+  it("refuses a bare aisle on an aisles shop, and allows it on a list one", () => {
+    expect(canHoldProducts(flat[1], flat, "aisles")).toBe(false);
+    expect(canHoldProducts(flat[1], flat, "list")).toBe(true);
+  });
+
+  it("allows a sub-aisle", () => {
+    expect(canHoldProducts(flat[0], flat, "aisles")).toBe(true);
+  });
+});
+
+describe("applySectionOrder", () => {
+  it("reorders one level and carries the rest of the menu through", () => {
+    const { next, updates } = applySectionOrder(flat, ["bakery", "dairy"]);
+    // Every section still there — the sub-aisles were not part of the drag.
+    expect(next.map((one) => one.id).sort()).toEqual(
+      ["bakery", "cheese", "dairy", "milk"].sort(),
+    );
+    expect(updates).toEqual([
+      { id: "bakery", sortOrder: 0 },
+      { id: "dairy", sortOrder: 1 },
+    ]);
+  });
+});
+
+describe("sectionPath", () => {
+  it("names a sub-aisle with its aisle in front", () => {
+    expect(sectionPath(flat[0], flat)).toEqual({ en: "Dairy › Milk" });
+  });
+
+  it("leaves an aisle's name as it is", () => {
+    expect(sectionPath(flat[2], flat)).toEqual({ en: "Dairy" });
   });
 });
