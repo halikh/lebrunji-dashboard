@@ -789,8 +789,7 @@ const en = {
     oneLevel: "Aisles go one level deep: an aisle, then its sub-aisles.",
     subAisleHoldsProducts:
       "This sub-aisle holds products, so on an aisles shop it cannot become an aisle of its own. Move it under another aisle instead.",
-    aisleArchived:
-      "Its aisle is archived. Restore the aisle first, then this.",
+    aisleArchived: "Its aisle is archived. Restore the aisle first, then this.",
     aisleHoldsSubAisles:
       "This aisle still holds sub-aisles. Move or archive them first.",
   },
@@ -1231,29 +1230,6 @@ const en = {
     // — so it says what to do, which is the same in all three cases. It reads
     // right on a legacy category opened without one, too.
     iconRequired: "Add an icon — every category needs one to be saved.",
-    // The card's look (`0164`). Automatic is the default: the app picks both
-    // from the category's id, so leaving them alone is a fine answer.
-    cardSection: "Card look",
-    cardSectionHint:
-      "The background and colour the app draws behind the icon. Automatic picks them for you.",
-    preset: "Background",
-    presetHint: "Automatic picks one from the category itself.",
-    presetHintNew: "Automatic picks one when the category is saved.",
-    presets: {
-      orbs: "Orbs",
-      wave: "Wave",
-      halo: "Halo",
-      blob: "Blob",
-      arc: "Arc",
-      petals: "Petals",
-    },
-    tint: "Colour",
-    tintHint:
-      "Only the shade is used, softened to the app's pastels — so a bright red becomes a soft blush.",
-    tintCustom: "Other…",
-    tintInvalid: "That colour is not a #RRGGBB hex.",
-    auto: "Automatic",
-    autoShort: "Auto",
     // Reached by a link to a category that has since been archived, or a
     // mistyped id. Says what happened rather than showing an empty form that
     // would create a *new* one on save.
