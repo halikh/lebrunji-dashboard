@@ -2587,8 +2587,9 @@ const en = {
     sectionTitleHint: "What customers see above the items in it.",
     // `menu_sections.image_url`, 0190 — read only by the Aisles layout.
     sectionImage: "Aisle picture",
+    // A sub-aisle's tile too, since its aisle's page shows them (0196).
     sectionImageHint:
-      "Shown on the aisle's tile when the shop's menu layout is Aisles. Without one, the aisle shows its first item's picture.",
+      "Shown on its tile when the shop's menu layout is Aisles — an aisle on the shop's page, a sub-aisle on its aisle's page. Without one, the tile shows its first item's picture.",
     sectionAdded: "{name} added",
     // The new name, not the old one: it is what the operator is looking at
     // in the list, and it confirms the edit landed as typed.
