@@ -93,6 +93,19 @@ const AUTOFILL_OFF = {
   "data-form-type": "other",
 };
 
+/**
+ * Open downward when the list fits below, upward when it does not.
+ *
+ * The library's default is always down, which at the foot of a modal put the
+ * list under the footer's buttons or past the bottom of the screen. `auto`
+ * measures the room below against the scroll parent and the viewport and flips
+ * when there is more above.
+ *
+ * Not portalled to `body` to escape the clip instead: the modals are native
+ * `<dialog>`s in the top layer, and anything outside them draws underneath.
+ */
+const MENU_PLACEMENT = "auto" as const;
+
 /** react-select's own input, marked so nothing fills it. */
 function NoAutofillInput<
   Option,
@@ -135,6 +148,7 @@ export function Select({
       placeholder={placeholder ?? ""}
       isDisabled={disabled}
       isClearable={isClearable}
+      menuPlacement={MENU_PLACEMENT}
       components={{ Input: NoAutofillInput }}
       // The library's own class names are not used; everything is `styles`
       // below. This only removes them from the DOM so nothing can accidentally
@@ -369,6 +383,7 @@ export function MultiSelect({
       // chosen makes selecting it a no-op, which reads as the click not having
       // registered.
       hideSelectedOptions
+      menuPlacement={MENU_PLACEMENT}
       components={{ Input: NoAutofillInput }}
       classNamePrefix=""
       formatOptionLabel={renderOption}
@@ -443,6 +458,7 @@ export function AsyncMultiSelect({
       noOptionsMessage={({ inputValue }) =>
         noOptionsMessage ? noOptionsMessage(inputValue) : null
       }
+      menuPlacement={MENU_PLACEMENT}
       components={{ Input: NoAutofillInput }}
       classNamePrefix=""
       formatOptionLabel={renderOption}
