@@ -156,6 +156,8 @@ export function StoreEditor() {
   const [otherCategoryIds, setOtherCategoryIds] = useState<string[]>([]);
   const [currencyCode, setCurrencyCode] = useState("");
   const [pin, setPin] = useState("");
+  /** The first branch's street address — optional, `0194`. */
+  const [address, setAddress] = useState<Localized>({});
   const [whatsapp, setWhatsapp] = useState("");
   // Off, like Visibility beside it. A shop with no menu, no hours and no pin is
   // not one to put at the top of the home screen — but an operator adding a
@@ -201,6 +203,7 @@ export function StoreEditor() {
     category?: string;
     currency?: string;
     pin?: string;
+    address?: string;
     prep?: string;
     whatsapp?: string;
     rate?: string;
@@ -222,6 +225,7 @@ export function StoreEditor() {
         otherCategoryIds,
         currencyCode,
         pin,
+        address,
         whatsapp,
         isFeatured,
         menuLayout,
@@ -238,6 +242,7 @@ export function StoreEditor() {
         otherCategoryIds: [],
         currencyCode: "",
         pin: "",
+        address: {},
         whatsapp: "",
         isFeatured: false,
         menuLayout: "list",
@@ -281,6 +286,9 @@ export function StoreEditor() {
    */
   function check() {
     const nameCheck = validateLocalizedText(name, codes, TEXT.name);
+    const addressCheck = validateLocalizedText(address, codes, TEXT.address, {
+      optional: true,
+    });
     const prepCheck = validatePrepWindow(Number(prepMin), Number(prepMax));
     const phone = validatePhone(digitsOf(whatsapp));
 
@@ -303,6 +311,9 @@ export function StoreEditor() {
           : located.reason === "shortened"
             ? t("store.pinShortened")
             : t("store.pinInvalid"),
+      address: addressCheck.ok
+        ? undefined
+        : t(addressCheck.key, addressCheck.params),
       prep: prepCheck.ok ? undefined : t(prepCheck.key, prepCheck.params),
       // Required, because a shop that is listed, takes orders and has nowhere
       // to send them is worse than one that cannot be added yet. A *wrong*
@@ -377,6 +388,7 @@ export function StoreEditor() {
       prepMinMinutes: Number(prepMin),
       prepMaxMinutes: Number(prepMax),
       whatsappPhone: whatsapp.trim() || null,
+      address,
       isFeatured,
       menuLayout,
       // Empty is null, which is what leaves the shop on the platform's rate —
@@ -476,6 +488,20 @@ export function StoreEditor() {
                   placeholder="33.8938, 35.5018"
                 />
               </Field>
+
+              <LocalizedField
+                label={t("branches.address")}
+                hint={t("branches.addressHint")}
+                value={address}
+                onChange={setAddress}
+                placeholder={{
+                  en: t("branches.addressPlaceholder"),
+                  ar: "شارع الحمرا، قرب بوابة الجامعة الأميركية",
+                }}
+                optional
+                error={errors.address}
+                maxLength={TEXT.address}
+              />
 
               <Field
                 label={t("store.whatsapp")}
@@ -862,5 +888,5 @@ type Step = 1 | 2 | 3;
  */
 const STEP_FIELDS = {
   1: ["name", "category", "currency", "rate"],
-  2: ["pin", "whatsapp", "prep"],
+  2: ["pin", "address", "whatsapp", "prep"],
 } as const;

@@ -22,6 +22,7 @@ import { parseLocation } from "@/lib/location";
 import { restatePrice } from "@/lib/money";
 import { digitsOf } from "@/lib/phone";
 import {
+  localizedOrNull,
   validateLocalizedText,
   validatePhone,
   validatePrepWindow,
@@ -174,6 +175,7 @@ function signature(store: Store, sole: Branch | null): string {
     sole?.id ?? null,
     sole?.latitude ?? null,
     sole?.longitude ?? null,
+    sole?.address ?? null,
     sole?.prepMinMinutes ?? null,
     sole?.prepMaxMinutes ?? null,
     sole?.whatsappPhone ?? null,
@@ -242,6 +244,8 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
   const [prepMin, setPrepMin] = useState(String(sole?.prepMinMinutes ?? 10));
   const [prepMax, setPrepMax] = useState(String(sole?.prepMaxMinutes ?? 20));
   const [whatsapp, setWhatsapp] = useState(sole?.whatsappPhone ?? "");
+  /** The branch's street address — `0194`, the branch editor's field. */
+  const [address, setAddress] = useState<Localized>(sole?.address ?? {});
   /**
    * Whether the one branch trades at all — the branch editor's Branch status.
    * A shop that is one place never shows that editor's switch anywhere else,
@@ -256,6 +260,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     name?: string;
     rate?: string;
     pin?: string;
+    address?: string;
     prep?: string;
     whatsapp?: string;
   }>({});
@@ -275,6 +280,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         menuLayout,
         rate,
         pin,
+        address,
         prepMin,
         prepMax,
         whatsapp,
@@ -296,6 +302,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         prepMin: String(sole?.prepMinMinutes ?? 10),
         prepMax: String(sole?.prepMaxMinutes ?? 20),
         whatsapp: sole?.whatsappPhone ?? "",
+        address: sole?.address ?? {},
         trading: sole?.isActive ?? true,
       },
     ),
@@ -405,6 +412,9 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
       ? validatePrepWindow(Number(prepMin), Number(prepMax))
       : null;
     const phoneCheck = sole ? validatePhone(digitsOf(whatsapp)) : null;
+    const addressCheck = sole
+      ? validateLocalizedText(address, codes, TEXT.address, { optional: true })
+      : null;
 
     const found = {
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
@@ -415,6 +425,10 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
       pin:
         sole && pin.trim() !== "" && !coordinates
           ? t("store.pinInvalid")
+          : undefined,
+      address:
+        addressCheck && !addressCheck.ok
+          ? t(addressCheck.key, addressCheck.params)
           : undefined,
       prep:
         prepCheck && !prepCheck.ok
@@ -533,8 +547,20 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     const phone = digitsOf(whatsapp) || null;
     const phoneMoved = phone !== sole.whatsappPhone;
     const tradingMoved = trading !== sole.isActive;
+    // Through `localizedOrNull` on both sides, so a box typed into and emptied
+    // again compares equal to the null it was.
+    const addressMoved =
+      JSON.stringify(localizedOrNull(address)) !==
+      JSON.stringify(localizedOrNull(sole.address));
 
-    if (nameMoved || pinMoved || prepMoved || phoneMoved || tradingMoved) {
+    if (
+      nameMoved ||
+      pinMoved ||
+      addressMoved ||
+      prepMoved ||
+      phoneMoved ||
+      tradingMoved
+    ) {
       updateBranch.mutate({
         id: sole.id,
         patch: {
@@ -547,6 +573,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
             prepMinMinutes: Number(prepMin),
             prepMaxMinutes: Number(prepMax),
           }),
+          ...(addressMoved && { address }),
           ...(phoneMoved && { whatsappPhone: phone }),
           ...(tradingMoved && { isActive: trading }),
         },
@@ -792,6 +819,20 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
                         inputMode="text"
                       />
                     </Field>
+
+                    <LocalizedField
+                      label={t("branches.address")}
+                      hint={t("branches.addressHint")}
+                      value={address}
+                      onChange={setAddress}
+                      placeholder={{
+                        en: t("branches.addressPlaceholder"),
+                        ar: "شارع الحمرا، قرب بوابة الجامعة الأميركية",
+                      }}
+                      optional
+                      error={errors.address}
+                      maxLength={TEXT.address}
+                    />
 
                     <Field
                       label={t("branches.whatsapp")}

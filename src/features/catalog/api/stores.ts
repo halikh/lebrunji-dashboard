@@ -3,7 +3,7 @@ import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
 import { digitsOf } from "@/lib/phone";
 import { titleLocalized } from "@/lib/text-format";
-import type { Localized } from "@/lib/validation";
+import { localizedOrNull, type Localized } from "@/lib/validation";
 
 import { createBranch } from "./branches";
 
@@ -321,6 +321,12 @@ export type StoreDraft = {
    * opens an empty chat. It can be filled in later on the details tab.
    */
   whatsappPhone?: string | null;
+  /**
+   * The first branch's street address — `0194`. Optional, like the branch
+   * editor's: it is written to the branch rather than the store, which has no
+   * such column. See `createStore`.
+   */
+  address?: Localized | null;
 };
 
 /**
@@ -413,6 +419,7 @@ export async function createStore(
 
   const id = data.id as string;
   await ensureFirstBranch(id, draft);
+  await addressFirstBranch(id, draft.address);
 
   // The extras, after the row: the trigger has already linked the main one,
   // and a link needs a shop to point at. Not a failure of the create if it
@@ -478,9 +485,7 @@ async function ensureFirstBranch(
         // to "Hamra" is the operator's first job on a shop that turns out to be
         // a chain.
         name: titleLocalized(draft.name),
-        // None — the shop form does not ask for one, and the branch's own
-        // editor is where it is written (0194).
-        address: null,
+        address: localizedOrNull(draft.address),
         latitude: draft.latitude,
         longitude: draft.longitude,
         prepMinMinutes: draft.prepMinMinutes,
@@ -503,6 +508,33 @@ async function ensureFirstBranch(
     );
   } catch {
     // Deliberately swallowed — see the note above.
+  }
+}
+
+/**
+ * The address the form asked for, on the branch `0121`'s trigger made.
+ *
+ * The trigger copies the store's columns and `stores` has no address, so the
+ * branch it writes has none — the form's answer has to follow it there. A shop
+ * made seconds ago has exactly one branch, so the store id finds it.
+ *
+ * Not a failure of the create if it fails, for the reason `ensureFirstBranch`
+ * gives: the shop exists, and the address can be typed again on Details.
+ */
+async function addressFirstBranch(
+  storeId: string,
+  address: Localized | null | undefined,
+): Promise<void> {
+  const value = localizedOrNull(address);
+  if (!value) return;
+  try {
+    await getClient()
+      .from("branches")
+      .update({ address: value })
+      .eq("store_id", storeId)
+      .is("deleted_at", null);
+  } catch {
+    // Deliberately swallowed — see above.
   }
 }
 
