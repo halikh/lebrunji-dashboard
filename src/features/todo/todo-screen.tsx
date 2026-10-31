@@ -13,6 +13,7 @@ import { t, type TranslationKey } from "@/i18n/translations";
 import type { Localized } from "@/lib/validation";
 
 import {
+  fetchBranchesWithoutAddress,
   fetchItemsWithoutImage,
   fetchStoresWithoutHours,
   fetchStoresWithoutImage,
@@ -25,15 +26,17 @@ const todoKeys = {
   storeImages: ["todo", "store-images"] as const,
   itemImages: ["todo", "item-images"] as const,
   hours: ["todo", "hours"] as const,
+  addresses: ["todo", "addresses"] as const,
 };
 
 /**
  * What is left to do before the catalogue looks finished.
  *
- * Three lists, each a row per thing with a link straight to where it is
+ * Four lists, each a row per thing with a link straight to where it is
  * fixed, so the page is worked *through* rather than read. Hours first: a shop
- * with no hours cannot be ordered from at all, where a missing picture only
- * looks unfinished.
+ * with no hours cannot be ordered from at all. Addresses next: required since
+ * `0198`, and the branches from before it are filled here before launch. A
+ * missing picture only looks unfinished.
  *
  * Refetched on every visit (`staleTime: 0`): this is the page somebody comes
  * back to after fixing three things, and a cached list still showing them
@@ -45,6 +48,11 @@ export function TodoScreen() {
   const hours = useQuery({
     queryKey: todoKeys.hours,
     queryFn: fetchStoresWithoutHours,
+    staleTime: 0,
+  });
+  const addresses = useQuery({
+    queryKey: todoKeys.addresses,
+    queryFn: fetchBranchesWithoutAddress,
     staleTime: 0,
   });
   const storeImages = useQuery({
@@ -73,6 +81,9 @@ export function TodoScreen() {
         !searching ||
         matches(term, row.storeName, ...row.branches.map((b) => b.name)),
     )
+    .sort((a, b) => Number(b.storeActive) - Number(a.storeActive));
+  const addressRows = (addresses.data?.rows ?? [])
+    .filter((row) => !searching || matches(term, row.storeName, row.branchName))
     .sort((a, b) => Number(b.storeActive) - Number(a.storeActive));
   const storeRows = (storeImages.data?.rows ?? [])
     .filter((row) => !searching || matches(term, row.name))
@@ -138,6 +149,36 @@ export function TodoScreen() {
                     : t("todo.hoursNone")
                 }
                 actionKey="todo.setHours"
+              />
+            ))}
+          </TodoSection>
+
+          <TodoSection
+            titleKey="todo.addressTitle"
+            bodyKey="todo.addressBody"
+            query={addresses}
+            count={addressRows.length}
+            doneKey="todo.addressDone"
+            searching={searching}
+          >
+            {addressRows.map((row) => (
+              <TodoRow
+                key={row.branchId}
+                // A one-branch shop's address is on its Details tab; a chain's
+                // branch has a page of its own.
+                href={
+                  row.branchCount > 1
+                    ? `/catalogue/${row.storeId}/branches/${row.branchId}`
+                    : `/catalogue/${row.storeId}?tab=details`
+                }
+                title={pickLocalized(row.storeName)}
+                hidden={!row.storeActive}
+                detail={
+                  row.branchCount > 1
+                    ? pickLocalized(row.branchName)
+                    : undefined
+                }
+                actionKey="todo.addAddress"
               />
             ))}
           </TodoSection>

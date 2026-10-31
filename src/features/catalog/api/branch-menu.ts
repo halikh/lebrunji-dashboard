@@ -170,8 +170,12 @@ export async function setItemHidden(
  * The way out is on this screen — turn the question off here, or the dish —
  * which the database's sentence cannot name.
  */
-function branchMenuError(error: { message: string; code?: string | null }): Error {
-  if (error.code === "NOCHO") return new Error(t("branchMenu.lastChoiceRefused"));
+function branchMenuError(error: {
+  message: string;
+  code?: string | null;
+}): Error {
+  if (error.code === "NOCHO")
+    return new Error(t("branchMenu.lastChoiceRefused"));
   return new Error(error.message);
 }
 

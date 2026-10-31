@@ -322,9 +322,9 @@ export type StoreDraft = {
    */
   whatsappPhone?: string | null;
   /**
-   * The first branch's street address — `0194`. Optional, like the branch
-   * editor's: it is written to the branch rather than the store, which has no
-   * such column. See `createStore`.
+   * The first branch's street address — `0194`, required since `0198`, as in
+   * the branch editor. Written to the branch rather than the store, which has
+   * no such column. See `createStore`.
    */
   address?: Localized | null;
 };

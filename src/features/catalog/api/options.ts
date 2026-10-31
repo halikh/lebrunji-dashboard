@@ -715,7 +715,9 @@ async function questionIdsMatching(
     throw new Error(`Could not search the questions: ${byTitle.error.message}`);
   }
   if (byChoice.error) {
-    throw new Error(`Could not search the questions: ${byChoice.error.message}`);
+    throw new Error(
+      `Could not search the questions: ${byChoice.error.message}`,
+    );
   }
 
   const ids = new Set<string>();

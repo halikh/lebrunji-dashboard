@@ -90,6 +90,11 @@ const en = {
     hoursBranches: "{count} of {total} branches have no hours: {names}",
     hoursDone: "Every shop has its opening hours.",
     setHours: "Set hours",
+    addressTitle: "Branches without an address",
+    addressBody:
+      "Every branch needs one before launch: the app prints it under the shop's name.",
+    addressDone: "Every branch has its address.",
+    addAddress: "Add address",
     storeImagesTitle: "Shops without a picture",
     storeImagesBody: "The picture is the shop's card in the app.",
     storeImagesDone: "Every shop has a picture.",
@@ -2704,11 +2709,11 @@ const en = {
     // The place, not the brand — the shop's name is already above.
     nameHint: "The area or street, not the shop's name.",
     namePlaceholder: "Hamra",
-    // Optional (0194). Printed under the shop in the app, so the hint says
+    // Required since 0198. Printed under the shop in the app, so the hint says
     // where it shows rather than repeating the label.
     address: "Address",
-    addressHint:
-      "A short street address the app shows under the shop. Leave empty if the name says it.",
+    addressHint: "A short street address the app shows under the shop.",
+    addressRequired: "Every branch needs its address, in English at least.",
     addressPlaceholder: "Hamra St., near the AUB gate",
     pin: "Where it is",
     pinHint:

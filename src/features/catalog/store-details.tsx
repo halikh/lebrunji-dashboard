@@ -413,7 +413,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
       : null;
     const phoneCheck = sole ? validatePhone(digitsOf(whatsapp)) : null;
     const addressCheck = sole
-      ? validateLocalizedText(address, codes, TEXT.address, { optional: true })
+      ? validateLocalizedText(address, codes, TEXT.address)
       : null;
 
     const found = {

@@ -39,6 +39,17 @@ export type HoursTodo = {
   branchCount: number;
 };
 
+/** A live branch with no street address (required since `0198`). */
+export type AddressTodo = {
+  branchId: string;
+  branchName: Localized;
+  storeId: string;
+  storeName: Localized;
+  storeActive: boolean;
+  /** How many live branches the shop has: one is edited on the shop's Details. */
+  branchCount: number;
+};
+
 export type TodoList<T> = { rows: T[]; truncated: boolean };
 
 /** Live shops with no picture. */
@@ -170,6 +181,61 @@ export async function fetchStoresWithoutHours(): Promise<TodoList<HoursTodo>> {
     rows: [...byStore.values()].filter((entry) => entry.branches.length > 0),
     truncated: rows.length > PAGE.cap,
   };
+}
+
+/**
+ * Live branches with no address in English — the language every reader falls
+ * back to, and the one `0198` requires.
+ *
+ * Every live branch is read rather than filtering on `address is null`, because
+ * `{"ar": …}` alone is as missing as nothing, and because a one-branch shop is
+ * fixed on a different page than a chain's branch — so the count is needed.
+ */
+export async function fetchBranchesWithoutAddress(): Promise<
+  TodoList<AddressTodo>
+> {
+  const { data, error } = await getClient()
+    .from("branches")
+    .select(
+      `id, name, address, store_id,
+       stores!inner ( id, name, is_active, deleted_at )`,
+    )
+    .is("deleted_at", null)
+    .is("stores.deleted_at", null)
+    .order("store_id", { ascending: true })
+    .order("sort_order", { ascending: true })
+    .limit(PAGE.cap + 1);
+
+  if (error) throw new Error(`Could not read branches: ${error.message}`);
+  const rows = data ?? [];
+
+  const counts = new Map<string, number>();
+  for (const row of rows.slice(0, PAGE.cap)) {
+    const storeId = row.store_id as string;
+    counts.set(storeId, (counts.get(storeId) ?? 0) + 1);
+  }
+
+  const missing: AddressTodo[] = [];
+  for (const row of rows.slice(0, PAGE.cap)) {
+    const store = one(row.stores) as {
+      id: string;
+      name: Localized | null;
+      is_active: boolean;
+    } | null;
+    if (!store) continue;
+    const address = row.address as Localized | null;
+    if ((address?.en ?? "").trim().length > 0) continue;
+    missing.push({
+      branchId: row.id as string,
+      branchName: (row.name as Localized) ?? {},
+      storeId: store.id,
+      storeName: store.name ?? {},
+      storeActive: store.is_active,
+      branchCount: counts.get(store.id) ?? 1,
+    });
+  }
+
+  return { rows: missing, truncated: rows.length > PAGE.cap };
 }
 
 /** PostgREST hands back a to-one embed as an object, or as a one-row array. */

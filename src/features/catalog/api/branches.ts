@@ -49,9 +49,11 @@ export type Branch = {
    * A short street address — "Hamra St., near the AUB gate" — which the app
    * prints under the shop (`0194`).
    *
-   * Optional, unlike the name: most branches have none yet, and a card with no
-   * address line is the card it was before. Null when blank, never `{}` — the
-   * same encoding `localizedOrNull` gives every optional translated column.
+   * Required in English since `0198` — the forms ask for it and a trigger
+   * refuses a branch without it. Still typed nullable: the branches from before
+   * `0198` have none until the To do page's list is worked through, and the
+   * first branch of a new shop has none for the moment between the database
+   * making it and `addressFirstBranch` writing it. Null when blank, never `{}`.
    */
   address: Localized | null;
   /**
@@ -441,5 +443,7 @@ function friendly(message: string): string {
   if (message.includes("prep")) return t("store.prepBackwards");
   if (message.includes("whatsapp")) return t("validation.phone");
   if (message.includes("pin_whole")) return t("branches.pinHalf");
+  if (message.includes("needs its address"))
+    return t("branches.addressRequired");
   return message;
 }

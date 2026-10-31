@@ -229,9 +229,8 @@ function BranchEditor({
     const max = Number(prepMax);
 
     const nameCheck = validateLocalizedText(name, codes, TEXT.name);
-    const addressCheck = validateLocalizedText(address, codes, TEXT.address, {
-      optional: true,
-    });
+    // Required since 0198: the app prints it under every shop's name.
+    const addressCheck = validateLocalizedText(address, codes, TEXT.address);
     const prepCheck = validatePrepWindow(min, max);
     const phoneCheck = validatePhone(digitsOf(whatsapp));
 

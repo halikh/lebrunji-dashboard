@@ -156,7 +156,7 @@ export function StoreEditor() {
   const [otherCategoryIds, setOtherCategoryIds] = useState<string[]>([]);
   const [currencyCode, setCurrencyCode] = useState("");
   const [pin, setPin] = useState("");
-  /** The first branch's street address — optional, `0194`. */
+  /** The first branch's street address — `0194`, required since `0198`. */
   const [address, setAddress] = useState<Localized>({});
   const [whatsapp, setWhatsapp] = useState("");
   // Off, like Visibility beside it. A shop with no menu, no hours and no pin is
@@ -286,9 +286,8 @@ export function StoreEditor() {
    */
   function check() {
     const nameCheck = validateLocalizedText(name, codes, TEXT.name);
-    const addressCheck = validateLocalizedText(address, codes, TEXT.address, {
-      optional: true,
-    });
+    // Required since 0198: the app prints it under every shop's name.
+    const addressCheck = validateLocalizedText(address, codes, TEXT.address);
     const prepCheck = validatePrepWindow(Number(prepMin), Number(prepMax));
     const phone = validatePhone(digitsOf(whatsapp));
 

@@ -372,11 +372,12 @@ async function writeScopes(
     p_discount_id: discountId,
     // Deduplicated: the unique index would refuse a repeat, and the form can
     // produce one if a target is picked twice.
-    p_scopes: [...new Map(scopes.map((scope) => [keyOf(scope), scope])).values()]
-      .map((scope) => ({
-        scope_type: scope.scopeType,
-        target_id: scope.targetId,
-      })),
+    p_scopes: [
+      ...new Map(scopes.map((scope) => [keyOf(scope), scope])).values(),
+    ].map((scope) => ({
+      scope_type: scope.scopeType,
+      target_id: scope.targetId,
+    })),
   });
 
   if (!rpcError) return;
