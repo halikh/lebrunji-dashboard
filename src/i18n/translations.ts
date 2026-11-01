@@ -2105,10 +2105,23 @@ const en = {
     sameShop: "Every dish in a bundle must come from the bundle's shop.",
     noNesting: "A bundle can't contain another bundle.",
     dishTwice: "A dish is listed twice. Set its quantity instead.",
+    choicesSection: "Choices",
+    questions: "Questions it asks",
+    questionsHint:
+      "Asked when a customer adds the bundle, like a dish's options. An answer's extra price is added to the bundle price.",
+    questionsPlaceholder: "None, it's added as it is",
+    questionRequired: "Required",
+    questionOptional: "Optional",
+    questionsManage: "Write or edit questions in this shop's Options tab",
     priceSection: "Price",
     price: "Bundle price",
     priceHint: "What the customer pays for the whole bundle, in {code}.",
     pricePositive: "The bundle needs a price above zero.",
+    originalPrice: "Original price",
+    originalPriceHint:
+      "What the dishes cost bought separately. The app shows it struck through next to the bundle price.",
+    originalPriceSaving: "Customers save {saving} ({percent}%)",
+    originalPriceEmpty: "Add dishes to see it",
     branchPrices: "Price at each branch",
     branchPricesHint: "Leave blank to charge the bundle price above.",
     branchPriceOf: "Price at {name}",
@@ -2149,7 +2162,6 @@ const en = {
     pickPage: "Choose a page",
     pages: {
       home: "Home",
-      search: "Search",
       cart: "Basket",
       orders: "Orders",
       account: "Account",
@@ -2171,10 +2183,21 @@ const en = {
   },
 
   artworks: {
+    subject: "Advertises",
+    subjectHint:
+      "A picture can advertise a promotion or a bundle, not both. Either way it runs on that deal's dates.",
+    subjects: {
+      none: "Nothing, artwork only",
+      promotion: "A promotion",
+      bundle: "A bundle",
+    },
+    pickPromotion: "Choose the promotion this picture advertises.",
+    pickBundle: "Choose the bundle this picture advertises.",
+    pickPromotionPlaceholder: "Choose a promotion",
+    pickBundlePlaceholder: "Choose a bundle",
     bundle: "Linked bundle",
     bundleHint:
       "Or advertise a bundle: the picture shows while the bundle is on offer, and a tap opens the shop's bundles.",
-    noBundle: "None",
     archivedBundleOption: "{name} (archived)",
     linkedToBundle: "Bundle: {name}",
     runsOnBundle: "Runs on its bundle's dates: {window}.",
@@ -2247,7 +2270,6 @@ const en = {
     promotion: "Linked promotion",
     promotionHint:
       "A linked picture is shown only while its promotion is live, and on shop pages only where the promotion applies. Artwork only is always shown within its own dates.",
-    noPromotion: "None — artwork only",
     archivedPromotionOption: "{slug} (archived)",
     promotionGone: "That promotion no longer exists. Choose another, or none.",
     linkedTo: "Linked to {slug}",
@@ -2263,7 +2285,6 @@ const en = {
     // app's own order. Named for what the customer sees, not the route.
     placements: {
       home: "Home",
-      search: "Search",
       category: "Category page",
       store: "Shop page",
       item: "Dish page",
@@ -2280,7 +2301,6 @@ const en = {
     },
     placementsHint: {
       home: "Near the top, to everyone.",
-      search: "On the search screen, before and while a customer searches.",
       category: "On a category's page, above its shops.",
       store:
         "On shop pages — the shops chosen below, or every shop when none are. A linked picture also only where its promotion applies.",

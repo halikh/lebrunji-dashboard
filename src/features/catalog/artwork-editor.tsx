@@ -40,6 +40,9 @@ import { useStores } from "./use-stores";
 
 const LIST_HREF = "/catalogue?tab=artworks";
 
+/** What a picture advertises — `artworks.discount_id`, `bundle_id`, or neither. */
+type Subject = "none" | "promotion" | "bundle";
+
 /**
  * One picture, on a page of its own — the same shape as `PromotionEditor`,
  * which is where most of these fields lived until `0129`.
@@ -170,6 +173,14 @@ function Form({
   const [placements, setPlacements] = useState<Placement[]>(start.placements);
   const [discountId, setDiscountId] = useState<string | null>(start.discountId);
   const [bundleId, setBundleId] = useState<string | null>(start.bundleId);
+  /**
+   * What the picture advertises: nothing, a promotion, or a bundle — one
+   * question with one answer, because the table takes one
+   * (`artworks_one_subject`). The picker for the answer follows it.
+   */
+  const [subject, setSubject] = useState<Subject>(
+    start.discountId ? "promotion" : start.bundleId ? "bundle" : "none",
+  );
   /** A picture tied to a deal — a promotion or a bundle — runs on its dates. */
   const linkedDeal = Boolean(discountId || bundleId);
   const [startsAt, setStartsAt] = useState<string | null>(start.startsAt);
@@ -197,6 +208,7 @@ function Form({
   );
 
   const [errors, setErrors] = useState<{
+    subject?: string;
     image?: string;
     window?: string;
     link?: string;
@@ -218,7 +230,6 @@ function Form({
 
   /** The live bundles, plus the one it points at if archived since. */
   const bundleOptions = [
-    { value: "", label: t("artworks.noBundle") },
     ...(bundles.data ?? []).map((one) => ({
       value: one.id,
       label: pickLocalized(one.name),
@@ -245,7 +256,6 @@ function Form({
    * show nothing and saving would look like it unlinks the picture.
    */
   const options = [
-    { value: "", label: t("artworks.noPromotion") },
     ...(promotions.data ?? []).map((promotion) => ({
       value: promotion.id,
       label: promotion.slug,
@@ -282,10 +292,17 @@ function Form({
           ? t("artworks.windowBackwards")
           : undefined,
       link: missingTarget(link) ? t("links.targetRequired") : undefined,
+      // "A promotion" with none chosen is not "nothing" — said, not guessed.
+      subject:
+        subject === "promotion" && !discountId
+          ? t("artworks.pickPromotion")
+          : subject === "bundle" && !bundleId
+            ? t("artworks.pickBundle")
+            : undefined,
     };
 
     setErrors(found);
-    if (found.image || found.window || found.link || !imageUrl) return;
+    if (found.image || found.window || found.link || found.subject || !imageUrl) return;
 
     onSave({
       format,
@@ -443,37 +460,58 @@ function Form({
 
         <aside className="flex min-w-0 flex-col gap-lg lg:sticky lg:top-0">
           <FormSection title={t("artworks.whenSection")}>
-            {/* The promotion leads this card because it decides the rest of
-                it: a linked picture runs on the promotion's dates. */}
-            <Field
-              label={t("artworks.promotion")}
-              hint={t("artworks.promotionHint")}
-            >
+            {/* What it advertises leads this card because it decides the rest
+                of it: a picture tied to a promotion or a bundle runs on that
+                deal's dates. One answer — never both (`artworks_one_subject`). */}
+            <Field label={t("artworks.subject")} hint={t("artworks.subjectHint")}>
               <Select
-                value={discountId ?? ""}
+                value={subject}
                 onChange={(next) => {
-                  setDiscountId(next === "" ? null : next);
-                  // One deal per picture — `artworks_one_subject`.
-                  if (next !== "") setBundleId(null);
+                  setSubject(next as Subject);
+                  // Switching what it advertises lets go of the old one.
+                  setDiscountId(null);
+                  setBundleId(null);
+                  setErrors((current) => ({ ...current, subject: undefined }));
                 }}
-                options={options}
-                disabled={pending || !promotions.isSuccess}
+                options={(["none", "promotion", "bundle"] as Subject[]).map((value) => ({
+                  value,
+                  label: t(`artworks.subjects.${value}`),
+                }))}
+                disabled={pending}
               />
             </Field>
 
-            {/* Or a bundle (`0204`): the picture is shown while the bundle is
-                on offer, and a tap opens that shop's bundles. */}
-            <Field label={t("artworks.bundle")} hint={t("artworks.bundleHint")}>
-              <Select
-                value={bundleId ?? ""}
-                onChange={(next) => {
-                  setBundleId(next === "" ? null : next);
-                  if (next !== "") setDiscountId(null);
-                }}
-                options={bundleOptions}
-                disabled={pending || !bundles.isSuccess}
-              />
-            </Field>
+            {subject === "promotion" && (
+              <Field
+                label={t("artworks.promotion")}
+                hint={t("artworks.promotionHint")}
+                error={errors.subject}
+              >
+                <Select
+                  value={discountId ?? ""}
+                  onChange={(next) => setDiscountId(next === "" ? null : next)}
+                  options={options}
+                  placeholder={t("artworks.pickPromotionPlaceholder")}
+                  disabled={pending || !promotions.isSuccess}
+                />
+              </Field>
+            )}
+
+            {subject === "bundle" && (
+              <Field
+                label={t("artworks.bundle")}
+                hint={t("artworks.bundleHint")}
+                error={errors.subject}
+              >
+                <Select
+                  value={bundleId ?? ""}
+                  onChange={(next) => setBundleId(next === "" ? null : next)}
+                  options={bundleOptions}
+                  placeholder={t("artworks.pickBundlePlaceholder")}
+                  disabled={pending || !bundles.isSuccess}
+                />
+              </Field>
+            )}
 
             {/* A linked picture has no dates of its own (`0136`) — it runs on
                 its promotion's, said here in place of the two fields. */}

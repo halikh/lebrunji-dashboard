@@ -17,10 +17,12 @@ export const LINK_KINDS = ["store", "category", "tab", "page"] as const;
 
 export type LinkKind = (typeof LINK_KINDS)[number];
 
-/** The tab-bar screens `link_page` may name when the kind is `tab`. */
+/**
+ * The tab-bar screens `link_page` may name when the kind is `tab`. No
+ * `search` since `0205` — the app's Search tab was deleted.
+ */
 export const TAB_PAGES = [
   "home",
-  "search",
   "cart",
   "orders",
   "account",

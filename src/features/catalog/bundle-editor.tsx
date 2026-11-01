@@ -15,7 +15,12 @@ import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
-import { AsyncMultiSelect, Select, type SelectOption } from "@/components/ui/select";
+import {
+  AsyncMultiSelect,
+  MultiSelect,
+  Select,
+  type SelectOption,
+} from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
@@ -33,6 +38,7 @@ import {
   type BundleDraft,
   type BundleItem,
 } from "./api/bundles";
+import { fetchStoreQuestions, type StoreQuestion } from "./api/options";
 import { useArtworks } from "./use-artworks";
 import { useBranches } from "./use-branches";
 import {
@@ -41,6 +47,7 @@ import {
   useCreateBundle,
   useUpdateBundle,
 } from "./use-bundles";
+import { optionKeys } from "./use-options";
 import { useStores } from "./use-stores";
 
 const LIST_HREF = "/catalogue?tab=bundles";
@@ -108,16 +115,16 @@ export function BundleEditor({ id }: { id: string | null }) {
       initial={initial ?? undefined}
       initialBranchPrices={branchPrices.data ?? {}}
       pending={create.isPending || update.isPending}
-      onSave={(draft, changes) => {
+      onSave={(draft, changes, questions) => {
         const done = (focusId: string | null) => back(focusId);
         if (initial) {
           update.mutate(
-            { id: initial.id, draft, branchPrices: changes },
+            { id: initial.id, draft, branchPrices: changes, questions },
             { onSuccess: () => done(initial.id) },
           );
         } else {
           create.mutate(
-            { draft, sortOrder: rows.length, branchPrices: changes },
+            { draft, sortOrder: rows.length, branchPrices: changes, questions },
             { onSuccess: (newId) => done(newId) },
           );
         }
@@ -137,7 +144,11 @@ function Form({
   initial?: Bundle;
   initialBranchPrices: Record<string, number>;
   pending: boolean;
-  onSave: (draft: BundleDraft, branchPrices: Record<string, number | null>) => void;
+  onSave: (
+    draft: BundleDraft,
+    branchPrices: Record<string, number | null>,
+    questions: { wanted: string[]; current: string[] } | null,
+  ) => void;
   onCancel: () => void;
 }) {
   const { format, decimalsOf } = useMoney();
@@ -150,27 +161,67 @@ function Form({
   const [description, setDescription] = useState<Localized>(
     initial?.description ?? {},
   );
-  const [imageUrl, setImageUrl] = useState<string | null>(initial?.imageUrl ?? null);
-  const [price, setPrice] = useState<number | null>(initial ? initial.price : null);
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    initial?.imageUrl ?? null,
+  );
+  const [price, setPrice] = useState<number | null>(
+    initial ? initial.price : null,
+  );
   const [items, setItems] = useState<BundleItem[]>(initial?.items ?? []);
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
-  const [startsAt, setStartsAt] = useState<string | null>(initial?.startsAt ?? null);
+  const [startsAt, setStartsAt] = useState<string | null>(
+    initial?.startsAt ?? null,
+  );
   const [endsAt, setEndsAt] = useState<string | null>(initial?.endsAt ?? null);
   /** Per branch: a figure, or `null` for "the bundle's own price". */
   const [branchPrices, setBranchPrices] =
     useState<Record<string, number | null>>(initialBranchPrices);
 
-  const store = (stores.data?.stores ?? []).find((one) => one.id === storeId) ?? null;
+  const store =
+    (stores.data?.stores ?? []).find((one) => one.id === storeId) ?? null;
   const currencyCode = store?.currencyCode ?? initial?.currencyCode ?? "";
   const decimals = currencyCode ? decimalsOf(currencyCode) : null;
   const branches = useBranches(storeId);
+
+  /**
+   * The shop's questions — "Pick your drink", "Make it large" — written once in
+   * its Options tab and asked by any dish, or bundle, that links them. Read
+   * only once a shop is chosen; the key is the Options tab's, so a question
+   * written there shows here without a reload.
+   */
+  const questions = useQuery({
+    queryKey: [...optionKeys.counts(storeId), "questions", ""],
+    queryFn: () => fetchStoreQuestions(storeId),
+    enabled: Boolean(storeId),
+  });
+  /** The questions this bundle asks as saved — read off each question's items. */
+  const savedQuestionIds = initial
+    ? (questions.data ?? [])
+        .filter((question) => question.itemIds.includes(initial.id))
+        .map((question) => question.id)
+    : [];
+  /** `null` until the operator changes it: then the saved list is still the answer. */
+  const [pickedQuestionIds, setPickedQuestionIds] = useState<string[] | null>(
+    null,
+  );
+  const questionIds = pickedQuestionIds ?? savedQuestionIds;
+  const chosenQuestions = questionIds.flatMap((questionId) => {
+    const found = (questions.data ?? []).find(
+      (question) => question.id === questionId,
+    );
+    return found ? [found] : [];
+  });
+  const money = (minor: number) =>
+    currencyCode ? format(minor, currencyCode) : String(minor);
 
   /** Prices of dishes seen in the picker, so a new pick arrives with its own. */
   const seenPrices = useRef(new Map<string, number>());
 
   const artworks = useArtworks();
   const linked = initial
-    ? (artworks.data ?? []).filter((artwork) => artwork.bundle?.id === initial.id)
+    ? (artworks.data ?? []).filter(
+        (artwork) => artwork.bundle?.id === initial.id,
+      )
     : [];
 
   useUnsavedChanges(
@@ -186,6 +237,7 @@ function Form({
         startsAt,
         endsAt,
         branchPrices,
+        questionIds,
       },
       {
         storeId: initial?.storeId ?? "",
@@ -193,11 +245,15 @@ function Form({
         description: initial?.description ?? {},
         imageUrl: initial?.imageUrl ?? null,
         price: initial ? initial.price : null,
-        items: (initial?.items ?? []).map((item) => [item.menuItemId, item.quantity]),
+        items: (initial?.items ?? []).map((item) => [
+          item.menuItemId,
+          item.quantity,
+        ]),
         isActive: initial?.isActive ?? true,
         startsAt: initial?.startsAt ?? null,
         endsAt: initial?.endsAt ?? null,
         branchPrices: initialBranchPrices,
+        questionIds: savedQuestionIds,
       },
     ),
   );
@@ -233,7 +289,13 @@ function Form({
     };
 
     setErrors(found);
-    if (found.store || found.name || found.items || found.price || found.window) {
+    if (
+      found.store ||
+      found.name ||
+      found.items ||
+      found.price ||
+      found.window
+    ) {
       return;
     }
 
@@ -261,6 +323,10 @@ function Form({
         })),
       },
       changes,
+      // Only once the operator has touched the list; untouched, nothing moves.
+      pickedQuestionIds === null
+        ? null
+        : { wanted: pickedQuestionIds, current: savedQuestionIds },
     );
   }
 
@@ -287,7 +353,9 @@ function Form({
             <FieldPair>
               <Field
                 label={t("bundles.store")}
-                hint={initial ? t("bundles.storeLocked") : t("bundles.storeHint")}
+                hint={
+                  initial ? t("bundles.storeLocked") : t("bundles.storeHint")
+                }
                 error={errors.store}
               >
                 <Select
@@ -297,6 +365,8 @@ function Form({
                     // Another shop's dishes cannot be in it — `bundle_items_same_store`.
                     setItems([]);
                     setBranchPrices({});
+                    // Questions are a shop's too.
+                    setPickedQuestionIds([]);
                   }}
                   options={(stores.data?.stores ?? []).map((one) => ({
                     value: one.id,
@@ -366,7 +436,9 @@ function Form({
                   setItems((current) =>
                     next.map(
                       (option) =>
-                        current.find((item) => item.menuItemId === option.value) ?? {
+                        current.find(
+                          (item) => item.menuItemId === option.value,
+                        ) ?? {
                           menuItemId: option.value,
                           label: option.label,
                           price: seenPrices.current.get(option.value) ?? 0,
@@ -378,8 +450,12 @@ function Form({
                 loadOptions={async (input) => {
                   if (!storeId) return [];
                   const found = await searchBundleDishes(input, storeId);
-                  for (const dish of found) seenPrices.current.set(dish.id, dish.price);
-                  return found.map((dish) => ({ value: dish.id, label: dish.label }));
+                  for (const dish of found)
+                    seenPrices.current.set(dish.id, dish.price);
+                  return found.map((dish) => ({
+                    value: dish.id,
+                    label: dish.label,
+                  }));
                 }}
                 placeholder={t("bundles.pickDishesPlaceholder")}
                 disabled={pending || !storeId}
@@ -408,7 +484,9 @@ function Form({
                     </span>
                     <div className="w-[88px] shrink-0">
                       <NumberInput
-                        aria-label={t("bundles.quantityOf", { name: item.label })}
+                        aria-label={t("bundles.quantityOf", {
+                          name: item.label,
+                        })}
                         min={1}
                         max={MAX_QUANTITY}
                         step={1}
@@ -416,7 +494,10 @@ function Form({
                         onChange={(event) => {
                           const next = Math.min(
                             MAX_QUANTITY,
-                            Math.max(1, Math.round(Number(event.target.value) || 1)),
+                            Math.max(
+                              1,
+                              Math.round(Number(event.target.value) || 1),
+                            ),
                           );
                           setItems((current) =>
                             current.map((one) =>
@@ -434,6 +515,68 @@ function Form({
             )}
           </FormSection>
 
+          {/* Choices the customer makes when adding it — "Pick your drink".
+              The shop's own questions, the ones its dishes ask: a bundle asks
+              them the same way, and an answer's price is added to the bundle's
+              (user, 2026-11-02). Written and edited in the Options tab. */}
+          <FormSection title={t("bundles.choicesSection")}>
+            <Field
+              label={t("bundles.questions")}
+              hint={t("bundles.questionsHint")}
+            >
+              <MultiSelect
+                value={questionIds}
+                onChange={setPickedQuestionIds}
+                placeholder={
+                  storeId
+                    ? t("bundles.questionsPlaceholder")
+                    : t("bundles.pickShopFirst")
+                }
+                disabled={pending || !storeId || !questions.isSuccess}
+                options={(questions.data ?? [])
+                  .filter((question) => question.isActive)
+                  .map((question) => ({
+                    value: question.id,
+                    label: pickLocalized(question.title),
+                    detail: describeChoices(question, money),
+                  }))}
+              />
+            </Field>
+
+            {chosenQuestions.length > 0 && (
+              <ul className="flex flex-col gap-xs">
+                {chosenQuestions.map((question) => (
+                  <li
+                    key={question.id}
+                    className="flex flex-col gap-xxs rounded-md bg-neutral-fill px-lg py-sm"
+                  >
+                    <span className="text-[14px] font-medium">
+                      {pickLocalized(question.title)}
+                      <span className="font-normal text-text-faint">
+                        {" · "}
+                        {question.minSelections > 0
+                          ? t("bundles.questionRequired")
+                          : t("bundles.questionOptional")}
+                      </span>
+                    </span>
+                    <span className="text-[13px] text-text-soft">
+                      {describeChoices(question, money)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {storeId && (
+              <Link
+                href={`/catalogue/${storeId}?tab=options`}
+                className="self-start text-[13px] font-semibold text-primary underline-offset-2 hover:underline"
+              >
+                {t("bundles.questionsManage")}
+              </Link>
+            )}
+          </FormSection>
+
           <FormSection title={t("bundles.priceSection")}>
             <FieldPair>
               <Field
@@ -446,6 +589,38 @@ function Form({
                   onChange={setPrice}
                   decimalDigits={decimals}
                 />
+              </Field>
+
+              {/* What the dishes cost one by one — the figure the app strikes
+                  through beside the bundle's price. Read, not typed: it is the
+                  sum of the dishes above at their brand prices. Drawn as a
+                  tinted line rather than a box, so it does not look like one
+                  more field to fill in. */}
+              <Field
+                label={t("bundles.originalPrice")}
+                hint={t("bundles.originalPriceHint")}
+              >
+                <p className="flex min-h-[44px] items-center gap-sm rounded-md bg-neutral-fill px-lg text-[14px]">
+                  {currencyCode && items.length > 0 ? (
+                    <>
+                      <span className="font-semibold tabular-nums text-text">
+                        {format(separately, currencyCode)}
+                      </span>
+                      {price !== null && saving > 0 && (
+                        <span className="text-[13px] font-medium text-accent-deep">
+                          {t("bundles.originalPriceSaving", {
+                            saving: format(saving, currencyCode),
+                            percent: Math.floor((saving / separately) * 100),
+                          })}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-text-faint">
+                      {t("bundles.originalPriceEmpty")}
+                    </span>
+                  )}
+                </p>
               </Field>
             </FieldPair>
 
@@ -492,7 +667,10 @@ function Form({
 
           <FormSection title={t("bundles.whenSection")}>
             <FieldPair>
-              <Field label={t("bundles.startsAt")} hint={t("bundles.startsHint")}>
+              <Field
+                label={t("bundles.startsAt")}
+                hint={t("bundles.startsHint")}
+              >
                 <DateField value={startsAt} onChange={setStartsAt} />
               </Field>
               <Field
@@ -532,7 +710,9 @@ function Form({
             <span className="text-[14px] font-semibold text-text">
               {t("bundles.artworkTitle")}
             </span>
-            <p className="text-[13px] text-text-soft">{t("bundles.artworkBody")}</p>
+            <p className="text-[13px] text-text-soft">
+              {t("bundles.artworkBody")}
+            </p>
             {linked.length > 0 ? (
               <ul className="flex flex-col gap-sm">
                 {linked.map((artwork) => {
@@ -578,4 +758,19 @@ function Form({
       </div>
     </EditorPage>
   );
+}
+
+/** "Pepsi, 7-Up +$0.50, Miranda" — a question's live answers, extras priced. */
+function describeChoices(
+  question: StoreQuestion,
+  money: (minor: number) => string,
+): string {
+  return question.choices
+    .filter((choice) => choice.isActive)
+    .map((choice) =>
+      choice.price > 0
+        ? `${pickLocalized(choice.name)} +${money(choice.price)}`
+        : pickLocalized(choice.name),
+    )
+    .join(", ");
 }
