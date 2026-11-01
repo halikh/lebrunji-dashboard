@@ -321,22 +321,13 @@ function Row({
   );
 }
 
-/** "20% off · over $25 · first order" — what the promotion does, in one line. */
+/** "Free delivery · over $25 · first order" — what the promotion does, in one line. */
 function describeDiscount(
   promotion: Promotion,
   format: (minorUnits: number, code: string) => string,
   code: string,
 ): string {
-  const amount =
-    promotion.kind === "percentage"
-      ? t("promotions.summaryPercent", { value: promotion.value })
-      : promotion.kind === "fixedAmount"
-        ? t("promotions.summaryFixed", {
-            amount: format(promotion.value, code),
-          })
-        : t("promotions.summaryFreeDelivery");
-
-  const parts = [amount];
+  const parts = [t("promotions.summaryFreeDelivery")];
   if (promotion.minSubtotal) {
     parts.push(
       t("promotions.summaryOver", {

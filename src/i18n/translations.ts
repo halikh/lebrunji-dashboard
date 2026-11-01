@@ -751,9 +751,6 @@ const en = {
     bandTooBig: "At most {max} km.",
     twoDecimals: "At most two decimal places.",
     bandDuplicate: "There is already a band ending at that distance.",
-    valueRequired: "Enter a value.",
-    discountNegative: "A discount cannot be negative.",
-    percentageOver: "A percentage cannot be over 100.",
     windowReversed: "The promotion would end before it started.",
     imageType: "Images must be JPEG, PNG or WebP.",
     // The sound. Says the shape of the answer, not just that the answer was
@@ -1928,48 +1925,21 @@ const en = {
     searchNone: "No promotion matches {term}.",
 
     // ---- what it takes off -------------------------------------------------
-    discountSection: "The discount",
-    kind: "Kind",
-    kindHint: "What comes off the bill.",
-    kinds: {
-      percentage: "Percentage off",
-      fixedAmount: "Amount off",
-      freeDelivery: "Free delivery",
-    },
-    kindNotes: {
-      percentage: "of the food",
-      fixedAmount: "off the food",
-      freeDelivery: "whatever the fee is",
-    },
-    percentLabel: "Percentage",
-    percentHint:
-      "Of the food only — a promotion should not quietly pay the courier.",
-    percentTooBig: "A percentage over 100 would pay the customer.",
-    amountLabel: "Amount off",
-    // The real hazard, said plainly. `discounts` has no currency column, so the
-    // number is compared against whatever the order happens to be priced in.
-    amountHint:
-      "In {code}, without separators — the line below shows what it comes to. A shop pricing in another currency takes off the converted amount, at the rate you set on the Pricing screen.",
-    valueRequired: "Say how much comes off.",
-    valueOutOfRange: "That amount is outside what a discount can be.",
+    // Since 0203 a promotion is free delivery and nothing else, so what is
+    // left to set here is the minimum spend.
+    discountSection: "Free delivery",
     minSubtotal: "Minimum spend",
     // Since 0173 a narrowed promotion counts only the matching items towards
     // the minimum — said here, because "spend 20" reads as the whole basket.
     minSubtotalHint:
       "In {code}. Below this the promotion does not apply. When it is narrowed to shops, categories or items, only those count towards it. Compared after conversion, so it means the same amount of money whatever a shop prices in. Leave empty for no minimum.",
     noMinimum: "No minimum",
-    maxDiscount: "Most it can take off",
-    maxDiscountHint:
-      "In {code}. A ceiling on the percentage, so a large basket cannot run away with it. Leave empty for none.",
-    noCeiling: "No ceiling",
 
     // ---- who gets it -------------------------------------------------------
     whoSection: "Who gets it",
     appliesTo: "Applies to",
-    // 0173: a narrowed percentage comes off the matching items only. It used
-    // to come off the whole subtotal, and this hint said so.
     appliesToHint:
-      "Narrowing it means the basket has to contain something matching. A percentage then comes off the matching items only, not the whole order.",
+      "Narrowing it means the basket has to contain something matching, and only those items count towards the minimum spend.",
     scopes: {
       order: "Every order",
       store: "Orders from certain shops",
@@ -2043,13 +2013,10 @@ const en = {
     // ---- summaries ---------------------------------------------------------
     previewLabel: "In the app",
     preview: "{summary}",
-    summaryPercent: "{value}% off the food",
-    summaryFixed: "{amount} off the food",
     summaryFreeDelivery: "Free delivery",
     summaryOver: "over {amount}",
     summaryFirstOrder: "first order only",
     summaryScoped: "{count} scope(s)",
-    summaryIncomplete: "No amount set yet",
     redeemed: "{count} used",
     redeemedOf: "{count} of {cap} used",
 

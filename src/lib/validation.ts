@@ -21,7 +21,6 @@ import type { Params, TranslationKey } from "@/i18n/translations";
 import {
   DAY_OF_WEEK,
   DELIVERY,
-  DISCOUNT,
   IMAGE,
   MONEY,
   PASSWORD,
@@ -272,15 +271,6 @@ export function validateDeliveryBand(
   if (existing.includes(upToKm)) return fail("validation.bandDuplicate");
 
   return validatePrice(amountMinorUnits);
-}
-
-export function validateDiscountValue(kind: string, value: number): Valid {
-  if (!Number.isFinite(value)) return fail("validation.valueRequired");
-  if (value < DISCOUNT.minValue) return fail("validation.discountNegative");
-  if (kind === "percentage" && value > DISCOUNT.maxPercentage) {
-    return fail("validation.percentageOver");
-  }
-  return OK;
 }
 
 export function validateDiscountWindow(

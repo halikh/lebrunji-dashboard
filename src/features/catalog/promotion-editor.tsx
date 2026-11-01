@@ -26,12 +26,10 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
 import {
-  PROMOTION_KINDS,
   fetchDishesByIds,
   searchDishes,
   type Promotion,
   type PromotionDraft,
-  type PromotionKind,
   type Scope,
   type ScopeType,
 } from "./api/promotions";
@@ -260,15 +258,8 @@ function Form({
   const [endsAt, setEndsAt] = useState<string | null>(initial?.endsAt ?? null);
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
 
-  const [kind, setKind] = useState<PromotionKind>(
-    initial?.kind ?? "percentage",
-  );
-  const [value, setValue] = useState(numberField(initial?.value));
   const [minSubtotal, setMinSubtotal] = useState(
     numberField(initial?.minSubtotal),
-  );
-  const [maxDiscount, setMaxDiscount] = useState(
-    numberField(initial?.maxDiscount),
   );
   const [perUser, setPerUser] = useState(
     numberField(initial?.maxRedemptionsPerUser),
@@ -328,10 +319,7 @@ function Form({
         startsAt,
         endsAt,
         isActive,
-        kind,
-        value,
         minSubtotal,
-        maxDiscount,
         perUser,
         total,
         firstOrderOnly,
@@ -346,10 +334,7 @@ function Form({
         startsAt: initial?.startsAt ?? null,
         endsAt: initial?.endsAt ?? null,
         isActive: initial?.isActive ?? true,
-        kind: initial?.kind ?? "percentage",
-        value: numberField(initial?.value),
         minSubtotal: numberField(initial?.minSubtotal),
-        maxDiscount: numberField(initial?.maxDiscount),
         perUser: numberField(initial?.maxRedemptionsPerUser),
         total: numberField(initial?.maxRedemptionsTotal),
         firstOrderOnly: initial?.isFirstOrderOnly ?? false,
@@ -370,14 +355,10 @@ function Form({
 
   const [errors, setErrors] = useState<{
     name?: string;
-    value?: string;
     window?: string;
     targets?: string;
     link?: string;
   }>({});
-
-  /** `freeDelivery` takes the delivery fee, so there is no amount to set. */
-  const takesValue = kind !== "freeDelivery";
 
   function targetsFor(type: ScopeType): string[] {
     if (type === "store") return storeIds;
@@ -387,21 +368,10 @@ function Form({
   }
 
   function submit() {
-    const parsed = Number(value);
     const targets = targetsFor(scopeType);
 
     const found = {
       name: name.trim() === "" ? t("promotions.nameRequired") : undefined,
-
-      // The database refuses this too (`discounts_value_sane`, 0066), and it
-      // refuses it by constraint name. Caught here so it reads as a form.
-      value: !takesValue
-        ? undefined
-        : value.trim() === "" || !Number.isFinite(parsed) || parsed < 0
-          ? t("promotions.valueRequired")
-          : kind === "percentage" && parsed > 100
-            ? t("promotions.percentTooBig")
-            : undefined,
 
       window:
         startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)
@@ -424,7 +394,6 @@ function Form({
     setErrors(found);
     if (
       found.name ||
-      found.value ||
       found.window ||
       found.targets ||
       found.link
@@ -437,12 +406,7 @@ function Form({
       startsAt,
       endsAt,
       isActive,
-      kind,
-      value: takesValue ? parsed : 0,
       minSubtotal: optionalNumber(minSubtotal),
-      // Only a percentage has a ceiling; the field is hidden for the rest, and
-      // a value left in it from before the kind changed is not an answer.
-      maxDiscount: kind === "percentage" ? optionalNumber(maxDiscount) : null,
       maxRedemptionsPerUser: optionalNumber(perUser),
       maxRedemptionsTotal: optionalNumber(total),
       isFirstOrderOnly: firstOrderOnly,
@@ -533,51 +497,6 @@ function Form({
           <FormSection title={t("promotions.discountSection")}>
             <FieldPair>
               <Field
-                label={t("promotions.kind")}
-                hint={t("promotions.kindHint")}
-              >
-                <Select
-                  value={kind}
-                  onChange={(next) => setKind(next as PromotionKind)}
-                  options={PROMOTION_KINDS.map((option) => ({
-                    value: option,
-                    label: t(`promotions.kinds.${option}`),
-                    note: t(`promotions.kindNotes.${option}`),
-                  }))}
-                />
-              </Field>
-
-              {takesValue && (
-                <Field
-                  label={
-                    kind === "percentage"
-                      ? t("promotions.percentLabel")
-                      : t("promotions.amountLabel")
-                  }
-                  hint={
-                    kind === "percentage"
-                      ? t("promotions.percentHint")
-                      : t("promotions.amountHint", { code })
-                  }
-                  error={errors.value}
-                >
-                  <Amount
-                    value={value}
-                    onChange={setValue}
-                    decimalDigits={baseDecimals}
-                    max={kind === "percentage" ? 100 : undefined}
-                    placeholder={kind === "percentage" ? "20" : "5.00"}
-                    // A percentage is not money, so it gets no echo — showing
-                    // "$0.20" under a field reading 20 would be worse than
-                    // nothing.
-                    money={kind !== "percentage"}
-                  />
-                </Field>
-              )}
-            </FieldPair>
-
-            <FieldPair>
-              <Field
                 label={t("promotions.minSubtotal")}
                 hint={t("promotions.minSubtotalHint", { code })}
               >
@@ -589,25 +508,6 @@ function Form({
                   money
                 />
               </Field>
-
-              {/* Only where it can bite. A ceiling on a fixed amount is the
-                same number twice, and on free delivery it would cap a fee the
-                operator does not set here — a control that cannot change the
-                outcome is worse than no control. */}
-              {kind === "percentage" && (
-                <Field
-                  label={t("promotions.maxDiscount")}
-                  hint={t("promotions.maxDiscountHint", { code })}
-                >
-                  <Amount
-                    value={maxDiscount}
-                    onChange={setMaxDiscount}
-                    decimalDigits={baseDecimals}
-                    placeholder={t("promotions.noCeiling")}
-                    money
-                  />
-                </Field>
-              )}
             </FieldPair>
           </FormSection>
 
@@ -825,7 +725,7 @@ function Form({
             </span>
             <p className="text-[14px] font-semibold text-text">
               {describeDraft(
-                { kind, value, minSubtotal, firstOrderOnly },
+                { minSubtotal, firstOrderOnly },
                 format,
                 code,
               )}
@@ -978,27 +878,13 @@ function Amount({
 /** The draft in one sentence, for the preview under the form. */
 function describeDraft(
   draft: {
-    kind: PromotionKind;
-    value: string;
     minSubtotal: string;
     firstOrderOnly: boolean;
   },
   format: (minorUnits: number, code: string) => string,
   code: string,
 ): string {
-  const parsed = Number(draft.value);
-  const valid = draft.value.trim() !== "" && Number.isFinite(parsed);
-
-  const amount =
-    draft.kind === "freeDelivery"
-      ? t("promotions.summaryFreeDelivery")
-      : !valid
-        ? t("promotions.summaryIncomplete")
-        : draft.kind === "percentage"
-          ? t("promotions.summaryPercent", { value: parsed })
-          : t("promotions.summaryFixed", { amount: format(parsed, code) });
-
-  const parts = [amount];
+  const parts = [t("promotions.summaryFreeDelivery")];
 
   const minimum = Number(draft.minSubtotal);
   if (

@@ -99,9 +99,6 @@ export const PREP_MINUTES = { min: 1, max: 240 } as const;
  */
 export const DELIVERY = { minKm: 0.01, maxKm: 999.99 } as const;
 
-/** Percentage discounts. A value over 100 pays the customer to order. */
-export const DISCOUNT = { minValue: 0, maxPercentage: 100 } as const;
-
 /** `store_hours.day_of_week`, Sunday-first, matching `extract(dow …)`. */
 export const DAY_OF_WEEK = { min: 0, max: 6 } as const;
 

@@ -30,8 +30,8 @@ import {
  * have found out from a customer's bill.
  *
  * **`0076_discount_engine.sql` built the engine**, so the reasoning that kept
- * those fields off the screen no longer holds. `discount_for_order()` decides
- * eligibility and amount, `place_order` asks it, and the redemption is written
+ * those fields off the screen no longer holds. `discount_for_lines()` (once
+ * `discount_for_order()`) decides eligibility and amount, `place_order` asks it, and the redemption is written
  * in the same transaction as the order. The fields arrive with the engine,
  * exactly as the plan said they would, and the screen stops being called
  * banners.
@@ -48,22 +48,14 @@ import {
  * So the drag order on this screen is not decoration: it is which promotion
  * wins when two apply.
  *
- * ## The unit `value` is in
+ * ## What it takes off
  *
- * A **percent** for `percentage`, not basis points. `0001`'s comment says basis
- * points and `0066` then added `check (kind <> 'percentage' or value <= 100)` —
- * a constraint outranks a comment, and it is the constraint a save is refused
- * by. Minor units for `fixedAmount`. Ignored entirely for `freeDelivery`, where
- * the amount is whatever the delivery fee turned out to be.
+ * The delivery fee, and nothing else. `0203` removed "percentage off" and
+ * "amount off" from the database — the kind, `value` and `max_discount` — so
+ * there is no amount to set and no kind to pick: `kind` defaults to
+ * `freeDelivery`, the only value it has, and this file never writes it. What
+ * the form decides is who qualifies.
  */
-
-export type PromotionKind = "percentage" | "fixedAmount" | "freeDelivery";
-
-export const PROMOTION_KINDS: PromotionKind[] = [
-  "percentage",
-  "fixedAmount",
-  "freeDelivery",
-];
 
 /** What a scope row narrows the promotion to. Mirrors `discount_scope_type`. */
 export type ScopeType = "order" | "store" | "category" | "menuItem";
@@ -84,11 +76,7 @@ export type Promotion = {
   /** Lower wins — the app orders ascending, and so does the engine. */
   priority: number;
 
-  kind: PromotionKind;
-  /** Percent, or minor units, or unused — see the file header. */
-  value: number;
   minSubtotal: number | null;
-  maxDiscount: number | null;
   maxRedemptionsPerUser: number | null;
   maxRedemptionsTotal: number | null;
   isFirstOrderOnly: boolean;
@@ -120,7 +108,7 @@ export type Promotion = {
 };
 
 const COLUMNS = `id, slug, starts_at, ends_at, is_active, priority,
-   kind, value, min_subtotal, max_discount,
+   min_subtotal,
    max_redemptions_per_user, max_redemptions_total, is_first_order_only,
    discount_scopes ( scope_type, target_id ),
    discount_redemptions ( count ),
@@ -172,10 +160,7 @@ export async function fetchPromotions(
     isActive: row.is_active as boolean,
     priority: row.priority as number,
 
-    kind: row.kind as PromotionKind,
-    value: row.value as number,
     minSubtotal: (row.min_subtotal as number | null) ?? null,
-    maxDiscount: (row.max_discount as number | null) ?? null,
     maxRedemptionsPerUser:
       (row.max_redemptions_per_user as number | null) ?? null,
     maxRedemptionsTotal: (row.max_redemptions_total as number | null) ?? null,
@@ -200,10 +185,7 @@ export type PromotionDraft = {
   endsAt: string | null;
   isActive: boolean;
 
-  kind: PromotionKind;
-  value: number;
   minSubtotal: number | null;
-  maxDiscount: number | null;
   maxRedemptionsPerUser: number | null;
   maxRedemptionsTotal: number | null;
   isFirstOrderOnly: boolean;
@@ -213,7 +195,7 @@ export type PromotionDraft = {
    *
    * `null` means "leave them alone" — the form passes that when it is editing a
    * promotion whose scopes it could not represent. Empty is a real answer and
-   * means order-wide: `discount_for_order` treats an unscoped promotion as
+   * means order-wide: `discount_for_lines` treats an unscoped promotion as
    * applying to everything, which is the only reading that is not a silent
    * no-op.
    */
@@ -238,8 +220,8 @@ export type PromotionDraft = {
  * The row goes in with `is_active` off whatever the form says, then its
  * scopes, and only then is it switched on. A promotion with no scope rows is
  * **order-wide**, so one inserted live and scoped a request later spent that
- * gap — or for ever, if the scope write failed — taking 30% off every basket
- * in the catalogue. In this order every failure leaves a hidden promotion the
+ * gap — or for ever, if the scope write failed — giving free delivery on every
+ * basket in the catalogue. In this order every failure leaves a hidden promotion the
  * operator can see in the list and fix, never a live one wider than intended.
  */
 export async function createPromotion(
@@ -295,16 +277,7 @@ export async function updatePromotion(
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.priority !== undefined) row.priority = patch.priority;
-  if (patch.kind !== undefined) row.kind = patch.kind;
-  if (patch.value !== undefined) row.value = valueFor(patch.kind, patch.value);
   if (patch.minSubtotal !== undefined) row.min_subtotal = patch.minSubtotal;
-  // A ceiling only means something on a percentage — see `maxDiscountFor`. A
-  // switch of kind clears it even when the patch did not mention it.
-  if (patch.kind !== undefined && patch.kind !== "percentage") {
-    row.max_discount = null;
-  } else if (patch.maxDiscount !== undefined) {
-    row.max_discount = patch.maxDiscount;
-  }
   if (patch.maxRedemptionsPerUser !== undefined) {
     row.max_redemptions_per_user = patch.maxRedemptionsPerUser;
   }
@@ -342,7 +315,7 @@ export async function updatePromotion(
  * reader ever sees it half-written. That matters more here than on most
  * tables: an empty `discount_scopes` means **order-wide**, so a promotion caught
  * with its old scopes gone and its new ones not yet written is not broken — it
- * is briefly applying to *everything*. A 30%-off meant for one shop, live
+ * is briefly applying to *everything*. Free delivery meant for one shop, live
  * across the whole catalogue, is the most expensive failure this screen can
  * have, and it would be invisible until the day's takings came in.
  *
@@ -570,51 +543,14 @@ function dishLabel(row: Record<string, unknown>): string {
 // Shared
 // ---------------------------------------------------------------------------
 
-/**
- * The discount columns, on a create.
- *
- * Split out so `createPromotion` and `updatePromotion` cannot drift on what
- * `value` means for each kind — which is the sort of thing that would be wrong
- * on one path only, and therefore wrong on whichever of the two nobody tested.
- */
+/** Who qualifies, on a create. */
 function moneyColumns(draft: PromotionDraft): Record<string, unknown> {
   return {
-    kind: draft.kind,
-    value: valueFor(draft.kind, draft.value),
     min_subtotal: draft.minSubtotal,
-    max_discount: maxDiscountFor(draft.kind, draft.maxDiscount),
     max_redemptions_per_user: draft.maxRedemptionsPerUser,
     max_redemptions_total: draft.maxRedemptionsTotal,
     is_first_order_only: draft.isFirstOrderOnly,
   };
-}
-
-/**
- * `value`, made safe for the kind it belongs to.
- *
- * `freeDelivery` ignores it — the amount is whatever the delivery fee was — but
- * the column is `not null`, so it is written as zero rather than left at
- * whatever number the operator had typed into a field that has since been
- * hidden. A stale value in an unread column is the kind of thing that becomes a
- * bug the day somebody switches the kind back.
- */
-function valueFor(kind: PromotionKind | undefined, value: number): number {
-  return kind === "freeDelivery" ? 0 : value;
-}
-
-/**
- * `max_discount`, only where it can bite.
- *
- * A ceiling on a fixed amount is the same number twice, and on free delivery
- * it would cap a fee nobody sets here. The form hides the field for both, but
- * a value typed before the kind was switched stayed in state and was saved —
- * an unread column that becomes a bug the day the kind is switched back.
- */
-function maxDiscountFor(
-  kind: PromotionKind,
-  maxDiscount: number | null,
-): number | null {
-  return kind === "percentage" ? maxDiscount : null;
 }
 
 function countOf(value: unknown): number {
@@ -659,7 +595,6 @@ function friendly(message: string): string {
   if (link) return link;
   if (message.includes("window_ordered"))
     return t("promotions.windowBackwards");
-  if (message.includes("value_sane")) return t("promotions.valueOutOfRange");
   if (message.includes("caps_positive")) return t("promotions.capsPositive");
   if (message.includes("slug")) return t("dbError.duplicateSlug");
   return message;

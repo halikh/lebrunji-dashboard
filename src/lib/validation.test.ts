@@ -5,7 +5,6 @@ import {
   firstFailure,
   sniffImageType,
   validateDeliveryBand,
-  validateDiscountValue,
   validateDiscountWindow,
   validateHours,
   validateImage,
@@ -213,13 +212,6 @@ describe("validateDeliveryBand", () => {
 });
 
 describe("discounts", () => {
-  it("caps a percentage at 100", () => {
-    expect(validateDiscountValue("percentage", 100).ok).toBe(true);
-    expect(validateDiscountValue("percentage", 101).ok).toBe(false);
-    // A fixed amount has no such ceiling — it is money, in minor units.
-    expect(validateDiscountValue("fixedAmount", 500_000).ok).toBe(true);
-  });
-
   it("refuses a window that ends before it starts", () => {
     expect(validateDiscountWindow("2026-09-01", "2026-08-01").ok).toBe(false);
     expect(validateDiscountWindow("2026-08-01", "2026-09-01").ok).toBe(true);
