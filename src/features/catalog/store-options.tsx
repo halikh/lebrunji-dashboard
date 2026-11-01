@@ -29,6 +29,8 @@ import {
 import type { ItemOption, OptionGroupMode, StoreQuestion } from "./api/options";
 import { BulkForm } from "./bulk-form";
 import { useMenu } from "./use-menu";
+import { useBundles } from "./use-bundles";
+import type { MenuSection } from "./api/menu";
 import {
   useCreateOptionGroup,
   useItemOptions,
@@ -86,7 +88,7 @@ export function StoreOptions({ storeId }: { storeId: string }) {
   const pathname = usePathname();
   const params = useSearchParams();
 
-  const menu = useMenu(storeId);
+  const menu = useMenuWithBundles(storeId);
   const counts = useOptionCounts(storeId);
   const store = useStore(storeId);
 
@@ -293,7 +295,7 @@ function ItemQuestions({
   search: string;
 }) {
   const groups = useStoreQuestions(storeId, search);
-  const menu = useMenu(storeId);
+  const menu = useMenuWithBundles(storeId);
   const setItems = useSetQuestionItems();
   // Lifted to the screen, because the button that turns it on now lives up
   // beside the filters rather than at the foot of this list.
@@ -1596,3 +1598,54 @@ function NewQuestion({
     </section>
   );
 }
+
+/**
+ * The shop's menu with its bundles as one more section, first (`0204`).
+ *
+ * A bundle is in no menu section, so the section select never offered one,
+ * and its questions could not be set here (user, 2026-11-02). It asks them
+ * the way a dish does — the same links — so it is listed the way a dish is:
+ * pick "Bundles", then the bundle. The question's own picker lists them too.
+ * The section is not a row; its id is never written anywhere.
+ */
+function useMenuWithBundles(storeId: string) {
+  const menu = useMenu(storeId);
+  const bundles = useBundles("", storeId);
+
+  const rows = bundles.data ?? [];
+  const data: MenuSection[] | undefined = menu.data
+    ? rows.length > 0
+      ? [
+          {
+            id: BUNDLES_SECTION,
+            slug: BUNDLES_SECTION,
+            title: { en: t("bundles.tab") },
+            imageUrl: null,
+            parentId: null,
+            sortOrder: -1,
+            items: rows.map((bundle) => ({
+              id: bundle.id,
+              sectionId: BUNDLES_SECTION,
+              slug: bundle.id,
+              name: bundle.name,
+              description: bundle.description ?? {},
+              price: bundle.price,
+              imageUrl: bundle.imageUrl,
+              isActive: bundle.isActive,
+              sortOrder: bundle.sortOrder,
+              priceUnit: null,
+              unitQuantity: null,
+              unitStep: null,
+              tagIds: [],
+            })),
+          },
+          ...menu.data,
+        ]
+      : menu.data
+    : undefined;
+
+  return { ...menu, data };
+}
+
+/** The bundles' place in the section select — not a `menu_sections` id. */
+const BUNDLES_SECTION = "bundles";
