@@ -50,7 +50,11 @@ import {
 import { optionKeys } from "./use-options";
 import { useStores } from "./use-stores";
 
-const LIST_HREF = "/catalogue?tab=bundles";
+/**
+ * A bundle's list is its shop's Bundles tab (user, 2026-11-02): bundles are a
+ * shop's, so they live on the shop's screen and nowhere else.
+ */
+const listOf = (storeId: string) => `/catalogue/${storeId}?tab=bundles`;
 
 /** The most of one dish a bundle may hold — `bundle_items_quantity_sane`. */
 const MAX_QUANTITY = 20;
@@ -72,13 +76,15 @@ export function BundleEditor({
   fromStoreId?: string | null;
 }) {
   const router = useRouter();
-  const listHref = fromStoreId
-    ? `/catalogue/${fromStoreId}?tab=bundles`
-    : LIST_HREF;
 
   const bundles = useBundles("");
   const rows = bundles.data ?? [];
   const initial = id ? (rows.find((row) => row.id === id) ?? null) : null;
+
+  // The shop it came from, else the bundle's own — say, opened from a link on
+  // a picture. The catalogue when neither is known yet.
+  const shopId = fromStoreId ?? initial?.storeId ?? null;
+  const listHref = shopId ? listOf(shopId) : "/catalogue";
 
   const create = useCreateBundle();
   const update = useUpdateBundle();
@@ -90,9 +96,14 @@ export function BundleEditor({
     enabled: Boolean(id),
   });
 
-  const back = (focusId: string | null) => {
+  /** Back to the shop's list — a new bundle's shop is the one it was saved on. */
+  const back = (focusId: string | null, storeId: string | null = shopId) => {
+    if (!storeId) {
+      router.replace("/catalogue");
+      return;
+    }
     const focus = focusId ? `&focus=${focusId}` : "";
-    router.replace(`${listHref}${focus}`);
+    router.replace(`${listOf(storeId)}${focus}`);
   };
 
   if (id && !initial) {
@@ -137,7 +148,7 @@ export function BundleEditor({
         } else {
           create.mutate(
             { draft, sortOrder: rows.length, branchPrices: changes, questions },
-            { onSuccess: (newId) => done(newId) },
+            { onSuccess: (newId) => back(newId, draft.storeId) },
           );
         }
       }}
@@ -351,7 +362,11 @@ function Form({
   return (
     <EditorPage
       title={initial ? pickLocalized(initial.name) : t("bundles.add")}
-      backHref={initial ? `${listHref}&focus=${initial.id}` : listHref}
+      backHref={
+        initial
+          ? `${listHref}${listHref.includes("?") ? "&" : "?"}focus=${initial.id}`
+          : listHref
+      }
       backLabel={t("bundles.tab")}
       width="wide"
       footer={

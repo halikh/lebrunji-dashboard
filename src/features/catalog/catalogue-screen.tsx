@@ -10,7 +10,6 @@ import { t } from "@/i18n/translations";
 import { ArtworksList } from "./artworks-list";
 import { CatalogueArchive } from "./catalogue-archive";
 import { CategoriesList } from "./categories-list";
-import { BundlesList } from "./bundles-list";
 import { PromotionsList } from "./promotions-list";
 import { StoresList } from "./stores-list";
 import { TagsList } from "./tags-list";
@@ -47,9 +46,6 @@ const TABS = [
   { key: "shops", labelKey: "catalogue.stores" },
   { key: "categories", labelKey: "categories.tab" },
   { key: "promotions", labelKey: "promotions.tab" },
-  // Beside promotions: a bundle is campaign work too, announced the same way —
-  // by a picture on the Artwork tab (`0204`).
-  { key: "bundles", labelKey: "bundles.tab" },
   // Beside promotions because the two are one errand more often than not — a
   // promotion is usually announced by a picture — but its own tab since `0129`,
   // because plenty of pictures announce nothing but the app itself.
@@ -142,9 +138,6 @@ export function CatalogueScreen() {
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "promotions" && "hidden")}>
         <PromotionsList />
-      </div>
-      <div className={cx("min-h-0 flex-1", tab !== "bundles" && "hidden")}>
-        <BundlesList />
       </div>
       <div className={cx("min-h-0 flex-1", tab !== "artworks" && "hidden")}>
         <ArtworksList />

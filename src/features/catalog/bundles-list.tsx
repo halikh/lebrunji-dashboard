@@ -281,14 +281,14 @@ function Row({
   );
 }
 
-/** "2× Burger · Fries · Soft drink". */
+/** "2× Burger, Fries, Soft drink" — the app's own wording. */
 export function describeContents(bundle: Pick<Bundle, "items">): string {
   if (bundle.items.length === 0) return t("bundles.empty");
   return bundle.items
     .map((item) =>
       item.quantity > 1 ? `${item.quantity}× ${item.label}` : item.label,
     )
-    .join(" · ");
+    .join(", ");
 }
 
 /** When it is on offer, and whether that is now — as the promotions list says it. */
