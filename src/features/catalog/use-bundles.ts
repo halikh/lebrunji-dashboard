@@ -22,15 +22,16 @@ import { artworkKeys } from "./use-artworks";
 
 export const bundleKeys = {
   all: ["bundles"] as const,
-  list: (search: string) => ["bundles", "list", search] as const,
+  list: (search: string, storeId = "") =>
+    ["bundles", "list", search, storeId] as const,
   branchPrices: (id: string) => ["bundles", "branch-prices", id] as const,
 };
 
-export function useBundles(search = "") {
+export function useBundles(search = "", storeId = "") {
   const term = search.trim();
   return useQuery({
-    queryKey: bundleKeys.list(term),
-    queryFn: () => fetchBundles(term),
+    queryKey: bundleKeys.list(term, storeId),
+    queryFn: () => fetchBundles(term, storeId || undefined),
     placeholderData: (previous) => previous,
   });
 }
@@ -199,14 +200,16 @@ export function useReorderBundles() {
     mutationFn: (input: {
       updates: { id: string; sortOrder: number }[];
       next: Bundle[];
+      /** The list being dragged — every shop's, or one shop's tab. */
+      storeId?: string;
     }) => setBundleOrder(input.updates),
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: bundleKeys.all });
       const snapshot = queryClient.getQueriesData<Bundle[]>({
         queryKey: bundleKeys.all,
       });
-      queryClient.setQueriesData<Bundle[]>(
-        { queryKey: bundleKeys.list("") },
+      queryClient.setQueryData<Bundle[]>(
+        bundleKeys.list("", input.storeId ?? ""),
         input.next,
       );
       return { snapshot };

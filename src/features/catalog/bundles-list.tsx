@@ -36,12 +36,17 @@ import {
  *
  * Dragging sets the order the app lists a shop's bundles in.
  */
-export function BundlesList() {
+export function BundlesList({ storeId }: { storeId?: string } = {}) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const searching = search.trim().length >= SEARCH.minTerm;
 
-  const bundles = useBundles(searching ? search : "");
+  /**
+   * On a shop's own screen, that shop's bundles: new ones start on it, and
+   * the editor comes back here rather than to the catalogue.
+   */
+  const bundles = useBundles(searching ? search : "", storeId);
+  const fromShop = storeId ? `?store=${storeId}` : "";
   const toggle = useToggleBundle();
   const archive = useArchiveBundle();
   const reorder = useReorderBundles();
@@ -62,9 +67,10 @@ export function BundlesList() {
           ? []
           : [{ id: row.id, sortOrder: row.sortOrder }];
       });
-      reorder.mutate({ updates, next });
+      reorder.mutate({ updates, next, storeId });
     },
-    labelOf: (id) => pickLocalized(rows.find((row) => row.id === id)?.name ?? {}),
+    labelOf: (id) =>
+      pickLocalized(rows.find((row) => row.id === id)?.name ?? {}),
     disabled: searching,
   });
 
@@ -80,7 +86,9 @@ export function BundlesList() {
           }}
           hint={order.sortable ? t("bundles.reorderHint") : undefined}
           action={
-            <Button onClick={() => router.push("/catalogue/bundles/new")}>
+            <Button
+              onClick={() => router.push(`/catalogue/bundles/new${fromShop}`)}
+            >
               {t("bundles.add")}
             </Button>
           }
@@ -115,7 +123,10 @@ export function BundlesList() {
                 anchor={focus.attach(row.id)}
                 rowProps={order.rowProps}
                 handleProps={order.handleProps}
-                onEdit={() => router.push(`/catalogue/bundles/${row.id}`)}
+                onEdit={() =>
+                  router.push(`/catalogue/bundles/${row.id}${fromShop}`)
+                }
+                showShop={!storeId}
                 onToggleActive={() =>
                   toggle.mutate({ id: row.id, isActive: !row.isActive })
                 }
@@ -160,8 +171,11 @@ function Row({
   onEdit,
   onToggleActive,
   onArchive,
+  showShop,
 }: {
   bundle: Bundle;
+  /** Off on a shop's own tab, where every row is that shop's. */
+  showShop: boolean;
   open: boolean;
   anchor: (node: HTMLElement | null) => void;
   onEdit: () => void;
@@ -209,10 +223,12 @@ function Row({
       >
         <span className="truncate text-[15px] font-semibold">
           {name}
-          <span className="font-normal text-text-faint">
-            {" · "}
-            {bundle.storeName}
-          </span>
+          {showShop && (
+            <span className="font-normal text-text-faint">
+              {" · "}
+              {bundle.storeName}
+            </span>
+          )}
         </span>
         <span className="truncate text-[13px] text-text-soft">
           {describeContents(bundle)}
@@ -278,8 +294,11 @@ export function describeContents(bundle: Pick<Bundle, "items">): string {
 /** When it is on offer, and whether that is now — as the promotions list says it. */
 function describeWindow(bundle: Bundle): string {
   const now = Date.now();
-  const started = !bundle.startsAt || new Date(bundle.startsAt).getTime() <= now;
-  const ended = Boolean(bundle.endsAt && new Date(bundle.endsAt).getTime() <= now);
+  const started =
+    !bundle.startsAt || new Date(bundle.startsAt).getTime() <= now;
+  const ended = Boolean(
+    bundle.endsAt && new Date(bundle.endsAt).getTime() <= now,
+  );
 
   if (bundle.isActive && ended) return t("bundles.ended");
   if (bundle.isActive && !started) {
@@ -292,6 +311,7 @@ function describeWindow(bundle: Bundle): string {
       to: formatDate(bundle.endsAt),
     });
   }
-  if (bundle.endsAt) return t("bundles.until", { to: formatDate(bundle.endsAt) });
+  if (bundle.endsAt)
+    return t("bundles.until", { to: formatDate(bundle.endsAt) });
   return t("bundles.from", { from: formatDate(bundle.startsAt!) });
 }

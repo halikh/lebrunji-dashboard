@@ -63,8 +63,18 @@ const MAX_QUANTITY = 20;
  * each branch that charges otherwise. The side column is what the operator
  * checks: the saving, when it is on offer, and the pictures that advertise it.
  */
-export function BundleEditor({ id }: { id: string | null }) {
+export function BundleEditor({
+  id,
+  fromStoreId = null,
+}: {
+  id: string | null;
+  /** Opened from a shop's Bundles tab: a new one starts on it, and Back returns there. */
+  fromStoreId?: string | null;
+}) {
   const router = useRouter();
+  const listHref = fromStoreId
+    ? `/catalogue/${fromStoreId}?tab=bundles`
+    : LIST_HREF;
 
   const bundles = useBundles("");
   const rows = bundles.data ?? [];
@@ -82,14 +92,14 @@ export function BundleEditor({ id }: { id: string | null }) {
 
   const back = (focusId: string | null) => {
     const focus = focusId ? `&focus=${focusId}` : "";
-    router.replace(`${LIST_HREF}${focus}`);
+    router.replace(`${listHref}${focus}`);
   };
 
   if (id && !initial) {
     return (
       <EditorPage
         title={t("bundles.edit")}
-        backHref={LIST_HREF}
+        backHref={listHref}
         backLabel={t("bundles.tab")}
       >
         {bundles.isPending ? (
@@ -114,6 +124,8 @@ export function BundleEditor({ id }: { id: string | null }) {
       key={initial?.id ?? "new"}
       initial={initial ?? undefined}
       initialBranchPrices={branchPrices.data ?? {}}
+      startStoreId={fromStoreId}
+      listHref={listHref}
       pending={create.isPending || update.isPending}
       onSave={(draft, changes, questions) => {
         const done = (focusId: string | null) => back(focusId);
@@ -137,12 +149,16 @@ export function BundleEditor({ id }: { id: string | null }) {
 function Form({
   initial,
   initialBranchPrices,
+  startStoreId,
+  listHref,
   pending,
   onSave,
   onCancel,
 }: {
   initial?: Bundle;
   initialBranchPrices: Record<string, number>;
+  startStoreId: string | null;
+  listHref: string;
   pending: boolean;
   onSave: (
     draft: BundleDraft,
@@ -156,7 +172,9 @@ function Form({
   const codes = languages.data?.map((language) => language.code) ?? [];
   const stores = useStores("");
 
-  const [storeId, setStoreId] = useState(initial?.storeId ?? "");
+  const [storeId, setStoreId] = useState(
+    initial?.storeId ?? startStoreId ?? "",
+  );
   const [name, setName] = useState<Localized>(initial?.name ?? {});
   const [description, setDescription] = useState<Localized>(
     initial?.description ?? {},
@@ -240,7 +258,7 @@ function Form({
         questionIds,
       },
       {
-        storeId: initial?.storeId ?? "",
+        storeId: initial?.storeId ?? startStoreId ?? "",
         name: initial?.name ?? {},
         description: initial?.description ?? {},
         imageUrl: initial?.imageUrl ?? null,
@@ -333,7 +351,7 @@ function Form({
   return (
     <EditorPage
       title={initial ? pickLocalized(initial.name) : t("bundles.add")}
-      backHref={initial ? `${LIST_HREF}&focus=${initial.id}` : LIST_HREF}
+      backHref={initial ? `${listHref}&focus=${initial.id}` : listHref}
       backLabel={t("bundles.tab")}
       width="wide"
       footer={
@@ -610,7 +628,6 @@ function Form({
                         <span className="text-[13px] font-medium text-accent-deep">
                           {t("bundles.originalPriceSaving", {
                             saving: format(saving, currencyCode),
-                            percent: Math.floor((saving / separately) * 100),
                           })}
                         </span>
                       )}

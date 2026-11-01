@@ -97,10 +97,7 @@ export function TagsList() {
           {tags.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1, 2].map((row) => (
-                <div
-                  key={row}
-                  className="h-[58px] rounded-lg bg-line-soft"
-                />
+                <div key={row} className="h-[58px] rounded-lg bg-line-soft" />
               ))}
             </div>
           )}

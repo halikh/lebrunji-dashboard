@@ -117,10 +117,7 @@ export function StoresList() {
         {stores.isPending && (
           <div aria-hidden className="flex flex-col gap-sm">
             {[0, 1, 2, 3].map((row) => (
-              <div
-                key={row}
-                className="h-[74px] rounded-lg bg-line-soft"
-              />
+              <div key={row} className="h-[74px] rounded-lg bg-line-soft" />
             ))}
           </div>
         )}
@@ -225,7 +222,9 @@ function StoreRow({
         //
         // So the *content* mutes and the controls stay full strength, with a
         // border and a badge carrying the state instead.
-        store.isActive ? "border-transparent" : "border-transparent bg-neutral-fill/60 shadow-none",
+        store.isActive
+          ? "border-transparent"
+          : "border-transparent bg-neutral-fill/60 shadow-none",
       )}
     >
       {/* First in the row, and above the name's stretched overlay — `z-10`

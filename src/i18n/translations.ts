@@ -2120,7 +2120,7 @@ const en = {
     originalPrice: "Original price",
     originalPriceHint:
       "What the dishes cost bought separately. The app shows it struck through next to the bundle price.",
-    originalPriceSaving: "Customers save {saving} ({percent}%)",
+    originalPriceSaving: "Customers save {saving}",
     originalPriceEmpty: "Add dishes to see it",
     branchPrices: "Price at each branch",
     branchPricesHint: "Leave blank to charge the bundle price above.",

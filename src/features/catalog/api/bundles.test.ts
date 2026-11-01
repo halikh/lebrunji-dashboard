@@ -18,14 +18,27 @@ describe("toBundle", () => {
       sort_order: 2,
       stores: { name: { en: "Grill House" }, currency_code: "USD" },
       bundle_items: [
-        { menu_item_id: "fries", quantity: 1, sort_order: 1, dish: { name: { en: "Fries" }, price: 300 } },
-        { menu_item_id: "burger", quantity: 2, sort_order: 0, dish: { name: { en: "Burger" }, price: 450 } },
+        {
+          menu_item_id: "fries",
+          quantity: 1,
+          sort_order: 1,
+          dish: { name: { en: "Fries" }, price: 300 },
+        },
+        {
+          menu_item_id: "burger",
+          quantity: 2,
+          sort_order: 0,
+          dish: { name: { en: "Burger" }, price: 450 },
+        },
       ],
     });
 
     expect(bundle.storeName).toBe("Grill House");
     expect(bundle.currencyCode).toBe("USD");
-    expect(bundle.items.map((item) => item.menuItemId)).toEqual(["burger", "fries"]);
+    expect(bundle.items.map((item) => item.menuItemId)).toEqual([
+      "burger",
+      "fries",
+    ]);
     expect(separatePrice(bundle.items)).toBe(1200);
   });
 });
@@ -33,7 +46,11 @@ describe("toBundle", () => {
 describe("artwork toColumns with a bundle", () => {
   it("writes the bundle and drops the picture's own dates", () => {
     expect(
-      toColumns({ bundleId: "b1", startsAt: "2026-11-01T00:00:00Z", endsAt: null }),
+      toColumns({
+        bundleId: "b1",
+        startsAt: "2026-11-01T00:00:00Z",
+        endsAt: null,
+      }),
     ).toMatchObject({ bundle_id: "b1", starts_at: null, ends_at: null });
   });
 });

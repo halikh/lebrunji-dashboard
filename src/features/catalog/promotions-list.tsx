@@ -128,10 +128,7 @@ export function PromotionsList() {
           {promotions.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1].map((row) => (
-                <div
-                  key={row}
-                  className="h-[90px] rounded-lg bg-line-soft"
-                />
+                <div key={row} className="h-[90px] rounded-lg bg-line-soft" />
               ))}
             </div>
           )}
@@ -218,7 +215,8 @@ function Row({
     cx(
       ROW,
       "max-md:flex-wrap",
-      !promotion.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
+      !promotion.isActive &&
+        "border-transparent bg-neutral-fill/60 shadow-none",
       promotion.isActive && "border-transparent",
       promotion.isActive && open && "border-active",
     ),

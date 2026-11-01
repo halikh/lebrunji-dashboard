@@ -1748,7 +1748,10 @@ function SectionForm({
 
 /** The end of one level of the tree — where a new or moved section lands. */
 function nextSectionSort(level: { sortOrder: number }[]): number {
-  return level.reduce((highest, one) => Math.max(highest, one.sortOrder + 1), 0);
+  return level.reduce(
+    (highest, one) => Math.max(highest, one.sortOrder + 1),
+    0,
+  );
 }
 
 /** Whether a row being returned to is in one of these sub-aisles. */
@@ -1802,8 +1805,12 @@ function MovePanel({
   const [error, setError] = useState<string | undefined>(undefined);
 
   const options = [
-    ...(moves.canGroup ? [{ value: NEW_AISLE, label: t("menu.moveNewAisle") }] : []),
-    ...(moves.canUnnest ? [{ value: OWN_AISLE, label: t("menu.moveOwnAisle") }] : []),
+    ...(moves.canGroup
+      ? [{ value: NEW_AISLE, label: t("menu.moveNewAisle") }]
+      : []),
+    ...(moves.canUnnest
+      ? [{ value: OWN_AISLE, label: t("menu.moveOwnAisle") }]
+      : []),
     ...moves.targets.map((aisle) => ({
       value: aisle.id,
       label: pickLocalized(aisle.title),

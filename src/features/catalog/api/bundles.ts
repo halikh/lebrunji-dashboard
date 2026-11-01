@@ -71,7 +71,10 @@ const COLUMNS = `id, store_id, name, description, image_url, price, is_active,
  * Capped, not paged, for the same reason promotions are: the order is the
  * operator's, and a position within a page is not one.
  */
-export async function fetchBundles(search: string): Promise<Bundle[]> {
+export async function fetchBundles(
+  search: string,
+  storeId?: string,
+): Promise<Bundle[]> {
   let query = getClient()
     .from("menu_items")
     .select(COLUMNS)
@@ -80,6 +83,9 @@ export async function fetchBundles(search: string): Promise<Bundle[]> {
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true })
     .limit(PAGE.cap);
+
+  // One shop's, for its own Bundles tab; every shop's on the catalogue's.
+  if (storeId) query = query.eq("store_id", storeId);
 
   const term = search.trim();
   if (term) query = query.or(likeAny(["name->>en", "name->>ar", "slug"], term));
@@ -198,7 +204,10 @@ export async function createBundle(
   return id;
 }
 
-export async function updateBundle(id: string, draft: BundleDraft): Promise<void> {
+export async function updateBundle(
+  id: string,
+  draft: BundleDraft,
+): Promise<void> {
   const { error } = await getClient()
     .from("menu_items")
     .update({ ...toColumns(draft), is_active: draft.isActive })
@@ -209,7 +218,10 @@ export async function updateBundle(id: string, draft: BundleDraft): Promise<void
 }
 
 /** The switch in the row, on its own. */
-export async function setBundleActive(id: string, isActive: boolean): Promise<void> {
+export async function setBundleActive(
+  id: string,
+  isActive: boolean,
+): Promise<void> {
   const { error } = await getClient()
     .from("menu_items")
     .update({ is_active: isActive })

@@ -458,7 +458,10 @@ export function windowOf(
   artwork: Pick<Artwork, "startsAt" | "endsAt" | "discount" | "bundle">,
 ): { startsAt: string | null; endsAt: string | null } {
   if (artwork.discount) {
-    return { startsAt: artwork.discount.startsAt, endsAt: artwork.discount.endsAt };
+    return {
+      startsAt: artwork.discount.startsAt,
+      endsAt: artwork.discount.endsAt,
+    };
   }
   if (artwork.bundle) {
     return { startsAt: artwork.bundle.startsAt, endsAt: artwork.bundle.endsAt };
@@ -475,9 +478,18 @@ export function windowOf(
  * load it, and the row names the promotion so the operator can look.
  */
 export function artworkState(
-  artwork: Pick<Artwork, "isActive" | "startsAt" | "endsAt" | "discount" | "bundle">,
+  artwork: Pick<
+    Artwork,
+    "isActive" | "startsAt" | "endsAt" | "discount" | "bundle"
+  >,
   now: number,
-): "off" | "scheduled" | "ended" | "promotionArchived" | "bundleArchived" | "live" {
+):
+  | "off"
+  | "scheduled"
+  | "ended"
+  | "promotionArchived"
+  | "bundleArchived"
+  | "live" {
   if (!artwork.isActive) return "off";
   if (artwork.discount?.archived) return "promotionArchived";
   if (artwork.bundle?.archived) return "bundleArchived";

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { IBM_Plex_Sans_Arabic, Inter, Playfair_Display } from "next/font/google";
+import {
+  IBM_Plex_Sans_Arabic,
+  Inter,
+  Playfair_Display,
+} from "next/font/google";
 
 import "./globals.css";
 

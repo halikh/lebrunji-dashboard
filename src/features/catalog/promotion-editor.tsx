@@ -392,12 +392,7 @@ function Form({
     };
 
     setErrors(found);
-    if (
-      found.name ||
-      found.window ||
-      found.targets ||
-      found.link
-    ) {
+    if (found.name || found.window || found.targets || found.link) {
       return;
     }
 
@@ -724,11 +719,7 @@ function Form({
               {t("promotions.previewLabel")}
             </span>
             <p className="text-[14px] font-semibold text-text">
-              {describeDraft(
-                { minSubtotal, firstOrderOnly },
-                format,
-                code,
-              )}
+              {describeDraft({ minSubtotal, firstOrderOnly }, format, code)}
             </p>
           </div>
 

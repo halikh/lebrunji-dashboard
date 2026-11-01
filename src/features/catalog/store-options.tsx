@@ -543,7 +543,9 @@ function Question({
     <section
       className={cx(
         "flex flex-col gap-lg rounded-lg border-2 bg-surface p-lg shadow-card",
-        group.isActive ? "border-transparent" : "border-transparent bg-neutral-fill/60 shadow-none",
+        group.isActive
+          ? "border-transparent"
+          : "border-transparent bg-neutral-fill/60 shadow-none",
       )}
     >
       <div className="flex flex-wrap items-center gap-md">

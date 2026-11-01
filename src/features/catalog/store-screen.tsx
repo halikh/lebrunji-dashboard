@@ -12,6 +12,7 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
 import { BranchesTab } from "./branches-tab";
+import { BundlesList } from "./bundles-list";
 import { StoreFacts, StoreThumb } from "./store-identity";
 import { StoreArchive } from "./store-archive";
 import { StoreDetails } from "./store-details";
@@ -71,6 +72,9 @@ const TABS = [
   // about it on another. The selects are a filter now: nothing picked is the
   // shop's questions, an item picked is what the old Options tab showed.
   { key: "options", labelKey: "options.tab" },
+  // Beside the questions, because a bundle asks them too (`0204`). The same
+  // list as the catalogue's Bundles tab, narrowed to this shop.
+  { key: "bundles", labelKey: "bundles.tab" },
   { key: "hours", labelKey: "hours.tab" },
   // Last. It is where you go to undo something, not part of setting a shop up,
   // and the tab order should read as the order the work is done in.
@@ -249,6 +253,12 @@ export function StoreScreen({ storeId }: { storeId: string }) {
         <Pane show={tab === "options"} mounted={visited.has("options")}>
           <StoreOptions storeId={storeId} />
         </Pane>
+        {/* Mounted only when open, like Branches: no scroll worth keeping. */}
+        {tab === "bundles" && (
+          <div className="min-h-0 flex-1">
+            <BundlesList storeId={storeId} />
+          </div>
+        )}
         <Pane show={tab === "hours"} mounted={visited.has("hours")}>
           <StoreHours storeId={storeId} />
         </Pane>

@@ -302,7 +302,8 @@ function Form({
     };
 
     setErrors(found);
-    if (found.image || found.window || found.link || found.subject || !imageUrl) return;
+    if (found.image || found.window || found.link || found.subject || !imageUrl)
+      return;
 
     onSave({
       format,
@@ -463,7 +464,10 @@ function Form({
             {/* What it advertises leads this card because it decides the rest
                 of it: a picture tied to a promotion or a bundle runs on that
                 deal's dates. One answer — never both (`artworks_one_subject`). */}
-            <Field label={t("artworks.subject")} hint={t("artworks.subjectHint")}>
+            <Field
+              label={t("artworks.subject")}
+              hint={t("artworks.subjectHint")}
+            >
               <Select
                 value={subject}
                 onChange={(next) => {
@@ -473,10 +477,12 @@ function Form({
                   setBundleId(null);
                   setErrors((current) => ({ ...current, subject: undefined }));
                 }}
-                options={(["none", "promotion", "bundle"] as Subject[]).map((value) => ({
-                  value,
-                  label: t(`artworks.subjects.${value}`),
-                }))}
+                options={(["none", "promotion", "bundle"] as Subject[]).map(
+                  (value) => ({
+                    value,
+                    label: t(`artworks.subjects.${value}`),
+                  }),
+                )}
                 disabled={pending}
               />
             </Field>
@@ -526,7 +532,9 @@ function Form({
                               to: formatDate(bundle.endsAt),
                             })
                           : bundle.endsAt
-                            ? t("artworks.until", { to: formatDate(bundle.endsAt) })
+                            ? t("artworks.until", {
+                                to: formatDate(bundle.endsAt),
+                              })
                             : t("artworks.startsFrom", {
                                 from: formatDate(bundle.startsAt!),
                               }),

@@ -365,7 +365,9 @@ export function useAisles(storeId: string) {
       sortOrder: number;
     }) => moveMenuSection(input.id, input.parentId, input.sortOrder),
     onSuccess: (_result, input) => {
-      toast.success(t("menu.sectionMoved", { name: pickLocalized(input.name) }));
+      toast.success(
+        t("menu.sectionMoved", { name: pickLocalized(input.name) }),
+      );
     },
     ...settle,
   });

@@ -67,10 +67,7 @@ export function ArtworksList() {
           {artworks.isPending && (
             <div aria-hidden className="flex flex-col gap-sm">
               {[0, 1].map((row) => (
-                <div
-                  key={row}
-                  className="h-[90px] rounded-lg bg-line-soft"
-                />
+                <div key={row} className="h-[90px] rounded-lg bg-line-soft" />
               ))}
             </div>
           )}
@@ -136,9 +133,7 @@ function FormatSection({
 
   return (
     <section className="flex flex-col gap-sm">
-      <h2 className="ps-md text-[19px]">
-        {t(`artworks.sections.${format}`)}
-      </h2>
+      <h2 className="ps-md text-[19px]">{t(`artworks.sections.${format}`)}</h2>
       <p className="ps-md pb-xs text-[13px] text-text-soft">
         {t(`artworks.sectionsHint.${format}`)}
       </p>
@@ -330,7 +325,9 @@ function nameOf(artwork: Artwork): string {
     return t("artworks.linkedTo", { slug: artwork.discount.slug });
   }
   if (artwork.bundle) {
-    return t("artworks.linkedToBundle", { name: pickLocalized(artwork.bundle.name) });
+    return t("artworks.linkedToBundle", {
+      name: pickLocalized(artwork.bundle.name),
+    });
   }
   return t("artworks.artworkOnly");
 }

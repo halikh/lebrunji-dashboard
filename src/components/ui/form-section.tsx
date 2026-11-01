@@ -22,7 +22,9 @@ export function FormSection({
   return (
     <section className="@container flex min-w-0 flex-col gap-lg rounded-lg bg-surface p-lg shadow-card">
       {title && (
-        <h3 className="text-[19px]">
+        // `ps-md`: the column the fields' labels and hints run down — see
+        // `field.tsx`. Flush at zero it lines up with the inputs' borders instead.
+        <h3 className="ps-md text-[19px]">
           {title}
         </h3>
       )}
