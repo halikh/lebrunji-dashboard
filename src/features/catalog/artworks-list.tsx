@@ -271,7 +271,7 @@ function Row({
         <span
           className={cx(
             "truncate text-[12px]",
-            state === "promotionArchived"
+            state === "promotionArchived" || state === "bundleArchived"
               ? "font-semibold text-text"
               : "text-text-faint",
           )}
@@ -326,9 +326,13 @@ function Row({
  * image — so it borrows its promotion's reference, or says it has none.
  */
 function nameOf(artwork: Artwork): string {
-  return artwork.discount
-    ? t("artworks.linkedTo", { slug: artwork.discount.slug })
-    : t("artworks.artworkOnly");
+  if (artwork.discount) {
+    return t("artworks.linkedTo", { slug: artwork.discount.slug });
+  }
+  if (artwork.bundle) {
+    return t("artworks.linkedToBundle", { name: pickLocalized(artwork.bundle.name) });
+  }
+  return t("artworks.artworkOnly");
 }
 
 /** Where it stands at the moment the row is drawn. */
@@ -352,6 +356,7 @@ function describeWindow(
 ): string {
   if (state === "off") return t("artworks.stateOff");
   if (state === "promotionArchived") return t("artworks.promotionArchived");
+  if (state === "bundleArchived") return t("artworks.bundleArchived");
   if (state === "ended") return t("artworks.ended");
   // The promotion's dates for a linked picture, which has none of its own
   // since `0136` — see `windowOf`.
@@ -369,5 +374,7 @@ function describeWindow(
   if (endsAt) {
     return t("artworks.until", { to: formatDate(endsAt) });
   }
-  return artwork.discount ? t("artworks.whilePromotion") : t("artworks.always");
+  if (artwork.discount) return t("artworks.whilePromotion");
+  if (artwork.bundle) return t("artworks.whileBundle");
+  return t("artworks.always");
 }

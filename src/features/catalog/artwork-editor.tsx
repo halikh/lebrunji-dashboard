@@ -34,6 +34,7 @@ import {
   useCreateArtwork,
   useUpdateArtwork,
 } from "./use-artworks";
+import { useBundles } from "./use-bundles";
 import { usePromotions } from "./use-promotions";
 import { useStores } from "./use-stores";
 
@@ -49,9 +50,12 @@ const LIST_HREF = "/catalogue?tab=artworks";
 export function ArtworkEditor({
   id,
   initialDiscountId = null,
+  initialBundleId = null,
 }: {
   id: string | null;
   initialDiscountId?: string | null;
+  /** Preselects the bundle it advertises — the bundle editor's link (`0204`). */
+  initialBundleId?: string | null;
 }) {
   const router = useRouter();
 
@@ -98,6 +102,7 @@ export function ArtworkEditor({
       key={initial?.id ?? "new"}
       initial={initial ?? undefined}
       initialDiscountId={initialDiscountId}
+      initialBundleId={initialBundleId}
       pending={create.isPending || update.isPending}
       onSave={(draft) => {
         const done = () => back(initial?.id ?? null);
@@ -129,17 +134,20 @@ export function ArtworkEditor({
 function Form({
   initial,
   initialDiscountId,
+  initialBundleId,
   pending,
   onSave,
   onCancel,
 }: {
   initial?: Artwork;
   initialDiscountId: string | null;
+  initialBundleId: string | null;
   pending: boolean;
   onSave: (draft: ArtworkDraft) => void;
   onCancel: () => void;
 }) {
   const promotions = usePromotions("");
+  const bundles = useBundles("");
   const stores = useStores("");
 
   const start = {
@@ -149,6 +157,7 @@ function Form({
     // since `0053`.
     placements: initial?.placements ?? (["home"] as Placement[]),
     discountId: initial ? (initial.discount?.id ?? null) : initialDiscountId,
+    bundleId: initial ? (initial.bundle?.id ?? null) : initialBundleId,
     startsAt: initial?.startsAt ?? null,
     endsAt: initial?.endsAt ?? null,
     isActive: initial?.isActive ?? true,
@@ -160,6 +169,9 @@ function Form({
   const [imageUrl, setImageUrl] = useState<Localized | null>(start.imageUrl);
   const [placements, setPlacements] = useState<Placement[]>(start.placements);
   const [discountId, setDiscountId] = useState<string | null>(start.discountId);
+  const [bundleId, setBundleId] = useState<string | null>(start.bundleId);
+  /** A picture tied to a deal — a promotion or a bundle — runs on its dates. */
+  const linkedDeal = Boolean(discountId || bundleId);
   const [startsAt, setStartsAt] = useState<string | null>(start.startsAt);
   const [endsAt, setEndsAt] = useState<string | null>(start.endsAt);
   const [isActive, setIsActive] = useState(start.isActive);
@@ -173,6 +185,7 @@ function Form({
         imageUrl,
         placements,
         discountId,
+        bundleId,
         startsAt,
         endsAt,
         isActive,
@@ -197,6 +210,31 @@ function Form({
   const promotion = discountId
     ? ((promotions.data ?? []).find((one) => one.id === discountId) ?? null)
     : null;
+
+  /** The bundle it advertises, as the bundles list has it — for its dates. */
+  const bundle = bundleId
+    ? ((bundles.data ?? []).find((one) => one.id === bundleId) ?? null)
+    : null;
+
+  /** The live bundles, plus the one it points at if archived since. */
+  const bundleOptions = [
+    { value: "", label: t("artworks.noBundle") },
+    ...(bundles.data ?? []).map((one) => ({
+      value: one.id,
+      label: pickLocalized(one.name),
+      detail: one.storeName,
+    })),
+    ...(initial?.bundle?.archived
+      ? [
+          {
+            value: initial.bundle.id,
+            label: t("artworks.archivedBundleOption", {
+              name: pickLocalized(initial.bundle.name),
+            }),
+          },
+        ]
+      : []),
+  ];
 
   // Called unconditionally — it is a hook — and only shown when linked.
   const inherited = useLinkDescription(promotion?.link ?? NO_LINK);
@@ -237,7 +275,7 @@ function Form({
           : undefined,
       // Only for a picture with dates of its own — a linked one has none.
       window:
-        !discountId &&
+        !linkedDeal &&
         startsAt &&
         endsAt &&
         new Date(endsAt) <= new Date(startsAt)
@@ -254,11 +292,12 @@ function Form({
       imageUrl,
       placements,
       discountId,
+      bundleId,
       // Null whenever linked — `artworks_linked_has_no_window`. The form keeps
       // what was typed while the operator tries a link on and off, but a
       // linked picture is never saved with dates.
-      startsAt: discountId ? null : startsAt,
-      endsAt: discountId ? null : endsAt,
+      startsAt: linkedDeal ? null : startsAt,
+      endsAt: linkedDeal ? null : endsAt,
       isActive,
       // Only meaningful with the shop page on; cleared without it, so turning
       // the placement back on later does not resurrect a forgotten choice.
@@ -412,15 +451,51 @@ function Form({
             >
               <Select
                 value={discountId ?? ""}
-                onChange={(next) => setDiscountId(next === "" ? null : next)}
+                onChange={(next) => {
+                  setDiscountId(next === "" ? null : next);
+                  // One deal per picture — `artworks_one_subject`.
+                  if (next !== "") setBundleId(null);
+                }}
                 options={options}
                 disabled={pending || !promotions.isSuccess}
               />
             </Field>
 
+            {/* Or a bundle (`0204`): the picture is shown while the bundle is
+                on offer, and a tap opens that shop's bundles. */}
+            <Field label={t("artworks.bundle")} hint={t("artworks.bundleHint")}>
+              <Select
+                value={bundleId ?? ""}
+                onChange={(next) => {
+                  setBundleId(next === "" ? null : next);
+                  if (next !== "") setDiscountId(null);
+                }}
+                options={bundleOptions}
+                disabled={pending || !bundles.isSuccess}
+              />
+            </Field>
+
             {/* A linked picture has no dates of its own (`0136`) — it runs on
                 its promotion's, said here in place of the two fields. */}
-            {discountId ? (
+            {bundleId ? (
+              <p className="rounded-md bg-neutral-fill px-lg py-md text-[13px] text-text-soft">
+                {bundle && (bundle.startsAt || bundle.endsAt)
+                  ? t("artworks.runsOnBundle", {
+                      window:
+                        bundle.startsAt && bundle.endsAt
+                          ? t("artworks.between", {
+                              from: formatDate(bundle.startsAt),
+                              to: formatDate(bundle.endsAt),
+                            })
+                          : bundle.endsAt
+                            ? t("artworks.until", { to: formatDate(bundle.endsAt) })
+                            : t("artworks.startsFrom", {
+                                from: formatDate(bundle.startsAt!),
+                              }),
+                    })
+                  : t("artworks.runsOnBundleOpen")}
+              </p>
+            ) : discountId ? (
               <p className="rounded-md bg-neutral-fill px-lg py-md text-[13px] text-text-soft">
                 {promotion && (promotion.startsAt || promotion.endsAt)
                   ? t("artworks.runsOnPromotion", {
@@ -473,7 +548,9 @@ function Form({
               hint={
                 discountId && link.kind === null
                   ? t("artworks.followsPromotion", { destination: inherited })
-                  : undefined
+                  : bundleId && link.kind === null
+                    ? t("artworks.followsBundle")
+                    : undefined
               }
             />
           </FormSection>

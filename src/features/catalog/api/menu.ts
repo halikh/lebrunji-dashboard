@@ -348,6 +348,8 @@ async function searchMenuItems(
        menu_item_tag_links ( menu_item_tag_id )`,
     )
     .eq("store_id", storeId)
+    // A bundle is in no section, so it has no place on the menu tab (`0204`).
+    .eq("is_bundle", false)
     .is("deleted_at", null)
     .or(likeAny(["name->>en", "name->>ar", "description->>en", "slug"], term))
     .order("sort_order", { ascending: true })

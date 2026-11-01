@@ -105,6 +105,20 @@ export type Artwork = {
     /** The promotion's destination, which this picture follows if it has none. */
     link: TapLink;
   } | null;
+  /**
+   * The bundle it advertises (`0204`), or null. Never set beside `discount` —
+   * `artworks_one_subject`. A linked picture runs on the bundle's dates and is
+   * shown only while the bundle is on offer.
+   */
+  bundle?: {
+    id: string;
+    name: Localized;
+    storeId: string;
+    archived: boolean;
+    isActive: boolean;
+    startsAt: string | null;
+    endsAt: string | null;
+  } | null;
   isActive: boolean;
   /**
    * ISO instants, or null for open-ended. Always both null on a linked
@@ -132,6 +146,8 @@ const COLUMNS = `id, format, image_url, placements, discount_id, is_active,
    discount:discounts ( id, slug, deleted_at, starts_at, ends_at,
      ${LINK_COLUMNS} ),
    artwork_stores ( store_id ),
+   bundle_id,
+   bundle:menu_items ( id, name, store_id, deleted_at, is_active, starts_at, ends_at ),
    ${LINK_COLUMNS}`;
 
 /**
@@ -161,6 +177,7 @@ export async function fetchArtworks(): Promise<Artwork[]> {
 /** A row as PostgREST returns it, to the shape the screens use. */
 export function toArtwork(row: Record<string, unknown>): Artwork {
   const linked = firstOf(row.discount);
+  const bundle = firstOf(row.bundle);
 
   return {
     id: row.id as string,
@@ -175,6 +192,17 @@ export function toArtwork(row: Record<string, unknown>): Artwork {
           startsAt: (linked.starts_at as string | null) ?? null,
           endsAt: (linked.ends_at as string | null) ?? null,
           link: linkOf(linked),
+        }
+      : null,
+    bundle: bundle
+      ? {
+          id: bundle.id as string,
+          name: (bundle.name as Localized | null) ?? {},
+          storeId: bundle.store_id as string,
+          archived: bundle.deleted_at != null,
+          isActive: Boolean(bundle.is_active),
+          startsAt: (bundle.starts_at as string | null) ?? null,
+          endsAt: (bundle.ends_at as string | null) ?? null,
         }
       : null,
     isActive: Boolean(row.is_active),
@@ -196,6 +224,8 @@ export type ArtworkDraft = {
   placements: Placement[];
   /** Null for pure artwork. */
   discountId: string | null;
+  /** The bundle it advertises (`0204`); never with `discountId`. */
+  bundleId?: string | null;
   isActive: boolean;
   /** Written as null whenever `discountId` is set — see `toColumns`. */
   startsAt: string | null;
@@ -337,10 +367,11 @@ export function toColumns(patch: ArtworkPatch): Record<string, unknown> {
     row.placements = orderPlacements(patch.placements);
   }
   if (patch.discountId !== undefined) row.discount_id = patch.discountId;
+  if (patch.bundleId !== undefined) row.bundle_id = patch.bundleId;
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;
-  if (patch.discountId) {
+  if (patch.discountId || patch.bundleId) {
     row.starts_at = null;
     row.ends_at = null;
   }
@@ -424,11 +455,15 @@ export function reorderUpdates(
  * own otherwise.
  */
 export function windowOf(
-  artwork: Pick<Artwork, "startsAt" | "endsAt" | "discount">,
+  artwork: Pick<Artwork, "startsAt" | "endsAt" | "discount" | "bundle">,
 ): { startsAt: string | null; endsAt: string | null } {
-  return artwork.discount
-    ? { startsAt: artwork.discount.startsAt, endsAt: artwork.discount.endsAt }
-    : { startsAt: artwork.startsAt, endsAt: artwork.endsAt };
+  if (artwork.discount) {
+    return { startsAt: artwork.discount.startsAt, endsAt: artwork.discount.endsAt };
+  }
+  if (artwork.bundle) {
+    return { startsAt: artwork.bundle.startsAt, endsAt: artwork.bundle.endsAt };
+  }
+  return { startsAt: artwork.startsAt, endsAt: artwork.endsAt };
 }
 
 /**
@@ -440,11 +475,12 @@ export function windowOf(
  * load it, and the row names the promotion so the operator can look.
  */
 export function artworkState(
-  artwork: Pick<Artwork, "isActive" | "startsAt" | "endsAt" | "discount">,
+  artwork: Pick<Artwork, "isActive" | "startsAt" | "endsAt" | "discount" | "bundle">,
   now: number,
-): "off" | "scheduled" | "ended" | "promotionArchived" | "live" {
+): "off" | "scheduled" | "ended" | "promotionArchived" | "bundleArchived" | "live" {
   if (!artwork.isActive) return "off";
   if (artwork.discount?.archived) return "promotionArchived";
+  if (artwork.bundle?.archived) return "bundleArchived";
   const { startsAt, endsAt } = windowOf(artwork);
   if (endsAt && new Date(endsAt).getTime() < now) {
     return "ended";
@@ -486,6 +522,15 @@ export function friendly(message: string): string {
   }
   if (message.includes("artworks_discount_id_fkey")) {
     return t("artworks.promotionGone");
+  }
+  if (message.includes("artworks_one_subject")) {
+    return t("artworks.oneSubject");
+  }
+  if (
+    message.includes("artworks_bundle_id_fkey") ||
+    message.includes("artworks_bundle_is_a_bundle")
+  ) {
+    return t("artworks.bundleGone");
   }
   return message;
 }
