@@ -17,7 +17,6 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import {
   AsyncMultiSelect,
-  MultiSelect,
   Select,
   type SelectOption,
 } from "@/components/ui/select";
@@ -138,16 +137,16 @@ export function BundleEditor({
       startStoreId={fromStoreId}
       listHref={listHref}
       pending={create.isPending || update.isPending}
-      onSave={(draft, changes, questions) => {
+      onSave={(draft, changes) => {
         const done = (focusId: string | null) => back(focusId);
         if (initial) {
           update.mutate(
-            { id: initial.id, draft, branchPrices: changes, questions },
+            { id: initial.id, draft, branchPrices: changes },
             { onSuccess: () => done(initial.id) },
           );
         } else {
           create.mutate(
-            { draft, sortOrder: rows.length, branchPrices: changes, questions },
+            { draft, sortOrder: rows.length, branchPrices: changes },
             { onSuccess: (newId) => back(newId, draft.storeId) },
           );
         }
@@ -174,7 +173,6 @@ function Form({
   onSave: (
     draft: BundleDraft,
     branchPrices: Record<string, number | null>,
-    questions: { wanted: string[]; current: string[] } | null,
   ) => void;
   onCancel: () => void;
 }) {
@@ -213,33 +211,22 @@ function Form({
   const branches = useBranches(storeId);
 
   /**
-   * The shop's questions — "Pick your drink", "Make it large" — written once in
-   * its Options tab and asked by any dish, or bundle, that links them. Read
-   * only once a shop is chosen; the key is the Options tab's, so a question
-   * written there shows here without a reload.
+   * The choices it asks — "Pick your drink" — shown, not edited, here (user,
+   * 2026-11-02). They are the shop's questions, set up in its Options tab with
+   * the bundle picked there, exactly as a dish's are; this reads the same
+   * cache, so a change made there shows here without a reload.
    */
   const questions = useQuery({
     queryKey: [...optionKeys.counts(storeId), "questions", ""],
     queryFn: () => fetchStoreQuestions(storeId),
-    enabled: Boolean(storeId),
+    enabled: Boolean(storeId) && Boolean(initial),
   });
-  /** The questions this bundle asks as saved — read off each question's items. */
-  const savedQuestionIds = initial
-    ? (questions.data ?? [])
-        .filter((question) => question.itemIds.includes(initial.id))
-        .map((question) => question.id)
+  const asked = initial
+    ? (questions.data ?? []).filter(
+        (question) =>
+          question.isActive && question.itemIds.includes(initial.id),
+      )
     : [];
-  /** `null` until the operator changes it: then the saved list is still the answer. */
-  const [pickedQuestionIds, setPickedQuestionIds] = useState<string[] | null>(
-    null,
-  );
-  const questionIds = pickedQuestionIds ?? savedQuestionIds;
-  const chosenQuestions = questionIds.flatMap((questionId) => {
-    const found = (questions.data ?? []).find(
-      (question) => question.id === questionId,
-    );
-    return found ? [found] : [];
-  });
   const money = (minor: number) =>
     currencyCode ? format(minor, currencyCode) : String(minor);
 
@@ -266,7 +253,6 @@ function Form({
         startsAt,
         endsAt,
         branchPrices,
-        questionIds,
       },
       {
         storeId: initial?.storeId ?? startStoreId ?? "",
@@ -282,7 +268,6 @@ function Form({
         startsAt: initial?.startsAt ?? null,
         endsAt: initial?.endsAt ?? null,
         branchPrices: initialBranchPrices,
-        questionIds: savedQuestionIds,
       },
     ),
   );
@@ -352,10 +337,6 @@ function Form({
         })),
       },
       changes,
-      // Only once the operator has touched the list; untouched, nothing moves.
-      pickedQuestionIds === null
-        ? null
-        : { wanted: pickedQuestionIds, current: savedQuestionIds },
     );
   }
 
@@ -398,8 +379,6 @@ function Form({
                     // Another shop's dishes cannot be in it — `bundle_items_same_store`.
                     setItems([]);
                     setBranchPrices({});
-                    // Questions are a shop's too.
-                    setPickedQuestionIds([]);
                   }}
                   options={(stores.data?.stores ?? []).map((one) => ({
                     value: one.id,
@@ -545,68 +524,6 @@ function Form({
                   </li>
                 ))}
               </ul>
-            )}
-          </FormSection>
-
-          {/* Choices the customer makes when adding it — "Pick your drink".
-              The shop's own questions, the ones its dishes ask: a bundle asks
-              them the same way, and an answer's price is added to the bundle's
-              (user, 2026-11-02). Written and edited in the Options tab. */}
-          <FormSection title={t("bundles.choicesSection")}>
-            <Field
-              label={t("bundles.questions")}
-              hint={t("bundles.questionsHint")}
-            >
-              <MultiSelect
-                value={questionIds}
-                onChange={setPickedQuestionIds}
-                placeholder={
-                  storeId
-                    ? t("bundles.questionsPlaceholder")
-                    : t("bundles.pickShopFirst")
-                }
-                disabled={pending || !storeId || !questions.isSuccess}
-                options={(questions.data ?? [])
-                  .filter((question) => question.isActive)
-                  .map((question) => ({
-                    value: question.id,
-                    label: pickLocalized(question.title),
-                    detail: describeChoices(question, money),
-                  }))}
-              />
-            </Field>
-
-            {chosenQuestions.length > 0 && (
-              <ul className="flex flex-col gap-xs">
-                {chosenQuestions.map((question) => (
-                  <li
-                    key={question.id}
-                    className="flex flex-col gap-xxs rounded-md bg-neutral-fill px-lg py-sm"
-                  >
-                    <span className="text-[14px] font-medium">
-                      {pickLocalized(question.title)}
-                      <span className="font-normal text-text-faint">
-                        {" · "}
-                        {question.minSelections > 0
-                          ? t("bundles.questionRequired")
-                          : t("bundles.questionOptional")}
-                      </span>
-                    </span>
-                    <span className="text-[13px] text-text-soft">
-                      {describeChoices(question, money)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {storeId && (
-              <Link
-                href={`/catalogue/${storeId}?tab=options`}
-                className="self-start text-[13px] font-semibold text-primary underline-offset-2 hover:underline"
-              >
-                {t("bundles.questionsManage")}
-              </Link>
             )}
           </FormSection>
 
@@ -784,6 +701,56 @@ function Form({
               >
                 {initial ? t("bundles.artworkAdd") : t("bundles.artworkOpen")}
               </Link>
+            )}
+          </div>
+
+          {/* The choices it asks — "Pick your drink" — shown here and set up
+              in the shop's Options tab, opened on this bundle: the same place
+              and the same questions a dish's are (user, 2026-11-02). */}
+          <div className="flex flex-col gap-xs rounded-md bg-neutral-fill px-lg py-md">
+            <span className="text-[14px] font-semibold text-text">
+              {t("bundles.choicesTitle")}
+            </span>
+            <p className="text-[13px] text-text-soft">
+              {t("bundles.choicesBody")}
+            </p>
+            {asked.length > 0 ? (
+              <ul className="flex flex-col gap-sm">
+                {asked.map((question) => (
+                  <li key={question.id} className="flex flex-col gap-xxs">
+                    <span className="text-[13px] font-semibold text-text">
+                      {pickLocalized(question.title)}
+                      <span className="font-normal text-text-faint">
+                        {" · "}
+                        {question.minSelections > 0
+                          ? t("bundles.questionRequired")
+                          : t("bundles.questionOptional")}
+                      </span>
+                    </span>
+                    <span className="text-[12px] text-text-soft">
+                      {describeChoices(question, money)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : initial ? (
+              <p className="text-[13px] text-text-faint">
+                {t("bundles.choicesNone")}
+              </p>
+            ) : null}
+            {initial ? (
+              <Link
+                href={`/catalogue/${initial.storeId}?tab=options&section=bundles&item=${initial.id}`}
+                className="self-start text-[13px] font-semibold text-primary underline-offset-2 hover:underline"
+              >
+                {asked.length > 0
+                  ? t("bundles.choicesChange")
+                  : t("bundles.choicesAdd")}
+              </Link>
+            ) : (
+              <p className="text-[13px] text-text-faint">
+                {t("bundles.choicesSaveFirst")}
+              </p>
             )}
           </div>
         </aside>

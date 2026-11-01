@@ -7,7 +7,6 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
 import { setItemPrice } from "./api/branch-menu";
-import { offerGroupOn, stopOfferingGroupOn } from "./api/options";
 import {
   archiveBundle,
   createBundle,
@@ -49,25 +48,6 @@ async function writeBranchPrices(id: string, changes: BranchPriceChanges) {
   }
 }
 
-/**
- * The shop's questions this bundle asks — "Pick your drink" — as links, the
- * same rows a dish's options are (`menu_item_option_group_links`). `null`
- * leaves them as they are. Removals first, as `setQuestionItems` does.
- */
-type QuestionChanges = { wanted: string[]; current: string[] } | null;
-
-async function writeQuestions(id: string, changes: QuestionChanges) {
-  if (!changes) return;
-  const wanted = new Set(changes.wanted);
-  for (const groupId of changes.current) {
-    if (!wanted.has(groupId)) await stopOfferingGroupOn(groupId, [id]);
-  }
-  for (const [index, groupId] of changes.wanted.entries()) {
-    if (!changes.current.includes(groupId))
-      await offerGroupOn(groupId, [id], index);
-  }
-}
-
 export function useCreateBundle() {
   const queryClient = useQueryClient();
   const toast = useToasts();
@@ -77,11 +57,9 @@ export function useCreateBundle() {
       draft: BundleDraft;
       sortOrder: number;
       branchPrices: BranchPriceChanges;
-      questions: QuestionChanges;
     }) => {
       const id = await createBundle(input.draft, input.sortOrder);
       await writeBranchPrices(id, input.branchPrices);
-      await writeQuestions(id, input.questions);
       return id;
     },
     onSuccess: (_id, input) => {
@@ -108,11 +86,9 @@ export function useUpdateBundle() {
       id: string;
       draft: BundleDraft;
       branchPrices: BranchPriceChanges;
-      questions: QuestionChanges;
     }) => {
       await updateBundle(input.id, input.draft);
       await writeBranchPrices(input.id, input.branchPrices);
-      await writeQuestions(input.id, input.questions);
     },
     onSuccess: (_result, input) => {
       toast.success(

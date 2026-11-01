@@ -27,7 +27,6 @@ import {
 } from "@/lib/validation";
 
 import type { ItemOption, OptionGroupMode, StoreQuestion } from "./api/options";
-import { BulkForm } from "./bulk-form";
 import { useMenu } from "./use-menu";
 import { useBundles } from "./use-bundles";
 import type { MenuSection } from "./api/menu";
@@ -472,14 +471,8 @@ function Question({
   // same two tables.
   const options = useItemOptions();
 
-  /**
-   * How choices are being added: not at all, one at a time, or as a list.
-   *
-   * One state rather than two booleans. They are mutually exclusive — a form
-   * and a paste box open together would be two Add buttons doing nearly the
-   * same thing — and two booleans is a fourth state that means nothing.
-   */
-  const [adding, setAdding] = useState<"none" | "one" | "bulk">("none");
+  /** Whether the add-a-choice form is open. */
+  const [adding, setAdding] = useState<"none" | "one">("none");
   /** Which answer is being corrected. One at a time — a row is either a row or
       a form, and two open forms in a list is two places to press Save. */
   const [editingChoice, setEditingChoice] = useState<string | null>(null);
@@ -854,14 +847,7 @@ function Question({
             a place to press, not a form sitting open. A permanently visible
             form under a list reads as a row of it, and on a dish with four
             questions it is four forms nobody is filling in. */}
-            {adding === "bulk" ? (
-              <BulkChoices
-                groupId={group.id}
-                currencyCode={currencyCode}
-                sortOrder={group.choices.length}
-                onDone={() => setAdding("none")}
-              />
-            ) : adding === "one" ? (
+            {adding === "one" ? (
               <ChoiceForm
                 key={added}
                 currencyCode={currencyCode}
@@ -882,8 +868,7 @@ function Question({
                 onCancel={() => setAdding("none")}
               />
             ) : (
-              <div className="flex flex-wrap items-center gap-sm">
-                <button
+              <button
                   type="button"
                   onClick={() => setAdding("one")}
                   className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-soft hover:border-primary hover:text-primary"
@@ -904,14 +889,6 @@ function Question({
                     name: pickLocalized(group.title),
                   })}
                 </button>
-
-                {/* Beside the one-at-a-time button rather than inside the form,
-                    because they are two ways to start the same job and the
-                    choice between them is made before either is open. */}
-                <Button variant="secondary" onClick={() => setAdding("bulk")}>
-                  {t("options.bulkAdd")}
-                </Button>
-              </div>
             )}
           </div>
         </div>
@@ -1314,54 +1291,6 @@ function TitleForm({
         </Button>
       </div>
     </div>
-  );
-}
-
-/**
- * Adding a question's answers as a pasted list.
- *
- * The form itself is `BulkForm`, shared with sections and items — see its note
- * on why one component covers all three. What is local here is the rule that a
- * choice's price may be left off, because a free extra is the common case, and
- * the mutation that writes them.
- */
-function BulkChoices({
-  groupId,
-  currencyCode,
-  sortOrder,
-  onDone,
-}: {
-  groupId: string;
-  /** The shop's currency — what the prices in the list are denominated in. */
-  currencyCode: string;
-  sortOrder: number;
-  onDone: () => void;
-}) {
-  const options = useItemOptions();
-  const { decimalsOf } = useMoney();
-
-  return (
-    <BulkForm
-      kind="choices"
-      price="optional"
-      decimals={decimalsOf(currencyCode)}
-      pending={options.addMany.isPending}
-      onCancel={onDone}
-      onSubmit={(rows) =>
-        options.addMany.mutate(
-          {
-            groupId,
-            // Never null under the `optional` rule: an absent price is free.
-            choices: rows.map((row) => ({
-              name: row.name,
-              price: row.price ?? 0,
-            })),
-            sortOrder,
-          },
-          { onSuccess: onDone },
-        )
-      }
-    />
   );
 }
 
