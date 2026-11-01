@@ -49,16 +49,13 @@ import {
   BranchSectionNote,
   useBranchMenu,
 } from "./branch-menu";
-import { BulkForm } from "./bulk-form";
 import { ItemTags } from "./tag-chip";
 import {
   useAisles,
   useArchiveMenuItem,
   useArchiveMenuSection,
   useUpdateMenuSection,
-  useCreateMenuItems,
   useCreateMenuSection,
-  useCreateMenuSections,
   useMenu,
   useMenuSearch,
   useReorderMenu,
@@ -278,18 +275,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
    * the list growing by one, in the place the new section will be — and the
    * form is where the button was, so nothing has to move to make room.
    */
-  /**
-   * How a section is being added: not at all, one at a time, or as a list.
-   *
-   * One state rather than two booleans — they are mutually exclusive, and two
-   * booleans is a fourth state that means nothing.
-   */
-  const createItems = useCreateMenuItems(storeId);
-  const createSections = useCreateMenuSections(storeId);
-  const { decimalsOf } = useMoney();
-
-  const [adding, setAddingMode] = useState<"none" | "one" | "bulk">("none");
-  const setAdding = (on: boolean) => setAddingMode(on ? "one" : "none");
+  const [adding, setAdding] = useState(false);
 
   /**
    * The search term, and the mode it puts the screen in.
@@ -383,12 +369,6 @@ function MenuEditor({ storeId }: { storeId: string }) {
           // still lands in the right part of the menu.
           router.push(`/catalogue/${storeId}/items/new?section=${section.id}`),
         )}
-        decimals={decimalsOf(store.data?.currencyCode ?? "")}
-        bulk={{
-          pending: createItems.isPending,
-          add: (sectionId, items, sortOrder) =>
-            createItems.mutate({ sectionId, items, sortOrder }),
-        }}
         onToggle={(item) =>
           update.mutate({
             id: item.id,
@@ -401,21 +381,12 @@ function MenuEditor({ storeId }: { storeId: string }) {
         renderSubAisle={(sub, subOrder) => renderSection(sub, null, subOrder)}
         onReorderSubAisles={reorderSections}
         subAisleAdd={{
-          pending: createSection.isPending || createSections.isPending,
+          pending: createSection.isPending,
           add: (fields, done) =>
             createSection.mutate(
               {
                 draft: { storeId, ...fields, parentId: section.id },
                 sortOrder: nextSectionSort(subAisles ?? []),
-              },
-              { onSuccess: done },
-            ),
-          paste: (titles, done) =>
-            createSections.mutate(
-              {
-                titles,
-                sortOrder: nextSectionSort(subAisles ?? []),
-                parentId: section.id,
               },
               { onSuccess: done },
             ),
@@ -523,27 +494,13 @@ function MenuEditor({ storeId }: { storeId: string }) {
             {/* Beside the search rather than at the end of the list. The
                 header does not scroll, so this is reachable on a menu of any
                 length — which is what the pinned bar used to be for. */}
-            {menu.isSuccess && adding === "none" && (
-              // Grouped so they wrap as a pair: on a phone they share the line
-              // under the search equally rather than stacking one per line.
-              <div className="flex items-center gap-lg max-md:basis-full max-md:gap-sm">
-                <Button
-                  onClick={() => setAddingMode("one")}
-                  className="max-md:flex-1"
-                >
-                  {t("menu.addSection")}
-                </Button>
-                {/* Beside the one-at-a-time button, because they are two ways
-                    to start the same job and the choice is made before either
-                    is open. */}
-                <Button
-                  variant="secondary"
-                  onClick={() => setAddingMode("bulk")}
-                  className="max-md:flex-1"
-                >
-                  {t("menu.bulkSections")}
-                </Button>
-              </div>
+            {menu.isSuccess && !adding && (
+              <Button
+                onClick={() => setAdding(true)}
+                className="max-md:basis-full"
+              >
+                {t("menu.addSection")}
+              </Button>
             )}
             {searching && (
               <>
@@ -610,7 +567,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
               its own empty state and would stack a second one on this. */}
           {menu.isSuccess &&
             menu.data.length === 0 &&
-            adding === "none" &&
+            !adding &&
             !searching && (
               <EmptyState titleKey="menu.emptyTitle" bodyKey="menu.emptyBody" />
             )}
@@ -741,27 +698,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
           {/* The form appears where the new section will, at the end of the
               list — and scrolls itself into view, because on a long menu it
               opens below the fold. The button that opens it is pinned below. */}
-          {!searching && menu.isSuccess && adding === "bulk" && (
-            <BulkForm
-              kind="sections"
-              // A section is a heading and nothing else — no price column.
-              price="none"
-              decimals={null}
-              pending={createSections.isPending}
-              onCancel={guarded(() => setAddingMode("none"))}
-              onSubmit={(rows) =>
-                createSections.mutate(
-                  {
-                    titles: rows.map((row) => row.name),
-                    sortOrder: sections.length,
-                  },
-                  { onSuccess: () => setAddingMode("none") },
-                )
-              }
-            />
-          )}
-
-          {!searching && menu.isSuccess && adding === "one" && (
+          {!searching && menu.isSuccess && adding && (
             <SectionForm
               pending={createSection.isPending}
               onSave={(fields) =>
@@ -854,8 +791,6 @@ function Section({
   onReorderItems,
   onEdit,
   onAdd,
-  decimals,
-  bulk,
   onToggle,
   onArchive,
 }: {
@@ -872,11 +807,10 @@ function Section({
     order: ReorderProps & { carried: boolean },
   ) => ReactNode;
   onReorderSubAisles: (ids: string[]) => void;
-  /** Adding sub-aisles to this aisle, one at a time or pasted. */
+  /** Adding a sub-aisle to this aisle. */
   subAisleAdd: {
     pending: boolean;
     add: (fields: SectionFields, done: () => void) => void;
-    paste: (titles: Localized[], done: () => void) => void;
   };
   moves: SectionMoves;
   /**
@@ -907,29 +841,16 @@ function Section({
   onReorderItems: (ids: string[]) => void;
   onEdit: (id: string) => void;
   onAdd: () => void;
-  /** The shop's currency decimals, for scaling prices in a pasted list. */
-  decimals: number | null;
-  /** Writes a pasted list of items into this section. */
-  bulk: {
-    pending: boolean;
-    add: (
-      sectionId: string,
-      items: { name: Localized; price: number }[],
-      sortOrder: number,
-    ) => void;
-  };
   onToggle: (item: MenuItem) => void;
   onArchive: (item: MenuItem) => Promise<void>;
 } & ReorderProps) {
   const title = pickLocalized(section.title);
 
-  /** Whether this section's paste box is open. Per section, not per menu. */
-  const [pasting, setPasting] = useState(false);
   const guarded = useGuardedAction();
   const isSub = level === "sub";
 
-  /** How a sub-aisle is being added here — the menu's own three states. */
-  const [subAdding, setSubAdding] = useState<"none" | "one" | "bulk">("none");
+  /** Whether the add-a-sub-aisle form is open here. */
+  const [subAdding, setSubAdding] = useState(false);
   /** Whether the Move panel is open under the heading. */
   const [moving, setMoving] = useState(false);
 
@@ -1317,44 +1238,23 @@ function Section({
                   </p>
                 )}
 
-              {subAdding === "one" ? (
+              {subAdding ? (
                 <SectionForm
                   pending={subAisleAdd.pending}
                   placeholder={{ en: "Milk", ar: "حليب" }}
                   onSave={(fields) =>
-                    subAisleAdd.add(fields, () => setSubAdding("none"))
+                    subAisleAdd.add(fields, () => setSubAdding(false))
                   }
-                  onCancel={guarded(() => setSubAdding("none"))}
-                />
-              ) : subAdding === "bulk" ? (
-                <BulkForm
-                  kind="sections"
-                  price="none"
-                  decimals={null}
-                  pending={subAisleAdd.pending}
-                  onCancel={guarded(() => setSubAdding("none"))}
-                  onSubmit={(rows) =>
-                    subAisleAdd.paste(
-                      rows.map((one) => one.name),
-                      () => setSubAdding("none"),
-                    )
-                  }
+                  onCancel={guarded(() => setSubAdding(false))}
                 />
               ) : (
                 <div className="flex flex-wrap items-center gap-sm">
                   <Button
                     variant="primary-quiet"
                     size="sm"
-                    onClick={() => setSubAdding("one")}
+                    onClick={() => setSubAdding(true)}
                   >
                     {t("menu.addSubAisle")}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setSubAdding("bulk")}
-                  >
-                    {t("menu.bulkSubAisles")}
                   </Button>
                 </div>
               )}
@@ -1370,63 +1270,27 @@ function Section({
           dish should not need the section opened first, least of all an empty
           one, where opening it showed nothing but this. Gone while carried —
           a carried section is only its heading. */}
-      {!carried &&
-        holdsProducts &&
-        (pasting ? (
-          <BulkForm
-            kind="items"
-            // An item without a price is not an item — unlike a choice, where
-            // free is the common case.
-            price="required"
-            decimals={decimals}
-            pending={bulk.pending}
-            onCancel={guarded(() => setPasting(false))}
-            onSubmit={(rows) => {
-              bulk.add(
-                section.id,
-                // Never null under the `required` rule.
-                rows.map((row) => ({
-                  name: row.name,
-                  price: row.price ?? 0,
-                })),
-                nextSortOrder(section),
-              );
-              setPasting(false);
-            }}
-          />
-        ) : (
-          <div className="flex flex-wrap items-center gap-sm">
-            <button
-              type="button"
-              onClick={onAdd}
-              className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-faint hover:bg-neutral-fill hover:text-text-soft"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.75}
-                strokeLinecap="round"
-                aria-hidden
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              {t("menu.addItem", { section: title })}
-            </button>
-
-            {/* Full width once it has wrapped under the dashed row on a phone,
-                so the two read as one block rather than a stray button. */}
-            <Button
-              variant="secondary"
-              onClick={() => setPasting(true)}
-              className="max-md:w-full"
-            >
-              {t("menu.bulkItems")}
-            </Button>
-          </div>
-        ))}
+      {!carried && holdsProducts && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-faint hover:bg-neutral-fill hover:text-text-soft"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            strokeLinecap="round"
+            aria-hidden
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          {t("menu.addItem", { section: title })}
+        </button>
+      )}
     </section>
   );
 }
@@ -1874,16 +1738,6 @@ function MovePanel({
         </Button>
       </div>
     </div>
-  );
-}
-
-function nextSortOrder(section: MenuSection | undefined): number {
-  if (!section) return 0;
-  return (
-    section.items.reduce(
-      (highest, item) => Math.max(highest, item.sortOrder),
-      0,
-    ) + 1
   );
 }
 

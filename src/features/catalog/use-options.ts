@@ -10,7 +10,6 @@ import type { Localized } from "@/lib/validation";
 
 import {
   createItemOption,
-  createItemOptions,
   createOptionGroup,
   fetchItemOptionGroups,
   fetchOptionCounts,
@@ -146,27 +145,6 @@ export function useItemOptions() {
     ...settle,
   });
 
-  /**
-   * Several choices in one go — see `createItemOptions`.
-   *
-   * It says how many landed, unlike `add`, which is silent: adding one is a row
-   * appearing where the operator is looking, while adding nine is a block of
-   * text becoming a list, and the count is the confirmation that the paste was
-   * read the way it was meant.
-   */
-  const addMany = useMutation({
-    mutationFn: (input: {
-      groupId: string;
-      choices: { name: Localized; price: number }[];
-      sortOrder: number;
-    }) => createItemOptions(input.groupId, input.choices, input.sortOrder),
-    onSuccess: (_result, input) => {
-      void queryClient.invalidateQueries({ queryKey: ["options"] });
-      toast.success(t("bulk.addedChoices", { count: input.choices.length }));
-    },
-    onError: settle.onError,
-  });
-
   const edit = useMutation({
     mutationFn: (input: { id: string; patch: ItemOptionPatch }) =>
       updateItemOption(input.id, input.patch),
@@ -206,7 +184,7 @@ export function useItemOptions() {
     ...settle,
   });
 
-  return { add, addMany, edit, makeDefault, offerHere, defaultHere };
+  return { add, edit, makeDefault, offerHere, defaultHere };
 }
 
 export type { OptionGroup };

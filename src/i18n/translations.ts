@@ -1491,41 +1491,6 @@ const en = {
   },
 
   /**
-   * Bulk entry, shared by sections, items and choices.
-   *
-   * One namespace rather than three, because the strings are about the *format*
-   * — columns, a bar, a line number — and the format is one thing. Three copies
-   * would be three places for the separator to be described differently from
-   * the way the parser reads it.
-   */
-  bulk: {
-    hint: "One per line, columns separated by a vertical bar.",
-    hintPriceOptional:
-      "One per line, columns separated by a vertical bar. The price is last and can be left off — no price means free.",
-    hintPriceRequired:
-      "One per line, columns separated by a vertical bar, with the price last.",
-    label: "Your list",
-    sectionsTitle: "Several sections at once",
-    itemsTitle: "Several items at once",
-    choicesTitle: "Several choices at once",
-    submit: "Add {count}",
-    submitOne: "Add 1",
-    nothing: "Nothing to add yet — type or paste a list above.",
-    ready: "{count} ready to add",
-    problems: "Fix these lines first",
-    line: "Line {line}",
-    columns: "Expected {expected} columns separated by | , found {found}.",
-    nameMissing: "The {code} name is empty.",
-    nameLong: "The {code} name is longer than {max} characters.",
-    price: "The price is missing or is not a number.",
-    priceRange: "That price is out of range.",
-    duplicate: '"{name}" is already on line {first}.',
-    addedSections: "{count} sections added",
-    addedItems: "{count} items added",
-    addedChoices: "{count} choices added",
-  },
-
-  /**
    * Common questions: one question asked on many items.
    *
    * `0094` restored the link table `0074` dropped, so a question is offered on
@@ -1688,7 +1653,6 @@ const en = {
     extraCost: "Adds",
     extraCostHint: "Added to the item's price. Leave at 0 for a free choice.",
     addOption: "Add choice",
-    bulkAdd: "Paste a list",
     // Names the question, because a dish has several and the buttons are
     // otherwise identical down the page.
     addChoiceTo: "Add a choice to {name}",
@@ -2649,9 +2613,6 @@ const en = {
     // decoration.
     sections: "Sections",
     addSection: "Add a section",
-    // The bulk route, beside the one-at-a-time button in both places.
-    bulkSections: "Paste sections",
-    bulkItems: "Paste items",
     sectionTitle: "Section name",
     sectionTitleHint: "What customers see above the items in it.",
     // `menu_sections.image_url`, 0190 — read only by the Aisles layout.
@@ -2679,7 +2640,6 @@ const en = {
     aisleCount: "{subAisles} sub-aisles · {items} items",
     subAisleLabel: "Sub-aisle",
     addSubAisle: "Add a sub-aisle",
-    bulkSubAisles: "Paste sub-aisles",
     aisleNeedsSubAisle:
       "Products on an aisles shop go in a sub-aisle. Add one — Milk, Cheese — to start stocking this aisle.",
     looseTitle: "{count} product(s) sit directly on this aisle",

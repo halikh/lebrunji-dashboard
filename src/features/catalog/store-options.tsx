@@ -245,6 +245,7 @@ export function StoreOptions({ storeId }: { storeId: string }) {
           storeId={storeId}
           search={search}
           itemId={item?.id ?? null}
+          sectionItemIds={section?.items.map((one) => one.id) ?? null}
           itemName={
             item
               ? pickLocalized(item.name)
@@ -279,6 +280,7 @@ function ItemQuestions({
   onAddingChange,
   storeId,
   itemId,
+  sectionItemIds,
   itemName,
   search,
 }: {
@@ -288,6 +290,12 @@ function ItemQuestions({
   storeId: string;
   /** Null when no item is picked: the list is then the whole shop's. */
   itemId: string | null;
+  /**
+   * The picked section's items, or null when no section is picked. Narrows the
+   * list to questions asked on at least one of them — so a question asked
+   * nowhere drops out as soon as a section is chosen.
+   */
+  sectionItemIds: string[] | null;
   /** The heading — the item's name, or the shop's own. */
   itemName: string;
   /** What was typed in the box above. Empty for the whole list. */
@@ -328,8 +336,11 @@ function ItemQuestions({
    * and a `is_active` filter in the query would make this screen right and that
    * one empty.
    */
-  const shown = (groups.data ?? []).filter(
-    (group) => itemId === null || group.itemIds.includes(itemId),
+  const shown = (groups.data ?? []).filter((group) =>
+    itemId !== null
+      ? group.itemIds.includes(itemId)
+      : sectionItemIds === null ||
+        group.itemIds.some((id) => sectionItemIds.includes(id)),
   );
   const offered = shown.filter((group) => group.isActive);
   const withdrawn = shown.length - offered.length;
@@ -869,26 +880,26 @@ function Question({
               />
             ) : (
               <button
-                  type="button"
-                  onClick={() => setAdding("one")}
-                  className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-soft hover:border-primary hover:text-primary"
+                type="button"
+                onClick={() => setAdding("one")}
+                className="flex min-w-0 flex-grow items-center gap-sm rounded-md border border-dashed border-border px-lg py-md text-[14px] font-semibold text-text-soft hover:border-primary hover:text-primary"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  aria-hidden
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    aria-hidden
-                  >
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  {t("options.addChoiceTo", {
-                    name: pickLocalized(group.title),
-                  })}
-                </button>
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                {t("options.addChoiceTo", {
+                  name: pickLocalized(group.title),
+                })}
+              </button>
             )}
           </div>
         </div>

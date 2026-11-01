@@ -197,8 +197,8 @@ export async function fetchCategoryKinds(): Promise<CategoryKind[]> {
  *
  * Not a duplicate of the form's rule — a second layer under it. `LocalizedField`
  * filters as somebody types, which is the half that makes the rule *visible*;
- * `cleanLocalized` is the half that makes it *true*. Bulk paste, the wizard, a
- * future import and any screen written next all arrive here, and a rule
+ * `cleanLocalized` is the half that makes it *true*. The wizard, a future
+ * import and any screen written next all arrive here, and a rule
  * enforced only by a component is a rule the next component does not have.
  *
  * Names are stored in Title Case — "MILK BASED" is saved as "Milk Based" —

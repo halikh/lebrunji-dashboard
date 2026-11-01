@@ -447,40 +447,6 @@ export async function createItemOption(
   if (error) throw new Error(friendly(error.message));
 }
 
-/**
- * Adds several choices at once.
- *
- * **One insert, not a loop.** A loop of six inserts is six round trips and six
- * chances to stop halfway — and a half-inserted list is the worst outcome
- * available here, because the operator cannot re-paste it without duplicating
- * whatever landed. A single statement either writes every row or writes none.
- *
- * `sortOrder` is the position the first one takes; the rest follow it, in the
- * order they were typed. That is what makes a pasted list keep its order, which
- * for sizes is the difference between small-medium-large and an alphabetical
- * accident.
- */
-export async function createItemOptions(
-  groupId: string,
-  choices: { name: Localized; price: number }[],
-  sortOrder: number,
-): Promise<void> {
-  if (choices.length === 0) return;
-
-  const { error } = await getClient()
-    .from("item_options")
-    .insert(
-      choices.map((choice, index) => ({
-        option_group_id: groupId,
-        name: choice.name,
-        price: choice.price,
-        sort_order: sortOrder + index,
-      })),
-    );
-
-  if (error) throw new Error(friendly(error.message));
-}
-
 export type ItemOptionPatch = {
   name?: Localized;
   price?: number;

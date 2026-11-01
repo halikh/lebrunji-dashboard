@@ -13,8 +13,8 @@
  *
  * It applies in two places for the same reason the character filter does: as
  * the operator types (`LocalizedField`'s `"title"` filter) so the box shows what
- * will be stored, and on save (`titleLocalized`) so bulk paste and any screen
- * written next obey it too. Descriptions, options and long-form content are
+ * will be stored, and on save (`titleLocalized`) so any screen written next
+ * obeys it too. Descriptions, options and long-form content are
  * left exactly as typed.
  */
 
@@ -72,8 +72,8 @@ export function withoutRejected(value: string): string {
 /**
  * The rejected characters over a whole translated column.
  *
- * The second layer under the field's live filter — bulk paste and any screen
- * written next arrive at the api without passing through `LocalizedField`. It
+ * The second layer under the field's live filter — any screen written next
+ * can arrive at the api without passing through `LocalizedField`. It
  * removes characters only; case is left exactly as typed — names go through
  * `titleLocalized` below, which adds the casing. A null or absent
  * column comes back untouched: an absent description is a legitimate value and
