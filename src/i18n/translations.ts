@@ -2082,6 +2082,8 @@ const en = {
     price: "Bundle price",
     priceHint: "What the customer pays for the whole bundle, in {code}.",
     pricePositive: "The bundle needs a price above zero.",
+    priceBelowOriginal:
+      "The bundle's price must be less than the original price ({separately}).",
     originalPrice: "Original price",
     originalPriceHint:
       "What the dishes cost bought separately. The app shows it struck through next to the bundle price.",

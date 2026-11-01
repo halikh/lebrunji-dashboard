@@ -295,7 +295,14 @@ function Form({
           ? t("validation.priceRequired")
           : price <= 0
             ? t("bundles.pricePositive")
-            : undefined,
+            : // A bundle is a saving or it is not one.
+              items.length > 0 && price >= separately
+              ? t("bundles.priceBelowOriginal", {
+                  separately: currencyCode
+                    ? format(separately, currencyCode)
+                    : String(separately),
+                })
+              : undefined,
       window:
         startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)
           ? t("bundles.windowBackwards")
