@@ -847,11 +847,10 @@ const en = {
     archive: "Archive",
     truncated:
       "Showing the first 200 shops. Reordering and search still work, but the list is not complete.",
-    // Said once, above the list. `0118` gave the dashboard its own order so
-    // this drag cannot move a shop on the customer's home screen, and the
-    // second sentence is the whole of why the column exists.
+    // Said once, above the list — since `0206` this order is the app's too,
+    // and an operator dragging a row should know customers will see it move.
     reorderHint:
-      "Drag to arrange this list. It is the dashboard's own order — what customers see is unaffected.",
+      "Drag to set the order shops appear in the app — in Featured, Open now and every list.",
     openMenu: "Menu",
   },
 

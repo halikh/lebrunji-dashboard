@@ -47,10 +47,10 @@ export type Store = {
   /** How the app draws this shop's menu — see `MenuLayout`. */
   menuLayout: MenuLayout;
   /**
-   * Where the shop sits on the **customer's** home screen.
+   * Where the shop sits in the **app** — Featured, Open now, every list.
    *
-   * The app reads it — `fetchStores` there ends `.order('sort_order')` — so
-   * it is a merchandising decision, and nothing in this dashboard writes it.
+   * Since `0206` the same number as `adminSortOrder`: dragging a row in the
+   * stores list writes both, so the order here is the order customers see.
    */
   sortOrder: number;
   /**
@@ -170,9 +170,8 @@ export async function fetchStores(
        branches ( whatsapp_phone, sort_order, created_at, deleted_at )`,
     )
     .is("deleted_at", null)
-    // `0118`'s column, not the app's. An operator dragging a row here is
-    // putting the shop they are working on where they can find it; the
-    // customer's order is a different decision and stays where it was.
+    // The order the app shows too: a drag writes this and `sort_order`
+    // together (`0206`).
     .order("admin_sort_order", { ascending: true })
     // The tiebreak, and it does real work: every row is zero until the first
     // drag, so without it the whole catalogue would come back in whatever
@@ -410,7 +409,9 @@ export async function createStore(
       is_featured: draft.isFeatured,
       menu_layout: draft.menuLayout,
       exchange_rate: draft.exchangeRate,
+      // The end of both, which are one order since `0206`.
       sort_order: sortOrder,
+      admin_sort_order: sortOrder,
     })
     .select("id")
     .single();
@@ -921,16 +922,14 @@ function normalise(input: string): string {
 /**
  * Writes a new position to each shop that moved.
  *
- * ## Why `admin_sort_order` and not `sort_order`
+ * ## Both columns, one order
  *
- * Because they answer different questions. `sort_order` decides what a customer
- * sees first on the home screen — a merchandising decision the app reads and
- * nothing here writes. This one decides where a row sits in *this* list, which
- * is an operator putting the shop they are working on where they can find it.
- *
- * Migration `0118` added the second column for exactly this: one column would
- * mean dragging a row up here to work on it also moved it to the top of every
- * customer's home screen.
+ * `0118` split them: `admin_sort_order` for where a row sits here, so dragging
+ * a shop up to work on it would not move it up every customer's Home, and
+ * `sort_order` for the app — which nothing here wrote, so the order set here
+ * never reached a customer. The user wants the one order (2026-11-02): this
+ * list is the order the app shows, in Featured, Open now and every list.
+ * `0206` made the two equal; writing both keeps them so.
  *
  * ## Several requests rather than one
  *
@@ -956,7 +955,7 @@ export async function setStoreOrder(
     updates.map(({ id, sortOrder }) =>
       client
         .from("stores")
-        .update({ admin_sort_order: sortOrder })
+        .update({ sort_order: sortOrder, admin_sort_order: sortOrder })
         .eq("id", id),
     ),
   );

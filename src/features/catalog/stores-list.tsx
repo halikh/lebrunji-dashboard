@@ -67,8 +67,8 @@ export function StoresList() {
    * which keeps one numbering function for six lists rather than a second copy
    * differing by a field name.
    *
-   * What it writes is `admin_sort_order`, which nothing else reads: the
-   * customer’s own order is `sort_order` and is not touched here. See `0118`.
+   * What it writes is `admin_sort_order` and `sort_order` together — the
+   * order here is the order the app shows (`0206`). See `setStoreOrder`.
    */
   const order = useReorder({
     ids: rows.map((row) => row.id),
