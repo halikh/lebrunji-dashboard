@@ -29,6 +29,7 @@ import { Price } from "@/features/reference/price";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { ARTWORK_SHAPES } from "@/lib/image-shape";
 import { SEARCH, TEXT } from "@/lib/limits";
 import { itemUnit, pricePerUnit, unitKey } from "@/lib/units";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
@@ -1602,6 +1603,7 @@ function SectionForm({
           value={imageUrl}
           onChange={setImageUrl}
           folder="menu-sections"
+          shape={ARTWORK_SHAPES.aisle}
           cutout
           disabled={pending}
         />

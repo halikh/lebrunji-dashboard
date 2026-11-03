@@ -14,6 +14,12 @@
  * `offer-card.tsx` draws a banner at 21:9 and `promo-tiles.tsx` a tile at 4:5.
  * Change one there and it has to change here, or the dashboard refuses the
  * picture the app wants and accepts the one it crops.
+ *
+ * The square ones are drawn `contain` rather than cropped — a category in
+ * `category-tiles.tsx` and `category-card.tsx`, an aisle or sub-aisle in
+ * `aisle-tile.tsx` — so a picture of another shape loses nothing, but comes
+ * out smaller than its neighbours with grey down two sides of it, which in a
+ * row of them reads as the odd one out.
  */
 export type ImageShape = {
   /** Width over height, as the two whole numbers people say: 21 and 9. */
@@ -24,6 +30,8 @@ export type ImageShape = {
 export const ARTWORK_SHAPES = {
   banner: { width: 21, height: 9 },
   tile: { width: 4, height: 5 },
+  categoryIcon: { width: 1, height: 1 },
+  aisle: { width: 1, height: 1 },
 } as const satisfies Record<string, ImageShape>;
 
 /**

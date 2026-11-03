@@ -16,6 +16,7 @@ import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { ARTWORK_SHAPES } from "@/lib/image-shape";
 import { TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
@@ -389,6 +390,7 @@ function Form({
                   }
                 }}
                 folder="category-art"
+                shape={ARTWORK_SHAPES.categoryIcon}
                 cutout
                 disabled={pending}
               />
