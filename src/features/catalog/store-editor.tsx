@@ -368,11 +368,11 @@ export function StoreEditor() {
     if (!goTo(3)) return;
     if (!country.data) return;
 
-    // Required: at least one open day, each with both times. A week of closed
-    // days is a shop nobody can order from, which is what this step is for.
+    // Required: at least one open day, each with both times. `checkWeek`
+    // refuses a week of closed days, which would be no hours at all — open
+    // around the clock in the app, not shut.
     const hours = weekToHours(week);
-    const weekProblem =
-      checkWeek(week) ?? (hours.length === 0 ? t("store.hoursRequired") : null);
+    const weekProblem = checkWeek(week);
     setHoursError(weekProblem);
     if (weekProblem) return;
 

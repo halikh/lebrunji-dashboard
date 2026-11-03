@@ -84,8 +84,10 @@ const en = {
     blurb:
       "What the catalogue is still missing. Each row opens the place where it is fixed.",
     hoursTitle: "Shops without opening hours",
+    // Urgent, and said so: no hours reads as open around the clock (`0170`),
+    // so these shops take orders at hours nobody is there to cook them.
     hoursBody:
-      "A shop with no hours is closed every day in the app, so nobody can order from it.",
+      "Urgent: a shop with no hours is open around the clock in the app, so customers can order from it at any hour, even at night.",
     hoursNone: "No hours set",
     hoursBranches: "{count} of {total} branches have no hours: {names}",
     hoursDone: "Every shop has its opening hours.",
@@ -921,8 +923,6 @@ const en = {
     back: "Back",
     hoursBlurb:
       "When the shop takes orders. A day left closed is closed in the app — open at least one.",
-    hoursRequired:
-      "Open at least one day. A shop with no hours is closed every day in the app.",
     hoursNotSaved:
       "The shop was created, but its hours could not be saved. Set them here.",
     created: "{name} added — set up its menu next",
@@ -1169,6 +1169,13 @@ const en = {
     // wraps. The hours it copies are listed in "The week" right under it.
     copyToAll: "Apply to all open days",
     incomplete: "Every open day needs an opening and a closing time.",
+    // Seven closed days saves as no hours, and no hours is open around the
+    // clock (`0170`), so the week is refused and the real off switch named.
+    allClosed:
+      "Open at least one day. A week with every day closed counts as no hours, and the app treats a shop with no hours as open around the clock. To stop orders, set the shop to Hidden on its Details tab, or set a branch to Closed indefinitely.",
+    // The read-back for a branch that has no rows yet.
+    noHours:
+      "No hours set, so the app shows this branch as open around the clock. Set its hours and save.",
     // For a shop that shuts for the afternoon: 07:00–15:00, then 19:00–01:00.
     addShift: "Add a shift",
     removeShift: "Remove",
@@ -2055,7 +2062,8 @@ const en = {
     from: "From {from}",
     store: "Shop",
     storeHint: "A bundle holds dishes from one shop.",
-    storeLocked: "Fixed once saved: its dishes, prices and orders belong to this shop.",
+    storeLocked:
+      "Fixed once saved: its dishes, prices and orders belong to this shop.",
     storePlaceholder: "Choose a shop",
     storeRequired: "Choose the shop this bundle belongs to.",
     visibility: "On sale",
@@ -2069,7 +2077,8 @@ const en = {
     pickDishesHint: "At least two. Set how many of each next to it.",
     pickDishesPlaceholder: "Search this shop's dishes",
     pickShopFirst: "Choose the shop first",
-    itemsRequired: "Add at least two dishes. A single dish is better sold at its own price.",
+    itemsRequired:
+      "Add at least two dishes. A single dish is better sold at its own price.",
     quantityOf: "How many {name}",
     quantityRange: "Each dish can be in a bundle 1 to 20 times.",
     sameShop: "Every dish in a bundle must come from the bundle's shop.",
@@ -2081,7 +2090,8 @@ const en = {
     choicesNone: "None. It's added as it is.",
     choicesAdd: "Add choices",
     choicesChange: "Change",
-    choicesSaveFirst: "Save first, then add choices from the shop's Options tab.",
+    choicesSaveFirst:
+      "Save first, then add choices from the shop's Options tab.",
     questionRequired: "Required",
     questionOptional: "Optional",
     priceSection: "Price",
@@ -2175,10 +2185,12 @@ const en = {
     archivedBundleOption: "{name} (archived)",
     linkedToBundle: "Bundle: {name}",
     runsOnBundle: "Runs on its bundle's dates: {window}.",
-    runsOnBundleOpen: "Runs while its bundle is on offer, with no dates set there.",
+    runsOnBundleOpen:
+      "Runs while its bundle is on offer, with no dates set there.",
     whileBundle: "Runs while its bundle is on offer",
     bundleArchived: "Its bundle is archived, so this picture no longer shows",
-    followsBundle: "With nowhere set, a tap opens the bundle's shop page of bundles.",
+    followsBundle:
+      "With nowhere set, a tap opens the bundle's shop page of bundles.",
     oneSubject: "A picture can advertise a promotion or a bundle, not both.",
     bundleGone: "That bundle no longer exists. Choose another, or none.",
     tab: "Artwork",

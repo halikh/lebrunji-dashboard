@@ -126,7 +126,12 @@ export async function saveBranchHours(
     throw new Error(
       error.message.startsWith("HOURS: opening hours overlap")
         ? t("hours.overlapSaved")
-        : error.message,
+        : // `0228`: the editor refuses this first, so meeting it means the two disagree.
+          error.message.startsWith(
+              "HOURS: a week needs at least one open window",
+            )
+          ? t("hours.allClosed")
+          : error.message,
     );
   }
 }

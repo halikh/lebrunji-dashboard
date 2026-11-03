@@ -126,6 +126,7 @@ export function TodoScreen() {
             count={hoursRows.length}
             doneKey="todo.hoursDone"
             searching={searching}
+            urgent
           >
             {hoursRows.map((row) => (
               <TodoRow
@@ -249,6 +250,7 @@ function TodoSection<T>({
   query,
   count,
   searching,
+  urgent = false,
   children,
 }: {
   titleKey: TranslationKey;
@@ -263,14 +265,21 @@ function TodoSection<T>({
   };
   count: number;
   searching: boolean;
+  /**
+   * A gap that costs something now, not before launch: the section starts
+   * open while it has rows, and its count is drawn in the danger colour.
+   */
+  urgent?: boolean;
   children: ReactNode;
 }) {
   // Closed by default: the page opens on three headings and three counts,
-  // which is the summary, and a section is opened to work through it.
-  const [open, setOpen] = useState(false);
+  // which is the summary, and a section is opened to work through it. Null
+  // until the heading is pressed, so an urgent section can open itself once
+  // its rows arrive and still be closed by hand.
+  const [open, setOpen] = useState<boolean | null>(null);
   // A search opens every section it found something in — results folded
   // away behind a heading would read as no results.
-  const shown = open || (searching && count > 0);
+  const shown = (open ?? (urgent && count > 0)) || (searching && count > 0);
   const panelId = useId();
 
   // The heading's height, for the shop names sticking beneath it. Measured
@@ -327,7 +336,14 @@ function TodoSection<T>({
             <h2 className="flex items-center gap-sm text-[22px]">
               {t(titleKey)}
               {query.isSuccess && count > 0 && (
-                <span className="flex h-[24px] min-w-[24px] items-center justify-center rounded-full bg-active-fill px-sm font-sans text-[13px] font-medium text-on-active tabular-nums">
+                <span
+                  className={cx(
+                    "flex h-[24px] min-w-[24px] items-center justify-center rounded-full px-sm font-sans text-[13px] font-medium tabular-nums",
+                    urgent
+                      ? "bg-danger-wash text-danger"
+                      : "bg-active-fill text-on-active",
+                  )}
+                >
                   {count}
                   {query.data?.truncated && !searching && "+"}
                 </span>

@@ -127,8 +127,9 @@ export async function fetchItemsWithoutImage(): Promise<TodoList<ItemTodo>> {
  * Live shops with at least one live branch that has no opening hours.
  *
  * Hours belong to the branch since `0101`, and a branch with no
- * `branch_hours` rows is closed every day of the week — the app reads a
- * missing day as closed — so a shop like that can never be ordered from.
+ * `branch_hours` rows is open around the clock (`0170` `branch_open_at`) — a
+ * missing *day* reads as closed, a missing *week* as never closed — so a shop
+ * like that takes orders at 4 a.m. and the kitchen is not there to cook them.
  */
 export async function fetchStoresWithoutHours(): Promise<TodoList<HoursTodo>> {
   const { data, error } = await getClient()

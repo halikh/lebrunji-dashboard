@@ -51,6 +51,11 @@ import { useBranches } from "./use-branches";
  * row per window a shop opens and the app reads a missing day as shut, so this
  * grid's job is to decide which rows should exist.
  *
+ * A missing *week* is the exception: a branch with no rows at all is open
+ * around the clock (`0170` `branch_open_at`), so a week of seven closed days
+ * is not "closed". `checkWeek` refuses it, as `0228` does, and points to the
+ * switch that does shut a branch.
+ *
  * ## A day can be two shifts
  *
  * Some shops shut for the afternoon — 07:00 to 15:00, then 19:00 to 01:00.
@@ -345,10 +350,12 @@ export function weekToHours(week: WeekDraft): DayHours[] {
 }
 
 /**
- * What is wrong with a week, if anything — an open day missing a time, or two
- * windows covering the same minute.
+ * What is wrong with a week, if anything — no open day at all, an open day
+ * missing a time, or two windows covering the same minute.
  */
 export function checkWeek(week: WeekDraft): string | null {
+  // Saved, seven closed days would be no rows, which is open around the clock.
+  if (!week.some((day) => day.open)) return t("hours.allClosed");
   if (
     week.some(
       (day) =>
@@ -621,7 +628,10 @@ function Summary({
     now.minute,
   ).padStart(2, "0")}`;
 
-  const open = isOpenAt(windows, weekday, time);
+  // No windows is open around the clock, as the app and `place_order` read it,
+  // so the panel says that rather than "Closed".
+  const unset = windows.length === 0;
+  const open = unset || isOpenAt(windows, weekday, time);
   const spans = summarise(windows, DISPLAY_ORDER);
 
   return (
@@ -660,39 +670,43 @@ function Summary({
         <span className="text-[12px] font-medium tracking-[0.05em] text-text-faint">
           {t("hours.theWeek")}
         </span>
-        <ul className="flex flex-col gap-xxs">
-          {spans.map((span) => (
-            <li
-              key={`${span.from}-${span.to}`}
-              className="flex items-baseline justify-between gap-md text-[14px]"
-            >
-              <span className="font-semibold">
-                {span.from === span.to
-                  ? t(DAY_KEYS[span.from])
-                  : t("hours.range", {
-                      from: t(DAY_KEYS[span.from]),
-                      to: t(DAY_KEYS[span.to]),
-                    })}
-              </span>
-              <span
-                className={
-                  span.open
-                    ? "tabular-nums text-text-soft"
-                    : "text-[13px] text-text-faint"
-                }
+        {unset ? (
+          <p className="text-[14px] text-text-soft">{t("hours.noHours")}</p>
+        ) : (
+          <ul className="flex flex-col gap-xxs">
+            {spans.map((span) => (
+              <li
+                key={`${span.from}-${span.to}`}
+                className="flex items-baseline justify-between gap-md text-[14px]"
               >
-                {span.open
-                  ? span.windows
-                      .map(
-                        (one) =>
-                          `${clock.hhmm(one.opensAt)}–${clock.hhmm(one.closesAt)}`,
-                      )
-                      .join(", ")
-                  : t("hours.closed")}
-              </span>
-            </li>
-          ))}
-        </ul>
+                <span className="font-semibold">
+                  {span.from === span.to
+                    ? t(DAY_KEYS[span.from])
+                    : t("hours.range", {
+                        from: t(DAY_KEYS[span.from]),
+                        to: t(DAY_KEYS[span.to]),
+                      })}
+                </span>
+                <span
+                  className={
+                    span.open
+                      ? "tabular-nums text-text-soft"
+                      : "text-[13px] text-text-faint"
+                  }
+                >
+                  {span.open
+                    ? span.windows
+                        .map(
+                          (one) =>
+                            `${clock.hhmm(one.opensAt)}–${clock.hhmm(one.closesAt)}`,
+                        )
+                        .join(", ")
+                    : t("hours.closed")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {dirty && (
