@@ -15,10 +15,9 @@ import { validatePassword } from "@/lib/validation";
  *
  * ## Why this is not `/auth/update-password`
  *
- * That route sets a password for whoever the cookies say is signed in, and asks
- * for nothing else. That is correct where it is used: it runs after
- * `/auth/confirm` has consumed a recovery link, and **possession of the emailed
- * link is the proof**.
+ * That route sets a password and asks for nothing but the session. It accepts
+ * only a session that `/auth/confirm` opened from a recovery link in the last
+ * few minutes, because **possession of the emailed link is the proof**.
  *
  * A signed-in change has no such proof. The session by itself is not one — it
  * is exactly what an unattended laptop, or an XSS on this origin, already has.
