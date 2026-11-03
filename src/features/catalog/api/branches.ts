@@ -107,8 +107,46 @@ export type Branch = {
 const BRANCH_SEARCH = ["name->>en", "name->>ar", "slug"] as const;
 
 const COLUMNS = `id, store_id, slug, name, address, latitude, longitude,
-  prep_min_minutes, prep_max_minutes, whatsapp_phone, image_url, currency_code,
-  is_active, sort_order`;
+  prep_min_minutes, prep_max_minutes, image_url, currency_code,
+  is_active, sort_order, branch_contacts ( whatsapp_phone )`;
+
+/**
+ * A branch's WhatsApp number, from its `branch_contacts` embed.
+ *
+ * Not a column of `branches` since `0221`/`0222`: it is often the owner's own
+ * phone, and a column on a row anybody can read is a number anybody can read.
+ * `branch_contacts` is staff-only. One-to-one, so PostgREST hands back an
+ * object — or an array, depending on how the relationship was inferred, so
+ * both are taken.
+ */
+export function whatsappOf(row: Record<string, unknown> | null | undefined): string | null {
+  const contact = row?.branch_contacts;
+  const one = Array.isArray(contact) ? contact[0] : contact;
+  const phone = (one as Record<string, unknown> | null | undefined)?.whatsapp_phone;
+  return typeof phone === "string" && phone ? phone : null;
+}
+
+/**
+ * Writes a branch's number — digits, already normalised.
+ *
+ * Its own request, after the branch's: the two rows are separate tables, so
+ * they are separate writes. A failure here leaves a branch without a number,
+ * which the Branches tab shows and the editor fixes, rather than undoing a
+ * branch that was made.
+ */
+export async function setBranchWhatsapp(
+  branchId: string,
+  digits: string,
+): Promise<void> {
+  const { error } = await getClient()
+    .from("branch_contacts")
+    .upsert(
+      // No `updated_at`: `branch_contacts_touch_updated_at` (0223) sets it.
+      { branch_id: branchId, whatsapp_phone: digits },
+      { onConflict: "branch_id" },
+    );
+  if (error) throw new Error(friendly(error.message));
+}
 
 function toBranch(row: Record<string, unknown>): Branch {
   return {
@@ -121,7 +159,7 @@ function toBranch(row: Record<string, unknown>): Branch {
     longitude: (row.longitude as number | null) ?? null,
     prepMinMinutes: row.prep_min_minutes as number,
     prepMaxMinutes: row.prep_max_minutes as number,
-    whatsappPhone: (row.whatsapp_phone as string | null) ?? null,
+    whatsappPhone: whatsappOf(row),
     imageUrl: (row.image_url as string | null) ?? null,
     currencyCode: (row.currency_code as string | null) ?? null,
     isActive: row.is_active as boolean,
@@ -329,9 +367,6 @@ export async function createBranch(
       longitude: draft.longitude,
       prep_min_minutes: draft.prepMinMinutes,
       prep_max_minutes: draft.prepMaxMinutes,
-      whatsapp_phone: draft.whatsappPhone
-        ? digitsOf(draft.whatsappPhone)
-        : null,
       // Null is written on purpose rather than copied from the shop: it is the
       // reference that keeps a branch following the brand. See `Branch`.
       image_url: draft.imageUrl,
@@ -354,7 +389,10 @@ export async function createBranch(
     .single();
 
   if (error) throw new Error(friendly(error.message));
-  return (data as { id: string }).id;
+  const id = (data as { id: string }).id;
+  const digits = draft.whatsappPhone ? digitsOf(draft.whatsappPhone) : "";
+  if (digits) await setBranchWhatsapp(id, digits);
+  return id;
 }
 
 export type BranchPatch = Partial<BranchDraft>;
@@ -366,6 +404,7 @@ export async function updateBranch(
   requireTradeable(patch);
 
   const row: Record<string, unknown> = {};
+  let phone: string | null = null;
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.address !== undefined) {
     row.address = localizedOrNull(patch.address);
@@ -381,7 +420,7 @@ export async function updateBranch(
     // The same refusal `createBranch` makes: a number can be changed, never
     // taken away.
     if (!digits) throw new Error(t("branches.whatsappRequired"));
-    row.whatsapp_phone = digits;
+    phone = digits;
   }
   // `null` is a value for both — it is how a branch is put back to following
   // the shop — so what is tested is the key being absent, not the value.
@@ -394,6 +433,7 @@ export async function updateBranch(
 
   const { error } = await getClient().from("branches").update(row).eq("id", id);
   if (error) throw new Error(friendly(error.message));
+  if (phone) await setBranchWhatsapp(id, phone);
 }
 
 /**

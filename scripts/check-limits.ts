@@ -54,6 +54,7 @@ const EXPECTED: Record<string, number> = {
   policy_sections_body_len: TEXT.policyBody,
   address_kinds_name_len: TEXT.addressKindName,
   languages_name_len: TEXT.languageName,
+  artworks_alt_text_len: TEXT.altText,
   countries_name_len: TEXT.countryName,
   users_name_len: TEXT.customerName,
   orders_courier_note_len: TEXT.note,

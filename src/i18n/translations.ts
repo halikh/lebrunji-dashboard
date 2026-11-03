@@ -2238,6 +2238,15 @@ const en = {
       "The picture for {languages} is not {shape}. Replace it, or the app will crop it.",
     imageNeedsEnglish:
       "Add the English picture — it is the one shown wherever another language has none.",
+    // ---- alt text (0225) ---------------------------------------------------
+    // Read aloud by VoiceOver and TalkBack in place of the picture, whose words
+    // a screen reader cannot see. Optional, so says what leaving it costs.
+    altText: "What the picture says",
+    altTextHint:
+      "Read aloud to customers who use a screen reader. Write the words on the picture, e.g. “20% off at Forno”. Left blank, the app just says “Offer”.",
+    altTextNeedsEnglish:
+      "Add the English words too — they are read wherever another language has none.",
+    altTextTooLong: "Keep the words under {max} characters in each language.",
 
     // ---- linked promotion --------------------------------------------------
     promotion: "Linked promotion",

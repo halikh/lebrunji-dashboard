@@ -8,15 +8,22 @@ import { DateField } from "@/components/ui/date-field";
 import { EditorPage } from "@/components/ui/editor-page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FieldPair, FormSection } from "@/components/ui/form-section";
+import { LocalizedField } from "@/components/ui/localized-field";
 import { LocalizedImageField } from "@/components/ui/localized-image-field";
 import { MultiSelect, Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
+import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { ARTWORK_SHAPES, fitsShape, measureImage } from "@/lib/image-shape";
+import { TEXT } from "@/lib/limits";
 import { formatDate } from "@/lib/time";
-import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
+import {
+  FALLBACK_LANGUAGE,
+  validateLocalizedText,
+  type Localized,
+} from "@/lib/validation";
 
 import {
   ARTWORK_FORMATS,
@@ -153,10 +160,13 @@ function Form({
   const promotions = usePromotions("");
   const bundles = useBundles("");
   const stores = useStores("");
+  const languages = useLanguages();
+  const codes = languages.data?.map((language) => language.code) ?? [];
 
   const start = {
     format: initial?.format ?? ("banner" as ArtworkFormat),
     imageUrl: initial?.imageUrl ?? null,
+    altText: initial?.altText ?? ({} as Localized),
     // A new picture starts on Home, which is where every card has been shown
     // since `0053`.
     placements: initial?.placements ?? (["home"] as Placement[]),
@@ -171,6 +181,7 @@ function Form({
 
   const [format, setFormat] = useState<ArtworkFormat>(start.format);
   const [imageUrl, setImageUrl] = useState<Localized | null>(start.imageUrl);
+  const [altText, setAltText] = useState<Localized>(start.altText);
   const [placements, setPlacements] = useState<Placement[]>(start.placements);
   const [discountId, setDiscountId] = useState<string | null>(start.discountId);
   const [bundleId, setBundleId] = useState<string | null>(start.bundleId);
@@ -195,6 +206,7 @@ function Form({
       {
         format,
         imageUrl,
+        altText,
         placements,
         discountId,
         bundleId,
@@ -211,6 +223,7 @@ function Form({
   const [errors, setErrors] = useState<{
     subject?: string;
     image?: string;
+    altText?: string;
     window?: string;
     link?: string;
   }>({});
@@ -317,6 +330,14 @@ function Form({
         new Date(endsAt) <= new Date(startsAt)
           ? t("artworks.windowBackwards")
           : undefined,
+      // Optional, but English once anything is written — the same rule as
+      // every translated column (`artworks_alt_text_locales`).
+      altText: (() => {
+        const check = validateLocalizedText(altText, codes, TEXT.altText, {
+          optional: true,
+        });
+        return check.ok ? undefined : t(check.key, check.params);
+      })(),
       link: missingTarget(link) ? t("links.targetRequired") : undefined,
       // "A promotion" with none chosen is not "nothing" — said, not guessed.
       subject:
@@ -342,12 +363,20 @@ function Form({
     }
 
     setErrors(found);
-    if (found.image || found.window || found.link || found.subject || !imageUrl)
+    if (
+      found.image ||
+      found.altText ||
+      found.window ||
+      found.link ||
+      found.subject ||
+      !imageUrl
+    )
       return;
 
     onSave({
       format,
       imageUrl,
+      altText,
       placements,
       discountId,
       bundleId,
@@ -430,6 +459,19 @@ function Form({
               shape={ARTWORK_SHAPES[format]}
               disabled={pending}
               error={errors.image}
+            />
+
+            {/* The picture's words, for a screen reader — which cannot see
+                them. Beside the picture, because it is the picture's text. */}
+            <LocalizedField
+              label={t("artworks.altText")}
+              hint={t("artworks.altTextHint")}
+              value={altText}
+              onChange={setAltText}
+              maxLength={TEXT.altText}
+              optional
+              error={errors.altText}
+              placeholder={{ en: "20% off at Forno", ar: "خصم 20% في فورنو" }}
             />
           </FormSection>
 

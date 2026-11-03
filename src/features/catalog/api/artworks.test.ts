@@ -28,6 +28,7 @@ function artwork(overrides: Partial<Artwork> = {}): Artwork {
     id: "a",
     format: "banner",
     imageUrl: { en: "https://x/en.png" },
+    altText: {},
     placements: ["home"],
     discount: null,
     isActive: true,
@@ -76,6 +77,18 @@ describe("toColumns", () => {
 
   it("writes nothing for keys that are absent", () => {
     expect(toColumns({})).toEqual({});
+  });
+
+  it("writes alt text trimmed, and none at all as null (0225)", () => {
+    // `{}` is what `artworks_alt_text_locales` refuses; null is "none".
+    expect(toColumns({ altText: {} })).toEqual({ alt_text: null });
+    expect(toColumns({ altText: { en: "  ", ar: "" } })).toEqual({
+      alt_text: null,
+    });
+    // As typed otherwise — a banner's words have % and $ in them.
+    expect(toColumns({ altText: { en: " 20% off ", ar: "" } })).toEqual({
+      alt_text: { en: "20% off" },
+    });
   });
 
   it("maps a whole draft", () => {
@@ -164,6 +177,16 @@ describe("toArtwork", () => {
     });
     expect(toArtwork({ ...base, discount: null }).discount).toBeNull();
     expect(toArtwork({ ...base, discount: null }).format).toBe("tile");
+  });
+
+  it("reads alt text, and none as empty (0225)", () => {
+    const base = { id: "a", format: "banner", image_url: { en: "e" } };
+    expect(toArtwork({ ...base, alt_text: { en: "20% off" } }).altText).toEqual(
+      {
+        en: "20% off",
+      },
+    );
+    expect(toArtwork({ ...base, alt_text: null }).altText).toEqual({});
   });
 });
 

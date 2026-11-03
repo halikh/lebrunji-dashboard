@@ -1,7 +1,7 @@
-import { PAGE } from "@/lib/limits";
+import { PAGE, TEXT } from "@/lib/limits";
 import { getClient } from "@/lib/supabase/client";
 import { t } from "@/i18n/translations";
-import type { Localized } from "@/lib/validation";
+import { localizedOrNull, type Localized } from "@/lib/validation";
 
 import {
   LINK_COLUMNS,
@@ -85,6 +85,12 @@ export type Artwork = {
   format: ArtworkFormat;
   /** English required, the rest optional (`artworks_image_url_locales`). */
   imageUrl: Localized;
+  /**
+   * The words in the picture, for screen readers (`0225`). `{}` for none —
+   * stored as null. English required once anything is written
+   * (`artworks_alt_text_locales`).
+   */
+  altText: Localized;
   placements: Placement[];
   /**
    * The promotion it advertises, or null for pure artwork.
@@ -141,7 +147,7 @@ export type Artwork = {
   sortOrder: number;
 };
 
-const COLUMNS = `id, format, image_url, placements, discount_id, is_active,
+const COLUMNS = `id, format, image_url, alt_text, placements, discount_id, is_active,
    starts_at, ends_at, sort_order,
    discount:discounts ( id, slug, deleted_at, starts_at, ends_at,
      ${LINK_COLUMNS} ),
@@ -183,6 +189,7 @@ export function toArtwork(row: Record<string, unknown>): Artwork {
     id: row.id as string,
     format: row.format === "tile" ? "tile" : "banner",
     imageUrl: (row.image_url as Localized | null) ?? {},
+    altText: (row.alt_text as Localized | null) ?? {},
     placements: knownPlacements(row.placements),
     discount: linked
       ? {
@@ -221,6 +228,8 @@ export function toArtwork(row: Record<string, unknown>): Artwork {
 export type ArtworkDraft = {
   format: ArtworkFormat;
   imageUrl: Localized;
+  /** Written through `localizedOrNull` — all blank is null, not `{}`. */
+  altText: Localized;
   placements: Placement[];
   /** Null for pure artwork. */
   discountId: string | null;
@@ -363,6 +372,11 @@ export function toColumns(patch: ArtworkPatch): Record<string, unknown> {
   const row: Record<string, unknown> = {};
   if (patch.format !== undefined) row.format = patch.format;
   if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
+  // Trimmed, blanks dropped, all-blank as null — `artworks_alt_text_locales`
+  // refuses `{}`. Not `cleanLocalized`: that is a *name's* character set, and
+  // the words on a banner are "20% off" and "$5 delivery".
+  if (patch.altText !== undefined)
+    row.alt_text = localizedOrNull(patch.altText);
   if (patch.placements !== undefined) {
     row.placements = orderPlacements(patch.placements);
   }
@@ -525,6 +539,12 @@ export function friendly(message: string): string {
   }
   if (message.includes("artworks_image_url_locales")) {
     return t("artworks.imageNeedsEnglish");
+  }
+  if (message.includes("artworks_alt_text_locales")) {
+    return t("artworks.altTextNeedsEnglish");
+  }
+  if (message.includes("artworks_alt_text_len")) {
+    return t("artworks.altTextTooLong", { max: TEXT.altText });
   }
   if (message.includes("artworks_placements_known")) {
     return t("artworks.placementsUnknown");

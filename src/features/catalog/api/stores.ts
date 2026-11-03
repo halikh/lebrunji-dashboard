@@ -5,7 +5,7 @@ import { digitsOf } from "@/lib/phone";
 import { titleLocalized } from "@/lib/text-format";
 import { localizedOrNull, type Localized } from "@/lib/validation";
 
-import { createBranch } from "./branches";
+import { createBranch, setBranchWhatsapp, whatsappOf } from "./branches";
 
 /**
  * Stores — the shops a customer browses.
@@ -92,21 +92,20 @@ export type Store = {
   prepMinMinutes: number;
   prepMaxMinutes: number;
   /**
-   * Where an order is sent to this kitchen — digits, no `+`, as `wa.me` wants.
+   * The number an order actually reaches — the first live branch's. Null is
+   * ordinary: the catalogue is set up before every merchant has been asked for
+   * one, and it is what makes the dashboard hide the send control for a shop
+   * rather than offering one that opens an empty chat.
    *
-   * Null is ordinary: the catalogue is set up before every merchant has been
-   * asked for one. It is what makes the dashboard hide the send control for a
-   * shop rather than offering one that opens an empty chat.
-   */
-  whatsappPhone: string | null;
-  /**
-   * The number an order actually reaches — the branch's, falling back to this
-   * row's own.
+   * There is no shop-level number behind it any more. `stores.whatsapp_phone`
+   * went in `0222`, with `branches.whatsapp_phone`, because a column on a row
+   * anybody can read is a number anybody can read; the branch's lives in the
+   * staff-only `branch_contacts` (`0221`).
    *
    * ## Why it is resolved in the query
    *
    * `0101` moved the number to `branches`, and the branch editor is the only
-   * screen that writes one, so `whatsappPhone` above is null on every shop
+   * screen that writes one, so the shop's own column was null on every shop
    * created since. A header reading it said "No WhatsApp number" about a shop
    * whose number was on screen two tabs away.
    *
@@ -116,8 +115,8 @@ export type Store = {
    * trip, on the query the header was already making.
    *
    * The *first* branch with a number, in the Branches tab's own order, so the
-   * header and that tab name the same place. Null when no branch has one and
-   * neither has the shop — which is a real state, and the one the list flags.
+   * header and that tab name the same place. Null when no branch has one —
+   * which is a real state, and the one the list flags.
    */
   orderPhone: string | null;
 };
@@ -164,10 +163,9 @@ export async function fetchStores(
       `id, slug, name, image_url, category_id, currency_code, is_active, is_featured, menu_layout,
        sort_order, admin_sort_order, exchange_rate,
        latitude, longitude, prep_min_minutes, prep_max_minutes,
-       whatsapp_phone,
        categories!category_id ( name ),
        store_categories ( category_id, categories ( name ) ),
-       branches ( whatsapp_phone, sort_order, created_at, deleted_at )`,
+       branches ( sort_order, created_at, deleted_at, branch_contacts ( whatsapp_phone ) )`,
     )
     .is("deleted_at", null)
     // The order the app shows too: a drag writes this and `sort_order`
@@ -207,10 +205,9 @@ export async function fetchStore(id: string): Promise<Store> {
       `id, slug, name, image_url, category_id, currency_code, is_active, is_featured, menu_layout,
        sort_order, admin_sort_order, exchange_rate,
        latitude, longitude, prep_min_minutes, prep_max_minutes,
-       whatsapp_phone,
        categories!category_id ( name ),
        store_categories ( category_id, categories ( name ) ),
-       branches ( whatsapp_phone, sort_order, created_at, deleted_at )`,
+       branches ( sort_order, created_at, deleted_at, branch_contacts ( whatsapp_phone ) )`,
     )
     .eq("id", id)
     .single();
@@ -239,8 +236,8 @@ export async function fetchStore(id: string): Promise<Store> {
  * reasoning, as `requireTradeable` in `api/branches.ts`.
  *
  * A shop created here gets a branch of its own from `0121`'s trigger, copied
- * from these very columns, so the two rows carry the same number and the same
- * pin on the day a shop is made. Refusing both here means neither can be the
+ * from these very columns, and `numberFirstBranch` gives it the number, so the
+ * two rows carry the same number and the same pin on the day a shop is made. Refusing both here means neither can be the
  * one that slipped through: the form writes the store, the trigger copies it,
  * and a blank on this row would be a blank on that one.
  */
@@ -400,9 +397,6 @@ export async function createStore(
       // means nothing.
       latitude: draft.latitude,
       longitude: draft.longitude,
-      whatsapp_phone: draft.whatsappPhone
-        ? digitsOf(draft.whatsappPhone)
-        : null,
       prep_min_minutes: draft.prepMinMinutes,
       prep_max_minutes: draft.prepMaxMinutes,
       is_active: draft.isActive,
@@ -421,6 +415,7 @@ export async function createStore(
   const id = data.id as string;
   await ensureFirstBranch(id, draft);
   await addressFirstBranch(id, draft.address);
+  await numberFirstBranch(id, draft.whatsappPhone);
 
   // The extras, after the row: the trigger has already linked the main one,
   // and a link needs a shop to point at. Not a failure of the create if it
@@ -539,6 +534,34 @@ async function addressFirstBranch(
   }
 }
 
+/**
+ * The number on the first branch, which the trigger made without one.
+ *
+ * The shop has no column for it since `0222` — see `Store.orderPhone` — so
+ * what the wizard asked for goes where `addressFirstBranch` sends the address,
+ * and for the same reason a failure is swallowed rather than reported as the
+ * create failing. The Branches tab shows a branch with no number.
+ */
+async function numberFirstBranch(
+  storeId: string,
+  phone: string | null | undefined,
+): Promise<void> {
+  const digits = phone ? digitsOf(phone) : "";
+  if (!digits) return;
+  try {
+    const { data } = await getClient()
+      .from("branches")
+      .select("id")
+      .eq("store_id", storeId)
+      .is("deleted_at", null);
+    for (const branch of data ?? []) {
+      await setBranchWhatsapp(branch.id as string, digits);
+    }
+  } catch {
+    // Deliberately swallowed — see above.
+  }
+}
+
 export type StorePatch = {
   name?: Localized;
   /**
@@ -571,8 +594,6 @@ export type StorePatch = {
    * refuses a bare `currency_code` update at the database, so this is not a
    * convention anybody can drift away from.
    */
-  /** Blank clears it. See `updateStore` on why that is null and not "". */
-  whatsappPhone?: string | null;
   imageUrl?: string | null;
   isActive?: boolean;
   isFeatured?: boolean;
@@ -630,13 +651,6 @@ export async function updateStore(
   }
   if (patch.latitude !== undefined) row.latitude = patch.latitude;
   if (patch.longitude !== undefined) row.longitude = patch.longitude;
-  if (patch.whatsappPhone !== undefined) {
-    // Normalised on the way in, once, so no screen strips punctuation on the
-    // way out — the same rule `couriers.phone` follows. Blank clears it rather
-    // than storing an empty string, which the CHECK would refuse anyway.
-    const digits = patch.whatsappPhone ? digitsOf(patch.whatsappPhone) : "";
-    row.whatsapp_phone = digits || null;
-  }
   if (patch.prepMinMinutes !== undefined) {
     row.prep_min_minutes = patch.prepMinMinutes;
   }
@@ -816,7 +830,6 @@ function toStore(row: Record<string, unknown>): Store {
     exchangeRate: row.exchange_rate == null ? null : Number(row.exchange_rate),
     latitude: (row.latitude as number | null) ?? null,
     longitude: (row.longitude as number | null) ?? null,
-    whatsappPhone: (row.whatsapp_phone as string | null) ?? null,
     orderPhone: orderPhone(row),
     prepMinMinutes: row.prep_min_minutes as number,
     prepMaxMinutes: row.prep_max_minutes as number,
@@ -887,15 +900,11 @@ export function orderPhone(row: Record<string, unknown>): string | null {
       );
     });
 
-  const fromBranch = live.find(
-    (one) => typeof one.whatsapp_phone === "string" && one.whatsapp_phone,
-  );
-
-  return (
-    (fromBranch?.whatsapp_phone as string | undefined) ??
-    (row.whatsapp_phone as string | null) ??
-    null
-  );
+  for (const one of live) {
+    const phone = whatsappOf(one);
+    if (phone) return phone;
+  }
+  return null;
 }
 
 /** One readable string out of a translated column, for a label. */

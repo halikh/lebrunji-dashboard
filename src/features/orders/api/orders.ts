@@ -1,4 +1,5 @@
 import { orderPhone } from "@/features/catalog/api/stores";
+import { whatsappOf } from "@/features/catalog/api/branches";
 import { oneShopRate } from "@/features/reference/shop-rate";
 import { getClient } from "@/lib/supabase/client";
 import {
@@ -305,9 +306,9 @@ export async function fetchOrder(
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal, status,
-         branches ( id, name, whatsapp_phone ),
-         stores ( name, image_url, whatsapp_phone, exchange_rate,
-           branches ( id, whatsapp_phone, sort_order, created_at, deleted_at ) ),
+         branches ( id, name, branch_contacts ( whatsapp_phone ) ),
+         stores ( name, image_url, exchange_rate,
+           branches ( id, sort_order, created_at, deleted_at, branch_contacts ( whatsapp_phone ) ) ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
            options_price, price_unit, unit_quantity, unit_step,
            fulfilled_quantity, replaces_line_id, amendment_reason,
@@ -585,15 +586,15 @@ function pinOf(
 /**
  * Where this portion's kitchen is sent its half of the order.
  *
- * The number lives on the branch since `0101`, and the dashboard writes it
- * nowhere else — so `stores.whatsapp_phone` is null for every shop made since,
- * and reading only that told the operator to add a number the shop already had.
+ * The number lives on the branch since `0101` — in `branch_contacts` since
+ * `0221`, so only staff can read it. Reading the shop's old column told the
+ * operator to add a number the shop already had, and `0222` dropped it.
  *
  * The branch that took the order first: on a chain, the message has to reach
  * the kitchen cooking it, not the main one. An archived branch is still asked —
  * the order was placed there and that kitchen is the one holding it. Then the
- * shop's own number as the Catalogue shows it (first live branch, then the
- * legacy column), for portions written before `branch_id` was.
+ * shop's number as the Catalogue shows it (its first live branch's), for
+ * portions written before `branch_id` was.
  */
 /**
  * The branch's name, when the shop has somewhere else it could be.
@@ -626,8 +627,8 @@ export function placeName(
 }
 
 function kitchenPhone(portion: Record<string, unknown>): string | null {
-  const fromBranch = asRecord(portion.branches)?.whatsapp_phone;
-  if (typeof fromBranch === "string" && fromBranch) return fromBranch;
+  const fromBranch = whatsappOf(asRecord(portion.branches));
+  if (fromBranch) return fromBranch;
   const store = asRecord(portion.stores);
   return store ? orderPhone(store) : null;
 }

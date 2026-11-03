@@ -58,6 +58,11 @@ export const TEXT = {
   policyBody: 20000,
   addressKindName: 40,
   languageName: 40,
+  /**
+   * `artworks.alt_text` (`0225`) — the words in a picture, read aloud by a
+   * screen reader. What the banner says, in one breath; not a description.
+   */
+  altText: 200,
   countryName: 80,
   /** `users.name` — the customer's own, shown but not edited here. */
   customerName: 60,
