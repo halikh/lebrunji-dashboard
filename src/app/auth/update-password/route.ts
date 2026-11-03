@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { REFRESH_COOKIE } from "@/lib/auth/cookies";
+import { isFreshRecovery } from "@/lib/auth/recovery";
 import {
   anonymousClient,
   readRemember,
@@ -11,11 +12,19 @@ import { t } from "@/i18n/translations";
 import { validatePassword } from "@/lib/validation";
 
 /**
- * Sets a new password for whoever the cookies say is signed in.
+ * Sets a new password for a session that a recovery link just opened.
  *
- * The session comes from the `HttpOnly` refresh cookie — usually one written
- * moments earlier by `/auth/confirm` from a recovery link. The browser never
- * sees it, and never has to: it posts a password and is told whether it worked.
+ * The session comes from the `HttpOnly` refresh cookie that `/auth/confirm`
+ * wrote from the link. The browser never sees it, and never has to: it posts a
+ * password and is told whether it worked.
+ *
+ * ## Only a recovered session
+ *
+ * The route asks for nothing but the session because following the link is
+ * the proof. Any other session gets no such pass. It could be an unattended
+ * laptop or an XSS, and `/auth/account` makes it type the current password.
+ * `isFreshRecovery` reads the proof from the session itself: the `recovery`
+ * entry Supabase puts in its `amr`, from the last fifteen minutes.
  *
  * ## The rule is applied here as well as in the form
  *
@@ -63,6 +72,14 @@ export async function POST(request: NextRequest) {
       refresh_token: refreshToken,
     });
   if (refreshError || !refreshed.session) {
+    return NextResponse.json({ error: "expired" }, { status: 401 });
+  }
+
+  // The link is the proof, so the session must have come from one. An
+  // ordinary sign-in changes its password at `/auth/account`, which asks for
+  // the current one. The answer is the form's "link expired" because that is
+  // what to do next: ask for another.
+  if (!isFreshRecovery(refreshed.session.access_token)) {
     return NextResponse.json({ error: "expired" }, { status: 401 });
   }
 

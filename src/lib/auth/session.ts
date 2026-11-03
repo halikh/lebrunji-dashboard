@@ -11,6 +11,7 @@ import {
   clearedCookieAttributes,
   isExpiring,
 } from "./cookies";
+import { payloadOf } from "./jwt";
 
 /**
  * The server side of authentication. Nothing here ever reaches the browser.
@@ -156,18 +157,8 @@ export async function currentAccessToken(
  * Supabase, which does check. Decoding is a scheduling hint, not a decision.
  */
 export function expiryOf(jwt: string): number | null {
-  try {
-    const payload = jwt.split(".")[1];
-    if (!payload) return null;
-    const json = Buffer.from(
-      payload.replace(/-/g, "+").replace(/_/g, "/"),
-      "base64",
-    ).toString("utf8");
-    const exp: unknown = JSON.parse(json).exp;
-    return typeof exp === "number" ? exp : null;
-  } catch {
-    return null;
-  }
+  const exp = payloadOf(jwt)?.exp;
+  return typeof exp === "number" ? exp : null;
 }
 
 export { toPair };

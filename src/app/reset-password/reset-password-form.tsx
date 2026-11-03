@@ -84,8 +84,9 @@ export function ResetPasswordForm() {
     setPending(false);
 
     if (!response.ok) {
-      // 401 means the recovery session is gone — the link was used or timed
-      // out while the form sat open. Anything else carries a reason worth
+      // 401 means there is no recent recovery session. The link was used, it
+      // timed out while the form sat open, or this was an ordinary sign-in
+      // and not a link at all. Anything else carries a reason worth
       // showing, because by this point the operator is authenticated and it is
       // their own account.
       if (response.status === 401) {
