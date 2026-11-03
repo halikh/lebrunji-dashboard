@@ -2135,6 +2135,7 @@ const en = {
     pickPage: "Choose a page",
     pages: {
       home: "Home",
+      search: "Search",
       cart: "Basket",
       orders: "Orders",
       account: "Account",
@@ -2271,6 +2272,7 @@ const en = {
     // app's own order. Named for what the customer sees, not the route.
     placements: {
       home: "Home",
+      search: "Search",
       category: "Category page",
       store: "Shop page",
       item: "Dish page",
@@ -2287,6 +2289,7 @@ const en = {
     },
     placementsHint: {
       home: "Near the top, to everyone.",
+      search: "On the Search tab, under Featured, before anything is typed.",
       category: "On a category's page, above its shops.",
       store:
         "On shop pages — the shops chosen below, or every shop when none are. A linked picture also only where its promotion applies.",

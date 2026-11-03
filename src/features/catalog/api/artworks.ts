@@ -55,7 +55,7 @@ export type ArtworkFormat = (typeof ARTWORK_FORMATS)[number];
 
 /**
  * The screens a picture can be drawn on. Mirrors `artworks_placements_known`
- * — without `search` since `0205`: the app has no Search screen any more.
+ * — `search` again since `0227`, which undid `0205` with the Search tab.
  *
  * Advertising, not eligibility: `discount_for_order` never reads this. An
  * empty list is a draft — a picture shown nowhere, which the constraint allows
@@ -63,6 +63,7 @@ export type ArtworkFormat = (typeof ARTWORK_FORMATS)[number];
  */
 export const PLACEMENTS = [
   "home",
+  "search",
   "category",
   "store",
   "item",
