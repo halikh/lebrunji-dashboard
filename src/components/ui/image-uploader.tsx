@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { uploadImage, deleteImage } from "@/lib/images";
-import { fitsShape, measureImage, type ImageShape } from "@/lib/image-shape";
+import {
+  fitsShape,
+  isCutout,
+  measureImage,
+  type ImageShape,
+} from "@/lib/image-shape";
 import { t } from "@/i18n/translations";
 
 import { Button, cx } from "./index";
@@ -51,6 +56,7 @@ export function ImageUploader({
   onChange,
   folder,
   shape,
+  cutout = false,
   disabled = false,
 }: {
   /** The URL currently saved on the row, or chosen in this session. */
@@ -70,6 +76,12 @@ export function ImageUploader({
    * size and the shape wanted, so the fix is obvious. See `image-shape.ts`.
    */
   shape?: ImageShape;
+  /**
+   * Only a picture on a transparent background — for art the app lays on its
+   * own coloured tiles, where a white square around it shows as exactly that.
+   * Refused before upload, like `shape`. See `hasClearBorder`.
+   */
+  cutout?: boolean;
   disabled?: boolean;
 }) {
   const field = useFieldWiring();
@@ -114,6 +126,12 @@ export function ImageUploader({
         }
       }
 
+      // Unknown (null) is let through, for the same reason as the shape.
+      if (cutout && (await isCutout(file)) === false) {
+        setError(t("images.needsCutout"));
+        return;
+      }
+
       setProgress(0);
       abort.current = new AbortController();
 
@@ -145,7 +163,7 @@ export function ImageUploader({
         abort.current = null;
       }
     },
-    [disabled, folder, onChange, shape],
+    [cutout, disabled, folder, onChange, shape],
   );
 
   const busy = progress !== null;

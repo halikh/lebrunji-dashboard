@@ -389,6 +389,7 @@ function Form({
                   }
                 }}
                 folder="category-art"
+                cutout
                 disabled={pending}
               />
             </Field>

@@ -1602,6 +1602,7 @@ function SectionForm({
           value={imageUrl}
           onChange={setImageUrl}
           folder="menu-sections"
+          cutout
           disabled={pending}
         />
       </Field>

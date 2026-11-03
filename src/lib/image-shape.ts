@@ -56,8 +56,7 @@ export function fitsShape(
 export function measureImage(
   source: File | string,
 ): Promise<{ width: number; height: number } | null> {
-  const src =
-    typeof source === "string" ? source : URL.createObjectURL(source);
+  const src = typeof source === "string" ? source : URL.createObjectURL(source);
   return new Promise((resolve) => {
     const image = new Image();
     const done = (size: { width: number; height: number } | null) => {
@@ -69,4 +68,89 @@ export function measureImage(
     image.onerror = () => done(null);
     image.src = src;
   });
+}
+
+/**
+ * Whether a picture is a cut-out — drawn on nothing, so the app's own colour
+ * shows around it.
+ *
+ * ## What counts
+ *
+ * The border, not the whole picture. A photograph with one stray see-through
+ * pixel is still a photograph on a background; a dish cut out and laid on a
+ * transparent square is see-through all round its edge, apart from wherever
+ * it touches the frame. So: enough of the outermost ring of pixels has to be
+ * (nearly) fully transparent.
+ *
+ * A tenth of it, because a round dish that fills a square touches the frame at
+ * four points and leaves the corners clear — well over a tenth — while a photo
+ * on a background has none at all. A JPEG cannot hold transparency, so every
+ * JPEG fails, which is right.
+ *
+ * `pixels` is RGBA, four bytes a pixel, as `getImageData` returns it.
+ */
+const CLEAR_ALPHA = 16;
+const CLEAR_BORDER_SHARE = 0.1;
+
+export function hasClearBorder(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+): boolean {
+  if (width <= 0 || height <= 0) return false;
+
+  let border = 0;
+  let clear = 0;
+  for (let y = 0; y < height; y++) {
+    const edgeRow = y === 0 || y === height - 1;
+    for (let x = 0; x < width; x++) {
+      if (!edgeRow && x !== 0 && x !== width - 1) continue;
+      border++;
+      if (pixels[(y * width + x) * 4 + 3] < CLEAR_ALPHA) clear++;
+    }
+  }
+  return clear / border >= CLEAR_BORDER_SHARE;
+}
+
+/**
+ * Whether a chosen file is a cut-out — see `hasClearBorder`.
+ *
+ * Null when the browser cannot decode it, which callers treat as unknown, for
+ * the same reason as `measureImage`. Drawn no larger than 512 pixels across
+ * first: the edge of a scaled-down cut-out is as clear as the original's, and
+ * a phone photo at full size is twelve million pixels to read for nothing.
+ */
+const CUTOUT_SAMPLE = 512;
+
+export async function isCutout(file: File): Promise<boolean | null> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    return null;
+  }
+
+  const scale = Math.min(
+    1,
+    CUTOUT_SAMPLE / Math.max(bitmap.width, bitmap.height),
+  );
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    bitmap.close();
+    return null;
+  }
+
+  context.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  return hasClearBorder(
+    context.getImageData(0, 0, width, height).data,
+    width,
+    height,
+  );
 }

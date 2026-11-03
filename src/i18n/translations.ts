@@ -890,6 +890,10 @@ const en = {
     // The size it is and the shape it should be, so the fix is in the message.
     wrongShape:
       "This picture is {width} × {height}. It needs to be {shape} — the app crops anything else.",
+    // `cutout` uploads: category, aisle and sub-aisle art, laid on the app's
+    // own tiles. A JPEG always lands here — it cannot be transparent.
+    needsCutout:
+      "This picture has a background. Use a PNG or WebP with a transparent background — the app puts it on its own tile.",
 
     // The thumbnail's accessible name. It is a button now — every picture in
     // the dashboard opens full size — so it needs one, and the version that
