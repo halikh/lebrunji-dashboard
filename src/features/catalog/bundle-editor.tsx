@@ -298,9 +298,7 @@ function Form({
             : // A bundle is a saving or it is not one.
               items.length > 0 && price >= separately
               ? t("bundles.priceBelowOriginal", {
-                  separately: currencyCode
-                    ? format(separately, currencyCode)
-                    : String(separately),
+                  separately: money(separately),
                 })
               : undefined,
       window:
