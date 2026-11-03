@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button, Card, Field, FormError, Input } from "@/components/ui";
 import { t, type TranslationKey } from "@/i18n/translations";
+import { safeNextPath } from "@/lib/auth/next-path";
 import { unlock } from "@/lib/chime";
 import { forgetAccessToken } from "@/lib/supabase/client";
 
@@ -63,12 +64,9 @@ export function LoginForm() {
     // will ever play through.
     unlock();
 
-    const next = params.get("next");
-    // Only a path, never an absolute URL: `?next=https://elsewhere` on a login
-    // page is an open redirect, and this one is reachable signed out.
-    router.replace(
-      next && next.startsWith("/") && !next.startsWith("//") ? next : "/",
-    );
+    // Only somewhere on this dashboard — `safeNextPath` has why a prefix check
+    // is not enough to say so.
+    router.replace(safeNextPath(params.get("next"), window.location.origin));
     router.refresh();
   }
 
