@@ -494,6 +494,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
       categoryMoved ||
       categoriesMoved ||
       featureMoved ||
+      layoutMoved ||
       rateMoved;
 
     if (storeMoved) {
