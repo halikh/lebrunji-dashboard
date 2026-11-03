@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 
 import { NumberInput } from "./number-input";
 
@@ -47,10 +47,31 @@ import { NumberInput } from "./number-input";
  * here is wrong by a factor of a hundred and looks exactly like a right one —
  * `3` banked as `0.03`, `50000` banked as five million. There is no safe
  * default, so there is no default.
+ *
+ * ## Writing straight to the database: `onCommit`
+ *
+ * `onChange` reports every keystroke, which is right for a form that keeps a
+ * draft and has a Save button. It is wrong for a field whose value goes
+ * straight to the database, as a branch's price does: typing `350000` would
+ * store `3`, `35`, `350` and so on in turn, each one live and charged as it
+ * lands, and clearing the field to retype it would delete the override between
+ * two keystrokes.
+ *
+ * Such a caller passes `onCommit` instead. It fires once, on blur or Enter, and
+ * only when the figure differs from `value`, so a half-typed number is never
+ * written and tabbing through a list writes nothing. Escape leaves the field
+ * without writing, which is the way out of a figure typed by mistake. An
+ * unreadable figure
+ * commits nothing and falls back to the stored one. If `onCommit` returns a
+ * promise, the field keeps showing the committed figure until the promise
+ * settles, so it does not briefly show the old price while the write is in
+ * flight. A rejection is ignored here: reporting a failed write is the
+ * caller's job, and the field then falls back to what is actually stored.
  */
 export function MoneyInput({
   value,
   onChange,
+  onCommit,
   decimalDigits,
   disabled,
   placeholder,
@@ -60,7 +81,12 @@ export function MoneyInput({
   /** Minor units. The stored figure, always an integer. */
   value: number | null;
   /** Minor units, or null when the field is empty and empty is allowed. */
-  onChange: (minorUnits: number | null) => void;
+  onChange?: (minorUnits: number | null) => void;
+  /**
+   * The settled figure, once, on blur or Enter, and only if it changed. For a
+   * field that writes to the database directly. See above.
+   */
+  onCommit?: (minorUnits: number | null) => unknown;
   /**
    * From the currency: 2 for USD, 0 for LBP. `null` while it is unknown, which
    * disables the field — see above.
@@ -72,6 +98,8 @@ export function MoneyInput({
   "aria-label"?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  /** Set by Escape, so the blur that follows it writes nothing. */
+  const discard = useRef(false);
 
   const known = decimalDigits !== null;
   const factor = known ? 10 ** decimalDigits : 1;
@@ -96,24 +124,60 @@ export function MoneyInput({
       onChange={(event) => {
         const raw = event.target.value;
         setDraft(raw);
+        if (!onChange) return;
 
-        if (raw.trim() === "") {
-          onChange(null);
-          return;
-        }
-
-        const parsed = Number(raw);
         // A half-typed `1.` is `1` to `Number`, which is fine — it is a real
         // reading of what is there so far. `NaN` is not, and emitting it would
         // write garbage the moment somebody typed a stray character.
-        if (Number.isFinite(parsed)) onChange(Math.round(parsed * factor));
+        const parsed = toMinor(raw, factor);
+        if (parsed !== undefined) onChange(parsed);
+      }}
+      onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+        if (!onCommit) return;
+        // Enter settles the figure the way leaving the field does; Escape
+        // leaves it and puts the stored figure back.
+        if (event.key === "Enter") event.currentTarget.blur();
+        if (event.key === "Escape") {
+          discard.current = true;
+          event.currentTarget.blur();
+        }
       }}
       // The canonical rendering returns: `1.5` becomes `1.50`, `01` becomes
       // `1`, and a value rounded on the way in is shown as what was actually
       // stored rather than as what was typed.
-      onBlur={() => setDraft(null)}
+      onBlur={() => {
+        const discarded = discard.current;
+        discard.current = false;
+        if (!onCommit || discarded || draft === null || !known) {
+          setDraft(null);
+          return;
+        }
+
+        const parsed = toMinor(draft, factor);
+        if (parsed === undefined || parsed === value) {
+          setDraft(null);
+          return;
+        }
+
+        const settled = toMajor(parsed, decimalDigits);
+        setDraft(settled);
+        const done = () =>
+          // Only if nobody has started typing again in the meantime.
+          setDraft((current) => (current === settled ? null : current));
+        Promise.resolve(onCommit(parsed)).then(done, done);
+      }}
     />
   );
+}
+
+/**
+ * What was typed, in minor units. `null` for an empty field, `undefined` for
+ * one that does not read as a number.
+ */
+function toMinor(raw: string, factor: number): number | null | undefined {
+  if (raw.trim() === "") return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? Math.round(parsed * factor) : undefined;
 }
 
 /** Minor units as the number a person would say. `null` renders as empty. */

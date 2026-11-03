@@ -259,8 +259,8 @@ export function BranchItemStrip({
         <span className="w-[130px] shrink-0">
           <MoneyInput
             value={override}
-            onChange={(price) =>
-              menu.setPrice.mutate({ itemId: item.id, price })
+            onCommit={(price) =>
+              menu.setPrice.mutateAsync({ itemId: item.id, price })
             }
             decimalDigits={menu.decimals}
             disabled={sectionOff}
@@ -430,8 +430,8 @@ function ItemOptionsAtBranch({
                   <span className="w-[120px] shrink-0">
                     <MoneyInput
                       value={override}
-                      onChange={(price) =>
-                        setPrice.mutate({ optionId: option.id, price })
+                      onCommit={(price) =>
+                        setPrice.mutateAsync({ optionId: option.id, price })
                       }
                       decimalDigits={decimals}
                       disabled={disabled || groupOff}

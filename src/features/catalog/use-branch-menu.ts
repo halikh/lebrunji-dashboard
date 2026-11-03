@@ -42,20 +42,35 @@ export function useBranchOverrides(branchId: string | null) {
  * somewhere it should not be, or priced at the wrong number, and showing the
  * change and taking it back is a worse way to learn that than a moment's wait.
  * The lists are small and the writes are one row.
+ *
+ * Prices (`queued`) differ in two ways. They run in one queue per branch
+ * (`branchScope`), in the order they were made: two edits to the same price
+ * sent together could otherwise land in either order, and the one stored would
+ * be whichever arrived last rather than whichever the operator typed last. And
+ * a price write counts as done only once the screen has the new figure, which
+ * the price field waits on before it stops showing its draft, so the old price
+ * never flashes back in between. Toggles need neither and keep neither.
  */
+function branchScope(branchId: string) {
+  return { id: `branch-menu:${branchId}` };
+}
+
 function useOverrideMutation<TInput>(
   branchId: string,
   run: (input: TInput) => Promise<void>,
+  { queued = false }: { queued?: boolean } = {},
 ) {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
   return useMutation({
     mutationFn: run,
+    scope: queued ? branchScope(branchId) : undefined,
     onSuccess: () => {
-      void queryClient.invalidateQueries({
+      const refetch = queryClient.invalidateQueries({
         queryKey: branchMenuKeys.overrides(branchId),
       });
+      return queued ? refetch : undefined;
     },
     onError: (error) =>
       toast.danger(
@@ -85,6 +100,7 @@ export function useSetItemPrice(branchId: string) {
     branchId,
     (input: { itemId: string; price: number | null }) =>
       setItemPrice(branchId, input.itemId, input.price),
+    { queued: true },
   );
 }
 
@@ -109,6 +125,7 @@ export function useSetOptionPrice(branchId: string) {
     branchId,
     (input: { optionId: string; price: number | null }) =>
       setOptionPrice(branchId, input.optionId, input.price),
+    { queued: true },
   );
 }
 
@@ -124,6 +141,9 @@ export function useCopyBranchPrices(branchId: string) {
   const toast = useToasts();
 
   return useMutation({
+    // In the same queue as the single edits, so a copy and a price typed
+    // around it land in the order they were made.
+    scope: branchScope(branchId),
     mutationFn: (input: {
       fromBranchId: string;
       fromName: string;
