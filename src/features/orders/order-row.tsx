@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { Button, cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
 import { formatRelative } from "@/lib/time";
@@ -52,8 +54,19 @@ export function OrderRow({
   // it. The one state on the queue that is the operator's to answer now.
   const waiting = status?.slug === "ordered";
 
+  // Into view when it becomes the open order — moved with J/K, or followed
+  // into a new tab after a status change, where it may be below the fold.
+  // `nearest`, so a row already on screen does not make the list jump.
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selected) {
+      ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [selected]);
+
   return (
     <div
+      ref={ref}
       // A row is not a button — it holds one. `article` with a label keeps it
       // navigable without claiming to be a control.
       role="article"

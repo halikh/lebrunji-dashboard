@@ -275,11 +275,17 @@ export function OrderBody({
 export function OrderActions({
   order,
   statuses,
+  onMoved,
 }: {
   // The lines as well as the header: the dispatch message below is the whole
   // order, not a summary of it.
   order: OrderWithLines;
   statuses: OrderStatus[] | undefined;
+  /**
+   * Told the step the order was just moved to, so the queue can follow it
+   * into that tab instead of letting the receipt fall out of the list.
+   */
+  onMoved?: (toSlug: string) => void;
 }) {
   const { advance } = useAdvanceOrder();
   const [amending, setAmending] = useState(false);
@@ -405,7 +411,7 @@ export function OrderActions({
         {next && cancelled && (
           <span className="flex min-w-fit flex-1">
             <ConfirmButton
-              onConfirm={() =>
+              onConfirm={() => {
                 advance({
                   orderId: order.id,
                   code: order.code,
@@ -413,8 +419,9 @@ export function OrderActions({
                   toSlug: cancelled.slug,
                   toName: cancelled.name,
                   undoable: false,
-                })
-              }
+                });
+                onMoved?.(cancelled.slug);
+              }}
               titleKey="orders.cancelTitle"
               bodyKey="orders.cancelBody"
               confirmKey="orders.cancelConfirm"
@@ -457,7 +464,7 @@ export function OrderActions({
         <Button
           size="lg"
           fullWidth
-          onClick={() =>
+          onClick={() => {
             advance({
               orderId: order.id,
               code: order.code,
@@ -465,8 +472,9 @@ export function OrderActions({
               toSlug: next.slug,
               toName: next.name,
               // Undo is the hook's call, from the target: Delivered gets none.
-            })
-          }
+            });
+            onMoved?.(next.slug);
+          }}
         >
           <span
             aria-hidden

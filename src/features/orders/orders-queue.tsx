@@ -147,6 +147,43 @@ export function OrdersQueue() {
     [params, pathname, router],
   );
 
+  // Put away with its close button, or by dragging its edge shut, for the room.
+  // Not in the URL: it is a preference about this screen's layout, not part of
+  // the view a link would share. Picking a row brings it back — at its default
+  // width, since the panel unmounts while hidden and forgets the drag.
+  const [panelHidden, setPanelHidden] = useState(false);
+
+  /**
+   * After a move, go where the order went.
+   *
+   * Advancing takes an order out of the tab it was in — Confirm empties it out
+   * of Placed — and the screen used to let it go: the row vanished, and unless
+   * it had been opened first the receipt jumped to whatever row slid into its
+   * place. The operator had just acted on that order and lost sight of it.
+   *
+   * So the tab follows it, and the order is pinned in the URL so the receipt
+   * stays on it, in one write so the two never disagree for a render. On All
+   * the order is already in the list and only the pin is needed. The scope is
+   * left alone: a status tab lists its status under any scope, Delivered on
+   * Live included.
+   */
+  const follow = useCallback(
+    (orderId: string, toSlug: string) => {
+      const query = new URLSearchParams(params);
+      if (statusSlug !== null) {
+        if (toSlug === DEFAULT_STATUS) query.delete("status");
+        else query.set("status", toSlug);
+      }
+      query.set("order", orderId);
+      const text = query.toString();
+      router.replace(text ? `${pathname}?${text}` : pathname, {
+        scroll: false,
+      });
+      setPanelHidden(false);
+    },
+    [params, pathname, router, statusSlug],
+  );
+
   const statuses = useOrderStatuses();
   const counts = useStatusCounts(scope);
   const orders = useOrders(scope, statusSlug, search);
@@ -190,12 +227,6 @@ export function OrdersQueue() {
   // the highlight; a picked order that has since left the list (delivered off
   // the Live tab) stays up, because the operator was in the middle of it.
   const shownOrderId = openOrderId ?? rows[active]?.id ?? null;
-
-  // Put away with its close button, or by dragging its edge shut, for the room.
-  // Not in the URL: it is a preference about this screen's layout, not part of
-  // the view a link would share. Picking a row brings it back — at its default
-  // width, since the panel unmounts while hidden and forgets the drag.
-  const [panelHidden, setPanelHidden] = useState(false);
 
   const closePanel = useCallback(() => {
     setPanelHidden(true);
@@ -288,6 +319,7 @@ export function OrdersQueue() {
           // No `undoable`: the hook withholds it from Delivered and Cancelled
           // itself — see `isUndoableMove`.
         });
+        follow(order.id, next.slug);
       }
     }
 
@@ -303,6 +335,7 @@ export function OrdersQueue() {
     setOpenOrderId,
     closePanel,
     undoLast,
+    follow,
   ]);
 
   return (
@@ -458,6 +491,7 @@ export function OrdersQueue() {
                   // hook decides that from the target, see `isUndoableMove`.
                   // Testing `progress !== null` here offered one on Delivered.
                 });
+                follow(order.id, to.slug);
               }}
             />
           ))}
@@ -505,6 +539,7 @@ export function OrdersQueue() {
           docked
           opened={openOrderId !== null}
           onClose={closePanel}
+          onMoved={(toSlug) => follow(shownOrderId, toSlug)}
         />
       )}
     </div>

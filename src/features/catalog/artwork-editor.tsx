@@ -14,6 +14,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { ARTWORK_SHAPES, fitsShape, measureImage } from "@/lib/image-shape";
 import { formatDate } from "@/lib/time";
 import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
@@ -272,7 +273,32 @@ function Form({
       : []),
   ];
 
-  function submit() {
+  // While the pictures are measured on Save — a moment, but long enough that
+  // a second press should not start a second save.
+  const [checking, setChecking] = useState(false);
+
+  /**
+   * The languages whose picture is the wrong shape for the chosen format.
+   *
+   * The uploader already refuses a wrong file, but not a picture that was
+   * right when it went in: switching Banner to Tile keeps the banners, and an
+   * artwork saved before the check existed may never have been either. So the
+   * saved pictures are measured again against the format being saved. One
+   * that cannot be loaded right now is not counted — see `measureImage`.
+   */
+  async function wrongShapes(urls: Localized): Promise<string[]> {
+    const shape = ARTWORK_SHAPES[format];
+    const results = await Promise.all(
+      Object.entries(urls).map(async ([code, url]) => {
+        const size = url.trim() ? await measureImage(url) : null;
+        return size && !fitsShape(size, shape) ? code : null;
+      }),
+    );
+    return results.filter((code): code is string => code !== null);
+  }
+
+  async function submit() {
+    if (checking) return;
     const found = {
       // Required, and it means an English one: English is what every device
       // falls back to (`0128`), and `artworks_image_url_locales` refuses a
@@ -300,6 +326,20 @@ function Form({
             ? t("artworks.pickBundle")
             : undefined,
     };
+
+    if (!found.image && imageUrl) {
+      setChecking(true);
+      const wrong = await wrongShapes(imageUrl).finally(() =>
+        setChecking(false),
+      );
+      if (wrong.length > 0) {
+        const shape = ARTWORK_SHAPES[format];
+        found.image = t("artworks.imageWrongShape", {
+          languages: wrong.join(", "),
+          shape: `${shape.width}:${shape.height}`,
+        });
+      }
+    }
 
     setErrors(found);
     if (found.image || found.window || found.link || found.subject || !imageUrl)
@@ -337,7 +377,7 @@ function Form({
           <Button variant="secondary" onClick={onCancel} disabled={pending}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={submit} pending={pending}>
+          <Button onClick={() => void submit()} pending={pending || checking}>
             {t("artworks.save")}
           </Button>
         </>
@@ -387,6 +427,7 @@ function Form({
               value={imageUrl}
               onChange={setImageUrl}
               folder="artwork"
+              shape={ARTWORK_SHAPES[format]}
               disabled={pending}
               error={errors.image}
             />

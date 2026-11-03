@@ -38,6 +38,7 @@ export function OrderPanel({
   docked = false,
   opened = orderId !== null,
   onClose,
+  onMoved,
 }: {
   /** The order to show — on the queue, the selected one or the first. */
   orderId: string | null;
@@ -54,6 +55,8 @@ export function OrderPanel({
    */
   opened?: boolean;
   onClose: () => void;
+  /** See `OrderActions` — the queue follows a moved order into its new tab. */
+  onMoved?: (toSlug: string) => void;
 }) {
   const clock = useClock();
   const statuses = useOrderStatuses();
@@ -178,7 +181,11 @@ export function OrderPanel({
           </div>
 
           <OrderBody order={order.data} from={"panel"} />
-          <OrderActions order={order.data} statuses={statuses} />
+          <OrderActions
+            order={order.data}
+            statuses={statuses}
+            onMoved={onMoved}
+          />
         </>
       )}
     </Panel>

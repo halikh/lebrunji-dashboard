@@ -887,6 +887,9 @@ const en = {
     linkExpired: "That upload link expired. Choose the file again.",
     notAllowed: "This account is not allowed to upload images.",
     failed: "The upload did not finish. Nothing has been changed.",
+    // The size it is and the shape it should be, so the fix is in the message.
+    wrongShape:
+      "This picture is {width} × {height}. It needs to be {shape} — the app crops anything else.",
 
     // The thumbnail's accessible name. It is a button now — every picture in
     // the dashboard opens full size — so it needs one, and the version that
@@ -2226,9 +2229,13 @@ const en = {
     imageHint: {
       banner:
         "Wide, 21:9 — for example 2100 × 900 pixels. The words are in the picture, so each language gets its own. English is required; without an Arabic one, the English is shown.",
-      tile: "Square, 1:1 — for example 600 × 600 pixels. The words are in the picture, so each language gets its own. English is required; without an Arabic one, the English is shown.",
+      tile: "Portrait, 4:5 — for example 800 × 1000 pixels. The words are in the picture, so each language gets its own. English is required; without an Arabic one, the English is shown.",
     },
     imageRequired: "Add the picture — without one there is nothing to show.",
+    // Names the boxes, because after switching format it is usually all of
+    // them and the operator needs to know the pictures, not the form, are why.
+    imageWrongShape:
+      "The picture for {languages} is not {shape}. Replace it, or the app will crop it.",
     imageNeedsEnglish:
       "Add the English picture — it is the one shown wherever another language has none.",
 

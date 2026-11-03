@@ -4,6 +4,7 @@ import { useId } from "react";
 
 import { useLanguages } from "@/features/reference/use-languages";
 import { t } from "@/i18n/translations";
+import type { ImageShape } from "@/lib/image-shape";
 import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
 import { ImageUploader } from "./image-uploader";
@@ -47,6 +48,7 @@ export function LocalizedImageField({
   folder,
   hint,
   error,
+  shape,
   disabled = false,
 }: {
   label: string;
@@ -56,6 +58,8 @@ export function LocalizedImageField({
   folder: "menu-items" | "stores" | "promotions" | "artwork";
   hint?: string;
   error?: string | null;
+  /** Every language's picture is drawn in the same frame. See `ImageUploader`. */
+  shape?: ImageShape;
   disabled?: boolean;
 }) {
   const id = useId();
@@ -117,6 +121,7 @@ export function LocalizedImageField({
               value={value?.[language.code] ?? null}
               onChange={(url) => set(language.code, url)}
               folder={folder}
+              shape={shape}
               disabled={disabled}
             />
           </div>

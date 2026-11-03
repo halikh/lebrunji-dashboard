@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { uploadImage, deleteImage } from "@/lib/images";
+import { fitsShape, measureImage, type ImageShape } from "@/lib/image-shape";
 import { t } from "@/i18n/translations";
 
 import { Button, cx } from "./index";
@@ -49,6 +50,7 @@ export function ImageUploader({
   value,
   onChange,
   folder,
+  shape,
   disabled = false,
 }: {
   /** The URL currently saved on the row, or chosen in this session. */
@@ -62,6 +64,12 @@ export function ImageUploader({
     | "category-art"
     | "tag-art"
     | "menu-sections";
+  /**
+   * The shape the app draws this picture in, when it draws it in a fixed
+   * frame. A file of another shape is refused before it uploads, with its
+   * size and the shape wanted, so the fix is obvious. See `image-shape.ts`.
+   */
+  shape?: ImageShape;
   disabled?: boolean;
 }) {
   const field = useFieldWiring();
@@ -87,6 +95,25 @@ export function ImageUploader({
       if (!file || disabled) return;
 
       setError(null);
+
+      // Before the upload, so a wrong picture costs nothing — not five
+      // megabytes over a phone, and not an orphan in the bucket. A file the
+      // browser cannot read is let through: the upload's own checks say
+      // what is wrong with it better than a shape check can.
+      if (shape) {
+        const size = await measureImage(file);
+        if (size && !fitsShape(size, shape)) {
+          setError(
+            t("images.wrongShape", {
+              width: size.width,
+              height: size.height,
+              shape: `${shape.width}:${shape.height}`,
+            }),
+          );
+          return;
+        }
+      }
+
       setProgress(0);
       abort.current = new AbortController();
 
@@ -118,7 +145,7 @@ export function ImageUploader({
         abort.current = null;
       }
     },
-    [disabled, folder, onChange],
+    [disabled, folder, onChange, shape],
   );
 
   const busy = progress !== null;
