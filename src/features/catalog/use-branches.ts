@@ -16,6 +16,7 @@ import {
   type BranchDraft,
   type BranchPatch,
 } from "./api/branches";
+import { branchMenuKeys } from "./use-branch-menu";
 
 export const branchKeys = {
   all: ["branches"] as const,
@@ -104,6 +105,10 @@ export function useUpdateBranch(storeId: string) {
         queryKey: branchKeys.list(storeId),
       });
       void queryClient.invalidateQueries({ queryKey: ["stores"] });
+      // A currency change rewrites every price the branch has (0229).
+      void queryClient.invalidateQueries({
+        queryKey: branchMenuKeys.overrides(input.id),
+      });
       if (!input.quiet) {
         toast.success(t("branches.saved", { name: input.name }));
       }

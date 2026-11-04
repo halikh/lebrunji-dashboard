@@ -66,7 +66,14 @@ type BranchMenu = {
   name: string;
   /** Undefined while loading — every control reads as served until then. */
   state: BranchMenuOverrides | undefined;
+  /** The branch's own currency's, which its prices are in — not the shop's. */
   decimals: number | null;
+  /**
+   * Whether it prices in the shop's currency, so a dish it says nothing about
+   * charges the brand price. Off it, every dish has a price here (0229) and the
+   * brand's figure, in another currency, is not offered as a placeholder.
+   */
+  inherits: boolean;
   /** The other branches, for copying prices in. */
   others: Branch[];
   /** Which one to copy from — chosen once in the bar, used at every scope. */
@@ -127,7 +134,10 @@ export function BranchMenuProvider({
     branch,
     name: pickLocalized(branch.name),
     state: overrides.data,
-    decimals: decimalsOf(store.data?.currencyCode ?? ""),
+    decimals: decimalsOf(branch.currencyCode ?? store.data?.currencyCode ?? ""),
+    inherits:
+      branch.currencyCode === null ||
+      branch.currencyCode === store.data?.currencyCode,
     others,
     from,
     setSource,
@@ -266,7 +276,9 @@ export function BranchItemStrip({
             disabled={sectionOff}
             // The brand price, as a placeholder — what this branch charges
             // when it says nothing.
-            placeholder={toMajor(item.price, menu.decimals)}
+            placeholder={
+              menu.inherits ? toMajor(item.price, menu.decimals) : undefined
+            }
             aria-label={t("branchMenu.priceFor", { name })}
           />
         </span>
@@ -295,6 +307,7 @@ export function BranchItemStrip({
           branchId={menu.branch.id}
           itemId={item.id}
           decimals={menu.decimals}
+          inherits={menu.inherits}
           state={menu.state}
           disabled={off}
         />
@@ -330,12 +343,14 @@ function ItemOptionsAtBranch({
   branchId,
   itemId,
   decimals,
+  inherits,
   state,
   disabled,
 }: {
   branchId: string;
   itemId: string;
   decimals: number | null;
+  inherits: boolean;
   state: BranchMenuOverrides | undefined;
   disabled: boolean;
 }) {
@@ -435,7 +450,9 @@ function ItemOptionsAtBranch({
                       }
                       decimalDigits={decimals}
                       disabled={disabled || groupOff}
-                      placeholder={toMajor(option.price, decimals)}
+                      placeholder={
+                        inherits ? toMajor(option.price, decimals) : undefined
+                      }
                       aria-label={t("branchMenu.optionPriceFor", { name })}
                     />
                   </span>

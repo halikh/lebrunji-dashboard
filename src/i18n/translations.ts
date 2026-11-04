@@ -2777,7 +2777,7 @@ const en = {
       "This branch's own picture. Remove it to go back to the shop's.",
     currency: "Prices in",
     currencyHint:
-      "What this branch charges in. Its menu is quoted and its orders are charged in this — leave it on the shop's unless this place really does trade in another.",
+      "What this branch charges in. Changing it converts its prices at today's rate and makes every one of them this branch's own, so they no longer follow the shop's. Leave it on the shop's unless this place really does trade in another.",
     currencySame: "Same as the shop ({code})",
     // Said once at the top, because "why is there a Branches tab on a shop with
     // one branch" is the first question this screen gets.

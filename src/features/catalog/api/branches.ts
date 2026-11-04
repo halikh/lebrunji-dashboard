@@ -370,7 +370,9 @@ export async function createBranch(
       // Null is written on purpose rather than copied from the shop: it is the
       // reference that keeps a branch following the brand. See `Branch`.
       image_url: draft.imageUrl,
-      currency_code: draft.currencyCode,
+      // Always on the shop's to begin with: `0229` refuses a branch created in
+      // another, and a currency of its own is set below, where it converts.
+      currency_code: null,
       is_active: draft.isActive,
       sort_order: sortOrder,
       // No `slug`: derived from the English name by the same `fill_slug`
@@ -392,7 +394,35 @@ export async function createBranch(
   const id = (data as { id: string }).id;
   const digits = draft.whatsappPhone ? digitsOf(draft.whatsappPhone) : "";
   if (digits) await setBranchWhatsapp(id, digits);
+  if (draft.currencyCode) await setBranchCurrency(id, draft.currencyCode);
   return id;
+}
+
+/**
+ * Moves a branch to another currency, or back onto its shop's (`null`).
+ *
+ * An RPC and not a column write, for the reason `setStoreCurrency`
+ * gives: a price is digits with no currency of its own, so writing the column
+ * alone sold every dish the branch had not priced for itself at the brand's
+ * figure under the branch's label — 500 US cents as ل.ل500. `0229` refuses
+ * that write, and `api_v1_set_branch_currency` instead gives the branch a
+ * price of its own for everything it inherited and converts the lot.
+ *
+ * Always `convert`. The shop's `keep` is for a label that was wrong all along;
+ * a branch's currency is chosen on purpose, and its dishes should go on being
+ * worth what they were. Saving with the currency unchanged is a no-op there.
+ */
+export async function setBranchCurrency(
+  id: string,
+  currencyCode: string | null,
+): Promise<void> {
+  const { error } = await getClient().rpc("api_v1_set_branch_currency", {
+    p_branch_id: id,
+    p_currency_code: currencyCode,
+    p_mode: "convert",
+  });
+
+  if (error) throw new Error(friendly(error.message));
 }
 
 export type BranchPatch = Partial<BranchDraft>;
@@ -425,11 +455,15 @@ export async function updateBranch(
   // `null` is a value for both — it is how a branch is put back to following
   // the shop — so what is tested is the key being absent, not the value.
   if (patch.imageUrl !== undefined) row.image_url = patch.imageUrl;
-  if (patch.currencyCode !== undefined) {
-    row.currency_code = patch.currencyCode;
-  }
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   row.updated_at = new Date().toISOString();
+
+  // First, and on its own: it rewrites the branch's prices in one transaction,
+  // and if it fails the rest of the row should not be saved as though it had
+  // worked. The same order the Details tab keeps for the shop's currency.
+  if (patch.currencyCode !== undefined) {
+    await setBranchCurrency(id, patch.currencyCode);
+  }
 
   const { error } = await getClient().from("branches").update(row).eq("id", id);
   if (error) throw new Error(friendly(error.message));
