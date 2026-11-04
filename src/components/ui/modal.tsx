@@ -94,13 +94,8 @@ export function Modal({
         onClose();
       }}
       onClick={(event) => {
-        const box = event.currentTarget.getBoundingClientRect();
-        const outside =
-          event.clientX < box.left ||
-          event.clientX > box.right ||
-          event.clientY < box.top ||
-          event.clientY > box.bottom;
-        if (outside) onClose();
+        if (isBackdropClick(event, event.currentTarget.getBoundingClientRect()))
+          onClose();
       }}
       className={cx(
         // The open/close transition and the backdrop's colour are in
@@ -157,5 +152,33 @@ export function Modal({
 
       {children}
     </dialog>
+  );
+}
+
+/**
+ * Whether a click on the dialog was a click on its backdrop.
+ *
+ * Both halves are needed. The box alone is not enough: a button pressed with
+ * Enter or Space fires a `click` at 0,0 in Chromium, which is outside any
+ * centred dialog — so every keyboard-activated button inside one bubbled up
+ * here and shut it, before a confirm's failure message could show (QA-022).
+ * The target alone is not enough either: the dialog's own padding reports the
+ * dialog as its target too, and a click there is inside.
+ */
+export function isBackdropClick(
+  event: {
+    target: EventTarget | null;
+    currentTarget: EventTarget;
+    clientX: number;
+    clientY: number;
+  },
+  box: { left: number; right: number; top: number; bottom: number },
+): boolean {
+  if (event.target !== event.currentTarget) return false;
+  return (
+    event.clientX < box.left ||
+    event.clientX > box.right ||
+    event.clientY < box.top ||
+    event.clientY > box.bottom
   );
 }
