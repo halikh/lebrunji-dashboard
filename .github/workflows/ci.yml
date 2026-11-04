@@ -1,0 +1,54 @@
+name: CI
+
+# Runs on every push and every pull request — the same checks `npm run verify`
+# runs locally, plus a production build, which is the one that catches a
+# `server-only` module imported into a client component (src/lib/storage/
+# bucket.ts holds the R2 key; the build failing is the guard). Until QA-054
+# this repo had no CI at all, so nothing caught what an editor didn't.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push supersedes the run in flight for the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `ci` rather than `install`: exactly the lockfile, and fails if the two
+      # have drifted.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Test
+        run: npm test
+
+      # Placeholders, not secrets: `readEnv` is only called at request time, so
+      # the build needs the two `NEXT_PUBLIC_` names to exist, not to work.
+      # Nothing built here is deployed — Railway builds its own.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
