@@ -16,6 +16,7 @@ import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { ItemOptions } from "./item-options";
 import { ShopLine } from "./store-identity";
 import { TagChip } from "./tag-chip";
+import { useLiveBundlesWith } from "./use-bundles";
 import { useStore } from "./use-stores";
 import { useTagVocabulary } from "./use-tags";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -181,6 +182,8 @@ export function MenuItemEditor({
   );
   const [price, setPrice] = useState(String(initial?.price ?? ""));
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+  // Switched off, it takes these out of the app with it (`bundle_is_sellable`).
+  const inBundles = useLiveBundlesWith(storeId, itemId ?? "");
   const [imageUrl, setImageUrl] = useState<string | null>(
     initial?.imageUrl ?? null,
   );
@@ -754,7 +757,15 @@ export function MenuItemEditor({
 
           <Field
             label={t("menu.visibility")}
-            hint={isActive ? t("menu.liveHint") : t("menu.hiddenHint")}
+            hint={
+              isActive
+                ? t("menu.liveHint")
+                : inBundles.length > 0
+                  ? t("menu.hiddenInBundlesHint", {
+                      bundles: inBundles.join(", "),
+                    })
+                  : t("menu.hiddenHint")
+            }
           >
             <Toggle
               on={isActive}

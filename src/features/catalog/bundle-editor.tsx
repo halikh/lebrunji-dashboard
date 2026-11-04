@@ -31,6 +31,7 @@ import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import {
   fetchBundleBranchPrices,
+  offSaleItems,
   searchBundleDishes,
   separatePrice,
   type Bundle,
@@ -460,6 +461,8 @@ function Form({
                           label: option.label,
                           price: seenPrices.current.get(option.value) ?? 0,
                           quantity: 1,
+                          // The picker offers only dishes on the menu.
+                          onSale: true,
                         },
                     ),
                   )
@@ -495,6 +498,12 @@ function Form({
                   >
                     <span className="min-w-0 flex-grow truncate text-[14px] font-medium">
                       {item.label}
+                      {!item.onSale && (
+                        <span className="font-medium text-danger">
+                          {" · "}
+                          {t("bundles.dishOffSale")}
+                        </span>
+                      )}
                     </span>
                     <span className="shrink-0 tabular-nums text-[12px] text-text-faint">
                       {currencyCode ? format(item.price, currencyCode) : null}
@@ -529,6 +538,12 @@ function Form({
                   </li>
                 ))}
               </ul>
+            )}
+
+            {offSaleItems({ items }).length > 0 && (
+              <p role="status" className="text-[13px] font-medium text-danger">
+                {t("bundles.itemsOffSale")}
+              </p>
             )}
           </FormSection>
 

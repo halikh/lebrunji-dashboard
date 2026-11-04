@@ -2058,6 +2058,11 @@ const en = {
     archived: "{name} archived",
     always: "On offer with no end date",
     ended: "Live, but its end date has passed, so customers can't see it",
+    // `bundle_is_sellable` refusing it for a dish rather than for its dates.
+    offSale: "Live, but customers can't see it. Off the menu: {dishes}",
+    dishOffSale: "Off the menu",
+    itemsOffSale:
+      "Customers can't see this bundle while a dish in it is hidden or archived on the menu. Show the dish again, or take it out of the bundle.",
     startsOn: "Live from {when}",
     between: "{from} to {to}",
     until: "Until {to}",
@@ -2076,7 +2081,8 @@ const en = {
     imageHint: "The picture on the bundle's card in the app.",
     itemsSection: "What's inside",
     pickDishes: "Dishes",
-    pickDishesHint: "At least two. Set how many of each next to it.",
+    pickDishesHint:
+      "At least two. Set how many of each next to it. Hidden dishes aren't listed.",
     pickDishesPlaceholder: "Search this shop's dishes",
     pickShopFirst: "Choose the shop first",
     itemsRequired:
@@ -2618,6 +2624,8 @@ const en = {
     archiveTitle: "Archive this item?",
     archiveBody:
       "It disappears from the app immediately. Past orders keep it, and it can be brought back.",
+    archiveInBundlesBody:
+      "It disappears from the app immediately, and so do the bundles it's in: {bundles}. Past orders keep it, and it can be brought back.",
     archiveConfirm: "Archive",
     archive: "Archive",
     itemCount: "{count} items",
@@ -2644,6 +2652,9 @@ const en = {
     hideTitle: "Hide {name} from customers?",
     hideBody:
       "It disappears from the shop's menu straight away. Orders already placed are not affected, and you can show it again at any time.",
+    // The same, for a dish inside a switched-on bundle — which goes with it.
+    hideInBundlesBody:
+      "It disappears from the shop's menu straight away, and so do the bundles it's in: {bundles}. Orders already placed are not affected, and you can show it again at any time.",
     hideConfirm: "Hide it",
 
     // Sections. A section is the heading a customer scans before they read any
@@ -2722,6 +2733,8 @@ const en = {
     priceHint: "In the shop's currency, without separators.",
     liveHint: "Customers can see and order this.",
     hiddenHint: "Kept, but not shown in the app.",
+    hiddenInBundlesHint:
+      "Kept, but not shown in the app, and neither are the bundles it's in: {bundles}.",
     newItem: "New item",
     // Placeholders are examples, never labels. Each shows what a good answer
     // looks like for a field whose name is already above it.

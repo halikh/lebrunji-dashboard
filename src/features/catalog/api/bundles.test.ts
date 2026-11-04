@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { separatePrice, toBundle } from "./bundles";
+import {
+  liveBundlesWith,
+  offSaleItems,
+  separatePrice,
+  toBundle,
+} from "./bundles";
 import { toColumns } from "./artworks";
 
 describe("toBundle", () => {
@@ -40,6 +45,72 @@ describe("toBundle", () => {
       "fries",
     ]);
     expect(separatePrice(bundle.items)).toBe(1200);
+  });
+});
+
+/**
+ * The dish half of `bundle_is_sellable` (`0204`), as the dashboard reads it.
+ *
+ * Its failure is silent: a dish switched off or archived takes the bundle out
+ * of the app without a word, and a list that reads only the bundle's own
+ * switch goes on calling it Live (QA-021).
+ */
+describe("offSaleItems", () => {
+  const burger = {
+    name: { en: "Burger" },
+    price: 600,
+    is_active: true,
+    deleted_at: null,
+  };
+  const fries = {
+    name: { en: "Fries" },
+    price: 300,
+    is_active: true,
+    deleted_at: null,
+  };
+  const bundleOf = (...dishes: (Record<string, unknown> | null)[]) =>
+    toBundle({
+      id: "b1",
+      store_id: "s1",
+      name: { en: "Burger meal" },
+      is_active: true,
+      bundle_items: dishes.map((dish, index) => ({
+        menu_item_id: `d${index}`,
+        quantity: 1,
+        sort_order: index,
+        dish,
+      })),
+    });
+  const labels = (bundle: ReturnType<typeof toBundle>) =>
+    offSaleItems(bundle).map((item) => item.label);
+
+  it("is empty while every dish is on the menu", () => {
+    expect(labels(bundleOf(burger, fries))).toEqual([]);
+  });
+
+  it("names a switched-off dish", () => {
+    expect(labels(bundleOf(burger, { ...fries, is_active: false }))).toEqual([
+      "Fries",
+    ]);
+  });
+
+  it("names an archived dish, even one still switched on", () => {
+    expect(
+      labels(
+        bundleOf({ ...burger, deleted_at: "2026-11-04T10:00:00Z" }, fries),
+      ),
+    ).toEqual(["Burger"]);
+  });
+
+  it("counts a dish it cannot read as off sale", () => {
+    expect(offSaleItems(bundleOf(burger, null))).toHaveLength(1);
+  });
+
+  it("names only the switched-on bundles that hold a dish", () => {
+    const live = bundleOf(burger, fries);
+    const hidden = { ...live, id: "b2", isActive: false };
+    expect(liveBundlesWith([live, hidden], "d1")).toEqual(["Burger meal"]);
+    expect(liveBundlesWith([live, hidden], "d9")).toEqual([]);
   });
 });
 

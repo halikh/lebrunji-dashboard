@@ -11,6 +11,7 @@ import {
   archiveBundle,
   createBundle,
   fetchBundles,
+  liveBundlesWith,
   setBundleActive,
   setBundleOrder,
   updateBundle,
@@ -33,6 +34,16 @@ export function useBundles(search = "", storeId = "") {
     queryFn: () => fetchBundles(term, storeId || undefined),
     placeholderData: (previous) => previous,
   });
+}
+
+/**
+ * The switched-on bundles a dish is in, by name — what hiding or archiving it
+ * would take out of the app with it. The shop's bundle list, shared by every
+ * row of its menu through the query cache.
+ */
+export function useLiveBundlesWith(storeId: string, dishId: string): string[] {
+  const bundles = useBundles("", storeId);
+  return liveBundlesWith(bundles.data ?? [], dishId);
 }
 
 /**

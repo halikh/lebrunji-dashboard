@@ -27,6 +27,12 @@ export type BundleItem = {
   /** Its brand price, minor units of the shop's currency. */
   price: number;
   quantity: number;
+  /**
+   * Switched on and not archived. A bundle holding a dish that is not is
+   * refused by `bundle_is_sellable` everywhere a customer could meet it, so
+   * the screens say so rather than calling the bundle Live.
+   */
+  onSale: boolean;
 };
 
 export type Bundle = {
@@ -63,7 +69,7 @@ const COLUMNS = `id, store_id, name, description, image_url, price, is_active,
    starts_at, ends_at, sort_order,
    stores ( name, currency_code ),
    bundle_items!bundle_items_bundle_id_fkey ( menu_item_id, quantity, sort_order,
-     dish:menu_items!bundle_items_menu_item_id_fkey ( name, price ) )`;
+     dish:menu_items!bundle_items_menu_item_id_fkey ( name, price, is_active, deleted_at ) )`;
 
 /**
  * Every live bundle, every shop — or those matching a term.
@@ -129,6 +135,8 @@ export function toBundle(row: Record<string, unknown>): Bundle {
           label: dish ? pickLocalized((dish.name as Localized) ?? {}) : "",
           price: (dish?.price as number | null) ?? 0,
           quantity: (link.quantity as number | null) ?? 1,
+          // No row at all reads as off sale: the app would not find it either.
+          onSale: Boolean(dish?.is_active) && dish?.deleted_at == null,
         };
       }),
   };
@@ -139,6 +147,29 @@ export function separatePrice(
   items: readonly { price: number; quantity: number }[],
 ): number {
   return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+}
+
+/**
+ * The dishes keeping a bundle out of the app — `bundle_is_sellable`'s rule for
+ * the shop as a whole. A branch hiding one of them takes it off sale at that
+ * branch only, which the branch's own menu shows.
+ */
+export function offSaleItems(bundle: Pick<Bundle, "items">): BundleItem[] {
+  return bundle.items.filter((item) => !item.onSale);
+}
+
+/** The names of the switched-on bundles a dish is in, for its warnings. */
+export function liveBundlesWith(
+  bundles: readonly Bundle[],
+  dishId: string,
+): string[] {
+  return bundles
+    .filter(
+      (bundle) =>
+        bundle.isActive &&
+        bundle.items.some((item) => item.menuItemId === dishId),
+    )
+    .map((bundle) => pickLocalized(bundle.name));
 }
 
 /** The bundle's own columns, from a draft. */
@@ -271,7 +302,8 @@ export type BundleDish = { id: string; label: string; price: number };
 
 /**
  * One shop's dishes matching a term — never another bundle, which `0204`
- * refuses inside a bundle.
+ * refuses inside a bundle, and never a switched-off dish, which would keep the
+ * bundle out of the app from the moment it is saved.
  */
 export async function searchBundleDishes(
   term: string,
@@ -282,6 +314,7 @@ export async function searchBundleDishes(
     .select("id, name, price")
     .eq("store_id", storeId)
     .eq("is_bundle", false)
+    .eq("is_active", true)
     .is("deleted_at", null)
     .order("sort_order", { ascending: true })
     .limit(50);

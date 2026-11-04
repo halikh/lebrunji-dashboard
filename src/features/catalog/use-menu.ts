@@ -34,6 +34,7 @@ import {
 import { restoreBranch } from "./api/branches";
 import { updateItemOption, updateOptionGroup } from "./api/options";
 import { branchKeys } from "./use-branches";
+import { bundleKeys } from "./use-bundles";
 
 export const menuKeys = {
   all: ["menu"] as const,
@@ -160,6 +161,8 @@ export function useUpdateMenuItem(storeId: string) {
 
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
+      // A bundle names its dishes and says when one is off sale.
+      void queryClient.invalidateQueries({ queryKey: bundleKeys.all });
     },
   });
 }
@@ -173,6 +176,7 @@ export function useArchiveMenuItem(storeId: string) {
       archiveMenuItem(input.id),
     onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
+      void queryClient.invalidateQueries({ queryKey: bundleKeys.all });
       toast.success(t("menu.archived", { name: pickLocalized(input.name) }));
     },
     onError: (error) => {

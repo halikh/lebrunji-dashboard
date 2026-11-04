@@ -18,7 +18,7 @@ import { t } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
 import { formatDate } from "@/lib/time";
 
-import { separatePrice, type Bundle } from "./api/bundles";
+import { offSaleItems, separatePrice, type Bundle } from "./api/bundles";
 import {
   useArchiveBundle,
   useBundles,
@@ -185,6 +185,9 @@ function Row({
   const { format } = useMoney();
   const name = pickLocalized(bundle.name);
   const separately = separatePrice(bundle.items);
+  // Only worth saying while it is switched on: a hidden bundle is already
+  // out of the app, and its row says so.
+  const offSale = bundle.isActive ? offSaleItems(bundle) : [];
 
   const row = rowProps(
     bundle.id,
@@ -241,6 +244,13 @@ function Row({
           {" · "}
           {describeWindow(bundle)}
         </span>
+        {offSale.length > 0 && (
+          <span className="truncate text-[12px] font-medium text-danger">
+            {t("bundles.offSale", {
+              dishes: offSale.map((item) => item.label).join(", "),
+            })}
+          </span>
+        )}
       </button>
 
       <div className="flex shrink-0 items-center gap-lg max-md:w-full max-md:justify-end">

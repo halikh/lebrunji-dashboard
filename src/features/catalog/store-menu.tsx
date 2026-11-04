@@ -65,6 +65,8 @@ import {
 import { useLanguages } from "@/features/reference/use-languages";
 import { useStore } from "./use-stores";
 import { useBranches } from "./use-branches";
+import { useBundles } from "./use-bundles";
+import { liveBundlesWith } from "./api/bundles";
 
 /**
  * One shop's menu.
@@ -197,6 +199,11 @@ function MenuEditor({ storeId }: { storeId: string }) {
   const menu = useMenu(storeId);
   const update = useUpdateMenuItem(storeId);
   const archive = useArchiveMenuItem(storeId);
+  // Which switched-on bundles a dish is in, so hiding or archiving it says
+  // that they leave the app too (`bundle_is_sellable`).
+  const bundles = useBundles("", storeId);
+  const bundlesOf = (dishId: string) =>
+    liveBundlesWith(bundles.data ?? [], dishId);
 
   const createSection = useCreateMenuSection(storeId);
   const archiveSection = useArchiveMenuSection(storeId);
@@ -370,6 +377,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
           // still lands in the right part of the menu.
           router.push(`/catalogue/${storeId}/items/new?section=${section.id}`),
         )}
+        bundlesOf={bundlesOf}
         onToggle={(item) =>
           update.mutate({
             id: item.id,
@@ -664,6 +672,7 @@ function MenuEditor({ storeId }: { storeId: string }) {
                   onEdit={guarded(() =>
                     router.push(`/catalogue/${storeId}/items/${item.id}`),
                   )}
+                  inBundles={bundlesOf(item.id)}
                   onToggle={() =>
                     update.mutate({
                       id: item.id,
@@ -792,6 +801,7 @@ function Section({
   onReorderItems,
   onEdit,
   onAdd,
+  bundlesOf,
   onToggle,
   onArchive,
 }: {
@@ -842,6 +852,8 @@ function Section({
   onReorderItems: (ids: string[]) => void;
   onEdit: (id: string) => void;
   onAdd: () => void;
+  /** The switched-on bundles a dish is in — see `MenuEditor`. */
+  bundlesOf: (dishId: string) => string[];
   onToggle: (item: MenuItem) => void;
   onArchive: (item: MenuItem) => Promise<void>;
 } & ReorderProps) {
@@ -1211,6 +1223,7 @@ function Section({
                 // Marked and scrolled to on the way back from its own page.
                 anchor={focus.attach(item.id)}
                 onEdit={() => onEdit(item.id)}
+                inBundles={bundlesOf(item.id)}
                 onToggle={() => onToggle(item)}
                 onArchive={() => onArchive(item)}
               />
@@ -1306,6 +1319,7 @@ function ItemRow({
   rowProps,
   handleProps,
   onEdit,
+  inBundles,
   onToggle,
   onArchive,
 }: {
@@ -1325,6 +1339,8 @@ function ItemRow({
   /** Being dragged, so it sheds everything that is not identity. */
   carried: boolean;
   onEdit: () => void;
+  /** The switched-on bundles it is in, which leave the app with it. */
+  inBundles: string[];
   onToggle: () => void;
   onArchive: () => Promise<void>;
 } & ReorderProps) {
@@ -1449,7 +1465,10 @@ function ItemRow({
               onChange={onToggle}
               labelOn={t("menu.live")}
               labelOff={t("menu.hidden")}
-              params={{ name: pickLocalized(item.name) }}
+              params={{
+                name: pickLocalized(item.name),
+                bundles: inBundles.join(", "),
+              }}
               whenTurningOn={{
                 titleKey: "menu.showTitle",
                 bodyKey: "menu.showBody",
@@ -1457,7 +1476,10 @@ function ItemRow({
               }}
               whenTurningOff={{
                 titleKey: "menu.hideTitle",
-                bodyKey: "menu.hideBody",
+                bodyKey:
+                  inBundles.length > 0
+                    ? "menu.hideInBundlesBody"
+                    : "menu.hideBody",
                 confirmKey: "menu.hideConfirm",
               }}
               className={cx(ROW_ABOVE, "w-[92px]")}
@@ -1467,8 +1489,13 @@ function ItemRow({
               className={ROW_ABOVE}
               onConfirm={onArchive}
               titleKey="menu.archiveTitle"
-              bodyKey="menu.archiveBody"
+              bodyKey={
+                inBundles.length > 0
+                  ? "menu.archiveInBundlesBody"
+                  : "menu.archiveBody"
+              }
               confirmKey="menu.archiveConfirm"
+              params={{ bundles: inBundles.join(", ") }}
               variant="danger"
               triggerVariant="danger"
               size="sm"
@@ -1762,6 +1789,7 @@ function SearchResult({
   shopRate,
   sectionTitle,
   onEdit,
+  inBundles,
   onToggle,
   onArchive,
 }: {
@@ -1771,6 +1799,8 @@ function SearchResult({
   shopRate: number | null;
   sectionTitle: string;
   onEdit: () => void;
+  /** As on `ItemRow`. */
+  inBundles: string[];
   onToggle: () => void;
   onArchive: () => Promise<void>;
 }) {
@@ -1840,7 +1870,10 @@ function SearchResult({
           onChange={onToggle}
           labelOn={t("menu.live")}
           labelOff={t("menu.hidden")}
-          params={{ name: pickLocalized(item.name) }}
+          params={{
+            name: pickLocalized(item.name),
+            bundles: inBundles.join(", "),
+          }}
           whenTurningOn={{
             titleKey: "menu.showTitle",
             bodyKey: "menu.showBody",
@@ -1848,7 +1881,8 @@ function SearchResult({
           }}
           whenTurningOff={{
             titleKey: "menu.hideTitle",
-            bodyKey: "menu.hideBody",
+            bodyKey:
+              inBundles.length > 0 ? "menu.hideInBundlesBody" : "menu.hideBody",
             confirmKey: "menu.hideConfirm",
           }}
           className={cx(ROW_ABOVE, "w-[92px]")}
@@ -1858,9 +1892,16 @@ function SearchResult({
           className={ROW_ABOVE}
           onConfirm={onArchive}
           titleKey="menu.archiveTitle"
-          bodyKey="menu.archiveBody"
+          bodyKey={
+            inBundles.length > 0
+              ? "menu.archiveInBundlesBody"
+              : "menu.archiveBody"
+          }
           confirmKey="menu.archiveConfirm"
-          params={{ name: pickLocalized(item.name) }}
+          params={{
+            name: pickLocalized(item.name),
+            bundles: inBundles.join(", "),
+          }}
           variant="danger"
           triggerVariant="danger"
           size="sm"
