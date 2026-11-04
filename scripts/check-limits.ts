@@ -104,7 +104,7 @@ async function main() {
   const url = process.env.SUPABASE_DB_URL;
   if (!url) {
     console.error(
-      'SUPABASE_DB_URL is not set — not in the environment, and not in .env.local.\n\n' +
+      'SUPABASE_DB_URL is not set — not in the environment, and not in .env.scripts.\n\n' +
         'This reads the constraints back out of the linked database, so it needs a\n' +
         'connection string. Supabase dashboard → Project Settings → Database →\n' +
         'Connection string. Use the pooler URL; this opens one connection and closes it.',

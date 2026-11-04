@@ -30,9 +30,34 @@ export async function POST(request: NextRequest) {
   if (email) {
     const supabase = anonymousClient();
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${request.nextUrl.origin}/auth/confirm`,
+      redirectTo: `${publicOrigin(request)}/auth/confirm`,
     });
   }
 
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Where the link in the email points, and it is never the request's `Host`.
+ *
+ * Anybody can post here, with any `Host` header they like. Built from the
+ * request, the operator's recovery link would land on whatever origin the
+ * attacker named, carrying the code that resets the password, unless
+ * Supabase's redirect allow-list happened to catch it. That list is one
+ * setting in a hosted dashboard, and nothing here can check it is right.
+ *
+ * Production refuses rather than falling back, for the reason `imageUrlFor`
+ * gives. Development uses the request's origin, which there is the real one.
+ */
+function publicOrigin(request: NextRequest): string {
+  const configured = (process.env.APP_PUBLIC_URL ?? "").replace(/\/+$/, "");
+  if (configured) return configured;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "APP_PUBLIC_URL is not set. The password-reset link is built from it, " +
+        "and the request's own Host is whatever the caller chose to send.",
+    );
+  }
+  return request.nextUrl.origin;
 }

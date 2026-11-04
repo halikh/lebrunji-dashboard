@@ -126,8 +126,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "type" }, { status: 400 });
   }
 
+  // A claim, and checked as one: what holds the upload to it is that this
+  // exact number is signed into the URL below, so the store refuses any other
+  // body. See `presignUpload`.
   const bytes = body.bytes;
-  if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes <= 0) {
+  if (typeof bytes !== "number" || !Number.isSafeInteger(bytes) || bytes <= 0) {
     return NextResponse.json({ error: "size" }, { status: 400 });
   }
   if (bytes > rules.maxBytes) {
@@ -138,7 +141,7 @@ export async function POST(request: NextRequest) {
   // and a filename is text somebody typed appearing verbatim in a URL the app
   // then requests.
   const key = `${folder}/${crypto.randomUUID()}.${EXTENSIONS[type]}`;
-  const uploadUrl = await presignUpload(key, type);
+  const uploadUrl = await presignUpload(key, type, bytes);
 
   return NextResponse.json(
     { key, uploadUrl, url: imageUrlFor(key, request.nextUrl.origin) },

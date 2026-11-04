@@ -3,9 +3,10 @@
  *
  *     npm run create-admin you@example.com
  *
- * Reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from a gitignored
- * `.env.local`, and prompts for a password rather than taking it as an
- * argument — an argument would be in the shell history and in the process list.
+ * Reads the project URL from `.env.local` and `SUPABASE_SERVICE_ROLE_KEY` from
+ * `.env.scripts` (both gitignored), and prompts for a password rather than
+ * taking it as an argument — an argument would be in the shell history and in
+ * the process list.
  *
  * ## Why this is a script and not a screen
  *
@@ -22,8 +23,9 @@
  *
  * It bypasses RLS completely, which is exactly why it lives here and nowhere
  * else — not in `.env`, not on Railway, not in any file the app reads.
- * `.env.local` is gitignored. If this key is ever pasted into the dashboard's
- * environment, every policy in migrations 0062–0068 becomes decorative.
+ * `.env.scripts` is gitignored, and Next never loads it. If this key is ever
+ * pasted into the dashboard's environment, every policy in migrations
+ * 0062–0068 becomes decorative.
  */
 
 import { createInterface } from 'node:readline/promises';
@@ -77,7 +79,7 @@ async function main() {
   if (!serviceRoleKey) {
     console.error(
       'SUPABASE_SERVICE_ROLE_KEY is not set.\n\n' +
-        (source === 'file' ? 'Read .env.local, but it does not set it.\n\n' : '') +
+        (source === 'file' ? 'Read .env.local and .env.scripts, but neither sets it.\n\n' : '') +
         'This is a different key from the anon key, not the same one under\n' +
         'another name. The anon key cannot do either half of this job:\n\n' +
         '  - creating an auth user is an admin API call, which it is refused, and\n' +

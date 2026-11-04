@@ -116,8 +116,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Without `emailRedirectTo` the confirmation link falls back to the
+  // project's Site URL, which is the customer app's `deliveryapp://`.
   const { error } = await supabase.auth.updateUser(
     password ? { password } : { email: email as string },
+    { emailRedirectTo: `${request.nextUrl.origin}/auth/confirm` },
   );
 
   if (error) {

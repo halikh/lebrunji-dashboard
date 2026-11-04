@@ -25,8 +25,8 @@ import { currentAccessToken } from "./session";
  *   will be subtly different in one of them, and the one that is wrong is the
  *   one nobody reads.
  * - It still asks the database. Rather than trusting a claim inside the JWT, it
- *   reads `operators` **as the caller**, so the answer comes from the same RLS
- *   policy that governs everything else. A revoked operator stops being one
+ *   calls `is_admin()` **as the caller**, so the answer comes from the same
+ *   function every policy and RPC goes through. A revoked operator stops being one
  *   here at the same moment they stop being one everywhere.
  *
  * ## Signed in is not the same as authorised
@@ -61,23 +61,24 @@ export async function requireOperator(
 
   const { supabaseUrl, supabaseAnonKey } = readEnv();
 
-  // `operators` has one policy: an operator may read their own row. So a row
-  // coming back *is* the answer, and no row is the answer too — there is
-  // nothing here that decides on the app's behalf.
-  const lookup = await fetch(
-    `${supabaseUrl}/rest/v1/operators?select=id&limit=1`,
-    {
-      headers: {
-        apikey: supabaseAnonKey,
-        authorization: `Bearer ${accessToken}`,
-      },
-      // A permission decision must never come out of a cache.
-      cache: "no-store",
+  // The same question every policy asks, asked the same way: `is_admin()`, as
+  // the caller. Reading `operators` directly would answer "has a row", which is
+  // not what the policies mean — `is_admin()` also checks `role`, and a second
+  // role (0068) would otherwise be an operator here and nowhere else.
+  const lookup = await fetch(`${supabaseUrl}/rest/v1/rpc/is_admin`, {
+    method: "POST",
+    headers: {
+      apikey: supabaseAnonKey,
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
     },
-  );
+    body: "{}",
+    // A permission decision must never come out of a cache.
+    cache: "no-store",
+  });
 
-  const rows: unknown = lookup.ok ? await lookup.json() : null;
-  const isOperator = Array.isArray(rows) && rows.length > 0;
+  const answer: unknown = lookup.ok ? await lookup.json() : null;
+  const isOperator = answer === true;
 
   if (!isOperator) {
     return {

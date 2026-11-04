@@ -145,9 +145,15 @@ const UPLOAD_WINDOW_SECONDS = 15 * 60;
 /**
  * A URL the browser may `PUT` one object to.
  *
- * The signature covers the **key, the method and the content type** — so a URL
- * handed out for a JPEG cannot be used to store a script, or an object under a
- * different name. That matters because this is the only point in the design
+ * The signature covers the **key, the method, the content type and the exact
+ * size** — so a URL handed out for a JPEG cannot be used to store a script, an
+ * object under a different name, or a body larger than the one the route
+ * agreed to. The size is the one that is easy to miss: the route checks the
+ * `bytes` the client *claims*, and without `content-length` in the signature a
+ * caller could claim 1 byte and then `PUT` a gigabyte. The browser sets that
+ * header from the file itself, so an honest upload matches by construction.
+ *
+ * That matters because this is the only point in the design
  * where a browser writes to the bucket directly: what the route decided has to
  * be nailed into the signature, or it is a suggestion the client can ignore.
  *
@@ -158,6 +164,7 @@ const UPLOAD_WINDOW_SECONDS = 15 * 60;
 export async function presignUpload(
   key: string,
   contentType: string,
+  bytes: number,
 ): Promise<string> {
   const config = readBucketConfig();
   return getSignedUrl(
@@ -166,12 +173,13 @@ export async function presignUpload(
       Bucket: config.bucket,
       Key: key,
       ContentType: contentType,
+      ContentLength: bytes,
     }),
     {
       expiresIn: UPLOAD_WINDOW_SECONDS,
       // Part of the bargain above, so it must be presented by the browser and
       // checked by the store rather than left to trust.
-      signableHeaders: new Set(["content-type"]),
+      signableHeaders: new Set(["content-type", "content-length"]),
     },
   );
 }

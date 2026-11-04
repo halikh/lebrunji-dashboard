@@ -89,7 +89,9 @@ export function PreviewImage({
         labelledBy={titleId}
         // Wider than the dialog's default, which is sized for a question. The
         // point of this one is the picture, so it takes what the viewport has.
-        className="w-[min(880px,calc(100vw-2rem))] p-lg"
+        // Through `width`, not a `w-[…]` class — see the prop on `Modal`.
+        width={880}
+        className="p-lg"
       >
         {/* `pe-[40px]` keeps the heading clear of the close button the dialog
             puts in that corner. */}

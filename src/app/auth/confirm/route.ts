@@ -21,15 +21,32 @@ import { anonymousClient, toPair, writeSession } from "@/lib/auth/session";
  * machine should stay signed in, and a password reset is disproportionately
  * likely to be happening on a machine that is not theirs. A session cookie is
  * the conservative reading of an unanswered question.
+ *
+ * ## Only the links this app sends
+ *
+ * `verifyOtp` signs in whoever the token belongs to, so accepting any `type`
+ * would let a page link a visitor into the *linker's* account with a
+ * `magiclink` or `signup` token (login CSRF). The dashboard mails two kinds of
+ * link — the reset from `/auth/reset-request` and the confirmation of a new
+ * address from `/auth/account` — and anything else is refused before it
+ * reaches Supabase. Each one lands on the screen that asked for it.
  */
+const LANDING: Partial<Record<EmailOtpType, string>> = {
+  recovery: "/reset-password",
+  email_change: "/account",
+};
+
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
+  // `hasOwn`, not a bare lookup: `?type=constructor` is a key every object has.
+  const landing =
+    type && Object.hasOwn(LANDING, type) ? LANDING[type] : undefined;
 
   const failed = new URL("/reset-password?error=expired", url.origin);
 
-  if (!tokenHash || !type) return NextResponse.redirect(failed);
+  if (!tokenHash || !type || !landing) return NextResponse.redirect(failed);
 
   const supabase = anonymousClient();
   const { data, error } = await supabase.auth.verifyOtp({
@@ -42,9 +59,7 @@ export async function GET(request: NextRequest) {
   // another.
   if (error || !data.session) return NextResponse.redirect(failed);
 
-  const response = NextResponse.redirect(
-    new URL("/reset-password", url.origin),
-  );
+  const response = NextResponse.redirect(new URL(landing, url.origin));
   writeSession(response.cookies, toPair(data.session), {
     remember: false,
     isSecure: url.protocol === "https:",

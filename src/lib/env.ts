@@ -17,7 +17,7 @@
  * every authorisation decision in the database irrelevant and move it into
  * whatever this app remembered to check. The one place it is used is
  * `scripts/create-admin.ts`, run once from a laptop, reading a gitignored
- * `.env.local` that is never deployed.
+ * `.env.scripts` that is never deployed and that Next never loads.
  *
  * `NEXT_PUBLIC_` means **inlined into the bundle and readable by anyone with
  * the URL**. That is correct for a hostname and for a key whose security model

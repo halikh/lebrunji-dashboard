@@ -374,7 +374,9 @@ export async function createBranch(
       // Always on the shop's to begin with: `0229` refuses a branch created in
       // another, and a currency of its own is set below, where it converts.
       currency_code: null,
-      is_active: draft.isActive,
+      // Hidden until the writes below have landed — see the end of this
+      // function.
+      is_active: false,
       sort_order: sortOrder,
       // No `slug`: derived from the English name by the same `fill_slug`
       // trigger every other catalogue row uses, inside the insert's own
@@ -396,6 +398,19 @@ export async function createBranch(
   const digits = draft.whatsappPhone ? digitsOf(draft.whatsappPhone) : "";
   if (digits) await setBranchWhatsapp(id, digits);
   if (draft.currencyCode) await setBranchCurrency(id, draft.currencyCode);
+
+  // Live only now. The number is a row in another table, written in a request
+  // of its own, and a branch inserted live took orders the moment it existed.
+  // If that second write failed, the branch was open with no number, and its
+  // orders went to no kitchen at all. A failure above now leaves a hidden
+  // branch instead, which loses nothing and can be fixed and switched on.
+  if (draft.isActive) {
+    const { error: liveError } = await getClient()
+      .from("branches")
+      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (liveError) throw new Error(friendly(liveError.message));
+  }
   return id;
 }
 

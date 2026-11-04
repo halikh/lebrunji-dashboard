@@ -7,7 +7,7 @@
  *
  * `supabase gen types --linked` needs the CLI to be logged in, which needs a
  * personal access token minted in the dashboard and stored on the machine.
- * `--db-url` needs one connection string, which is already in `.env.local` for
+ * `--db-url` needs one connection string, which is already in `.env.scripts` for
  * `check:limits`. Same output, one less credential to create and keep.
  *
  * It prefers `--linked` when the CLI *is* logged in, so this does not fight
@@ -51,7 +51,8 @@ function main() {
         ? '\nCould not read the schema over SUPABASE_DB_URL.\n\n' +
             'Check the string still works — a rotated database password invalidates it.'
         : '\nNo SUPABASE_DB_URL, and the Supabase CLI is not logged in.\n\n' +
-            'Add the connection string to .env.local (gitignored):\n\n' +
+            'Add the connection string to .env.dev / .env.staging / .env.prod and\n' +
+            're-run npm run env:<name>, which puts it in .env.scripts (gitignored):\n\n' +
             '  SUPABASE_DB_URL=postgresql://postgres:<password>@<host>:5432/postgres\n\n' +
             'Supabase dashboard → Project Settings → Database → Connection string → URI.\n' +
             'The same string `npm run check:limits` uses.',

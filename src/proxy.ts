@@ -46,16 +46,26 @@ export async function proxy(request: NextRequest) {
     (p) => path === p || path.startsWith(`${p}/`),
   );
 
-  const response = NextResponse.next({ request });
+  // Only somewhere for the refresh to write its cookies; the real response is
+  // built below, once the refresh has finished.
+  const jar = NextResponse.next();
 
   if (request.cookies.get(REFRESH_COOKIE)?.value) {
     // Refreshes only when the current token is spent; a valid one comes back
     // untouched, so this is not a round trip on every request.
-    await currentAccessToken(bridgeCookies(request, response), {
+    await currentAccessToken(bridgeCookies(request, jar), {
       write: true,
       isSecure: request.nextUrl.protocol === "https:",
     });
   }
+
+  // After the refresh, not before. `next({ request })` copies the request's
+  // headers at the moment it is built, so a response built first forwarded the
+  // *spent* tokens to the route handler. The handler then refreshed again with a
+  // token the proxy had already used, and it worked only because GoTrue lets a
+  // just-rotated token be reused for a few seconds.
+  const response = NextResponse.next({ request });
+  for (const cookie of jar.cookies.getAll()) response.cookies.set(cookie);
 
   // Re-read rather than reusing the value above: a failed refresh clears both
   // cookies, and that is exactly the case that should now redirect instead of

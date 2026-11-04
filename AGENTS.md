@@ -27,7 +27,7 @@ thing". It bypasses RLS completely, and RLS is the whole of the authorisation
 model — see the README.
 
 The single exception is `scripts/create-admin.ts`, which runs on a laptop and
-reads a gitignored `.env.local`.
+reads a gitignored `.env.scripts` — a file Next never loads.
 
 If something seems to need it, what is actually needed is a policy or an
 `api_v1_*` function in the app repo.

@@ -28,7 +28,9 @@ components, flows or conventions are carried over from any other dashboard.
 
    `npm run env:dev` / `env:staging` / `env:prod` copies one of them to
    `.env.local`, which is what Next and the scripts below actually read — so
-   edit the three files, never `.env.local`. `npm run env` says which project is
+   edit the three files, never `.env.local`. The two scripts-only secrets below
+   are split out into `.env.scripts` instead, which Next never loads, so the
+   dev server never has them in its environment. `npm run env` says which project is
    active. `scripts/use-env.mjs` refuses a file whose `NEXT_PUBLIC_ENVIRONMENT`
    does not match its name, or one still holding the template's placeholders.
 
@@ -59,11 +61,11 @@ components, flows or conventions are carried over from any other dashboard.
    ```
 
    This is the only thing that ever uses the service-role key, and it reads it
-   from `.env.local` on your machine — so against whichever project is switched
-   to. See below.
+   from `.env.scripts` on your machine — so against whichever project is
+   switched to. See below.
 
-   The scripts are plain Node, not Next, so they load `.env.local` themselves —
-   `scripts/load-env.ts`. Worth knowing, because it is easy to assume Node reads
+   The scripts are plain Node, not Next, so they load `.env.local` and
+   `.env.scripts` themselves — `scripts/load-env.ts`. Worth knowing, because it is easy to assume Node reads
    that file and then be confused by a script reporting a variable that is
    plainly sitting in it.
 
@@ -210,6 +212,21 @@ settings, and they have to be set once per Supabase project.
 | Minimum length | 12 | Matches `PASSWORD.min` in `src/lib/limits.ts`. If the two disagree, the form accepts what the server then refuses. |
 | Required characters | none | Deliberate. Composition rules push people to `Password1!` — every class satisfied, guessed instantly — and refuse long passphrases that are far stronger. Length is what costs an attacker. |
 | Leaked password protection | on | Checks against HaveIBeenPwned. This is the real breach check; `validatePassword` only refuses a handful of obvious words, and does not pretend otherwise. |
+
+**Authentication → URL Configuration and Email Templates** (QA-073)
+
+The reset and email-change links only work if the hosted project sends them to
+`/auth/confirm` in the form that route accepts. The app repo's `config.toml`
+sets the Site URL and allow-list to `deliveryapp://` only, and that file
+configures the *local* stack. Nothing in either repo sets these for staging or
+production, so check them by hand on each project:
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Redirect URLs | `https://<dashboard host>/auth/confirm` for each deployment that sends mail (plus `http://localhost:3000/auth/confirm` on dev) | `/auth/reset-request` and `/auth/account` pass this as the redirect. A redirect that is not on the list is silently replaced by the Site URL, `deliveryapp://`, and the link then opens the customer app. |
+| Site URL | leave as `deliveryapp://` | It belongs to the customer app. The dashboard always passes an explicit redirect, so it never relies on this value. |
+| Reset Password template | `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery` | `/auth/confirm` exchanges a `token_hash` server-side. The default `{{ .ConfirmationURL }}` goes through Supabase's `/verify` instead and returns tokens the route never sees. |
+| Change Email Address template | `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email_change` | Same reason. `/auth/confirm` accepts `recovery` and `email_change` and refuses every other `type`. |
 
 What *is* in this repo is the layer that can explain: `validatePassword` in
 `src/lib/validation.ts`, applied by both the reset screen and `create-admin`, so
