@@ -192,8 +192,20 @@ export function LocalizedField({
     isBlank(FALLBACK_LANGUAGE) &&
     languages.data.some((language) => !isBlank(language.code));
 
+  // The one message slot below, tied to every input. Without it the error is
+  // drawn under the boxes and never read out from inside them.
+  const labelId = `${id}-label`;
+  const messageId = `${id}-message`;
+  const hasMessage = Boolean(error) || dropped.length > 0 || partial || !!hint;
+
   return (
-    <div className="flex flex-col gap-xs">
+    // A group, so the field's name is announced once on the way in rather
+    // than being something each box has to repeat to make sense.
+    <div
+      role="group"
+      aria-labelledby={labelId}
+      className="flex flex-col gap-xs"
+    >
       {/* `ps-md`, the same inset `Field` gives its label and hint.
           These inputs have horizontal padding, so their text starts some way
           inside the left edge; a label flush at zero lines up with the border
@@ -202,7 +214,7 @@ export function LocalizedField({
           which is how it came to be the one place in the dashboard where that
           column did not line up. */}
       <div className="flex items-baseline gap-sm ps-md">
-        <span className="text-[13px] font-semibold text-text-soft">
+        <span id={labelId} className="text-[13px] font-semibold text-text-soft">
           {label}
         </span>
         {optional && (
@@ -238,13 +250,20 @@ export function LocalizedField({
                 `pointer-events-none` so a click lands on the input underneath —
                 the label still focuses it via `htmlFor`, and text selection is
                 not interrupted by a dead patch.
+
+                The code is what is seen; what is heard is "Name, English".
+                A bare "en" names the language but not the field, and once
+                focus is inside a box the field's name is nowhere else.
               */}
               <label
                 htmlFor={inputId}
                 title={language.name}
                 className="pointer-events-none absolute start-[13px] top-[14px] z-10 text-[10px] font-bold uppercase tracking-[0.08em] text-text-faint"
               >
-                {language.code}
+                <span aria-hidden>{language.code}</span>
+                <span className="sr-only">
+                  {label}, <span lang={language.code}>{language.name}</span>
+                </span>
               </label>
 
               {multiline ? (
@@ -263,6 +282,7 @@ export function LocalizedField({
                     change(language.code, event.target.value, event.target)
                   }
                   aria-invalid={isMissing || undefined}
+                  aria-describedby={hasMessage ? messageId : undefined}
                   className={cx(
                     "w-full rounded-md border bg-cream py-md pe-md ps-[42px] text-[15px] text-text",
                     "placeholder:text-text-faint focus:bg-field-focus",
@@ -281,6 +301,7 @@ export function LocalizedField({
                     change(language.code, event.target.value, event.target)
                   }
                   invalid={isMissing || Boolean(error)}
+                  aria-describedby={hasMessage ? messageId : undefined}
                   padding="ps-[42px] pe-md"
                 />
               )}
@@ -290,26 +311,42 @@ export function LocalizedField({
       </div>
 
       {error ? (
-        <p role="alert" className="ps-md text-[13px] font-medium text-danger">
+        <p
+          id={messageId}
+          role="alert"
+          className="ps-md text-[13px] font-medium text-danger"
+        >
           {error}
         </p>
       ) : dropped.length > 0 ? (
         // Above the hint and below the error, in the one slot this field has
         // for a message: what was just refused matters more than standing
         // advice and less than a value that will not save.
-        <p role="alert" className="ps-md text-[13px] font-medium text-danger">
+        <p
+          id={messageId}
+          role="alert"
+          className="ps-md text-[13px] font-medium text-danger"
+        >
           {t("form.rejectedChars", { chars: dropped.join(" ") })}
         </p>
       ) : partial ? (
         // Names the languages rather than saying "incomplete". The operator has
         // done most of the work; what they need is which box is empty.
-        <p role="alert" className="ps-md text-[13px] font-medium text-danger">
+        <p
+          id={messageId}
+          role="alert"
+          className="ps-md text-[13px] font-medium text-danger"
+        >
           {t("form.stillNeeded", { languages: FALLBACK_LANGUAGE })}
         </p>
       ) : (
         // The same slot as the error, never a second line: showing both means
         // reading advice about a value already reported as wrong.
-        hint && <p className="ps-md text-[13px] text-text-faint">{hint}</p>
+        hint && (
+          <p id={messageId} className="ps-md text-[13px] text-text-faint">
+            {hint}
+          </p>
+        )
       )}
     </div>
   );
