@@ -7,7 +7,7 @@ import { Button, Field, Input } from "@/components/ui";
 import { EditorPage } from "@/components/ui/editor-page";
 import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { PhoneInput } from "@/components/ui/phone-input";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState, LoadFailed } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import type { DayHours } from "@/features/catalog/api/hours";
 import { t } from "@/i18n/translations";
@@ -83,6 +83,8 @@ export function DriverEditor({ id }: { id: string | null }) {
       >
         {courier.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
+        ) : courier.isError ? (
+          <LoadFailed onRetry={() => void courier.refetch()} />
         ) : (
           <EmptyState titleKey="drivers.notFound" mood="lost" />
         )}

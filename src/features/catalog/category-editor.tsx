@@ -11,7 +11,7 @@ import { Field } from "@/components/ui/field";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState, LoadFailed } from "@/components/ui/empty-state";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
@@ -80,6 +80,11 @@ export function CategoryEditor({ id }: { id: string | null }) {
   if (id && !initial) {
     return categories.isPending ? (
       <Frame title={t("categories.add")} pending />
+    ) : categories.isError ? (
+      <Frame
+        title={t("categories.add")}
+        onRetry={() => void categories.refetch()}
+      />
     ) : (
       <Frame title={t("categories.add")} missing />
     );
@@ -127,10 +132,13 @@ function Frame({
   title,
   pending,
   missing,
+  onRetry,
 }: {
   title: string;
   pending?: boolean;
   missing?: boolean;
+  /** The read failed; given, the page offers another go. */
+  onRetry?: () => void;
 }) {
   return (
     <EditorPage
@@ -142,6 +150,7 @@ function Frame({
         <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
       )}
       {missing && <EmptyState titleKey="categories.notFound" mood="lost" />}
+      {onRetry && <LoadFailed onRetry={onRetry} />}
     </EditorPage>
   );
 }

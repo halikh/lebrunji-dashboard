@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { PoseStage, type StagedPose } from "@/components/brand/pose-stage";
 import { t, type Params, type TranslationKey } from "@/i18n/translations";
 
-import { cx } from "./index";
+import { Button, cx } from "./index";
 
 /**
  * What a screen shows when it has nothing to show.
@@ -74,6 +74,38 @@ export function EmptyState({
       </div>
       {action}
     </div>
+  );
+}
+
+/**
+ * What a screen shows when the read behind it failed.
+ *
+ * Its own state rather than an `EmptyState` with an error title, because the
+ * two must never be confused: "not found" tells the operator the thing is gone
+ * and sends them back to the list, while a failed read — offline, an expired
+ * session, a timeout — says nothing about whether it exists. Showing the first
+ * for the second is how an editor told people a driver had been deleted when
+ * the wifi had dropped (QA-023). So this is checked before "not found", and it
+ * carries the one thing that helps: another go.
+ */
+export function LoadFailed({
+  onRetry,
+  className,
+}: {
+  onRetry: () => void;
+  className?: string;
+}) {
+  return (
+    <EmptyState
+      titleKey="common.loadFailed"
+      mood="lost"
+      className={className}
+      action={
+        <Button variant="secondary" onClick={onRetry}>
+          {t("common.retry")}
+        </Button>
+      }
+    />
   );
 }
 

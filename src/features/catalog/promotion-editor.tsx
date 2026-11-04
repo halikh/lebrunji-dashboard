@@ -18,7 +18,7 @@ import {
   type SelectOption,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState, LoadFailed } from "@/components/ui/empty-state";
 import { PreviewImage } from "@/components/ui/image-preview";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -85,6 +85,8 @@ export function PromotionEditor({ id }: { id: string | null }) {
       >
         {promotions.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
+        ) : promotions.isError ? (
+          <LoadFailed onRetry={() => void promotions.refetch()} />
         ) : (
           <EmptyState titleKey="promotions.notFound" mood="lost" />
         )}

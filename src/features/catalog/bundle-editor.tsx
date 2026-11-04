@@ -8,7 +8,7 @@ import { useRef, useState } from "react";
 import { Button, Field } from "@/components/ui";
 import { DateField } from "@/components/ui/date-field";
 import { EditorPage } from "@/components/ui/editor-page";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState, LoadFailed } from "@/components/ui/empty-state";
 import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { PreviewImage } from "@/components/ui/image-preview";
 import { ImageUploader } from "@/components/ui/image-uploader";
@@ -115,6 +115,8 @@ export function BundleEditor({
       >
         {bundles.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
+        ) : bundles.isError ? (
+          <LoadFailed onRetry={() => void bundles.refetch()} />
         ) : (
           <EmptyState titleKey="bundles.notFound" mood="lost" />
         )}

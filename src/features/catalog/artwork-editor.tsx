@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Button, Field, cx } from "@/components/ui";
 import { DateField } from "@/components/ui/date-field";
 import { EditorPage } from "@/components/ui/editor-page";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState, LoadFailed } from "@/components/ui/empty-state";
 import { FieldPair, FormSection } from "@/components/ui/form-section";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { LocalizedImageField } from "@/components/ui/localized-image-field";
@@ -91,6 +91,8 @@ export function ArtworkEditor({
       >
         {artworks.isPending ? (
           <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
+        ) : artworks.isError ? (
+          <LoadFailed onRetry={() => void artworks.refetch()} />
         ) : (
           <EmptyState titleKey="artworks.notFound" mood="lost" />
         )}

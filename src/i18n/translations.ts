@@ -60,6 +60,8 @@ const en = {
     resize: "Resize panel",
     undo: "Undo",
     retry: "Try again",
+    /** A read failed — not the same as the thing not existing. */
+    loadFailed: "Could not load this.",
     loading: "Loading",
     copied: "Copied",
   },
