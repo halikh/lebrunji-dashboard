@@ -2,6 +2,8 @@
 
 import { useRef, useState, type KeyboardEvent } from "react";
 
+import { toMajor, toMinor } from "@/lib/minor-units";
+
 import { NumberInput } from "./number-input";
 
 /**
@@ -128,8 +130,9 @@ export function MoneyInput({
 
         // A half-typed `1.` is `1` to `Number`, which is fine — it is a real
         // reading of what is there so far. `NaN` is not, and emitting it would
-        // write garbage the moment somebody typed a stray character.
-        const parsed = toMinor(raw, factor);
+        // write garbage the moment somebody typed a stray character — nor is a
+        // figure under `min`, which the browser flags and does not stop.
+        const parsed = toMinor(raw, decimalDigits ?? 0, min);
         if (parsed !== undefined) onChange(parsed);
       }}
       onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
@@ -153,7 +156,7 @@ export function MoneyInput({
           return;
         }
 
-        const parsed = toMinor(draft, factor);
+        const parsed = toMinor(draft, decimalDigits, min);
         if (parsed === undefined || parsed === value) {
           setDraft(null);
           return;
@@ -168,21 +171,4 @@ export function MoneyInput({
       }}
     />
   );
-}
-
-/**
- * What was typed, in minor units. `null` for an empty field, `undefined` for
- * one that does not read as a number.
- */
-function toMinor(raw: string, factor: number): number | null | undefined {
-  if (raw.trim() === "") return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? Math.round(parsed * factor) : undefined;
-}
-
-/** Minor units as the number a person would say. `null` renders as empty. */
-function toMajor(value: number | null, decimalDigits: number): string {
-  if (value === null) return "";
-  if (decimalDigits === 0) return String(value);
-  return (value / 10 ** decimalDigits).toFixed(decimalDigits);
 }

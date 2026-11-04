@@ -42,6 +42,16 @@ export function download(filename: string, blob: Blob) {
  *
  * Numbers are written bare so a spreadsheet treats them as numbers. Everything
  * else is text.
+ *
+ * ## Text that starts like a formula is defused
+ *
+ * Dish and shop names are typed by merchants, and a spreadsheet runs a cell
+ * that starts with `=`, `+`, `-` or `@` as a formula — `=HYPERLINK(...)` in a
+ * dish name becomes a live link in the operator's Excel, and worse is
+ * possible. Such text gets a leading `'`, which Excel and Sheets read as "this
+ * is text" (QA-058). A leading tab or carriage return counts too, because some
+ * readers strip it and then see what follows. Numbers are never touched: a
+ * negative number written as a number is not a formula.
  */
 export function toCsv(rows: (string | number)[][]): Blob {
   const body = rows.map((row) => row.map(cell).join(",")).join("\r\n");
@@ -55,7 +65,8 @@ export function toCsv(rows: (string | number)[][]): Blob {
 
 function cell(value: string | number): string {
   if (typeof value === "number") return String(value);
-  const text = value ?? "";
+  const raw = value ?? "";
+  const text = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 

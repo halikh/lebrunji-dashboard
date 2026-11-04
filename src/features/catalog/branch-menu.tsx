@@ -9,6 +9,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { toMajor } from "@/lib/minor-units";
 
 import type { Branch } from "./api/branches";
 import type { BranchMenuOverrides } from "./api/branch-menu";
@@ -314,18 +315,6 @@ export function BranchItemStrip({
       )}
     </div>
   );
-}
-
-/**
- * Minor units as the number a person would say, for the placeholder.
- *
- * The same conversion `MoneyInput` does on the way out, done here because a
- * placeholder is text and the field's own value is not involved.
- */
-function toMajor(minorUnits: number, decimals: number | null): string {
-  if (decimals === null) return "";
-  if (decimals === 0) return String(minorUnits);
-  return (minorUnits / 10 ** decimals).toFixed(decimals);
 }
 
 /**
