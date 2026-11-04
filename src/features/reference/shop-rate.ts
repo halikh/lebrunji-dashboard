@@ -28,7 +28,8 @@
 type Portion = Record<string, unknown>;
 
 function firstOf(value: unknown): Record<string, unknown> | null {
-  if (Array.isArray(value)) return (value[0] as Record<string, unknown>) ?? null;
+  if (Array.isArray(value))
+    return (value[0] as Record<string, unknown>) ?? null;
   if (value && typeof value === "object")
     return value as Record<string, unknown>;
   return null;

@@ -12,10 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { SearchInput } from "@/components/ui/search-input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { isTakingOrders, type Courier } from "@/features/drivers/api/couriers";
-import {
-  useCouriers,
-  useDispatchOrder,
-} from "@/features/drivers/use-couriers";
+import { useCouriers, useDispatchOrder } from "@/features/drivers/use-couriers";
 import { useMoney } from "@/features/reference/use-currencies";
 import { t } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
@@ -323,13 +320,7 @@ export function DispatchModal({
   }
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      labelledBy={titleId}
-      width={520}
-      flush
-    >
+    <Modal open onClose={onClose} labelledBy={titleId} width={520} flush>
       {/* `dvh` on a phone, where `vh` is the height with the address bar
           gone and a dialog sized to it runs its footer under the bar. Less
           the UA's margin, so the body scrolls inside and the dialog itself
@@ -366,9 +357,7 @@ export function DispatchModal({
               good. */}
           <section className="flex flex-col gap-sm">
             <div className="flex flex-wrap items-center justify-between gap-md">
-              <h3 className="text-[17px]">
-                {t("dispatch.kitchenTab")}
-              </h3>
+              <h3 className="text-[17px]">{t("dispatch.kitchenTab")}</h3>
 
               {/* Notify all: one press opens every shop's chat, each already
                   written. Only worth having with more than one shop to tell. */}
@@ -460,9 +449,7 @@ export function DispatchModal({
             )}
           </section>
 
-          <h3 className="text-[17px]">
-            {t("dispatch.driverTab")}
-          </h3>
+          <h3 className="text-[17px]">{t("dispatch.driverTab")}</h3>
 
           {holder && (
             // Who has it, before anybody is offered it again.
@@ -501,7 +488,9 @@ export function DispatchModal({
           {confirming && (
             <div
               role="alertdialog"
-              aria-label={t("dispatch.reassignTitle", { name: confirming.name })}
+              aria-label={t("dispatch.reassignTitle", {
+                name: confirming.name,
+              })}
               className="flex flex-col gap-md rounded-lg border-2 border-warning bg-warning-wash/60 p-lg"
             >
               <div className="flex flex-col gap-xxs">
@@ -550,89 +539,96 @@ export function DispatchModal({
             </div>
           )}
 
-          {!finished && couriers.isSuccess && live.length === 0 && searching && (
-            <EmptyState
-              titleKey="drivers.searchNone"
-              params={{ term: search.trim() }}
-              mood="lost"
-            />
-          )}
+          {!finished &&
+            couriers.isSuccess &&
+            live.length === 0 &&
+            searching && (
+              <EmptyState
+                titleKey="drivers.searchNone"
+                params={{ term: search.trim() }}
+                mood="lost"
+              />
+            )}
 
-          {!finished && couriers.isSuccess && live.length === 0 && !searching && (
-            // Not a broken control and not an empty list — a sentence with the
-            // next step in it. A button that opened an empty chat would be
-            // worse than one that is absent.
-            // Two different empties. Drivers on the books who are all off shift
-            // is not "no driver yet" — said that way, it sends the operator to
-            // add somebody who is already there.
-            <EmptyState
-              titleKey={
-                (all.data?.length ?? 0) > 0
-                  ? "dispatch.noDriversOnShift"
-                  : "dispatch.noDrivers"
-              }
-              action={
-                <Link
-                  href="/drivers"
-                  className="font-semibold text-primary hover:underline"
-                >
-                  {t(
-                    (all.data?.length ?? 0) > 0
-                      ? "dispatch.seeDrivers"
-                      : "dispatch.addDriver",
-                  )}
-                </Link>
-              }
-            />
-          )}
+          {!finished &&
+            couriers.isSuccess &&
+            live.length === 0 &&
+            !searching && (
+              // Not a broken control and not an empty list — a sentence with the
+              // next step in it. A button that opened an empty chat would be
+              // worse than one that is absent.
+              // Two different empties. Drivers on the books who are all off shift
+              // is not "no driver yet" — said that way, it sends the operator to
+              // add somebody who is already there.
+              <EmptyState
+                titleKey={
+                  (all.data?.length ?? 0) > 0
+                    ? "dispatch.noDriversOnShift"
+                    : "dispatch.noDrivers"
+                }
+                action={
+                  <Link
+                    href="/drivers"
+                    className="font-semibold text-primary hover:underline"
+                  >
+                    {t(
+                      (all.data?.length ?? 0) > 0
+                        ? "dispatch.seeDrivers"
+                        : "dispatch.addDriver",
+                    )}
+                  </Link>
+                }
+              />
+            )}
 
-          {!finished && live.map((driver) => (
-            <button
-              key={driver.id}
-              type="button"
-              // One hand-over at a time: a second press while the first is in
-              // flight would be the server's `TAKEN`, asked of the operator
-              // about their own press.
-              disabled={dispatch.isPending}
-              aria-busy={
-                dispatch.isPending &&
-                dispatch.variables?.courierId === driver.id
-                  ? true
-                  : undefined
-              }
-              onClick={() => choose(driver)}
-              className={cx(
-                "flex items-center gap-lg rounded-lg border-2 border-transparent bg-surface p-lg text-start shadow-card",
-                "transition-[border-color,background-color] hover:border-whatsapp hover:bg-whatsapp-wash/60",
-                "disabled:cursor-wait disabled:opacity-60",
-              )}
-            >
-              <Avatar id={driver.id} name={driver.name} />
+          {!finished &&
+            live.map((driver) => (
+              <button
+                key={driver.id}
+                type="button"
+                // One hand-over at a time: a second press while the first is in
+                // flight would be the server's `TAKEN`, asked of the operator
+                // about their own press.
+                disabled={dispatch.isPending}
+                aria-busy={
+                  dispatch.isPending &&
+                  dispatch.variables?.courierId === driver.id
+                    ? true
+                    : undefined
+                }
+                onClick={() => choose(driver)}
+                className={cx(
+                  "flex items-center gap-lg rounded-lg border-2 border-transparent bg-surface p-lg text-start shadow-card",
+                  "transition-[border-color,background-color] hover:border-whatsapp hover:bg-whatsapp-wash/60",
+                  "disabled:cursor-wait disabled:opacity-60",
+                )}
+              >
+                <Avatar id={driver.id} name={driver.name} />
 
-              <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-                <span className="truncate text-[15px] font-semibold">
-                  {driver.name}
-                </span>
-                {/* The number is on the row on purpose. It is the last chance
+                <div className="flex min-w-0 flex-grow flex-col gap-xxs">
+                  <span className="truncate text-[15px] font-semibold">
+                    {driver.name}
+                  </span>
+                  {/* The number is on the row on purpose. It is the last chance
                     to notice that the order is about to go to the wrong
                     person, and it is not recoverable afterwards — the message
                     carries the customer's home address. */}
-                <span className="truncate text-[12px] tabular-nums text-text-faint">
-                  {formatPhone(driver.phone)}
-                </span>
-              </div>
+                  <span className="truncate text-[12px] tabular-nums text-text-faint">
+                    {formatPhone(driver.phone)}
+                  </span>
+                </div>
 
-              {/* WhatsApp's own green. It is the mark's colour, so it is used
+                {/* WhatsApp's own green. It is the mark's colour, so it is used
                   only where a control hands off to that application — the same
                   rule the brand red follows. */}
-              <span className="flex shrink-0 items-center gap-sm rounded-md bg-whatsapp px-lg py-sm text-[14px] font-semibold text-on-whatsapp">
-                <WhatsAppMark />
-                {holder?.courierId === driver.id
-                  ? t("dispatch.sendAgain")
-                  : t("dispatch.send")}
-              </span>
-            </button>
-          ))}
+                <span className="flex shrink-0 items-center gap-sm rounded-md bg-whatsapp px-lg py-sm text-[14px] font-semibold text-on-whatsapp">
+                  <WhatsAppMark />
+                  {holder?.courierId === driver.id
+                    ? t("dispatch.sendAgain")
+                    : t("dispatch.send")}
+                </span>
+              </button>
+            ))}
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-lg border-t border-border p-lg md:p-xxl">

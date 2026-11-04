@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  convertMoney,
-  restatePrice,
-  type ConvertibleCurrency,
-} from "./money";
+import { convertMoney, restatePrice, type ConvertibleCurrency } from "./money";
 
 /**
  * Restating a shop's prices when its currency changes — migration 0097.

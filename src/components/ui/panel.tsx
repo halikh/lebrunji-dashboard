@@ -184,9 +184,7 @@ export function Panel({
         // that there is not enough room for both, and a 380px panel next to a
         // 200px queue serves neither.
         "absolute inset-0 z-10 lg:relative lg:z-auto lg:border-l",
-        width === null
-          ? "lg:w-[440px] xl:w-[500px]"
-          : "lg:w-(--panel-width)",
+        width === null ? "lg:w-[440px] xl:w-[500px]" : "lg:w-(--panel-width)",
         "animate-[panel-in_var(--duration-fade)_var(--ease-arrive)]",
       )}
     >

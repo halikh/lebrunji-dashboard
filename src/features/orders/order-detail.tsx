@@ -382,10 +382,7 @@ export function OrderActions({
             thread. A link, like every hand-off to WhatsApp here. */}
         {holder?.courierPhone && (
           <a
-            href={whatsappLink(
-              holder.courierPhone,
-              cancellationMessage(order),
-            )}
+            href={whatsappLink(holder.courierPhone, cancellationMessage(order))}
             target="_blank"
             rel="noreferrer"
             className="flex h-[40px] min-w-0 flex-1 items-center justify-center gap-sm rounded-xs bg-whatsapp px-md text-[14px] font-medium text-on-whatsapp hover:bg-whatsapp-deep"
@@ -601,7 +598,10 @@ function StoreSection({
                   code={currencyCode}
                   shopRate={shopRate}
                   align="end"
-                  className={cx("text-[15px] font-medium", gone && "opacity-50")}
+                  className={cx(
+                    "text-[15px] font-medium",
+                    gone && "opacity-50",
+                  )}
                 />
               </div>
             </li>
@@ -668,8 +668,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-const PERSON =
-  "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0";
+const PERSON = "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0";
 const PIN =
   "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z";
 

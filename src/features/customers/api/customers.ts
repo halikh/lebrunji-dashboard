@@ -307,7 +307,10 @@ export async function fetchCustomer(id: string): Promise<CustomerDetail> {
   if (addresses.error) throw new Error(addresses.error.message);
   if (preferences.error) throw new Error(preferences.error.message);
 
-  const selected = selectedId(addresses.data ?? [], preferences.data?.selected_address_id);
+  const selected = selectedId(
+    addresses.data ?? [],
+    preferences.data?.selected_address_id,
+  );
 
   return {
     id: profile.data.id as string,

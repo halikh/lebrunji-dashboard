@@ -649,7 +649,8 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     // The number for the door the order went to — the address's own, copied
     // onto the order when it was placed (app migration 0156) — and the
     // account's only for an order placed before addresses had one.
-    customerPhone: ((row.contact_phone as string | null) || (user?.phone as string)) ?? "",
+    customerPhone:
+      ((row.contact_phone as string | null) || (user?.phone as string)) ?? "",
     addressLine: row.address_line as string,
     courierNote: (row.courier_note as string | null) ?? null,
     // Both from one source, never one from each: `0131` holds the order's pair

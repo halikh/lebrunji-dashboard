@@ -96,7 +96,9 @@ export function FilterTab({
         <span
           className={cx(
             "flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-[6px] text-[12px] tabular-nums",
-            active ? "bg-active-fill text-on-active" : "bg-neutral-fill text-text",
+            active
+              ? "bg-active-fill text-on-active"
+              : "bg-neutral-fill text-text",
           )}
         >
           {count}

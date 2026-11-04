@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { RECOVERY_WINDOW_SECONDS, isFreshRecovery, recoveredAt } from "./recovery";
+import {
+  RECOVERY_WINDOW_SECONDS,
+  isFreshRecovery,
+  recoveredAt,
+} from "./recovery";
 
 /**
  * Getting this wrong fails quietly. A refusal that is too strict breaks
@@ -30,7 +34,9 @@ describe("recoveredAt", () => {
 
   it("is null for a password sign-in", () => {
     expect(
-      recoveredAt(token({ amr: [{ method: "password", timestamp: nowSeconds }] })),
+      recoveredAt(
+        token({ amr: [{ method: "password", timestamp: nowSeconds }] }),
+      ),
     ).toBeNull();
   });
 

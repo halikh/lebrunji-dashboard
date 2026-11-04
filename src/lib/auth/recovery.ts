@@ -50,7 +50,10 @@ export function recoveredAt(accessToken: string): number | null {
   return latest;
 }
 
-export function isFreshRecovery(accessToken: string, now = Date.now()): boolean {
+export function isFreshRecovery(
+  accessToken: string,
+  now = Date.now(),
+): boolean {
   const at = recoveredAt(accessToken);
   if (at === null) return false;
   const age = Math.floor(now / 1000) - at;

@@ -262,12 +262,7 @@ function shiftDate(instant: Date): {
 } {
   const clock = toWallClock(instant);
   const rolled = new Date(
-    Date.UTC(
-      clock.year,
-      clock.month - 1,
-      clock.day,
-      clock.hour - dayStartsAt,
-    ),
+    Date.UTC(clock.year, clock.month - 1, clock.day, clock.hour - dayStartsAt),
   );
   return {
     year: rolled.getUTCFullYear(),

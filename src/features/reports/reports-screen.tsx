@@ -202,7 +202,9 @@ export function ReportsScreen() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       <div className="flex shrink-0 items-center gap-lg border-b border-border bg-surface px-lg py-lg md:px-xxl">
-        <h1 className="flex-grow text-[26px] md:text-[30px]">{t("reports.title")}</h1>
+        <h1 className="flex-grow text-[26px] md:text-[30px]">
+          {t("reports.title")}
+        </h1>
       </div>
 
       <div className="min-h-0 flex-grow overflow-y-auto scroll-hint">

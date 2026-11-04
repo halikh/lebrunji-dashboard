@@ -94,8 +94,7 @@ describe("validateLocalizedText", () => {
 
   it("treats whitespace as empty, because the constraint does too", () => {
     expect(
-      validateLocalizedText({ en: "   ", ar: "كبة" }, languages, TEXT.name)
-        .ok,
+      validateLocalizedText({ en: "   ", ar: "كبة" }, languages, TEXT.name).ok,
     ).toBe(false);
   });
 

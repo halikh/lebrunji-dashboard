@@ -27,7 +27,12 @@ import {
   type Substitution,
 } from "./api/amend";
 import { countAmendments } from "./api/history";
-import { placeName, roundingOf, type Order, type OrderLine } from "./api/orders";
+import {
+  placeName,
+  roundingOf,
+  type Order,
+  type OrderLine,
+} from "./api/orders";
 import { OrderRefusal } from "./api/refusal";
 import { Thumbnail } from "./order-detail";
 import { orderKeys } from "./use-orders";
@@ -125,9 +130,7 @@ export function AmendOrder({
     queryFn: () => countAmendments(order.id),
     gcTime: 0,
   });
-  const [amendmentsAtOpen, setAmendmentsAtOpen] = useState<number | null>(
-    null,
-  );
+  const [amendmentsAtOpen, setAmendmentsAtOpen] = useState<number | null>(null);
   if (amendmentsAtOpen === null && seen.data !== undefined) {
     setAmendmentsAtOpen(seen.data);
   }
@@ -161,14 +164,12 @@ export function AmendOrder({
   // the total read out is the total of exactly what gets saved.
   const amendment: Amendment = {
     orderId: order.id,
-    changes: Object.entries(counts).map(
-      ([lineId, quantity]): LineChange => ({
-        lineId,
-        fulfilledQuantity: quantity,
-        // The reason follows from the number rather than being asked for.
-        reason: quantity === 0 ? "out_of_stock" : "short",
-      }),
-    ),
+    changes: Object.entries(counts).map(([lineId, quantity]): LineChange => ({
+      lineId,
+      fulfilledQuantity: quantity,
+      // The reason follows from the number rather than being asked for.
+      reason: quantity === 0 ? "out_of_stock" : "short",
+    })),
     substitutions: Object.entries(swaps).map(
       ([replacesLineId, menuItemId]): Substitution => {
         const original = lines.find((line) => line.id === replacesLineId);

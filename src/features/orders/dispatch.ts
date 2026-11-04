@@ -137,12 +137,7 @@ export function dispatchMessage(
       if (quantity === 0) continue;
 
       const amount = money(
-        linePrice(
-          line.unitPrice,
-          line.optionsPrice,
-          itemUnit(line),
-          quantity,
-        ),
+        linePrice(line.unitPrice, line.optionsPrice, itemUnit(line), quantity),
       );
       // "2 × Kafta" for a counted dish, "1.5 kg Kafta" for one sold by weight.
       // The `×` goes with the count: it belongs in front of a number of things

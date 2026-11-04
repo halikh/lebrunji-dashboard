@@ -81,8 +81,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // Ink, the app's `primary`: the one to press to go on. White on it is 17:1.
   primary: "bg-primary-fill text-on-primary hover:bg-primary-deep",
   // The app's `secondary`: cream with a hairline, ink label.
-  secondary:
-    "border border-line bg-cream text-text hover:bg-neutral-fill",
+  secondary: "border border-line bg-cream text-text hover:bg-neutral-fill",
   quiet: "bg-transparent text-text hover:bg-primary-wash",
   // `danger-action`, not `danger`: the darker red is tuned for text on cream and
   // reads as near-black poured across a whole button.

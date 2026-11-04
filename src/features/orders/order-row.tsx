@@ -112,7 +112,9 @@ export function OrderRow({
       )}
 
       <div className="col-start-1 row-start-1 flex flex-col gap-xxs @[42rem]:w-[132px] @[42rem]:shrink-0">
-        <span className="text-[15px] font-medium tabular-nums">{order.code}</span>
+        <span className="text-[15px] font-medium tabular-nums">
+          {order.code}
+        </span>
         <span
           className={cx(
             "text-[12px]",

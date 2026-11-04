@@ -105,24 +105,24 @@ export function OrderPanel({
               {/* Docked too: the queue's column can be put away for room, and
                   picking a row brings it back. */}
               <button
-                  type="button"
-                  onClick={onClose}
-                  aria-label={t("common.close")}
-                  className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft lg:flex"
+                type="button"
+                onClick={onClose}
+                aria-label={t("common.close")}
+                className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft lg:flex"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  aria-hidden
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    aria-hidden
-                  >
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
             </div>
 
             {/* The ways out, as two quiet chips on one line. They leave the

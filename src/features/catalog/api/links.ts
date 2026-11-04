@@ -21,7 +21,13 @@ export type LinkKind = (typeof LINK_KINDS)[number];
  * The tab-bar screens `link_page` may name when the kind is `tab`. `search`
  * left with `0205` and came back with `0227`, with the app's Search tab.
  */
-export const TAB_PAGES = ["home", "search", "cart", "orders", "account"] as const;
+export const TAB_PAGES = [
+  "home",
+  "search",
+  "cart",
+  "orders",
+  "account",
+] as const;
 
 /** The other screens `link_page` may name when the kind is `page`. */
 export const OTHER_PAGES = [

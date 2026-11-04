@@ -34,18 +34,20 @@ describe("itemUnit", () => {
   });
 
   it("carries a step through when there is one", () => {
-    expect(
-      itemUnit({ priceUnit: "kg", unitQuantity: 5, unitStep: 5 }),
-    ).toEqual({ unit: "kg", quantity: 5, step: 5 });
+    expect(itemUnit({ priceUnit: "kg", unitQuantity: 5, unitStep: 5 })).toEqual(
+      { unit: "kg", quantity: 5, step: 5 },
+    );
   });
 
   it("drops a step that cannot move", () => {
     // `0119`'s CHECK refuses these, so this is about an item built by hand —
     // a `+` that does nothing is worse than no `+` at all.
-    expect(itemUnit({ priceUnit: "kg", unitQuantity: 5, unitStep: 0 })?.step)
-      .toBeNull();
-    expect(itemUnit({ priceUnit: "kg", unitQuantity: 5, unitStep: -1 })?.step)
-      .toBeNull();
+    expect(
+      itemUnit({ priceUnit: "kg", unitQuantity: 5, unitStep: 0 })?.step,
+    ).toBeNull();
+    expect(
+      itemUnit({ priceUnit: "kg", unitQuantity: 5, unitStep: -1 })?.step,
+    ).toBeNull();
   });
 });
 

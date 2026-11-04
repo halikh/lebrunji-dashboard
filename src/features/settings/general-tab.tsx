@@ -111,7 +111,10 @@ export function GeneralTab() {
 
   if (settings.isError) {
     return (
-      <p role="alert" className="p-lg text-[13px] md:p-xxl font-medium text-danger">
+      <p
+        role="alert"
+        className="p-lg text-[13px] md:p-xxl font-medium text-danger"
+      >
         {t("content.failed")}
       </p>
     );

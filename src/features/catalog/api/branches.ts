@@ -119,10 +119,13 @@ const COLUMNS = `id, store_id, slug, name, address, latitude, longitude,
  * object — or an array, depending on how the relationship was inferred, so
  * both are taken.
  */
-export function whatsappOf(row: Record<string, unknown> | null | undefined): string | null {
+export function whatsappOf(
+  row: Record<string, unknown> | null | undefined,
+): string | null {
   const contact = row?.branch_contacts;
   const one = Array.isArray(contact) ? contact[0] : contact;
-  const phone = (one as Record<string, unknown> | null | undefined)?.whatsapp_phone;
+  const phone = (one as Record<string, unknown> | null | undefined)
+    ?.whatsapp_phone;
   return typeof phone === "string" && phone ? phone : null;
 }
 
@@ -138,13 +141,11 @@ export async function setBranchWhatsapp(
   branchId: string,
   digits: string,
 ): Promise<void> {
-  const { error } = await getClient()
-    .from("branch_contacts")
-    .upsert(
-      // No `updated_at`: `branch_contacts_touch_updated_at` (0223) sets it.
-      { branch_id: branchId, whatsapp_phone: digits },
-      { onConflict: "branch_id" },
-    );
+  const { error } = await getClient().from("branch_contacts").upsert(
+    // No `updated_at`: `branch_contacts_touch_updated_at` (0223) sets it.
+    { branch_id: branchId, whatsapp_phone: digits },
+    { onConflict: "branch_id" },
+  );
   if (error) throw new Error(friendly(error.message));
 }
 

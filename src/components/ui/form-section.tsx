@@ -24,9 +24,7 @@ export function FormSection({
       {title && (
         // `ps-md`: the column the fields' labels and hints run down — see
         // `field.tsx`. Flush at zero it lines up with the inputs' borders instead.
-        <h3 className="ps-md text-[19px]">
-          {title}
-        </h3>
+        <h3 className="ps-md text-[19px]">{title}</h3>
       )}
       {children}
     </section>
