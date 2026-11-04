@@ -475,6 +475,8 @@ const en = {
       "For whoever reads this order next. The customer does not see it.",
     notePlaceholder: "Called Rana — no kibbeh left, took the sfiha instead",
     newTotal: "New total",
+    // In place of the total while the database works out the first one (0233).
+    pricing: "Working it out…",
     // Said before it is committed, because it is the surprising part: the
     // customer's order shrank and their delivery fee did not.
     feesStand: "Delivery and any discount stay as they were.",

@@ -16,20 +16,18 @@ import { t } from "@/i18n/translations";
 import { useMenu } from "@/features/catalog/use-menu";
 import { useItemOptionGroups } from "@/features/catalog/use-options";
 import { Price } from "@/features/reference/price";
-import { useMoney } from "@/features/reference/use-currencies";
 import { unitLabel } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
-import { formatMoney } from "@/lib/money";
 
-import { amendOrder, type LineChange, type Substitution } from "./api/amend";
-import { countAmendments } from "./api/history";
 import {
-  placeName,
-  roundingOf,
-  roundToCash,
-  type Order,
-  type OrderLine,
-} from "./api/orders";
+  amendOrder,
+  previewAmendment,
+  type Amendment,
+  type LineChange,
+  type Substitution,
+} from "./api/amend";
+import { countAmendments } from "./api/history";
+import { placeName, roundingOf, type Order, type OrderLine } from "./api/orders";
 import { OrderRefusal } from "./api/refusal";
 import { Thumbnail } from "./order-detail";
 import { orderKeys } from "./use-orders";
@@ -61,16 +59,16 @@ import { orderKeys } from "./use-orders";
  * ## The new total is on screen before it is committed
  *
  * The operator is on the phone. "So it comes to £22.40 instead" is the sentence
- * they need to say, and it has to be true before they say it — so the running
- * total is computed here from the same rule the function uses, and the delivery
- * fee and discount are shown unchanged beside it so nobody is surprised by
- * them.
+ * they need to say, and it has to be true before they say it — so every change
+ * is sent to `api_v1_preview_amendment` (`0233`), which runs the amendment and
+ * rolls it back. The figure on screen is the one Save will write.
  *
- * That is a second implementation of the arithmetic, which is normally the
- * thing this codebase refuses. It is tolerable here for the reason a preview
- * always is: it decides nothing. The figure that gets written is the one
- * Postgres computes and returns, and the panel refetches — so a disagreement
- * shows up as a corrected number rather than as a wrong bill.
+ * It used to be worked out here, as a second copy of the arithmetic, on the
+ * grounds that a preview decides nothing. It decided what the customer was
+ * told: a substitute at the brand's price in the shop's currency, added to an
+ * order in another one, so a $5 dish read as 500 LBP (QA-012). Branch prices,
+ * conversion at the shop's rate and `line_price` all live in the function, and
+ * a copy here only follows them until the next migration.
  */
 export function AmendOrder({
   order,
@@ -98,21 +96,6 @@ export function AmendOrder({
    * and would look, on screen, as though they had been accepted.
    */
   const [swapOptions, setSwapOptions] = useState<Record<string, string[]>>({});
-  /**
-   * Line id → what the substitute costs, options included.
-   *
-   * Reported up by `AmendLine`, which is the only component holding the menu
-   * and the option groups. Without it the running total below counted a
-   * substituted line at **zero** — the original goes to zero and the
-   * replacement was invisible — so the figure the operator read down the phone
-   * was lower than the one the order ended up with.
-   *
-   * Pushed from the handlers rather than derived in an effect: the dish and the
-   * options both change in response to a click, and that click already knows
-   * the new price. An effect would recompute it a render later, which is one
-   * frame of a total nobody chose.
-   */
-  const [swapPrices, setSwapPrices] = useState<Record<string, number>>({});
   const [note, setNote] = useState("");
   const guarded = useGuardedAction();
 
@@ -150,8 +133,8 @@ export function AmendOrder({
   }
 
   // Absent keys mean unchanged, so an amendment that has been opened and not
-  // touched is not unsaved work. `swapOptions` and `swapPrices` are left out:
-  // neither can be set without a swap, which is counted.
+  // touched is not unsaved work. `swapOptions` is left out: it cannot be set
+  // without a swap, which is counted.
   useUnsavedChanges(
     Object.keys(counts).length > 0 ||
       Object.keys(swaps).length > 0 ||
@@ -174,42 +157,75 @@ export function AmendOrder({
       !lines.some((other) => other.replacesLineId === line.id),
   );
 
-  const amend = useMutation({
-    mutationFn: () =>
-      amendOrder({
-        orderId: order.id,
-        changes: Object.entries(counts).map(
-          ([lineId, quantity]): LineChange => ({
-            lineId,
-            fulfilledQuantity: quantity,
-            // The reason follows from the number rather than being asked for.
-            reason: quantity === 0 ? "out_of_stock" : "short",
-          }),
-        ),
-        substitutions: Object.entries(swaps).map(
-          ([replacesLineId, menuItemId]): Substitution => {
-            const original = lines.find((line) => line.id === replacesLineId);
-            const ordered = original?.quantity ?? 1;
-            const coming = counts[replacesLineId] ?? ordered;
-
-            return {
-              replacesLineId,
-              menuItemId,
-              // The substitute covers what is **missing**, not the whole line.
-              // Sending the ordered quantity charged for both halves of a
-              // partial swap: three ordered, one available, and the customer
-              // got billed for one kibbeh and three sfiha.
-              quantity: Math.max(ordered - coming, 1),
-              optionIds: swapOptions[replacesLineId] ?? [],
-            };
-          },
-        ),
-        note,
-        expectedTotal: openedAt,
-        // Null only when the count could not be read; the total check then
-        // stands alone, as it did before `0175`.
-        expectedAmendments: amendmentsAtOpen,
+  // One description of the change, for the preview and the save alike — so
+  // the total read out is the total of exactly what gets saved.
+  const amendment: Amendment = {
+    orderId: order.id,
+    changes: Object.entries(counts).map(
+      ([lineId, quantity]): LineChange => ({
+        lineId,
+        fulfilledQuantity: quantity,
+        // The reason follows from the number rather than being asked for.
+        reason: quantity === 0 ? "out_of_stock" : "short",
       }),
+    ),
+    substitutions: Object.entries(swaps).map(
+      ([replacesLineId, menuItemId]): Substitution => {
+        const original = lines.find((line) => line.id === replacesLineId);
+        const ordered = original?.quantity ?? 1;
+        const coming = counts[replacesLineId] ?? ordered;
+
+        return {
+          replacesLineId,
+          menuItemId,
+          // The substitute covers what is **missing**, not the whole line.
+          // Sending the ordered quantity charged for both halves of a
+          // partial swap: three ordered, one available, and the customer
+          // got billed for one kibbeh and three sfiha.
+          quantity: Math.max(ordered - coming, 1),
+          optionIds: swapOptions[replacesLineId] ?? [],
+        };
+      },
+    ),
+    expectedTotal: openedAt,
+    // Null only when the count could not be read; the total check then
+    // stands alone, as it did before `0175`.
+    expectedAmendments: amendmentsAtOpen,
+  };
+
+  const touched =
+    Object.keys(counts).length > 0 || Object.keys(swaps).length > 0;
+
+  /**
+   * What the order comes to with these changes, from the function itself.
+   *
+   * Keyed on the change, so each click asks once and going back to an earlier
+   * state is answered from cache. The last answer stays on screen, dimmed,
+   * while the next is fetched — a total that blinks out on every press is
+   * one the operator cannot read from. Not retried: a refusal is an answer.
+   *
+   * Waits for the amendment count, so the preview checks the same version the
+   * save will — and is refused `MOVED` the moment somebody else saves, which
+   * realtime makes it ask again about.
+   */
+  const preview = useQuery({
+    queryKey: [
+      ...orderKeys.amendments(order.id),
+      "preview",
+      amendment.changes,
+      amendment.substitutions,
+      openedAt,
+      amendmentsAtOpen,
+    ],
+    queryFn: () => previewAmendment(amendment),
+    enabled: touched && !seen.isPending,
+    placeholderData: (previous) => previous,
+    retry: false,
+    gcTime: 0,
+  });
+
+  const amend = useMutation({
+    mutationFn: () => amendOrder({ ...amendment, note }),
 
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: orderKeys.all });
@@ -240,53 +256,14 @@ export function AmendOrder({
     },
   });
 
-  /**
-   * What the order comes to with these changes.
-   *
-   * A substituted line is counted at the *replacement's* price, which is not
-   * known here until a dish is picked — so the preview reads it off the menu
-   * the select was populated from. Where it cannot, the line is left at its
-   * original price and the note under the total says the figure will settle on
-   * save, rather than showing a number quietly built on a guess.
-   */
-  const subtotal = lines.reduce((sum, line) => {
-    const quantity = counts[line.id] ?? line.fulfilledQuantity ?? line.quantity;
-    // `linePrice`, not a multiplication — `api_v1_amend_order` reprices with
-    // the SQL twin of this, and the preview has to land on the same figure.
-    // On a line sold by weight, shortening it is a smaller *amount* rather
-    // than a fraction of the presses. See `0122`.
-    const kept = linePrice(
-      line.unitPrice,
-      line.optionsPrice,
-      itemUnit(line),
-      quantity,
-    );
-
-    // A substitution is the original at its reduced quantity **plus** the
-    // replacement at the quantity that went missing — which is what the
-    // function does, and what the customer agreed to.
-    const swapped = swaps[line.id]
-      ? (swapPrices[line.id] ?? 0) * (line.quantity - quantity)
-      : 0;
-
-    return sum + kept + swapped;
-  }, 0);
-  // Rounded to the cash step the way `round_to_cash` rounds the saved total
-  // (`0173`) — a lira total to the nearest 1,000. Without it the operator read
-  // out 1,234,500 and the order came back at 1,235,000.
-  const total = roundToCash(
-    subtotal + order.deliveryFee - order.discount,
-    order.currencyCode,
-  );
-  const rounding = roundingOf({
-    subtotal,
-    deliveryFee: order.deliveryFee,
-    discount: order.discount,
-    total,
-  });
-
-  const touched =
-    Object.keys(counts).length > 0 || Object.keys(swaps).length > 0;
+  // Untouched, the order as it stands. Touched, the function's answer — and
+  // nothing until there is one: a figure for a change it has not priced is
+  // the guess this form used to read out.
+  const figures = touched ? preview.data : order;
+  const total = figures?.total ?? null;
+  const rounding = figures ? roundingOf(figures) : 0;
+  // Behind the change on screen: still asking, or the last answer refused.
+  const stale = touched && (preview.isFetching || preview.isError);
 
   return (
     <Modal
@@ -345,7 +322,7 @@ export function AmendOrder({
                       setCounts((current) => ({ ...current, [line.id]: next }))
                     }
                     swap={swaps[line.id] ?? null}
-                    onSwap={(itemId, unitPrice) => {
+                    onSwap={(itemId) => {
                       setSwaps((current) => {
                         const next = { ...current };
                         if (itemId) next[line.id] = itemId;
@@ -360,22 +337,14 @@ export function AmendOrder({
                         delete next[line.id];
                         return next;
                       });
-                      setSwapPrices((current) => ({
-                        ...current,
-                        [line.id]: unitPrice,
-                      }));
                     }}
                     options={swapOptions[line.id] ?? []}
-                    onOptions={(ids, unitPrice) => {
+                    onOptions={(ids) =>
                       setSwapOptions((current) => ({
                         ...current,
                         [line.id]: ids,
-                      }));
-                      setSwapPrices((current) => ({
-                        ...current,
-                        [line.id]: unitPrice,
-                      }));
-                    }}
+                      }))
+                    }
                   />
                 ))}
               </section>
@@ -414,8 +383,14 @@ export function AmendOrder({
             <span className="text-[15px] font-semibold">
               {t("amend.newTotal")}
             </span>
-            <div className="flex items-baseline gap-md">
-              {touched && total !== order.total && (
+            <div
+              className={cx(
+                "flex items-baseline gap-md transition-opacity",
+                stale && "opacity-40",
+              )}
+              aria-busy={preview.isFetching}
+            >
+              {touched && total !== null && total !== order.total && (
                 // The old figure, struck through beside the new one. On the
                 // phone the operator is saying "it was X, it is now Y", and
                 // both halves of that sentence should be readable at once.
@@ -427,14 +402,29 @@ export function AmendOrder({
                   />
                 </span>
               )}
-              <Price
-                value={total}
-                code={order.currencyCode}
-                shopRate={order.shopRate}
-                align="end"
-              />
+              {total === null ? (
+                <span className="text-[13px] text-text-faint">
+                  {t("amend.pricing")}
+                </span>
+              ) : (
+                <Price
+                  value={total}
+                  code={order.currencyCode}
+                  shopRate={order.shopRate}
+                  align="end"
+                />
+              )}
             </div>
           </div>
+
+          {/* The function's refusal, in the operator's words — the same one
+              Save would get, shown while there is still time to change the
+              form rather than after pressing it. */}
+          {touched && preview.isError && (
+            <p role="alert" className="text-[13px] text-danger">
+              {preview.error.message}
+            </p>
+          )}
 
           <p className="text-[12px] text-text-faint">{t("amend.feesStand")}</p>
 
@@ -449,7 +439,10 @@ export function AmendOrder({
               onClick={() => amend.mutate()}
               // Not until the amendment count is in: saving without it would
               // drop back to the total check this form is meant to outgrow.
-              disabled={!touched || seen.isPending}
+              // Nor while the total is still being asked for — Save is what
+              // the operator presses after reading it out. A refused preview
+              // leaves Save on, so its refusal closes a stale form as before.
+              disabled={!touched || seen.isPending || preview.isFetching}
               pending={amend.isPending}
             >
               {t("amend.confirm")}
@@ -489,46 +482,16 @@ function AmendLine({
   count: number;
   onCount: (next: number) => void;
   swap: string | null;
-  /** The chosen dish and what it costs bare — the parent cannot price it. */
-  onSwap: (itemId: string | null, unitPrice: number) => void;
+  onSwap: (itemId: string | null) => void;
   options: string[];
-  /** The choices and the resulting unit price, extras included. */
-  onOptions: (ids: string[], unitPrice: number) => void;
+  onOptions: (ids: string[]) => void;
 }) {
   const menu = useMenu(storeId);
   // Only for the dish actually chosen. A question about a dish nobody has
   // picked is a request for nothing, and `useItemOptionGroups` is disabled on
   // a null id rather than fetching every menu's questions up front.
   const groups = useItemOptionGroups(swap);
-  const { currencies } = useMoney();
-  const currency = currencies?.find((one) => one.code === currencyCode);
-  const money = (minor: number) =>
-    currency ? formatMoney(minor, currency) : null;
   const short = count < line.quantity;
-
-  /**
-   * What a dish costs with these choices.
-   *
-   * The same sum migration 0091 does — the dish's price plus every chosen
-   * option's — and it is a preview, not the decision: the figure written is the
-   * one the function computes and returns. That is what makes a second copy of
-   * the arithmetic tolerable here.
-   */
-  function priceOf(itemId: string | null, optionIds: string[]): number {
-    if (!itemId) return 0;
-
-    const dish = (menu.data ?? [])
-      .flatMap((section) => section.items)
-      .find((item) => item.id === itemId);
-    if (!dish) return 0;
-
-    const extras = (groups.data ?? [])
-      .flatMap((group) => group.options)
-      .filter((option) => optionIds.includes(option.id))
-      .reduce((sum, option) => sum + option.price, 0);
-
-    return dish.price + extras;
-  }
 
   // Flattened across sections: the operator is looking for a dish, and which
   // heading it lives under is the menu screen's concern rather than this one's.
@@ -624,9 +587,7 @@ function AmendLine({
             <div className="min-w-0 flex-grow">
               <Select
                 value={swap ?? ""}
-                onChange={(value) =>
-                  onSwap(value || null, priceOf(value || null, []))
-                }
+                onChange={(value) => onSwap(value || null)}
                 options={dishes}
                 placeholder={t("amend.nothing")}
                 isClearable
@@ -689,7 +650,7 @@ function AmendLine({
                                   ? options.filter((id) => id !== option.id)
                                   : [...options, option.id];
 
-                            onOptions(next, priceOf(swap, next));
+                            onOptions(next);
                           }}
                           className={cx(
                             "rounded-md border px-md py-xs text-[13px] transition-[background-color,border-color]",
@@ -698,17 +659,12 @@ function AmendLine({
                               : "border-border text-text-soft",
                           )}
                         >
+                          {/* No price on the chip. The catalogue's figure is
+                              the brand's, in the shop's currency — not what
+                              this branch charges, nor in the order's money —
+                              and printing it here was QA-012 in small. The
+                              new total moves with every press instead. */}
                           {pickLocalized(option.name)}
-                          {option.price > 0 && (
-                            // `Price` renders both currencies stacked, which is
-                            // right on a bill and wrong inside a chip. The
-                            // extra is a nudge on a label, so it is the one
-                            // figure here shown in one currency.
-                            <span className="ps-xs tabular-nums text-text-faint">
-                              {"+"}
-                              {money(option.price) ?? option.price}
-                            </span>
-                          )}
                         </button>
                       );
                     })}

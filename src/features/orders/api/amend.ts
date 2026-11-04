@@ -66,11 +66,11 @@ export type AmendedTotals = {
   total: number;
 };
 
-export async function amendOrder(input: {
+/** What an amendment is: the counts set and the dishes sent instead. */
+export type Amendment = {
   orderId: string;
   changes: LineChange[];
   substitutions: Substitution[];
-  note: string;
   /**
    * The order's total when the form was opened — `0173`.
    *
@@ -90,31 +90,26 @@ export async function amendOrder(input: {
    * total check standing on its own.
    */
   expectedAmendments: number | null;
-}): Promise<AmendedTotals> {
-  const { data, error } = await getClient()
-    .rpc("api_v1_amend_order", {
-      p_order_id: input.orderId,
-      p_changes: {
-        lines: input.changes.map((change) => ({
-          line_id: change.lineId,
-          fulfilled_quantity: change.fulfilledQuantity,
-          reason: change.reason,
-        })),
-        substitutes: input.substitutions.map((swap) => ({
-          replaces_line_id: swap.replacesLineId,
-          menu_item_id: swap.menuItemId,
-          quantity: swap.quantity,
-          option_ids: swap.optionIds,
-        })),
-      },
-      p_note: input.note,
-      p_expected_total: input.expectedTotal,
-      p_expected_amendments: input.expectedAmendments ?? undefined,
-    })
-    .single();
+};
 
-  if (error) throw orderRefusal(error, "amend");
+/** The `p_changes` payload — one shape for the preview and the save. */
+function changesPayload(input: Amendment) {
+  return {
+    lines: input.changes.map((change) => ({
+      line_id: change.lineId,
+      fulfilled_quantity: change.fulfilledQuantity,
+      reason: change.reason,
+    })),
+    substitutes: input.substitutions.map((swap) => ({
+      replaces_line_id: swap.replacesLineId,
+      menu_item_id: swap.menuItemId,
+      quantity: swap.quantity,
+      option_ids: swap.optionIds,
+    })),
+  };
+}
 
+function totalsOf(data: unknown): AmendedTotals {
   const row = data as Record<string, unknown>;
   return {
     subtotal: Number(row.subtotal),
@@ -122,4 +117,49 @@ export async function amendOrder(input: {
     discount: Number(row.discount),
     total: Number(row.total),
   };
+}
+
+export async function amendOrder(
+  input: Amendment & { note: string },
+): Promise<AmendedTotals> {
+  const { data, error } = await getClient()
+    .rpc("api_v1_amend_order", {
+      p_order_id: input.orderId,
+      p_changes: changesPayload(input),
+      p_note: input.note,
+      p_expected_total: input.expectedTotal,
+      p_expected_amendments: input.expectedAmendments ?? undefined,
+    })
+    .single();
+
+  if (error) throw orderRefusal(error, "amend");
+  return totalsOf(data);
+}
+
+/**
+ * What `amendOrder` would write, without writing it — `0233`.
+ *
+ * The function runs the amendment itself and rolls it back, so the figure is
+ * the save's to the minor unit: the branch's price for a substitute, converted
+ * into the order's currency at the shop's rate, sized by `line_price`, and
+ * rounded to the cash step. Working that out here was QA-012 — the brand's
+ * price, unconverted, read down the phone as the new total.
+ *
+ * It refuses as the save would, with the same codes, so a stale form or a
+ * missing rate shows before Save rather than on it.
+ */
+export async function previewAmendment(
+  input: Amendment,
+): Promise<AmendedTotals> {
+  const { data, error } = await getClient()
+    .rpc("api_v1_preview_amendment", {
+      p_order_id: input.orderId,
+      p_changes: changesPayload(input),
+      p_expected_total: input.expectedTotal,
+      p_expected_amendments: input.expectedAmendments ?? undefined,
+    })
+    .single();
+
+  if (error) throw orderRefusal(error, "amend");
+  return totalsOf(data);
 }
