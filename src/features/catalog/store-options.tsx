@@ -15,6 +15,11 @@ import { SearchInput } from "@/components/ui/search-input";
 import { Select } from "@/components/ui/select";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { Toggle } from "@/components/ui/toggle";
+import {
+  changed,
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
 import { useMoney } from "@/features/reference/use-currencies";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
@@ -86,6 +91,7 @@ export function StoreOptions({ storeId }: { storeId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const guarded = useGuardedAction();
 
   const menu = useMenuWithBundles(storeId);
   const counts = useOptionCounts(storeId);
@@ -190,7 +196,11 @@ export function StoreOptions({ storeId }: { storeId: string }) {
           <Select
             aria-label={t("options.section")}
             value={sectionId ?? ""}
-            onChange={(value) => choose({ section: value || null })}
+            // The list below is keyed on the dish, so either select remounts
+            // every form in it — a way out, and asked about as one.
+            onChange={(value) =>
+              guarded(() => choose({ section: value || null }))()
+            }
             placeholder={t("options.pickSection")}
             isClearable
             options={sections.map((one) => ({
@@ -205,7 +215,9 @@ export function StoreOptions({ storeId }: { storeId: string }) {
             <Select
               aria-label={t("options.item")}
               value={itemId ?? ""}
-              onChange={(value) => choose({ item: value || null })}
+              onChange={(value) =>
+                guarded(() => choose({ item: value || null }))()
+              }
               placeholder={t("options.pickItem")}
               isClearable
               options={section.items.map((one) => ({
@@ -309,6 +321,7 @@ function ItemQuestions({
   const setAdding = onAddingChange;
   /** Which question's item picker is open. One at a time — it is a menu. */
   const [picking, setPicking] = useState<string | null>(null);
+  const guarded = useGuardedAction();
 
   /**
    * Which question is open, or none.
@@ -403,7 +416,7 @@ function ItemQuestions({
               question={group}
               sections={menu.data ?? []}
               pending={setItems.isPending}
-              onCancel={() => setPicking(null)}
+              onCancel={guarded(() => setPicking(null))}
               onSave={(itemIds) =>
                 setItems.mutate(
                   {
@@ -429,7 +442,8 @@ function ItemQuestions({
               onToggle={() =>
                 setOpen((current) => (current === group.id ? null : group.id))
               }
-              onPickItems={() => setPicking(group.id)}
+              // Swaps the question for the picker, and its open forms with it.
+              onPickItems={guarded(() => setPicking(group.id))}
             />
           ),
         )}
@@ -497,6 +511,7 @@ function Question({
    * choice's figure sat in a form that had already been submitted.
    */
   const [added, setAdded] = useState(0);
+  const guarded = useGuardedAction();
   const currencyCode = store.data?.currencyCode ?? "";
 
   /**
@@ -686,7 +701,7 @@ function Question({
                   { onSuccess: () => setRenaming(false) },
                 )
               }
-              onCancel={() => setRenaming(false)}
+              onCancel={guarded(() => setRenaming(false))}
             />
           )}
 
@@ -833,7 +848,7 @@ function Question({
                       { onSuccess: () => setEditingChoice(null) },
                     )
                   }
-                  onCancel={() => setEditingChoice(null)}
+                  onCancel={guarded(() => setEditingChoice(null))}
                 />
               ) : (
                 <ChoiceRow
@@ -849,7 +864,8 @@ function Question({
                   }
                   currencyCode={currencyCode}
                   options={options}
-                  onEdit={() => setEditingChoice(option.id)}
+                  // Editing a second closes the first, draft and all.
+                  onEdit={guarded(() => setEditingChoice(option.id))}
                 />
               ),
             )}
@@ -876,7 +892,7 @@ function Question({
                     { onSuccess: () => setAdded((count) => count + 1) },
                   )
                 }
-                onCancel={() => setAdding("none")}
+                onCancel={guarded(() => setAdding("none"))}
               />
             ) : (
               <button
@@ -1123,6 +1139,10 @@ function ItemPicker({
     () => new Set(question.itemIds),
   );
 
+  // Sorted, because a set is not an order and `changed` compares arrays as
+  // ordered.
+  useUnsavedChanges(changed([...chosen].sort(), [...question.itemIds].sort()));
+
   function toggle(id: string) {
     setChosen((current) => {
       const next = new Set(current);
@@ -1269,6 +1289,8 @@ function TitleForm({
   const [title, setTitle] = useState<Localized>(initial);
   const [error, setError] = useState<string | undefined>(undefined);
 
+  useUnsavedChanges(changed(title, initial));
+
   function submit() {
     const check = validateLocalizedText(title, codes, TEXT.title);
     if (!check.ok) {
@@ -1351,6 +1373,13 @@ export function ChoiceForm({
   /** Minor units, the way the column stores it — `MoneyInput` does the sum. */
   const [price, setPrice] = useState<number | null>(initial?.price ?? 0);
   const [error, setError] = useState<string | undefined>(undefined);
+
+  useUnsavedChanges(
+    changed(
+      { name, price },
+      { name: initial?.name ?? {}, price: initial?.price ?? 0 },
+    ),
+  );
 
   function submit() {
     const check = validateLocalizedText(name, codes, TEXT.name);
@@ -1454,6 +1483,14 @@ function NewQuestion({
   const [mode, setMode] = useState<OptionGroupMode>("single");
   const [required, setRequired] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const guarded = useGuardedAction();
+
+  useUnsavedChanges(
+    changed(
+      { title, mode, required },
+      { title: {}, mode: "single", required: false },
+    ),
+  );
 
   function submit() {
     const check = validateLocalizedText(title, codes, TEXT.title);
@@ -1524,9 +1561,12 @@ function NewQuestion({
       </div>
 
       <div className="flex items-center gap-sm">
+        {/* The button guarded, not `onDone`: that is also the save's
+            `onSuccess`, and asking whether to discard what was just created
+            would be absurd. */}
         <Button
           variant="secondary"
-          onClick={onDone}
+          onClick={guarded(onDone)}
           disabled={create.isPending}
         >
           {t("common.cancel")}

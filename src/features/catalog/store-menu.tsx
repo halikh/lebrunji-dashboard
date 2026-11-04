@@ -9,7 +9,11 @@ import {
   type ReactNode,
 } from "react";
 
-import { useGuardedAction } from "@/components/unsaved-changes";
+import {
+  changed,
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
 
 import { ImagePlaceholder, PreviewImage } from "@/components/ui/image-preview";
 import { Button, cx, Field } from "@/components/ui";
@@ -1583,6 +1587,15 @@ function SectionForm({
   );
   const [error, setError] = useState<string | undefined>(undefined);
 
+  // The menu's Cancels, renames and row clicks were already `guarded`, and
+  // asked nothing, because no form here ever said it held anything (QA-024).
+  useUnsavedChanges(
+    changed(
+      { title, imageUrl },
+      { title: initial?.title ?? {}, imageUrl: initial?.imageUrl ?? null },
+    ),
+  );
+
   function submit() {
     const result = validateLocalizedText(title, codes, TEXT.title);
     if (!result.ok) {
@@ -1697,6 +1710,8 @@ function MovePanel({
   const [target, setTarget] = useState("");
   const [title, setTitle] = useState<Localized>({});
   const [error, setError] = useState<string | undefined>(undefined);
+
+  useUnsavedChanges(changed({ target, title }, { target: "", title: {} }));
 
   const options = [
     ...(moves.canGroup
