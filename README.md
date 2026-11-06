@@ -299,3 +299,4 @@ staging and development). Add each
 deployed URL to its Supabase project's Auth redirect allowlist — the
 password-reset link needs it. The app
 repo's `ENVIRONMENTS.md` defines three Supabase projects; staging first.
+
