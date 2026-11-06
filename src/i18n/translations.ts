@@ -840,7 +840,7 @@ const en = {
     minVersionConfirmTitle: "Block older versions of the app?",
     minVersionConfirmBody:
       "From the next launch, customers below {versions} see the update screen and cannot order until they update. Make sure that build is already live in the store.",
-    minVersionConfirm: "Save and block older versions",
+    minVersionConfirm: "Block older versions",
     unusedFailedTitle: "Could not check storage",
     pageBlurb:
       "The business clock, the hours you take orders, and how a new order is announced. Each setting saves on its own.",

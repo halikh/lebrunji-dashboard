@@ -273,7 +273,7 @@ export function CustomerAppTab() {
         tone="danger"
         title={t("general.minVersionConfirmTitle")}
         description={t("general.minVersionConfirmBody", {
-          versions: newMinimums.join(" / "),
+          versions: [...new Set(newMinimums)].join(" / "),
         })}
         confirmLabel={t("general.minVersionConfirm")}
         onConfirm={async () => {
