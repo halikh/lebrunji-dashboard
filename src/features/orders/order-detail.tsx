@@ -7,6 +7,7 @@ import {
   MessageCircle,
   Pencil,
   Phone,
+  RotateCcw,
   UserRound,
   XCircle,
 } from "lucide-react";
@@ -40,6 +41,7 @@ import { AmendDialog } from "./amend-dialog";
 import { cancellationMessage, whatsappLink } from "./dispatch";
 import { DispatchDialog } from "./dispatch-dialog";
 import { PlaceName } from "./place";
+import { ReopenDialog } from "./reopen-dialog";
 import {
   nextStatus,
   orderKeys,
@@ -360,6 +362,7 @@ export function OrderActions({
   const [amending, setAmending] = useState(false);
   const [dispatching, setDispatching] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
   const cancelled = statuses.find((status) => status.progress === null);
   const status = orderStatus(order, statuses);
@@ -385,8 +388,15 @@ export function OrderActions({
           .length;
   const amendable = movesLeft > 1;
 
+  // Delivered or cancelled by mistake: the way back (0259).
+  const reopenable = finished && status ? status : null;
+
   const secondary =
-    !finished || holder?.courierPhone || amendable || (next && cancelled);
+    !finished ||
+    reopenable ||
+    holder?.courierPhone ||
+    amendable ||
+    (next && cancelled);
   if (!next && !secondary) return null;
 
   return (
@@ -439,6 +449,16 @@ export function OrderActions({
             >
               <XCircle />
               {t("orders.cancel")}
+            </Button>
+          )}
+          {reopenable && (
+            <Button
+              size="sm"
+              className="flex-1"
+              onClick={() => setReopening(true)}
+            >
+              <RotateCcw />
+              {t("reopen.open")}
             </Button>
           )}
         </div>
@@ -497,6 +517,14 @@ export function OrderActions({
           order={order}
           lines={order.lines}
           onClose={() => setDispatching(false)}
+        />
+      )}
+      {reopening && reopenable && (
+        <ReopenDialog
+          order={order}
+          from={reopenable}
+          statuses={statuses}
+          onClose={() => setReopening(false)}
         />
       )}
       {amending && (

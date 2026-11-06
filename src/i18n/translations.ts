@@ -894,6 +894,31 @@ const en = {
     cancelled: "Cancelled",
   },
 
+  /** Changing a delivered or cancelled order's status — `reopen-dialog.tsx`, 0259. */
+  reopen: {
+    open: "Change status",
+    title: "Change the status of {code}",
+    blurb:
+      "This order is {status}. If that was a mistake, choose where it really is.",
+    question: "Where is this order?",
+    pick: "Choose a status",
+    means: {
+      ordered: "Back to the start. The shop has to confirm it again.",
+      confirmed: "Accepted and being prepared.",
+      driverSent: "With a driver, on the way to the customer.",
+      delivered: "It reached the customer after all.",
+      cancelled:
+        "It never arrived. Any promotion it used goes back to the customer.",
+    },
+    customerSees: "The customer's app shows the new status straight away.",
+    samePrice:
+      "It keeps the price the customer was quoted, promotion included, even if that promotion has run out since.",
+    tellShop:
+      "Nobody else is told. Let the shop know, and send a driver when it is ready.",
+    notFinished:
+      "This order is not delivered or cancelled any more. Someone may have reopened it already. The screen now shows where it is.",
+  },
+
   orders: {
     title: "Orders",
     searchPlaceholder: "Search by order code",
@@ -952,9 +977,10 @@ const en = {
     payment: "Payment",
     cancel: "Cancel",
     cancelTitle: "Cancel this order?",
-    // Terminal, and it reaches a person who is waiting. Says both.
+    // It reaches a person who is waiting, and it is not a button to press
+    // lightly: the way back (0259) is a deliberate correction, not an undo.
     cancelBody:
-      "The customer is told immediately, and this cannot be undone. Nothing else on the order changes.",
+      "The customer is told immediately. If this turns out to be a mistake, use Change status on the order to reopen it.",
     cancelConfirm: "Cancel the order",
     keepOrder: "Keep the order",
     collapsePanel: "Collapse the order",
@@ -3558,6 +3584,29 @@ const en = {
     addSubAisle: "Add a sub-aisle",
     aisleNeedsSubAisle:
       "Products on an aisles shop go in a sub-aisle. Add one — Milk, Cheese — to start stocking this aisle.",
+    // The three levels, named on every heading so none is read for another
+    // (2026-11). An aisle holds sub-aisles; a sub-aisle and a section hold
+    // dishes — a section is a top-level heading with nothing under it.
+    aisleLabel: "Aisle",
+    addAisle: "Add an aisle",
+    newAisleTitle: "New aisle",
+    aisleTitle: "Aisle name",
+    subAisleTitle: "Sub-aisle name",
+    renameAisle: "Rename aisle",
+    renameSubAisle: "Rename sub-aisle",
+    renameSectionLevel: "Rename section",
+    renameAisleTitle: "Rename aisle {name}",
+    renameSubAisleTitle: "Rename sub-aisle {name}",
+    renameSectionLevelTitle: "Rename section {name}",
+    aisleArchiveTitle: "Archive this aisle?",
+    subAisleArchiveTitle: "Archive this sub-aisle?",
+    levelAisles: "{count} aisles",
+    levelAislesOne: "1 aisle",
+    levelSubAisles: "{count} sub-aisles",
+    levelSubAislesOne: "1 sub-aisle",
+    levelSections: "{count} sections",
+    levelSectionsOne: "1 section",
+    summaryLevels: "{items} dishes in {levels}",
     looseTitle: "{count} product(s) sit directly on this aisle",
     looseBody:
       "They keep selling, but new products cannot join them. Move them into a sub-aisle of their own, then split it further if you like.",

@@ -19,6 +19,7 @@ import {
   fetchOrders,
   fetchLiveOrderCount,
   fetchStatusCounts,
+  reopenOrder,
   withOrderMoved,
   type Order,
   type OrderLine,
@@ -400,4 +401,47 @@ export function useAdvanceOrder() {
   );
 
   return { advance, isPending: mutation.isPending };
+}
+
+/**
+ * Reopens a finished order — the correction for a wrong Delivered or Cancel
+ * (`0259`).
+ *
+ * Not optimistic, unlike `useAdvanceOrder`. It runs a few times a month, from
+ * a dialog the operator has just read, and the dialog waiting for the server
+ * is what lets it say why it was refused while it is still open. Nor is it
+ * undoable from the toast: reversing it is the same dialog again.
+ */
+export function useReopenOrder() {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  return useMutation({
+    mutationFn: async (input: {
+      orderId: string;
+      code: string;
+      fromSlug: string;
+      toSlug: string;
+      toName: string;
+    }) => {
+      const moved = await reopenOrder(
+        input.orderId,
+        input.toSlug,
+        input.fromSlug,
+      );
+      if (moved === 0) {
+        throw new OrderRefusal(t("orders.movedElsewhere"), "MOVED");
+      }
+      return moved;
+    },
+    onSuccess: (_moved, input) => {
+      toast.success(
+        t("orders.moved", { code: input.code, status: input.toName }),
+      );
+    },
+    // Refused or not, the screen may be wrong about where the order is.
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: orderKeys.all });
+    },
+  });
 }

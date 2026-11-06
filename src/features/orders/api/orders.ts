@@ -453,6 +453,34 @@ export async function advanceOrder(
 }
 
 /**
+ * Moves a finished order — delivered or cancelled — to any other status:
+ * `api_v1_reopen_order`, `0259`.
+ *
+ * The correction for a wrong press, and deliberately not `advanceOrder`: that
+ * one never leaves a finished status, so the buttons pressed all day cannot
+ * reopen anything by accident. Reopening a cancellation also restores the
+ * promotion it used, past the promotion's cap if need be.
+ *
+ * Refuses `UNFIN` for an order still on the path and `MOVED` when the order
+ * is no longer at `expectedFrom`. Returns how many portions moved; zero means
+ * it was already there.
+ */
+export async function reopenOrder(
+  orderId: string,
+  statusSlug: string,
+  expectedFrom: string,
+): Promise<number> {
+  const { data, error } = await getClient().rpc("api_v1_reopen_order", {
+    p_order_id: orderId,
+    p_status_slug: statusSlug,
+    p_expected_from: expectedFrom,
+  });
+
+  if (error) throw orderRefusal(error, "reopen");
+  return (data as number | null) ?? 0;
+}
+
+/**
  * An order as `api_v1_advance_order` would leave it after moving to `toSlug`.
  *
  * For the optimistic cache, which has to land where the server will or the

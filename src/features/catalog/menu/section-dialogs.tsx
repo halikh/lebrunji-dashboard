@@ -18,6 +18,8 @@ import { ARTWORK_SHAPES } from "@/lib/image-shape";
 import { TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
+import type { SectionLevel } from "./shared";
+
 /** What the section form edits — its name, and its aisle picture. */
 export type SectionFields = { title: Localized; imageUrl: string | null };
 
@@ -25,6 +27,9 @@ export type SectionFields = { title: Localized; imageUrl: string | null };
  * Naming a section — new, a new sub-aisle, or a rename. One form for all three,
  * because two would drift and the way they would drift is that one grows a
  * field the other does not.
+ *
+ * `level` is which kind of heading it makes or edits — aisle, sub-aisle or
+ * section — and the field is labelled for it (the title says it too).
  *
  * No slug field: the trigger from migration 0071 derives one from the English
  * title and keeps it unique within the shop.
@@ -37,6 +42,7 @@ export function SectionDialog({
   open,
   onOpenChange,
   title,
+  level,
   initial,
   placeholder = { en: "Starters", ar: "المقبلات" },
   pending,
@@ -45,6 +51,7 @@ export function SectionDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
+  level: SectionLevel;
   initial?: SectionFields;
   placeholder?: Localized;
   pending: boolean;
@@ -64,6 +71,7 @@ export function SectionDialog({
     >
       {open && (
         <SectionForm
+          level={level}
           initial={initial}
           placeholder={placeholder}
           pending={pending}
@@ -75,13 +83,21 @@ export function SectionDialog({
   );
 }
 
+const TITLE_LABEL = {
+  aisle: "menu.aisleTitle",
+  subAisle: "menu.subAisleTitle",
+  section: "menu.sectionTitle",
+} as const;
+
 function SectionForm({
+  level,
   initial,
   placeholder,
   pending,
   onSave,
   onCancel,
 }: {
+  level: SectionLevel;
   initial?: SectionFields;
   placeholder: Localized;
   pending: boolean;
@@ -122,7 +138,7 @@ function SectionForm({
       }}
     >
       <LocalizedField
-        label={t("menu.sectionTitle")}
+        label={t(TITLE_LABEL[level])}
         value={title}
         onChange={setTitle}
         maxLength={TEXT.title}

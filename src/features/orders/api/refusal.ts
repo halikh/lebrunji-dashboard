@@ -43,7 +43,7 @@ export class OrderRefusal extends Error {
  * means "too late to change it"; from anywhere else it means nothing this file
  * can name.
  */
-export type RefusalContext = "advance" | "amend" | "dispatch";
+export type RefusalContext = "advance" | "amend" | "dispatch" | "reopen";
 
 export function orderRefusal(
   error: PostgrestLike,
@@ -68,6 +68,10 @@ function messageFor(
         : t("orders.movedElsewhere");
     case "CANCL":
       return t("orders.wasCancelled");
+    // `api_v1_reopen_order` (0259): the order is back on the path already —
+    // somebody reopened it first, or it was never finished.
+    case "UNFIN":
+      return t("reopen.notFinished");
     case "DONE":
       return t("dispatch.alreadyDelivered");
     case "TAKEN":

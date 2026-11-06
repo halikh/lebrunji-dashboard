@@ -1,5 +1,7 @@
 "use client";
 
+import { CornerDownRight, Layers, List } from "lucide-react";
+
 import { cx } from "@/components/ui";
 import { useMoney } from "@/features/reference/use-currencies";
 import { t } from "@/i18n/translations";
@@ -135,4 +137,105 @@ export function foldedSections(storeId: string): Set<string> {
     folded.set(storeId, set);
   }
   return set;
+}
+
+/**
+ * Which of the three kinds of heading a section is, as the Menu tab and the
+ * branch's menu name it.
+ *
+ * The table has two levels (`parent_id`, 0196), but three kinds of heading:
+ *
+ * - **aisle** — top level, and a container: it has sub-aisles, or the shop's
+ *   layout is Aisles, where a top-level heading only ever holds sub-aisles.
+ * - **sub-aisle** — under an aisle; holds dishes.
+ * - **section** — top level on a list-layout shop with nothing under it; holds
+ *   dishes directly. A restaurant's menu is all sections.
+ *
+ * A sub-aisle whose aisle is missing is drawn at the top (`menuTree`), so it is
+ * named by where it is drawn, not by the column.
+ */
+export type SectionLevel = "aisle" | "subAisle" | "section";
+
+export function sectionLevel(
+  section: Pick<MenuSection, "id" | "parentId">,
+  sections: Pick<MenuSection, "id" | "parentId">[],
+  layout: "list" | "aisles",
+): SectionLevel {
+  if (
+    section.parentId &&
+    sections.some((other) => other.id === section.parentId)
+  ) {
+    return "subAisle";
+  }
+  if (layout === "aisles") return "aisle";
+  return sections.some((other) => other.parentId === section.id)
+    ? "aisle"
+    : "section";
+}
+
+const LEVEL_LABEL = {
+  aisle: "menu.aisleLabel",
+  subAisle: "menu.subAisleLabel",
+  section: "menu.sectionLabel",
+} as const;
+
+export function levelLabel(level: SectionLevel): string {
+  return t(LEVEL_LABEL[level]);
+}
+
+/**
+ * The small tag on a heading that says which level it is — in words and with
+ * an icon, so the level never rests on indentation or shade alone. Square
+ * corners rather than a pill, so it reads as a kind, not a status.
+ */
+export function LevelTag({
+  level,
+  className,
+}: {
+  level: SectionLevel;
+  className?: string;
+}) {
+  const Icon =
+    level === "aisle" ? Layers : level === "subAisle" ? CornerDownRight : List;
+  return (
+    <span
+      className={cx(
+        "inline-flex h-5 shrink-0 items-center gap-1 rounded-[5px] border px-1.5 text-[11.5px] font-medium whitespace-nowrap",
+        level === "aisle" && "border-line-strong bg-surface text-ink-2",
+        level === "subAisle" && "border-line bg-subtle text-ink-3",
+        level === "section" && "border-line bg-hover text-ink-2",
+        className,
+      )}
+    >
+      <Icon aria-hidden className="size-3 shrink-0 rtl:-scale-x-100" />
+      {levelLabel(level)}
+    </span>
+  );
+}
+
+/** "3 aisles, 12 sub-aisles, 2 sections" — only the levels the menu has. */
+export function levelCounts(counts: Record<SectionLevel, number>): string {
+  const parts: string[] = [];
+  if (counts.aisle > 0) {
+    parts.push(
+      counts.aisle === 1
+        ? t("menu.levelAislesOne")
+        : t("menu.levelAisles", { count: counts.aisle }),
+    );
+  }
+  if (counts.subAisle > 0) {
+    parts.push(
+      counts.subAisle === 1
+        ? t("menu.levelSubAislesOne")
+        : t("menu.levelSubAisles", { count: counts.subAisle }),
+    );
+  }
+  if (counts.section > 0) {
+    parts.push(
+      counts.section === 1
+        ? t("menu.levelSectionsOne")
+        : t("menu.levelSections", { count: counts.section }),
+    );
+  }
+  return parts.join(", ");
 }

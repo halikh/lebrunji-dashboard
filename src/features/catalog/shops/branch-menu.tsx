@@ -44,6 +44,8 @@ import {
 import { useMenu } from "../use-menu";
 import { useItemOptionGroups } from "../use-options";
 
+import { LevelTag, sectionLevel, type SectionLevel } from "../menu/shared";
+
 import { CopyPricesDialog } from "./copy-prices-dialog";
 import { Notice } from "./form-bits";
 
@@ -205,6 +207,10 @@ export function BranchMenuEditor({
     );
   }
 
+  const all = menu.data ?? [];
+  const layout = store?.menuLayout ?? "list";
+  const blocks = aisleBlocks(groups, all, layout);
+
   const empty = (menu.data ?? []).every(
     (section) => section.items.length === 0,
   );
@@ -278,64 +284,53 @@ export function BranchMenuEditor({
         />
       )}
 
-      {groups.map(({ section, path, items }) => {
-        const sectionOff = state?.hiddenSections.has(section.id) ?? false;
-        if (section.items.length === 0) return null;
+      {blocks.map((block) => {
+        const card = ({ section, path, items, level }: LevelGroup) => (
+          <SectionCard
+            key={section.id}
+            section={section}
+            path={path}
+            items={items}
+            level={level}
+            state={state}
+            highlight={highlight}
+            branchId={branch.id}
+            decimals={decimals}
+            inherits={inherits}
+            shopCode={shopCode}
+            onSectionServed={(served) =>
+              setSection.mutate({ sectionId: section.id, hidden: !served })
+            }
+            onHidden={(itemId, hidden) => setItem.mutate({ itemId, hidden })}
+            onPrice={(itemId, price) => setPrice.mutateAsync({ itemId, price })}
+          />
+        );
+        if (!block.aisle) return block.groups.map(card);
+        // An aisle is the same card as on the shop's Menu tab: a grey band
+        // with its tag, and its sub-aisles indented behind a guide line.
+        const dishes = block.groups.reduce(
+          (sum, group) => sum + group.section.items.length,
+          0,
+        );
         return (
           <section
-            key={section.id}
-            className="overflow-hidden rounded-lg border border-line bg-surface shadow-xs"
+            key={block.aisle.id}
+            className="rounded-lg border border-line bg-surface shadow-xs"
           >
-            <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-subtle px-4 py-3">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <h3
-                  className={cx(
-                    "truncate text-[14px] font-semibold",
-                    sectionOff ? "text-ink-3" : "text-ink",
-                  )}
-                >
-                  {path}
-                </h3>
-                <span className="text-[12.5px] text-ink-4 tabular-nums">
-                  {section.items.length}
-                </span>
-              </div>
-              <ServedSwitch
-                served={!sectionOff}
-                onChange={(served) =>
-                  setSection.mutate({ sectionId: section.id, hidden: !served })
-                }
-                label={t("branchMenu.sectionServed", { name: path })}
-              />
+            <header className="flex flex-wrap items-center gap-2 rounded-t-lg border-b border-line bg-hover px-4 py-3">
+              <h3 className="min-w-0 truncate text-[16px] font-semibold text-ink">
+                {pickLocalized(block.aisle.title)}
+              </h3>
+              <LevelTag level="aisle" />
+              <span className="text-[12.5px] text-ink-3 tabular-nums">
+                {t("menu.itemCount", { count: dishes })}
+              </span>
             </header>
-
-            {sectionOff && (
-              <p className="border-b border-line bg-hover/50 px-4 py-2 text-[12.5px] text-ink-3">
-                {t("branchMenu.sectionOff")}
-              </p>
-            )}
-
-            <ul className="divide-y divide-line">
-              {items.map((item) => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  focused={highlight === item.id}
-                  branchId={branch.id}
-                  state={state}
-                  sectionOff={sectionOff}
-                  decimals={decimals}
-                  inherits={inherits}
-                  shopCode={shopCode}
-                  onHidden={(hidden) =>
-                    setItem.mutate({ itemId: item.id, hidden })
-                  }
-                  onPrice={(price) =>
-                    setPrice.mutateAsync({ itemId: item.id, price })
-                  }
-                />
-              ))}
-            </ul>
+            <div className="rounded-b-lg bg-subtle py-3 ps-4 pe-3 sm:py-4 sm:ps-6 sm:pe-4">
+              <div className="flex flex-col gap-2.5 border-s-2 border-line-strong ps-3 sm:ps-4">
+                {block.groups.map(card)}
+              </div>
+            </div>
           </section>
         );
       })}
@@ -352,6 +347,140 @@ export function BranchMenuEditor({
         />
       )}
     </div>
+  );
+}
+
+type LevelGroup = {
+  section: MenuSection;
+  path: string;
+  items: MenuItem[];
+  level: SectionLevel;
+};
+
+/**
+ * The flat list of sections with dishes, with each run of sub-aisles gathered
+ * under its aisle — so the branch's menu draws the same three levels as the
+ * shop's. A section with no dishes is left out, as before; an aisle shows only
+ * as the frame around its sub-aisles (and any dishes still sitting on it).
+ */
+function aisleBlocks(
+  groups: { section: MenuSection; path: string; items: MenuItem[] }[],
+  sections: MenuSection[],
+  layout: "list" | "aisles",
+): { aisle: MenuSection | null; groups: LevelGroup[] }[] {
+  const blocks: { aisle: MenuSection | null; groups: LevelGroup[] }[] = [];
+  for (const group of groups) {
+    if (group.section.items.length === 0) continue;
+    const level = sectionLevel(group.section, sections, layout);
+    const entry = { ...group, level };
+    const aisleId =
+      level === "subAisle"
+        ? group.section.parentId
+        : level === "aisle"
+          ? group.section.id
+          : null;
+    const aisle = aisleId
+      ? (sections.find((one) => one.id === aisleId) ?? null)
+      : null;
+    const last = blocks.at(-1);
+    if (aisle && last?.aisle?.id === aisle.id) last.groups.push(entry);
+    else blocks.push({ aisle, groups: [entry] });
+  }
+  return blocks;
+}
+
+/**
+ * One heading's dishes at this branch. A section is a top-level card (15px
+ * semibold, white header, "Section" tag); a sub-aisle is a flat card inside
+ * its aisle (14px medium, "Sub-aisle" tag), named on its own since the aisle
+ * around it already says where it is.
+ */
+function SectionCard({
+  section,
+  path,
+  items,
+  level,
+  state,
+  highlight,
+  branchId,
+  decimals,
+  inherits,
+  shopCode,
+  onSectionServed,
+  onHidden,
+  onPrice,
+}: LevelGroup & {
+  state: BranchMenuOverrides | undefined;
+  highlight: string | null;
+  branchId: string;
+  decimals: number | null;
+  inherits: boolean;
+  shopCode: string;
+  onSectionServed: (served: boolean) => void;
+  onHidden: (itemId: string, hidden: boolean) => void;
+  onPrice: (itemId: string, price: number | null) => Promise<unknown>;
+}) {
+  const sectionOff = state?.hiddenSections.has(section.id) ?? false;
+  const nested = level !== "section";
+  return (
+    <section
+      className={cx(
+        "overflow-hidden border border-line bg-surface",
+        nested ? "rounded-md" : "rounded-lg shadow-xs",
+      )}
+    >
+      <header
+        className={cx(
+          "flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-4",
+          nested ? "py-2" : "py-2.5",
+        )}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <h3
+            className={cx(
+              "truncate",
+              nested ? "text-[14px] font-medium" : "text-[15px] font-semibold",
+              sectionOff ? "text-ink-3" : "text-ink",
+            )}
+          >
+            {pickLocalized(section.title)}
+          </h3>
+          <LevelTag level={level} />
+          <span className="text-[12.5px] text-ink-4 tabular-nums">
+            {section.items.length}
+          </span>
+        </div>
+        <ServedSwitch
+          served={!sectionOff}
+          onChange={onSectionServed}
+          label={t("branchMenu.sectionServed", { name: path })}
+        />
+      </header>
+
+      {sectionOff && (
+        <p className="border-b border-line bg-hover/50 px-4 py-2 text-[12.5px] text-ink-3">
+          {t("branchMenu.sectionOff")}
+        </p>
+      )}
+
+      <ul className="divide-y divide-line">
+        {items.map((item) => (
+          <ItemRow
+            key={item.id}
+            item={item}
+            focused={highlight === item.id}
+            branchId={branchId}
+            state={state}
+            sectionOff={sectionOff}
+            decimals={decimals}
+            inherits={inherits}
+            shopCode={shopCode}
+            onHidden={(hidden) => onHidden(item.id, hidden)}
+            onPrice={(price) => onPrice(item.id, price)}
+          />
+        ))}
+      </ul>
+    </section>
   );
 }
 

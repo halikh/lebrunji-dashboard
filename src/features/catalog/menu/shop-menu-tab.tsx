@@ -13,6 +13,8 @@ import {
   ChevronsUpDown,
   FolderInput,
   FolderPlus,
+  Layers,
+  List,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -23,7 +25,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import {
-  Badge,
   Button,
   Checkbox,
   ConfirmDialog,
@@ -78,10 +79,14 @@ import {
   type SectionMoves,
 } from "./section-dialogs";
 import {
+  LevelTag,
   foldedSections,
+  levelCounts,
   newDishHref,
   nextSectionSort,
   nextSortOrder,
+  sectionLevel,
+  type SectionLevel,
 } from "./shared";
 
 /**
@@ -273,6 +278,19 @@ function MenuBoard({ storeId }: { storeId: string }) {
 
   const allItems = sections.flatMap((one) => one.items);
   const hiddenCount = allItems.filter((item) => !item.isActive).length;
+  const levelOf = (section: MenuSection) =>
+    sectionLevel(section, sections, layout);
+  const perLevel: Record<SectionLevel, number> = {
+    aisle: 0,
+    subAisle: 0,
+    section: 0,
+  };
+  for (const one of sections) perLevel[levelOf(one)] += 1;
+  // What "add" at the top makes: on an aisles shop every top-level heading is
+  // an aisle; elsewhere it is a section until something is put under it.
+  const topLevel: SectionLevel = layout === "aisles" ? "aisle" : "section";
+  const addTopLabel =
+    topLevel === "aisle" ? t("menu.addAisle") : t("menu.addSection");
 
   // ---- bulk selection ----------------------------------------------------
   //
@@ -398,7 +416,7 @@ function MenuBoard({ storeId }: { storeId: string }) {
           )}
           <Button variant="secondary" onClick={() => setAdding(true)}>
             <FolderPlus />
-            {t("menu.addSection")}
+            {addTopLabel}
           </Button>
           {addDish}
         </div>
@@ -423,9 +441,9 @@ function MenuBoard({ storeId }: { storeId: string }) {
 
       {menu.isSuccess && sections.length > 0 && !searching && (
         <p className="text-[13px] text-ink-3">
-          {t("menu.summary", {
+          {t("menu.summaryLevels", {
             items: allItems.length,
-            sections: sections.length,
+            levels: levelCounts(perLevel),
           })}
           {hiddenCount > 0 && (
             <>
@@ -474,7 +492,7 @@ function MenuBoard({ storeId }: { storeId: string }) {
             action={
               <Button variant="primary" onClick={() => setAdding(true)}>
                 <FolderPlus />
-                {t("menu.addSection")}
+                {addTopLabel}
               </Button>
             }
           />
@@ -516,6 +534,7 @@ function MenuBoard({ storeId }: { storeId: string }) {
                 {visibleTree.length > 1 && (
                   <SectionRail
                     tree={sectionOrder.ordered(visibleTree, (one) => one.id)}
+                    levelOf={levelOf}
                     onGo={(section) => {
                       setOpen(section.id, true);
                       if (section.parentId) setOpen(section.parentId, true);
@@ -567,7 +586,12 @@ function MenuBoard({ storeId }: { storeId: string }) {
       <SectionDialog
         open={adding}
         onOpenChange={setAdding}
-        title={t("menu.newSectionTitle")}
+        title={
+          topLevel === "aisle"
+            ? t("menu.newAisleTitle")
+            : t("menu.newSectionTitle")
+        }
+        level={topLevel}
         pending={createSection.isPending}
         onSave={(fields) =>
           createSection.mutate(
@@ -642,10 +666,40 @@ type Selection = {
   set: (ids: string[], on: boolean) => void;
 };
 
+/** Edits say which level they act on — the tag says it, so does the action. */
+const RENAME_LABEL = {
+  aisle: "menu.renameAisle",
+  subAisle: "menu.renameSubAisle",
+  section: "menu.renameSectionLevel",
+} as const;
+const RENAME_TITLE = {
+  aisle: "menu.renameAisleTitle",
+  subAisle: "menu.renameSubAisleTitle",
+  section: "menu.renameSectionLevelTitle",
+} as const;
+const ARCHIVE_TITLE = {
+  aisle: "menu.aisleArchiveTitle",
+  subAisle: "menu.subAisleArchiveTitle",
+  section: "menu.sectionArchiveTitle",
+} as const;
+
 /**
  * One section, at either level — an aisle, or one of its sub-aisles (0196). A
  * restaurant's menu is the same tree with nothing on the second level, so it
  * draws as plain sections.
+ *
+ * ## Three kinds of heading, told apart at a glance (2026-11)
+ *
+ * Each says what it is in several ways at once, never by shade alone:
+ *
+ * - **Aisle** — a card with a grey header band, 16px semibold title, an
+ *   "Aisle" tag with a stack icon, and "n sub-aisles, m items". Its sub-aisles
+ *   sit inside on a faint ground, indented behind a guide line.
+ * - **Sub-aisle** — a smaller, flat card inside its aisle (no shadow, 14px
+ *   medium title, "Sub-aisle" tag with a return-arrow icon).
+ * - **Section** — a top-level card like an aisle's but with a white header,
+ *   15px semibold title and a "Section" tag with a list icon: it holds dishes
+ *   directly.
  */
 function SectionBlock({
   section,
@@ -672,6 +726,7 @@ function SectionBlock({
 
   const isSub = subAisles === null;
   const subs = subAisles ?? [];
+  const level = sectionLevel(section, ctx.sections, ctx.layout);
   const title = pickLocalized(section.title);
   const open = ctx.isOpen(section.id);
   const holdsProducts = canHoldProducts(section, ctx.sections, ctx.layout);
@@ -760,7 +815,7 @@ function SectionBlock({
 
   const actions: MenuAction[] = [
     {
-      label: t("menu.renameSection"),
+      label: t(RENAME_LABEL[level]),
       icon: <Pencil />,
       onSelect: () => setDialog("rename"),
     },
@@ -806,7 +861,7 @@ function SectionBlock({
   const row = order.rowProps(
     section.id,
     cx(
-      isSub
+      level === "subAisle"
         ? "rounded-md border border-line bg-surface"
         : "rounded-lg border border-line bg-surface shadow-xs",
     ),
@@ -821,9 +876,12 @@ function SectionBlock({
     <section {...row}>
       <header
         className={cx(
-          "flex items-center gap-2 px-3 py-2.5 sm:px-4",
+          "flex items-center gap-2 px-3 sm:px-4",
           showBody && "border-b border-line",
-          isSub ? "bg-subtle/60" : "",
+          level === "aisle" && "rounded-t-lg bg-hover py-3",
+          level === "aisle" && !showBody && "rounded-b-lg",
+          level === "section" && "py-2.5",
+          level === "subAisle" && "py-2",
         )}
       >
         {order.sortable && (
@@ -875,16 +933,22 @@ function SectionBlock({
             )}
           />
           {(ctx.layout === "aisles" || section.imageUrl) && (
-            <Thumb src={section.imageUrl} size={isSub ? 28 : 32} />
+            <Thumb
+              src={section.imageUrl}
+              size={level === "aisle" ? 36 : level === "subAisle" ? 28 : 32}
+            />
           )}
           <h3
             className={cx(
-              "truncate font-semibold text-ink",
-              isSub ? "text-[14px]" : "text-[15px]",
+              "truncate text-ink",
+              level === "aisle" && "text-[16px] font-semibold",
+              level === "section" && "text-[15px] font-semibold",
+              level === "subAisle" && "text-[14px] font-medium",
             )}
           >
             {title}
           </h3>
+          <LevelTag level={level} />
           <span className="shrink-0 text-[12.5px] text-ink-3 tabular-nums">
             {subs.length > 0
               ? t("menu.aisleCount", {
@@ -1005,31 +1069,36 @@ function SectionBlock({
           )}
 
           {showsSubAisles && (
-            <div className="flex flex-col gap-3 p-3 sm:p-4">
+            // The aisle's inside: a faint ground, and the sub-aisles indented
+            // behind a guide line, so what belongs to which aisle reads from
+            // the left edge (the right, in Arabic) without counting borders.
+            <div className="flex flex-col gap-2.5 rounded-b-lg bg-subtle py-3 ps-4 pe-3 sm:py-4 sm:ps-6 sm:pe-4">
               {subOrder.instructions}
-              {subOrder
-                .ordered(visibleSubs, (sub) => sub.id)
-                .map((sub) => (
-                  <SectionBlock
-                    key={sub.id}
-                    section={sub}
-                    subAisles={null}
-                    ctx={ctx}
-                    order={{
-                      rowProps: subOrder.rowProps,
-                      handleProps: subOrder.handleProps,
-                      sortable: ctx.canDrag && subOrder.sortable,
-                      carried: subOrder.movingId === sub.id,
-                    }}
-                  />
-                ))}
-              {ctx.layout === "aisles" &&
-                subs.length === 0 &&
-                section.items.length === 0 && (
-                  <p className="rounded-md border border-dashed border-line-strong px-4 py-3 text-[13px] text-ink-3">
-                    {t("menu.aisleNeedsSubAisle")}
-                  </p>
-                )}
+              <div className="flex flex-col gap-2.5 border-s-2 border-line-strong ps-3 sm:ps-4">
+                {subOrder
+                  .ordered(visibleSubs, (sub) => sub.id)
+                  .map((sub) => (
+                    <SectionBlock
+                      key={sub.id}
+                      section={sub}
+                      subAisles={null}
+                      ctx={ctx}
+                      order={{
+                        rowProps: subOrder.rowProps,
+                        handleProps: subOrder.handleProps,
+                        sortable: ctx.canDrag && subOrder.sortable,
+                        carried: subOrder.movingId === sub.id,
+                      }}
+                    />
+                  ))}
+                {ctx.layout === "aisles" &&
+                  subs.length === 0 &&
+                  section.items.length === 0 && (
+                    <p className="rounded-md border border-dashed border-line-strong bg-surface px-4 py-3 text-[13px] text-ink-3">
+                      {t("menu.aisleNeedsSubAisle")}
+                    </p>
+                  )}
+              </div>
               <div>
                 <Button
                   variant="ghost"
@@ -1048,7 +1117,8 @@ function SectionBlock({
       <SectionDialog
         open={dialog === "rename"}
         onOpenChange={(next) => setDialog(next ? "rename" : null)}
-        title={t("menu.renameSectionTitle", { name: title })}
+        title={t(RENAME_TITLE[level], { name: title })}
+        level={level}
         initial={{ title: section.title, imageUrl: section.imageUrl }}
         pending={renameSection.isPending}
         onSave={(fields) =>
@@ -1062,6 +1132,7 @@ function SectionBlock({
         open={dialog === "sub"}
         onOpenChange={(next) => setDialog(next ? "sub" : null)}
         title={t("menu.newSubAisleTitle", { name: title })}
+        level="subAisle"
         placeholder={{ en: "Milk", ar: "حليب" }}
         pending={createSection.isPending}
         onSave={(fields) =>
@@ -1094,7 +1165,7 @@ function SectionBlock({
       <ConfirmDialog
         open={dialog === "archive"}
         onOpenChange={(next) => !next && setDialog(null)}
-        title={t("menu.sectionArchiveTitle")}
+        title={t(ARCHIVE_TITLE[level])}
         description={t("menu.sectionArchiveBody")}
         confirmLabel={t("menu.archiveConfirm")}
         tone="danger"
@@ -1146,6 +1217,9 @@ function SearchResults({
     );
   }
 
+  const levelOfMatch = (match: { id: string; parentId: string | null }) =>
+    sectionLevel(match, ctx.sections, ctx.layout);
+
   const pathOf = (id: string) => {
     const section = ctx.sections.find((one) => one.id === id);
     return section ? pickLocalized(sectionPath(section, ctx.sections)) : "";
@@ -1167,11 +1241,7 @@ function SearchResults({
                 key={section.id}
                 className="flex flex-wrap items-center gap-3 px-4 py-3"
               >
-                <Badge>
-                  {section.parentId
-                    ? t("menu.subAisleLabel")
-                    : t("menu.sectionLabel")}
-                </Badge>
+                <LevelTag level={levelOfMatch(section)} />
                 <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-ink">
                   {pickLocalized(sectionPath(section, ctx.sections))}
                 </span>
@@ -1261,9 +1331,11 @@ function SearchSectionActions({
  */
 function SectionRail({
   tree,
+  levelOf,
   onGo,
 }: {
   tree: MenuAisle[];
+  levelOf: (section: MenuSection) => SectionLevel;
   onGo: (section: MenuSection) => void;
 }) {
   const count = (one: MenuSection, subs: MenuSection[]) =>
@@ -1283,16 +1355,17 @@ function SectionRail({
               label={pickLocalized(aisle.title)}
               count={count(aisle, aisle.subAisles)}
               onClick={() => onGo(aisle)}
+              level={levelOf(aisle)}
             />
             {aisle.subAisles.length > 0 && (
-              <ul className="flex flex-col">
+              <ul className="ms-[18px] mb-1 flex flex-col border-s border-line-strong">
                 {aisle.subAisles.map((sub) => (
                   <li key={sub.id}>
                     <RailLink
                       label={pickLocalized(sub.title)}
                       count={sub.items.length}
                       onClick={() => onGo(sub)}
-                      nested
+                      level="subAisle"
                     />
                   </li>
                 ))}
@@ -1305,29 +1378,41 @@ function SectionRail({
   );
 }
 
+/**
+ * One line of the rail. An aisle is semibold with a stack icon, a section
+ * regular with a list icon, and a sub-aisle indented behind its aisle's guide
+ * line — the same three cues as the headings in the list.
+ */
 function RailLink({
   label,
   count,
   onClick,
-  nested,
+  level,
 }: {
   label: string;
   count: number;
   onClick: () => void;
-  nested?: boolean;
+  level: SectionLevel;
 }) {
+  const Icon = level === "aisle" ? Layers : level === "section" ? List : null;
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={t("menu.jumpTo", { name: label })}
       className={cx(
-        "flex w-full items-center gap-2 py-1.5 pe-3 text-start text-[13px] transition-colors hover:bg-hover",
-        nested
-          ? "ps-6 text-ink-3 hover:text-ink"
-          : "ps-3 text-ink-2 hover:text-ink",
+        "flex w-full items-center gap-2 py-1.5 pe-3 text-start transition-colors hover:bg-hover hover:text-ink",
+        level === "aisle" && "ps-3 text-[13px] font-semibold text-ink",
+        level === "section" && "ps-3 text-[13px] text-ink-2",
+        level === "subAisle" && "ps-3 text-[12.5px] text-ink-3",
       )}
     >
+      {Icon && (
+        <Icon
+          aria-hidden
+          className="size-3.5 shrink-0 text-ink-4 rtl:-scale-x-100"
+        />
+      )}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="shrink-0 text-[12px] text-ink-4 tabular-nums">
         {count}
