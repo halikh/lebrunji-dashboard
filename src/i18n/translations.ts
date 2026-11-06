@@ -596,6 +596,8 @@ const en = {
     colTotal: "Total",
     totalsRow: "Totals",
     totalsSkipped: "Cancelled orders not counted",
+    // A row kept on the first driver's page after the order was reassigned.
+    movedTo: "Handed on to {name}",
     rangeToday: "Today ({count})",
     rangeAll: "All ({count})",
     noneToday: "Nothing handed to them today yet.",

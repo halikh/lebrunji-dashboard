@@ -75,8 +75,10 @@ export function useDispatches(courierId: string) {
  * offers what to do next (reassign, or close). A toast would be a second copy
  * of that sentence somewhere the eye is not.
  *
- * Invalidates the driver's own list, and everything under `orders`: the order
- * just moved to "On the way", and its handovers changed.
+ * Invalidates every driver's list, not just this one's: on a reassignment the
+ * driver it was taken from must stop showing it as theirs. And everything
+ * under `orders`: the order just moved to "On the way", and its handovers
+ * changed.
  */
 export function useDispatchOrder() {
   const queryClient = useQueryClient();
@@ -91,9 +93,11 @@ export function useDispatchOrder() {
       courierId: string;
       reassign?: boolean;
     }) => dispatchOrder(orderId, courierId, reassign),
-    onSettled: (_result, _error, variables) => {
+    onSettled: () => {
       void queryClient.invalidateQueries({
-        queryKey: courierKeys.dispatches(variables.courierId),
+        predicate: (query) =>
+          query.queryKey[0] === courierKeys.all[0] &&
+          query.queryKey[2] === "dispatches",
       });
       void queryClient.invalidateQueries({ queryKey: orderKeys.all });
     },

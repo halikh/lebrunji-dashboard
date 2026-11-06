@@ -149,17 +149,21 @@ function Loaded({
   const dayStart = startOfBusinessDay().getTime();
   const weekStart = startOfBusinessDayPlus(-6).getTime();
   const at = (one: Dispatch) => new Date(one.dispatchedAt).getTime();
-  const today = rows.filter((one) => at(one) >= dayStart).length;
-  const thisWeek = rows.filter((one) => at(one) >= weekStart).length;
+  // Counted only while the order is still theirs. One handed on to somebody
+  // else stays in the list, so who had it first can be read, but it is the
+  // other driver's run, not theirs.
+  const carried = rows.filter((one) => one.movedTo === null);
+  const today = carried.filter((one) => at(one) >= dayStart).length;
+  const thisWeek = carried.filter((one) => at(one) >= weekStart).length;
 
   /**
    * Averaged over the days since their **earliest hand-over**, not a fixed 7
    * or 30 — that would punish somebody who started on Tuesday, and `couriers`
    * records no start date. At least one day, so a first evening divides by one.
    */
-  const earliest = rows.length
+  const earliest = carried.length
     ? Math.min(
-        ...rows.map((one) =>
+        ...carried.map((one) =>
           startOfBusinessDay(new Date(one.dispatchedAt)).getTime(),
         ),
       )
@@ -168,7 +172,7 @@ function Loaded({
     1,
     Math.round((dayStart - earliest) / 86_400_000) + 1,
   );
-  const perDay = rows.length / daysActive;
+  const perDay = carried.length / daysActive;
   const shown =
     range === "today" ? rows.filter((one) => at(one) >= dayStart) : rows;
 
@@ -266,7 +270,10 @@ function Loaded({
           value={average(perDay * 7)}
           hint={t("drivers.overDays", { count: daysActive })}
         />
-        <StatTile label={t("drivers.statTotal")} value={String(rows.length)} />
+        <StatTile
+          label={t("drivers.statTotal")}
+          value={String(carried.length)}
+        />
       </div>
 
       <TwoColumn
@@ -288,7 +295,11 @@ function Loaded({
                   items={[
                     {
                       key: "today",
-                      label: t("drivers.rangeToday", { count: today }),
+                      // The rows the list will show, handed-on ones too —
+                      // as "All" counts them.
+                      label: t("drivers.rangeToday", {
+                        count: rows.filter((one) => at(one) >= dayStart).length,
+                      }),
                     },
                     {
                       key: "all",
@@ -348,25 +359,38 @@ function Loaded({
                       <Td className="whitespace-nowrap text-ink-2">
                         {clock.dayAndTime(row.dispatchedAt)}
                       </Td>
-                      <Td>
-                        <StatusBadge slug={row.statusSlug} />
-                      </Td>
-                      <Td className="text-end tabular-nums">
-                        <Price
-                          value={row.deliveryFee}
-                          code={row.currencyCode}
-                          shopRate={row.shopRate}
-                          align="end"
-                        />
-                      </Td>
-                      <Td className="text-end tabular-nums">
-                        <Price
-                          value={row.orderTotal}
-                          code={row.currencyCode}
-                          shopRate={row.shopRate}
-                          align="end"
-                        />
-                      </Td>
+                      {row.movedTo !== null ? (
+                        // Handed on: no status or money of theirs to show.
+                        <>
+                          <Td className="text-ink-3">
+                            {t("drivers.movedTo", { name: row.movedTo })}
+                          </Td>
+                          <Td className="text-end text-ink-4">—</Td>
+                          <Td className="text-end text-ink-4">—</Td>
+                        </>
+                      ) : (
+                        <>
+                          <Td>
+                            <StatusBadge slug={row.statusSlug} />
+                          </Td>
+                          <Td className="text-end tabular-nums">
+                            <Price
+                              value={row.deliveryFee}
+                              code={row.currencyCode}
+                              shopRate={row.shopRate}
+                              align="end"
+                            />
+                          </Td>
+                          <Td className="text-end tabular-nums">
+                            <Price
+                              value={row.orderTotal}
+                              code={row.currencyCode}
+                              shopRate={row.shopRate}
+                              align="end"
+                            />
+                          </Td>
+                        </>
+                      )}
                     </Tr>
                   ))}
                 </TBody>
@@ -518,8 +542,10 @@ function StatTile({
  */
 function HandoverTotals({ rows }: { rows: Dispatch[] }) {
   const { format } = useMoney();
-  const counted = rows.filter((row) => row.statusSlug !== "cancelled");
-  const skipped = rows.length - counted.length;
+  // Handed on to somebody else: not theirs to hand money in for.
+  const theirs = rows.filter((row) => row.movedTo === null);
+  const counted = theirs.filter((row) => row.statusSlug !== "cancelled");
+  const skipped = theirs.length - counted.length;
 
   const byCurrency = new Map<
     string,

@@ -164,9 +164,26 @@ export type Dispatch = {
   shopRate: number | null;
   statusSlug: string;
   statusName: string;
+  /**
+   * Who has this order now, when it is no longer this driver — the operator
+   * handed it on afterwards. The row stays, because the first driver did get
+   * the address, but it is not theirs to carry or to be counted for.
+   */
+  movedTo: string | null;
 };
 
-/** What this driver has been given, newest first. */
+/**
+ * What this driver has been given, newest first.
+ *
+ * Every hand-over is a row of `order_dispatches`, and a reassignment adds one
+ * rather than replacing the last, so this reads each order's *latest*
+ * hand-over too. Against it, a row is one of three things:
+ *
+ * - **Theirs** — the latest is this row.
+ * - **Moved on** — the latest went to somebody else: `movedTo` names them.
+ * - **An older copy** — the latest went to this same driver again (an Undo,
+ *   then sent again). Dropped, so one order is one row and one count.
+ */
 export async function fetchDispatches(
   courierId: string,
   limit = 50,
@@ -176,7 +193,8 @@ export async function fetchDispatches(
     .select(
       `id, dispatched_at,
        orders ( id, code, delivery_fee, total, currency_code,
-         order_stores ( store_id, status, stores ( exchange_rate ) ) )`,
+         order_stores ( store_id, status, stores ( exchange_rate ) ),
+         order_dispatches ( id, courier_id, dispatched_at, couriers ( name ) ) )`,
     )
     .eq("courier_id", courierId)
     .order("dispatched_at", { ascending: false })
@@ -187,6 +205,29 @@ export async function fetchDispatches(
   return (data ?? []).flatMap((row) => {
     const order = asRecord(row.orders);
     if (!order) return [];
+
+    // The order's newest hand-over. Ties on the timestamp cannot happen in
+    // practice (one transaction each, `now()` apiece), but break them by id
+    // so the answer is the same on every read.
+    const latest = asArray(order.order_dispatches).reduce<Record<
+      string,
+      unknown
+    > | null>((best, one) => {
+      if (!best) return one;
+      const a = String(one.dispatched_at);
+      const b = String(best.dispatched_at);
+      const newer = new Date(a).getTime() - new Date(b).getTime();
+      return newer > 0 || (newer === 0 && String(one.id) > String(best.id))
+        ? one
+        : best;
+    }, null);
+
+    let movedTo: string | null = null;
+    if (latest && latest.id !== row.id) {
+      if (latest.courier_id === courierId) return [];
+      movedTo =
+        ((asRecord(latest.couriers)?.name as string | undefined) ?? "") || "—";
+    }
 
     // An order can span two shops and therefore two statuses. The row shows the
     // *least advanced* one, because "what still needs doing" is the question a
@@ -209,6 +250,7 @@ export async function fetchDispatches(
         shopRate: oneShopRate(asArray(order.order_stores)),
         statusSlug: slug,
         statusName: statusName(slug),
+        movedTo,
       },
     ];
   });
