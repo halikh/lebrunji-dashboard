@@ -6,7 +6,6 @@ import { SearchX, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
-  Avatar,
   EmptyState,
   ListCard,
   Page,
@@ -249,7 +248,6 @@ function CustomerRow({
     >
       <Td className="min-w-0">
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar name={unnamed ? "" : customer.name} size={32} />
           <div className="flex min-w-0 flex-col">
             {/* A real link: keyboard-reachable, and open-in-new-tab works.
                 The row's own click is the larger, mouse-only target. */}

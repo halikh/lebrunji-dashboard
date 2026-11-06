@@ -15,7 +15,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import {
-  Avatar,
   Button,
   ConfirmDialog,
   EmptyState,
@@ -280,7 +279,6 @@ function DriverRow({
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <Avatar name={courier.name} />
         <div className="flex min-w-0 flex-col gap-0.5">
           <Link
             href={`/drivers/${courier.id}`}

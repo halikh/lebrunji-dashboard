@@ -13,7 +13,6 @@ import {
 import { useCallback, useMemo, type ReactNode } from "react";
 
 import {
-  Avatar,
   Badge,
   Button,
   Card,
@@ -260,7 +259,6 @@ function ProfileBody({
       <PageHeader
         title={
           <span className="flex min-w-0 items-center gap-3">
-            <Avatar name={unnamed ? "" : row.name} size={40} />
             <span
               className={cx(
                 "break-words",

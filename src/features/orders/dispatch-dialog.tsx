@@ -14,7 +14,6 @@ import {
 import { useId, useState, type ReactNode } from "react";
 
 import {
-  Avatar,
   Badge,
   Button,
   Copyable,
@@ -765,7 +764,6 @@ function DriverRow({
           : "border-line bg-surface hover:border-line-strong hover:bg-subtle",
       )}
     >
-      <Avatar name={driver.name} size={34} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[14px] font-medium text-ink">
           {driver.name}

@@ -13,7 +13,6 @@ import {
 import { useState } from "react";
 
 import {
-  Avatar,
   Button,
   Card,
   ConfirmDialog,
@@ -178,7 +177,6 @@ function Loaded({
       <PageHeader
         title={
           <span className="flex min-w-0 items-center gap-3">
-            <Avatar name={driver.name} size={40} />
             <span className="truncate">{driver.name}</span>
           </span>
         }
