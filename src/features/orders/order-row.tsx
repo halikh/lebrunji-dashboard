@@ -115,7 +115,14 @@ export function OrderRow({
         </div>
       )}
 
-      <div className="flex shrink-0 flex-col items-end gap-1">
+      <div
+        className={cx(
+          "flex shrink-0 flex-col items-end gap-1",
+          // Fixed width where the status column shows, so that column starts at
+          // the same x on every row whatever the total's length.
+          !compact && "lg:w-[128px]",
+        )}
+      >
         <span className="text-[14px] font-semibold text-ink tabular-nums">
           {money(order.total, order.currencyCode)}
         </span>
