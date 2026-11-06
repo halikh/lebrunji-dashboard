@@ -2116,6 +2116,8 @@ const en = {
     l: "L",
     ml: "mL",
     piece: "piece",
+    bag: "bag",
+    pack: "pack",
     // The size under an item's name: "1 kg", "500 g".
     size: "{quantity} {unit}",
     // The comparison figure beside the price: "$12.00/kg".

@@ -54,7 +54,7 @@
  */
 
 /** The units `menu_items_price_unit_known` allows. */
-export type PriceUnit = "g" | "kg" | "ml" | "l" | "piece";
+export type PriceUnit = "g" | "kg" | "ml" | "l" | "piece" | "bag" | "pack";
 
 export const PRICE_UNITS: readonly PriceUnit[] = [
   "kg",
@@ -62,7 +62,24 @@ export const PRICE_UNITS: readonly PriceUnit[] = [
   "l",
   "ml",
   "piece",
+  "bag",
+  "pack",
 ] as const;
+
+/**
+ * The units that count things rather than measure them — `0258` added bags
+ * and packs beside the piece.
+ *
+ * Each is its own dimension: a bag is not some number of pieces, so a bag is
+ * compared only with another bag. They share what a piece always had: no
+ * weight cap (`AMOUNT_MAX`), no per-unit figure for a single one, and a word
+ * that is a noun and inflects ("2 bags").
+ */
+export type CountUnit = "piece" | "bag" | "pack";
+
+export function isCountUnit(unit: PriceUnit): unit is CountUnit {
+  return unit === "piece" || unit === "bag" || unit === "pack";
+}
 
 /**
  * What each unit measures, and how much of the canonical one it is.
@@ -76,6 +93,8 @@ const SCALE: Record<PriceUnit, { canonical: PriceUnit; factor: number }> = {
   l: { canonical: "l", factor: 1 },
   ml: { canonical: "l", factor: 0.001 },
   piece: { canonical: "piece", factor: 1 },
+  bag: { canonical: "bag", factor: 1 },
+  pack: { canonical: "pack", factor: 1 },
 };
 
 /**
@@ -179,7 +198,7 @@ export function pricePerUnit(
 
   if (!(canonicalQuantity > 0)) return null;
   // Exactly one of the thing already shown. Nothing to add.
-  if (canonical === "piece" && canonicalQuantity === 1) return null;
+  if (isCountUnit(canonical) && canonicalQuantity === 1) return null;
 
   return {
     amount: Math.round(minorUnits / canonicalQuantity),
@@ -220,6 +239,68 @@ export function unitAmount(unit: ItemUnit, count: number): number {
 }
 
 /**
+ * The most of one thing a basket line holds by weight or volume (`0182`): 20 kg
+ * or 20 L, in whichever of the two units the item is sold by. Null for the
+ * counted units — pieces, bags, packs — whose only cap is the press count.
+ */
+export const AMOUNT_MAX: Record<PriceUnit, number | null> = {
+  kg: 20,
+  l: 20,
+  g: 20_000,
+  ml: 20_000,
+  piece: null,
+  bag: null,
+  pack: null,
+};
+
+/**
+ * How many presses one line may reach: `maxCount` (the 50 of `0173`), and for
+ * an item sold by weight or volume no more than `AMOUNT_MAX` of it — the same
+ * arithmetic as `unitAmount`, run backwards, and as the database's own check.
+ * A fixed pack (no step) counts its own size per press (`0184`): forty 500 g
+ * packs are 20 kg, the same as a stepper reaching it.
+ */
+export function maxPresses(unit: ItemUnit | null, maxCount: number): number {
+  if (!unit) return maxCount;
+  const max = AMOUNT_MAX[unit.unit];
+  if (max == null) return maxCount;
+  const step = unit.step ?? unit.quantity;
+  // The small epsilon absorbs `0.1`-style steps that land exactly on the cap.
+  const presses = Math.floor((max - unit.quantity) / step + 1e-9) + 1;
+  return Math.max(1, Math.min(maxCount, presses));
+}
+
+/**
+ * How many presses one line may reach beside the basket's other lines of the
+ * same dish (`0220`): the caps are per dish, so what the others hold comes off
+ * both the count and the weight.
+ *
+ * With nothing beside it this is {@link maxPresses}. Unlike it, this can be
+ * zero — the others may already hold the whole cap.
+ */
+export function maxPressesBeside(
+  unit: ItemUnit | null,
+  maxCount: number,
+  beside: readonly { unit: ItemUnit | null; quantity: number }[],
+): number {
+  if (beside.length === 0) return maxPresses(unit, maxCount);
+  const count = maxCount - beside.reduce((sum, line) => sum + line.quantity, 0);
+  const max = unit ? AMOUNT_MAX[unit.unit] : null;
+  if (!unit || max == null) return Math.max(0, count);
+  const held = beside.reduce(
+    (sum, line) => sum + (line.unit ? unitAmount(line.unit, line.quantity) : 0),
+    0,
+  );
+  const room = max - held;
+  const step = unit.step ?? unit.quantity;
+  const presses =
+    room + 1e-9 < unit.quantity
+      ? 0
+      : Math.floor((room - unit.quantity) / step + 1e-9) + 1;
+  return Math.max(0, Math.min(count, presses));
+}
+
+/**
  * What one line costs, in minor units.
  *
  * ## The two cases, and why they are one function
@@ -257,6 +338,18 @@ export function unitAmount(unit: ItemUnit, count: number): number {
  * precision either column has. `line_price` in `0122` is this function in SQL
  * and rounds in both the same places. The two drifting apart is the silent
  * class of bug `supabase/tests/branch-pricing.sql` exists for.
+ *
+ * ## Another currency is rounded per unit, on purpose
+ *
+ * A line priced in a currency other than its shop's arrives here already
+ * converted, one unit at a time (`priced_cart_lines`, `0134`), and is then
+ * multiplied. So three of a 70,000 LBP dish are 3 × 79¢ = 237¢, not the 236¢
+ * converting the whole line would give. That is deliberate (user, 2026-11-03):
+ * `order_lines.unit_price` is stored in the order's currency and the receipt
+ * reads quantity × unit price, so per-unit rounding keeps every line on it
+ * adding up. Converting the total instead is a cent closer to the rate and
+ * prints a line that does not multiply out. It moves a line by at most half a
+ * minor unit per unit, either way.
  */
 export function linePrice(
   /** The price of one press: the item plus every option on the line. */
