@@ -1,51 +1,44 @@
 "use client";
 
-import type { ReactNode } from "react";
-import ReactSelect, {
-  components as reactSelectComponents,
-  type GroupBase,
-  type InputProps,
-  type StylesConfig,
-} from "react-select";
-import AsyncSelect from "react-select/async";
+import { Command } from "cmdk";
+import { Check, ChevronDown, Search, X } from "lucide-react";
+import { Popover as PopoverPrimitive } from "radix-ui";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
-import { useFieldWiring } from "./field";
+import { t } from "@/i18n/translations";
+
+import { cx } from "./cx";
+import { Spinner } from "./spinner";
 
 /**
- * A choice from a set the database supplies.
+ * A choice from a set the database supplies — searchable, keyboard-complete,
+ * and drawn in the kit's own look.
  *
- * ## One wrapper, so the library is configured once
+ * Built on Radix Popover (placement, collision flipping, layering above a
+ * `Dialog` or `Sheet`) and cmdk (filtering, arrow-key focus, `listbox`
+ * semantics). No screen imports either directly, so swapping one later is
+ * this file.
  *
- * `react-select` is here because a select over database rows needs things the
- * native control cannot do — type-to-filter, a rendered option that is more
- * than a string, and later an async variant for lists with no ceiling. What it
- * arrives with is a blue-and-grey look of its own, which is the fastest way to
- * make a carefully transcribed design system look borrowed.
+ * ## Wiring to a `Field`
  *
- * So it is wrapped exactly once and styled from the palette's tokens. No screen
- * imports `react-select` directly, and swapping it later is one file.
+ * `Field` hands its control `id`, `aria-describedby` and `aria-invalid`
+ * through a render function; every control here accepts exactly those, so
+ * `<Field>{(p) => <Select {...p} … />}</Field>` ties label, hint and error to
+ * it. `invalid` is the older name for the same thing and still works.
  *
- * ## The `note` is why this is a component and not a `<select>`
+ * ## The `note` is why this is not a `<select>`
  *
- * An option can carry a short remark rendered beside its label — "no options
- * yet" against a dish that has none. A native `<option>` holds no markup, so
- * the remark could only be more text in the same string; here it can be its own
- * colour and weight, and the eye can skim the column for it. That marking is
- * the whole reason this screen has a picker rather than a link from each row.
- *
- * ## Styling through `styles`, not classes
- *
- * The library renders into elements this code never sees, so its own `styles`
- * API is the seam it offers. Every value below is a palette token read from CSS
- * — nothing is a literal — which is what keeps this in step with the rest of
- * the dashboard when a colour changes.
- *
- * ## One styling block, two components
- *
- * {@link MultiSelect} is the same control accepting several answers, and its
- * styling is *this* styling — one function, called by both. Written twice, the
- * second copy is where the focus ring stops matching, and it would stop
- * matching on whichever of the two screens nobody happened to open that week.
+ * An option can carry a short remark beside its label — "no options yet"
+ * against a dish that has none — in its own colour, so the eye can skim the
+ * column for it. A native `<option>` holds no markup.
  */
 
 export type SelectOption = {
@@ -54,36 +47,37 @@ export type SelectOption = {
   /** A short remark shown beside the label — "no options yet". */
   note?: string;
   /**
-   * Drawn in place of the label text, where the option *is* something to look
-   * at rather than to read — a tag's colour, shown as the chip it produces.
-   *
-   * `label` is still required and is still the truth: it is what the control
-   * filters on as the operator types, and what a screen reader announces. This
-   * only changes what the eye gets. An option that can only be recognised by
-   * sight is one nobody can find by typing.
+   * Drawn in place of the label text where the option *is* something to look
+   * at — a tag's colour, shown as the chip it produces. `label` is still what
+   * the search matches and what a screen reader announces.
    */
   render?: ReactNode;
   /**
    * A small second line under the label, in the open list only — a branch's
-   * phone number under its name. The closed control stays one line, so it is
-   * the same height as the fields beside it.
+   * phone under its name. The closed control stays one line.
    */
   detail?: string;
 };
 
+/** What `Field` passes a control, plus the older `invalid` flag. */
+type Wiring = {
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean | "true" | "false";
+  invalid?: boolean;
+};
+
+function isInvalid(wiring: Wiring): boolean {
+  if (wiring.invalid !== undefined) return wiring.invalid;
+  const aria = wiring["aria-invalid"];
+  return aria === true || aria === "true";
+}
+
 /**
- * What the browser is told about the search box: nothing goes in it.
- *
- * react-select's control is a bare text `<input>`, which is the shape Chrome
- * and the password managers guess at — on Settings it was being filled with the
- * signed-in operator's email, so "Closes at" read `hali_tj@outlook…` over an
- * empty menu, and the operator's hours were one keystroke from being saved
- * wrong. The library already sends `autocomplete="off"`; Chrome ignores that on
- * a field it believes it recognises. `new-password` is the token it does honour
- * on a text input, and the `data-*` flags are what the extensions read.
- *
- * Spread from an object rather than written as attributes because `data-*` is
- * not part of `InputProps`, and a component takes only the props it declares.
+ * Nothing goes in the search box. Chrome guesses a bare text input is a login
+ * field and fills it with the operator's email — on Settings that once put an
+ * address over an empty hours menu. `new-password` is the token it honours;
+ * the `data-*` flags are what the password-manager extensions read.
  */
 const AUTOFILL_OFF = {
   autoComplete: "new-password",
@@ -91,29 +85,153 @@ const AUTOFILL_OFF = {
   "data-lpignore": "true",
   "data-bwignore": "true",
   "data-form-type": "other",
-};
+} as const;
 
-/**
- * Open downward when the list fits below, upward when it does not.
- *
- * The library's default is always down, which at the foot of a modal put the
- * list under the footer's buttons or past the bottom of the screen. `auto`
- * measures the room below against the scroll parent and the viewport and flips
- * when there is more above.
- *
- * Not portalled to `body` to escape the clip instead: the modals are native
- * `<dialog>`s in the top layer, and anything outside them draws underneath.
- */
-const MENU_PLACEMENT = "auto" as const;
+/** The closed control's frame — `Input`'s look, so a select lines up beside one. */
+const frame =
+  "w-full rounded-md border border-line-strong bg-surface text-[14px] text-ink shadow-xs transition-[border-color,box-shadow] hover:border-ink-4 focus-visible:border-accent focus-visible:shadow-focus focus-visible:outline-none data-[state=open]:border-accent data-[state=open]:shadow-focus aria-invalid:border-danger aria-disabled:cursor-not-allowed aria-disabled:bg-subtle aria-disabled:text-ink-3 aria-disabled:hover:border-line-strong";
 
-/** react-select's own input, marked so nothing fills it. */
-function NoAutofillInput<
-  Option,
-  IsMulti extends boolean,
-  Group extends GroupBase<Option>,
->(props: InputProps<Option, IsMulti, Group>) {
-  return <reactSelectComponents.Input {...props} {...AUTOFILL_OFF} />;
+/** Matches on what a person reads, never on the id hidden in `value`. */
+function optionKeywords(option: SelectOption): string[] {
+  return [option.label, option.note ?? "", option.detail ?? ""];
 }
+
+function filterOptions(_value: string, search: string, keywords?: string[]) {
+  const needle = search.trim().toLocaleLowerCase();
+  if (!needle) return 1;
+  const hay = (keywords ?? []).join(" ").toLocaleLowerCase();
+  if (hay.startsWith(needle)) return 1;
+  return hay.includes(needle) ? 0.5 : 0;
+}
+
+/** One option's contents, in the list (`menu`) or the closed control (`value`). */
+function OptionContent({
+  option,
+  context,
+}: {
+  option: SelectOption;
+  context: "menu" | "value";
+}) {
+  const line = (
+    <span className="flex min-w-0 items-baseline gap-2">
+      <span className="min-w-0 truncate">{option.render ?? option.label}</span>
+      {option.note && (
+        <span className="shrink-0 text-[12px] text-ink-4">{option.note}</span>
+      )}
+    </span>
+  );
+  if (!option.detail || context !== "menu") return line;
+  return (
+    <span className="flex min-w-0 flex-col">
+      {line}
+      <span className="truncate text-[12px] text-ink-3">{option.detail}</span>
+    </span>
+  );
+}
+
+/** The open list: a search box, then the options. Shared by all three controls. */
+function OptionPanel({
+  options,
+  selected,
+  onPick,
+  search,
+  onSearch,
+  filter = true,
+  loading = false,
+  empty,
+}: {
+  options: readonly SelectOption[];
+  selected: ReadonlySet<string>;
+  onPick: (option: SelectOption) => void;
+  search: string;
+  onSearch: (value: string) => void;
+  /** False when the caller already filtered (the async control). */
+  filter?: boolean;
+  loading?: boolean;
+  empty?: ReactNode;
+}) {
+  return (
+    <Command
+      shouldFilter={filter}
+      filter={filterOptions}
+      loop
+      className="flex flex-col"
+    >
+      <div className="flex items-center gap-2 border-b border-line px-3">
+        <Search aria-hidden className="size-4 shrink-0 text-ink-4" />
+        <Command.Input
+          value={search}
+          onValueChange={onSearch}
+          placeholder={t("common.search")}
+          className="h-9 w-full min-w-0 bg-transparent text-[14px] text-ink placeholder:text-ink-4 focus:outline-none"
+          {...AUTOFILL_OFF}
+        />
+        {loading && <Spinner className="size-3.5 shrink-0 text-ink-4" />}
+      </div>
+      <Command.List className="max-h-[min(280px,var(--radix-popover-content-available-height,280px))] overflow-y-auto overscroll-contain p-1 scrollbar-thin">
+        <Command.Empty className="px-2.5 py-6 text-center text-[13px] text-ink-3">
+          {loading ? t("common.loading") : (empty ?? t("controls.noMatches"))}
+        </Command.Empty>
+        {options.map((option) => {
+          const isSelected = selected.has(option.value);
+          return (
+            <Command.Item
+              key={option.value}
+              value={option.value}
+              keywords={optionKeywords(option)}
+              onSelect={() => onPick(option)}
+              className="flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[14px] text-ink outline-none select-none data-[selected=true]:bg-hover"
+            >
+              <span className="min-w-0 flex-1">
+                <OptionContent option={option} context="menu" />
+              </span>
+              <Check
+                aria-hidden
+                className={cx(
+                  "size-4 shrink-0 text-accent",
+                  isSelected ? "opacity-100" : "opacity-0",
+                )}
+              />
+            </Command.Item>
+          );
+        })}
+      </Command.List>
+    </Command>
+  );
+}
+
+function PanelContent({
+  children,
+  anchor,
+  id,
+}: {
+  children: ReactNode;
+  /** Named by the control's `aria-controls`. */
+  id: string;
+  /** A box that opens the list itself, so pressing it is not "outside". */
+  anchor?: RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Content
+        id={id}
+        onInteractOutside={(event) => {
+          const target = event.target as Node | null;
+          if (target && anchor?.current?.contains(target))
+            event.preventDefault();
+        }}
+        align="start"
+        sideOffset={4}
+        collisionPadding={8}
+        className="z-50 w-[var(--radix-popover-trigger-width)] min-w-56 overflow-hidden rounded-lg border border-line bg-surface shadow-lg animate-pop-in focus:outline-none"
+      >
+        {children}
+      </PopoverPrimitive.Content>
+    </PopoverPrimitive.Portal>
+  );
+}
+
+/* ───────────────────────────── Select ───────────────────────────── */
 
 export function Select({
   value,
@@ -121,223 +239,235 @@ export function Select({
   options,
   placeholder,
   disabled = false,
-  invalid,
   isClearable = false,
+  className,
+  "aria-label": ariaLabel,
+  ...wiring
 }: {
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
   placeholder?: string;
   disabled?: boolean;
-  invalid?: boolean;
   isClearable?: boolean;
-}) {
-  const field = useFieldWiring();
-  const isInvalid = invalid ?? field?.invalid ?? false;
-
+  className?: string;
+  "aria-label"?: string;
+} & Wiring) {
+  const [open, setOpen] = useState(false);
+  const listId = useId();
+  const [search, setSearch] = useState("");
   const selected = options.find((option) => option.value === value) ?? null;
+  const invalid = isInvalid(wiring);
+  const clearable = isClearable && !!selected && !disabled;
+
+  function openChange(next: boolean) {
+    if (disabled) return;
+    setOpen(next);
+    if (!next) setSearch("");
+  }
 
   return (
-    <ReactSelect<SelectOption, false>
-      inputId={field?.id}
-      aria-describedby={field?.describedBy}
-      aria-invalid={isInvalid || undefined}
-      value={selected}
-      onChange={(option) => onChange(option?.value ?? "")}
-      options={options}
-      placeholder={placeholder ?? ""}
-      isDisabled={disabled}
-      isClearable={isClearable}
-      menuPlacement={MENU_PLACEMENT}
-      components={{ Input: NoAutofillInput }}
-      // The library's own class names are not used; everything is `styles`
-      // below. This only removes them from the DOM so nothing can accidentally
-      // depend on one.
-      classNamePrefix=""
-      formatOptionLabel={renderOption}
-      styles={paletteStyles(isInvalid)}
-    />
+    <PopoverPrimitive.Root open={open} onOpenChange={openChange}>
+      <div className={cx("relative", className)}>
+        <PopoverPrimitive.Trigger asChild>
+          <button
+            type="button"
+            id={wiring.id}
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-label={ariaLabel}
+            aria-describedby={wiring["aria-describedby"]}
+            aria-invalid={invalid || undefined}
+            aria-disabled={disabled || undefined}
+            disabled={disabled}
+            className={cx(
+              frame,
+              "flex h-9 items-center gap-2 ps-3 text-start",
+              clearable ? "pe-14" : "pe-9",
+            )}
+          >
+            <span
+              className={cx(
+                "min-w-0 flex-1 truncate",
+                !selected && "text-ink-4",
+              )}
+            >
+              {selected ? (
+                <OptionContent option={selected} context="value" />
+              ) : (
+                (placeholder ?? "")
+              )}
+            </span>
+          </button>
+        </PopoverPrimitive.Trigger>
+        {clearable && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            aria-label={t("common.clear")}
+            title={t("common.clear")}
+            className="absolute end-8 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded text-ink-4 hover:bg-hover hover:text-ink"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+        <ChevronDown
+          aria-hidden
+          className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-ink-3"
+        />
+      </div>
+      <PanelContent id={listId}>
+        <OptionPanel
+          options={options}
+          selected={new Set(selected ? [selected.value] : [])}
+          search={search}
+          onSearch={setSearch}
+          onPick={(option) => {
+            onChange(option.value);
+            openChange(false);
+          }}
+        />
+      </PanelContent>
+    </PopoverPrimitive.Root>
   );
 }
 
+/* ─────────────────────────── Multi box ──────────────────────────── */
+
 /**
- * One option's contents, for both controls.
- *
- * `render` wins over the label text where an option has one; the note sits
- * beside either.
+ * The closed multi control: chips with their own remove buttons, and a
+ * clear-all. Not a `<button>` because it contains buttons; a focusable
+ * `combobox` that opens on Enter, Space or ↓, and drops the last chip on
+ * Backspace.
  */
-function renderOption(
-  option: SelectOption,
-  meta?: { context: "menu" | "value" },
-) {
-  const line = (
-    <span className="flex items-baseline gap-sm">
-      <span className="min-w-0 truncate">{option.render ?? option.label}</span>
-      {option.note && (
-        <span className="shrink-0 text-[12px] text-text-faint">
-          {option.note}
-        </span>
+function MultiBox({
+  chosen,
+  onRemove,
+  onClear,
+  open,
+  onOpen,
+  placeholder,
+  disabled,
+  ariaLabel,
+  controls,
+  wiring,
+  className,
+  boxRef,
+}: {
+  boxRef: RefObject<HTMLDivElement | null>;
+  chosen: readonly SelectOption[];
+  onRemove: (value: string) => void;
+  onClear: () => void;
+  open: boolean;
+  onOpen: () => void;
+  placeholder?: string;
+  disabled: boolean;
+  ariaLabel?: string;
+  controls: string;
+  wiring: Wiring;
+  className?: string;
+}) {
+  const invalid = isInvalid(wiring);
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (disabled || event.target !== event.currentTarget) return;
+    if (
+      event.key === "Enter" ||
+      event.key === " " ||
+      event.key === "ArrowDown"
+    ) {
+      event.preventDefault();
+      onOpen();
+    } else if (event.key === "Backspace" && chosen.length > 0) {
+      event.preventDefault();
+      onRemove(chosen[chosen.length - 1].value);
+    }
+  }
+
+  return (
+    <div ref={boxRef} className={cx("relative", className)}>
+      <PopoverPrimitive.Anchor asChild>
+        <div
+          id={wiring.id}
+          role="combobox"
+          tabIndex={disabled ? -1 : 0}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={controls}
+          aria-label={ariaLabel}
+          aria-describedby={wiring["aria-describedby"]}
+          aria-invalid={invalid || undefined}
+          aria-disabled={disabled || undefined}
+          data-state={open ? "open" : "closed"}
+          onClick={() => !disabled && onOpen()}
+          onKeyDown={onKeyDown}
+          className={cx(
+            frame,
+            "flex min-h-9 cursor-pointer flex-wrap items-center gap-1 py-1 ps-1.5",
+            chosen.length > 0 ? "pe-14" : "pe-9",
+          )}
+        >
+          {chosen.length === 0 && (
+            <span className="truncate ps-1.5 text-ink-4">
+              {placeholder ?? ""}
+            </span>
+          )}
+          {chosen.map((option) => (
+            <span
+              key={option.value}
+              className="inline-flex h-6 max-w-full items-center gap-0.5 rounded-[5px] border border-line bg-subtle ps-2 pe-0.5 text-[13px] text-ink"
+            >
+              <span className="min-w-0 truncate">
+                {option.render ?? option.label}
+              </span>
+              {!disabled && (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemove(option.value);
+                  }}
+                  aria-label={t("controls.remove", { name: option.label })}
+                  className="flex size-5 items-center justify-center rounded text-ink-4 hover:bg-hover hover:text-ink"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      </PopoverPrimitive.Anchor>
+      {chosen.length > 0 && !disabled && (
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={t("common.clear")}
+          title={t("common.clear")}
+          className="absolute end-8 top-[7px] flex size-6 items-center justify-center rounded text-ink-4 hover:bg-hover hover:text-ink"
+        >
+          <X className="size-3.5" />
+        </button>
       )}
-    </span>
-  );
-
-  if (!option.detail || meta?.context !== "menu") return line;
-
-  return (
-    <span className="flex flex-col">
-      {line}
-      <span className="truncate text-[12px] text-text-faint">
-        {option.detail}
-      </span>
-    </span>
+      <ChevronDown
+        aria-hidden
+        className="pointer-events-none absolute end-3 top-[10px] size-4 text-ink-3"
+      />
+    </div>
   );
 }
 
-/**
- * The palette, as react-select's `styles` object.
- *
- * Generic over `IsMulti` so the same function serves both controls: everything
- * here is about colour and spacing, and none of it differs between picking one
- * thing and picking several.
- */
-function paletteStyles<M extends boolean>(
-  isInvalid: boolean,
-): StylesConfig<SelectOption, M> {
-  return {
-    control: (base, state) => ({
-      ...base,
-      minHeight: "auto",
-      // No vertical padding here: it all lives on `valueContainer` below, so
-      // the control's height is `md` above and below the text — exactly what
-      // `Input` gets from `py-md`. Split across both, a select came out
-      // shorter than the field beside it, which is visible the moment the two
-      // sit in one bar and invisible everywhere else.
-      padding: "0 var(--spacing-xs)",
-      borderRadius: "var(--radius-md)",
-      backgroundColor: state.isFocused
-        ? "var(--color-field-focus)"
-        : "var(--color-cream)",
-      borderColor: isInvalid ? "var(--color-danger)" : "var(--color-line)",
-      // The focus ring is the app's — a box-shadow that follows the radius,
-      // the same one `globals.css` puts on every other control.
-      boxShadow: state.isFocused
-        ? "0 0 0 1px var(--color-active), 0 0 0 4px var(--color-active-wash)"
-        : "none",
-      "&:hover": { borderColor: "var(--color-line)" },
-      fontSize: 15,
-    }),
-    valueContainer: (base) => ({
-      ...base,
-      // The same insets an `Input` gives its text — `py-md px-md` — so a select
-      // matches the height of a field beside it, and its label lines up with
-      // the value rather than with the border.
-      padding: "var(--spacing-md) var(--spacing-md)",
-    }),
-    singleValue: (base) => ({ ...base, color: "var(--color-text)" }),
-    placeholder: (base) => ({
-      ...base,
-      color: "var(--color-text-faint)",
-      // One line, always. A placeholder is a hint about what to type, and a
-      // hint that wraps to two lines makes the control taller than every field
-      // beside it — so a control the operator has not touched yet is the one
-      // thing breaking the row. Narrower than its text, it clips with an
-      // ellipsis rather than reflowing the layout around it.
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      maxWidth: "calc(100% - var(--spacing-sm))",
-    }),
-    input: (base) => ({
-      ...base,
-      color: "var(--color-text)",
-      margin: 0,
-      padding: 0,
-      // The search field inside the control must not draw a ring of its
-      // own.
-      //
-      // `globals.css` puts a focus ring on every `input` in the dashboard,
-      // deliberately and globally. react-select's search box is an `input`
-      // — a two-pixel-wide one — so it collected that ring and drew a tiny
-      // bordered box beside the value the moment the select took focus. The
-      // ring belongs to the control around it, which already has one.
-      "input:focus": { boxShadow: "none", outline: "none" },
-    }),
-    indicatorSeparator: () => ({ display: "none" }),
-    dropdownIndicator: (base) => ({
-      ...base,
-      color: "var(--color-text-faint)",
-      padding: "var(--spacing-xs)",
-    }),
-    menu: (base) => ({
-      ...base,
-      borderRadius: "var(--radius-md)",
-      border: "none",
-      backgroundColor: "var(--color-surface)",
-      boxShadow: "var(--shadow-overlay)",
-      overflow: "hidden",
-      zIndex: 20,
-    }),
-    option: (base, state) => ({
-      ...base,
-      fontSize: 14,
-      color: "var(--color-text)",
-      backgroundColor: state.isSelected
-        ? "var(--color-active-wash)"
-        : state.isFocused
-          ? "var(--color-neutral-fill)"
-          : "transparent",
-      ":active": { backgroundColor: "var(--color-active-wash)" },
-      cursor: "pointer",
-    }),
-    noOptionsMessage: (base) => ({
-      ...base,
-      fontSize: 14,
-      color: "var(--color-text-faint)",
-    }),
-
-    // Only ever rendered by `MultiSelect`. Defined here anyway, because the
-    // point of one styles function is that there is nowhere else for these to
-    // live where they could disagree with the control they sit inside.
-    multiValue: (base) => ({
-      ...base,
-      backgroundColor: "var(--color-neutral-fill)",
-      borderRadius: "var(--radius-sm)",
-    }),
-    multiValueLabel: (base) => ({
-      ...base,
-      color: "var(--color-text)",
-      fontSize: 13,
-    }),
-    multiValueRemove: (base) => ({
-      ...base,
-      color: "var(--color-text-soft)",
-      borderRadius: "var(--radius-sm)",
-      cursor: "pointer",
-      ":hover": {
-        backgroundColor: "var(--color-line-soft)",
-        color: "var(--color-text)",
-      },
-    }),
-  };
-}
+/* ─────────────────────────── MultiSelect ────────────────────────── */
 
 /**
- * The same control, accepting several answers.
+ * The same control, accepting several answers — a dish's tags. Separate from
+ * {@link Select} because the value types differ (a list, not a string).
  *
- * Where a plain {@link Select} answers "which one", this answers "which of
- * these" — a dish's tags, and anything later with the same shape. It is a
- * separate export rather than an `isMulti` prop because the two have different
- * value types: one is a string and the other is a list, and a component whose
- * `value` and `onChange` change type with a boolean is one every call site has
- * to cast around.
- *
- * ## Order is the *vocabulary's*, not the order they were picked in
- *
- * The chips inside the control read in the order the operator clicked them,
- * which is unavoidable and does not matter: nothing downstream uses it. A tag's
- * position on a dish comes from `menu_item_tags.sort_order`, decided once for
- * the whole app on the Tags tab, so "Popular" precedes "Spicy" on every dish
- * rather than on the ones where somebody happened to click it first.
+ * Chips read in the order they were picked; nothing downstream uses that
+ * order — a tag's position on a dish comes from `menu_item_tags.sort_order`.
+ * Picked options leave the list, and the list stays open between picks.
  */
 export function MultiSelect({
   value,
@@ -345,74 +475,83 @@ export function MultiSelect({
   options,
   placeholder,
   disabled = false,
-  invalid,
+  className,
+  "aria-label": ariaLabel,
+  ...wiring
 }: {
   value: readonly string[];
   onChange: (value: string[]) => void;
   options: SelectOption[];
   placeholder?: string;
   disabled?: boolean;
-  invalid?: boolean;
-}) {
-  const field = useFieldWiring();
-  const isInvalid = invalid ?? field?.invalid ?? false;
+  className?: string;
+  "aria-label"?: string;
+} & Wiring) {
+  const [open, setOpen] = useState(false);
+  const listId = useId();
+  const [search, setSearch] = useState("");
+  const box = useRef<HTMLDivElement>(null);
 
-  // Mapped through `options` rather than held as objects, so a label edited on
-  // another screen is the label this shows after a refetch — the value is the
-  // id, and everything else about a tag is read from the vocabulary.
-  const selected = value
+  // Mapped through `options` rather than held as objects, so a label edited
+  // elsewhere is the label shown after a refetch.
+  const chosen = value
     .map((id) => options.find((option) => option.value === id))
     .filter((option): option is SelectOption => option !== undefined);
+  const remaining = options.filter((option) => !value.includes(option.value));
+
+  function openChange(next: boolean) {
+    if (disabled) return;
+    setOpen(next);
+    if (!next) setSearch("");
+  }
 
   return (
-    <ReactSelect<SelectOption, true>
-      isMulti
-      inputId={field?.id}
-      aria-describedby={field?.describedBy}
-      aria-invalid={isInvalid || undefined}
-      value={selected}
-      onChange={(chosen) => onChange(chosen.map((option) => option.value))}
-      options={options}
-      placeholder={placeholder ?? ""}
-      isDisabled={disabled}
-      // Clearable and searchable, per the rule every select here follows. The
-      // cross clears the lot; each chip has its own.
-      isClearable
-      closeMenuOnSelect={false}
-      // Picked options leave the list. A menu that still offers what is already
-      // chosen makes selecting it a no-op, which reads as the click not having
-      // registered.
-      hideSelectedOptions
-      menuPlacement={MENU_PLACEMENT}
-      components={{ Input: NoAutofillInput }}
-      classNamePrefix=""
-      formatOptionLabel={renderOption}
-      styles={paletteStyles(isInvalid)}
-    />
+    <PopoverPrimitive.Root open={open} onOpenChange={openChange}>
+      <MultiBox
+        boxRef={box}
+        chosen={chosen}
+        onRemove={(id) => onChange(value.filter((v) => v !== id))}
+        onClear={() => onChange([])}
+        open={open}
+        onOpen={() => openChange(true)}
+        placeholder={placeholder}
+        disabled={disabled}
+        ariaLabel={ariaLabel}
+        controls={listId}
+        wiring={wiring}
+        className={className}
+      />
+      <PanelContent id={listId} anchor={box}>
+        <OptionPanel
+          options={remaining}
+          selected={new Set()}
+          search={search}
+          onSearch={setSearch}
+          empty={
+            remaining.length === 0 && !search
+              ? t("controls.allChosen")
+              : undefined
+          }
+          onPick={(option) => {
+            onChange([...value, option.value]);
+            setSearch("");
+          }}
+        />
+      </PanelContent>
+    </PopoverPrimitive.Root>
   );
 }
 
+/* ──────────────────────── AsyncMultiSelect ──────────────────────── */
+
 /**
- * Several answers from a set with **no ceiling** — the async half of the pair.
+ * Several answers from a set with **no ceiling** — every dish in every shop.
+ * Options come from `loadOptions` as the operator types (debounced), with the
+ * first page loaded on open so the list is never a dead end.
  *
- * The plan's rule: a plain select for a set already in hand, an async one for
- * anything unbounded. The dividing line is not taste, it is whether the list
- * can be loaded at all. Every dish in every shop is the case that breaks a
- * plain select: it is unusable at three hundred entries and slow at three
- * thousand, and it gets worse as the business grows, which is the wrong
- * direction for a control to move in.
- *
- * ## Why `value` is options here and ids in {@link MultiSelect}
- *
- * A plain select is handed the whole list, so an id is enough — the label is
- * looked up, and it stays correct when the row is renamed elsewhere. Here there
- * is no list: the options are whatever the last search returned, and an id
- * alone would render as a blank chip. So the chosen options are carried whole,
- * and the caller is responsible for resolving stored ids into labels when the
- * form opens.
- *
- * That is a real cost and it is the reason this is the exception rather than
- * the default.
+ * `value` holds whole options rather than ids: there is no list to look a
+ * label up in, so the caller resolves stored ids into labels when the form
+ * opens.
  */
 export function AsyncMultiSelect({
   value,
@@ -420,49 +559,100 @@ export function AsyncMultiSelect({
   loadOptions,
   placeholder,
   disabled = false,
-  invalid,
   noOptionsMessage,
+  className,
+  "aria-label": ariaLabel,
+  ...wiring
 }: {
   value: readonly SelectOption[];
   onChange: (value: SelectOption[]) => void;
-  /** Asked on every keystroke, debounced by the library. */
+  /** Asked as the operator types, debounced here. */
   loadOptions: (input: string) => Promise<SelectOption[]>;
   placeholder?: string;
   disabled?: boolean;
-  invalid?: boolean;
   /** What an empty result says. Should name the term the operator typed. */
   noOptionsMessage?: (input: string) => string;
-}) {
-  const field = useFieldWiring();
-  const isInvalid = invalid ?? field?.invalid ?? false;
+  className?: string;
+  "aria-label"?: string;
+} & Wiring) {
+  const [open, setOpen] = useState(false);
+  const listId = useId();
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<SelectOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  /** Only the latest request may write results — an older, slower one loses. */
+  const request = useRef(0);
+  const loader = useRef(loadOptions);
+  useEffect(() => {
+    loader.current = loadOptions;
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const ticket = ++request.current;
+    const timer = setTimeout(
+      () => {
+        setLoading(true);
+        loader.current(search).then(
+          (found) => {
+            if (ticket !== request.current) return;
+            setResults(found);
+            setLoading(false);
+          },
+          () => {
+            if (ticket !== request.current) return;
+            setResults([]);
+            setLoading(false);
+          },
+        );
+      },
+      search ? 250 : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [open, search]);
+
+  const chosenIds = new Set(value.map((option) => option.value));
+  const remaining = results.filter((option) => !chosenIds.has(option.value));
+
+  function openChange(next: boolean) {
+    if (disabled) return;
+    setOpen(next);
+    if (!next) setSearch("");
+  }
 
   return (
-    <AsyncSelect<SelectOption, true>
-      isMulti
-      inputId={field?.id}
-      aria-describedby={field?.describedBy}
-      aria-invalid={isInvalid || undefined}
-      value={value as SelectOption[]}
-      onChange={(chosen) => onChange([...chosen])}
-      loadOptions={loadOptions}
-      // The first page before a single keystroke. Without it the control opens
-      // on "type to search", which is a dead end for somebody who does not yet
-      // know what is in there — and the most common answer is usually near the
-      // top of an unfiltered list anyway.
-      defaultOptions
-      placeholder={placeholder ?? ""}
-      isDisabled={disabled}
-      isClearable
-      closeMenuOnSelect={false}
-      hideSelectedOptions
-      noOptionsMessage={({ inputValue }) =>
-        noOptionsMessage ? noOptionsMessage(inputValue) : null
-      }
-      menuPlacement={MENU_PLACEMENT}
-      components={{ Input: NoAutofillInput }}
-      classNamePrefix=""
-      formatOptionLabel={renderOption}
-      styles={paletteStyles(isInvalid)}
-    />
+    <PopoverPrimitive.Root open={open} onOpenChange={openChange}>
+      <MultiBox
+        boxRef={box}
+        chosen={value}
+        onRemove={(id) =>
+          onChange(value.filter((option) => option.value !== id))
+        }
+        onClear={() => onChange([])}
+        open={open}
+        onOpen={() => openChange(true)}
+        placeholder={placeholder}
+        disabled={disabled}
+        ariaLabel={ariaLabel}
+        controls={listId}
+        wiring={wiring}
+        className={className}
+      />
+      <PanelContent id={listId} anchor={box}>
+        <OptionPanel
+          options={remaining}
+          selected={new Set()}
+          search={search}
+          onSearch={setSearch}
+          filter={false}
+          loading={loading}
+          empty={noOptionsMessage ? noOptionsMessage(search) : undefined}
+          onPick={(option) => {
+            onChange([...value, option]);
+          }}
+        />
+      </PanelContent>
+    </PopoverPrimitive.Root>
   );
 }

@@ -1,854 +1,169 @@
 @import "tailwindcss";
-@import "./theme.css";
-/* The time picker's own stylesheet, immediately overridden below. A library
- * component left in its default clothes is the fastest way to make a carefully
- * transcribed design system look borrowed. */
-@import "react-datepicker/dist/react-datepicker.css";
 
-/**
- * Everything that is a *colour*, a *space* or a *radius* lives in `theme.css`.
- * This file holds only what has to be a rule rather than a token.
+/*
+ * The admin's design tokens.
+ *
+ * Deliberately not the customer app's palette: the app is playful, this is a
+ * work tool. Neutral surfaces, one accent for "do this", and colour otherwise
+ * reserved for meaning — order status, success, warning, danger.
  */
+@theme {
+  --font-sans:
+    var(--font-inter), var(--font-plex-arabic), ui-sans-serif, system-ui,
+    sans-serif;
+  --font-arabic: var(--font-plex-arabic), var(--font-inter), sans-serif;
 
-/**
- * `short:` — the rail's layout (`md` and up) on a window too short for it.
- *
- * The rail stacks a logo and nine items, about 730px at full spacing. A laptop
- * at 125% zoom, with a taskbar and the staging strip, has less than that, and
- * the bottom of the rail — account and sign-out — was cut off. Under this
- * height the rail tightens its spacing instead; below even that it scrolls.
- */
-@custom-variant short (@media (min-width: 48rem) and (max-height: 860px));
-
-/**
- * `scrollbar-none` — a row that scrolls sideways without drawing a bar for it.
- *
- * For a strip of tabs or chips that fits on a desktop and not on a phone. The
- * bar would sit under the tabs' own underline and read as a second one; the
- * last tab cut off at the edge already says there is more. Both spellings,
- * because Safari only learned `scrollbar-width` recently.
- *
- * A tab row that uses this should not pull its tabs over its own border with
- * `-mb-px`: a scroller clips to its padding box, so that last pixel becomes a
- * one-pixel vertical scroll. Draw the rule as an inset shadow instead — see
- * the queue's status tabs.
- */
-@utility scrollbar-none {
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
-}
-
-html,
-body {
-  height: 100%;
-}
-
-/**
- * The dashboard is an app frame, not a document.
- *
- * Its shell is exactly the viewport's height and every screen inside it scrolls
- * its own pane. What was left over was the *window*: the body is `min-h-full`,
- * so the smallest disagreement between that and the shell's `100dvh` gave the
- * page a scrollbar of its own — a second one, beside the pane's, scrolling the
- * header the pane keeps still.
- *
- * Matched on the shell rather than set on `<body>` directly, because the body
- * is the root layout's and the login pages share it. They are ordinary
- * documents and go on scrolling.
- *
- * A descendant match rather than a child one: the shell is a direct child of
- * the body today, and a provider growing a wrapper element around it is not the
- * sort of change anybody would think to check this rule against.
- */
-body:has([data-app-shell]) {
-  overflow: hidden;
-}
-
-body {
-  background: var(--color-background);
-  color: var(--color-text);
-  font-family: var(--font-sans);
-  /* The app's body size. Admin tools drift small; this one does not. */
-  font-size: 15px;
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-}
-
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-heading);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-/**
- * Arabic anywhere it appears — a menu item's name in a form, a store's title in
- * the queue. Inter has no Arabic coverage, and a designed Latin face beside a
- * fallback Arabic one looks broken rather than bilingual, so the *script* picks
- * the family. Set on `[lang]` rather than on a class, so it applies wherever a
- * localised value is rendered with its own `lang` — which is also what tells a
- * screen reader to switch voice.
- */
-[lang="ar"] {
-  font-family: var(--font-arabic);
-}
-
-/**
- * Text areas do not carry a resize handle.
- *
- * Set here rather than per component, for the reason every global rule in this
- * file exists: a convention repeated on each new field is one that will be
- * missed on the fourth.
- *
- * Two reasons it is off. A handle lets one field grow taller than the panel it
- * sits in, pushing the buttons below it out of view — the operator drags to see
- * more and loses Save. And how tall a field should be is a design decision made
- * once, not one handed to whoever happens to be typing; `rows` says it.
- */
-textarea {
-  resize: none;
-}
-
-/**
- * Anything you can press says so.
- *
- * A `<button>` gets `cursor: default` from the browser — the arrow, the same as
- * dead text — and Tailwind's preflight does not change it. So every button in
- * the app was silently indistinguishable from a label until the pointer was
- * already over it and nothing happened.
- *
- * Set once here rather than as a class on each control, for the same reason the
- * focus ring is: a rule that has to be remembered on every new component is one
- * that will be forgotten on the fourth.
- *
- * `:disabled` is excluded and given the opposite cursor instead, because a
- * pointer over a control that will not respond is a small lie — it promises
- * something the click will not do.
- */
-button:not(:disabled),
-summary,
-select:not(:disabled),
-label[for],
-[role="button"]:not([aria-disabled="true"]),
-[role="tab"]:not([aria-disabled="true"]),
-a[href] {
-  cursor: pointer;
-}
-
-button:disabled,
-select:disabled,
-[aria-disabled="true"] {
-  cursor: not-allowed;
-}
-
-/**
- * What moves when something is focused or hovered.
- *
- * Declared on the elements themselves rather than inside `:focus-visible`, and
- * that is the difference between a ring that fades in and one that fades in and
- * then *snaps* out: a transition written only in the focus rule applies while
- * entering the state, and on blur the element falls back to a base rule that
- * has none.
- *
- * Every duration and curve is the app's, from `src/theme/motion.ts`. Each
- * property gets the one it was specified with rather than a single number for
- * everything: focus rings are `standard`, because that curve is symmetric and
- * does not overshoot — a ring that springs past its size reads as a bounce
- * rather than as attention. Transforms are `press`, which *does* overshoot,
- * because that is the curve of a thing giving way and springing back.
- *
- * `svg` is in the selector so an icon can move with its link. `filter` and
- * `transform` are in the list so that no component has to declare a transition
- * of its own — one that did would *replace* this rather than add to it (a
- * Tailwind `transition-[...]` utility outranks an element selector), and the
- * property it forgot would be the one that snapped.
- */
-a,
-button,
-input,
-select,
-textarea,
-summary,
-svg,
-[tabindex] {
-  transition:
-    box-shadow var(--duration-focus) var(--ease-standard),
-    background-color var(--duration-control) var(--ease-standard),
-    border-color var(--duration-control) var(--ease-standard),
-    filter var(--duration-control) var(--ease-standard),
-    transform var(--duration-press) var(--ease-press);
-}
-
-/**
- * The focus ring, once.
- *
- * Coral, because coral is where the app's attention is — the same thing it
- * means on a focused field in the app. Never removed: an operator working the
- * queue from the keyboard needs to see where they are, and that is the whole
- * point of the keyboard flow on the order screen.
- *
- * ## Why a box-shadow rather than an outline
- *
- * Two reasons, and the first was a bug this rule used to have.
- *
- * An `outline` needs a `border-radius` to curve around, so the rule set one —
- * and setting `border-radius` here changes **the element's own corners**, not
- * the ring's. Focusing a 20px-radius input snapped it to 4px. A box-shadow
- * takes the element's real radius with no help, so the ring is always the shape
- * of the thing it is around.
- *
- * Second, `box-shadow` transitions cleanly. `outline-width` does not animate
- * reliably across browsers, so an outline-based ring appears instantly however
- * the transition above is written.
- *
- * Two layers: a crisp 1px coral edge, and a 3px wash outside it. The wash is
- * what makes it read as a ring rather than a border thickening, and it does the
- * job `outline-offset` used to — without needing to know what colour is behind
- * the element, which changes between the cream page and a white card.
- *
- * The transparent outline is not decoration. Windows High Contrast Mode
- * discards box-shadows entirely; it does not discard outlines, and it forces
- * their colour — so this is invisible normally and is the whole focus indicator
- * there.
- */
-:root {
-  /**
-   * The ring itself, named so that the rule below and the one after it are the
-   * same ring rather than two that agree today.
+  /*
+   * Tailwind's standard scales (slate, blue, green, amber, red, sky, violet),
+   * named by role. Every text colour here passes WCAG AA (4.5:1) on the
+   * background it is used on: ink-* on white and on canvas, *-ink on its own
+   * *-soft, and white on accent, danger and every status *-fill.
    */
-  --focus-ring:
-    0 0 0 1px var(--color-active), 0 0 0 4px var(--color-active-wash);
+  --color-canvas: #f8fafc; /* slate-50 — slate-100 left ink-4 at 4.34:1 */
+  --color-surface: #ffffff;
+  --color-subtle: #f8fafc; /* slate-50 */
+  --color-hover: #f1f5f9; /* slate-100 */
+  --color-line: #e2e8f0; /* slate-200 */
+  --color-line-strong: #cbd5e1; /* slate-300 */
+
+  --color-ink: #0f172a; /* slate-900 */
+  --color-ink-2: #334155; /* slate-700 */
+  --color-ink-3: #475569; /* slate-600 */
+  --color-ink-4: #64748b; /* slate-500 — still AA, so faint text stays readable */
+
+  /* The one action colour: buttons, links, selection, focus. */
+  --color-accent: #2563eb; /* blue-600 */
+  --color-accent-hover: #1d4ed8; /* blue-700 */
+  --color-accent-soft: #eff6ff; /* blue-50 */
+  --color-accent-ink: #1d4ed8; /* blue-700 */
+
+  --color-danger: #dc2626; /* red-600 */
+  --color-danger-hover: #b91c1c; /* red-700 */
+  --color-danger-soft: #fef2f2; /* red-50 */
+  --color-danger-ink: #b91c1c; /* red-700 */
+
+  --color-warning: #d97706; /* amber-600 */
+  --color-warning-soft: #fffbeb; /* amber-50 */
+  --color-warning-ink: #92400e; /* amber-800 */
+
+  --color-success: #16a34a; /* green-600 */
+  --color-success-soft: #f0fdf4; /* green-50 */
+  --color-success-ink: #15803d; /* green-700 */
+
+  --color-info: #0284c7; /* sky-600 */
+  --color-info-soft: #f0f9ff; /* sky-50 */
+  --color-info-ink: #075985; /* sky-800 */
+
+  /*
+   * Order statuses — read by `statusTone` in @/lib/order-status. The delivery-
+   * app convention: new is amber, confirmed blue, on the way violet,
+   * delivered green, cancelled red. `*` is the dot, `-fill` carries white text.
+   */
+  --color-status-ordered: #f59e0b; /* amber-500 */
+  --color-status-ordered-ink: #92400e;
+  --color-status-ordered-fill: #b45309; /* amber-700 */
+  --color-status-ordered-on-fill: #ffffff;
+  --color-status-ordered-wash: #fffbeb;
+
+  --color-status-confirmed: #3b82f6; /* blue-500 */
+  --color-status-confirmed-ink: #1d4ed8;
+  --color-status-confirmed-fill: #2563eb;
+  --color-status-confirmed-on-fill: #ffffff;
+  --color-status-confirmed-wash: #eff6ff;
+
+  --color-status-driver-sent: #8b5cf6; /* violet-500 */
+  --color-status-driver-sent-ink: #6d28d9;
+  --color-status-driver-sent-fill: #7c3aed;
+  --color-status-driver-sent-on-fill: #ffffff;
+  --color-status-driver-sent-wash: #f5f3ff;
+
+  --color-status-delivered: #22c55e; /* green-500 */
+  --color-status-delivered-ink: #15803d;
+  --color-status-delivered-fill: #15803d;
+  --color-status-delivered-on-fill: #ffffff;
+  --color-status-delivered-wash: #f0fdf4;
+
+  --color-status-cancelled: #ef4444; /* red-500 */
+  --color-status-cancelled-ink: #b91c1c;
+  --color-status-cancelled-fill: #dc2626;
+  --color-status-cancelled-on-fill: #ffffff;
+  --color-status-cancelled-wash: #fef2f2;
+
+  --color-status-unknown: #94a3b8; /* slate-400 */
+  --color-status-unknown-ink: #334155;
+  --color-status-unknown-fill: #475569;
+  --color-status-unknown-on-fill: #ffffff;
+  --color-status-unknown-wash: #f1f5f9;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --shadow-xs: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow-sm: 0 1px 3px rgb(15 23 42 / 0.08), 0 1px 2px rgb(15 23 42 / 0.04);
+  --shadow-md:
+    0 4px 8px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.04);
+  --shadow-lg:
+    0 12px 24px -4px rgb(15 23 42 / 0.1), 0 4px 8px -2px rgb(15 23 42 / 0.04);
+  --shadow-focus: 0 0 0 3px rgb(37 99 235 / 0.25);
+
+  --animate-fade-in: fade-in 120ms ease-out;
+  --animate-slide-in: slide-in 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-pop-in: pop-in 140ms ease-out;
 }
 
-:focus-visible {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
-}
-
-/**
- * A control made of more than one element rings as a whole.
- *
- * `PhoneInput` is a fixed `+961` beside a box of digits, sharing one border. The
- * rule above puts the ring on whatever is *focused*, which there is the inner
- * input — so tabbing into it drew a ring around the digits, inside the field,
- * leaving the country code sitting outside its own control's focus state.
- *
- * A group says so with `field-group`, takes the ring on behalf of whatever it
- * contains, and suppresses the inner one. `:has` rather than `:focus-within` so
- * that a *mouse* click does not ring it — matching `:focus-visible` exactly,
- * which is the behaviour every other control in the app has.
- *
- * Written here rather than as Tailwind classes on the component for the reason
- * the ring is here at all: a second declaration of these two shadows is a
- * divergence waiting to happen, and the field that drifts would be the one
- * nobody focuses while looking at it.
- */
-.field-group:has(:focus-visible) {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
-}
-
-.field-group :focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-/**
- * The rail's icons, animated on hover.
- *
- * Each moves the part that carries its meaning — the arrow leaves the door, the
- * bars grow, the sliders slide. Scaling the whole icon would have been one line
- * and would have said nothing, because every icon would move identically.
- *
- * ## The two rules that make SVG transforms behave
- *
- * `transform-box: fill-box` makes a child's transform origin its **own** box
- * rather than the whole 24-unit viewBox. Without it, `transform-origin: bottom`
- * on a report bar means the bottom of the icon, not the bottom of the bar, and
- * the bar grows from somewhere below itself and drifts sideways.
- *
- * `will-change` is deliberately absent: six small icons do not need their own
- * compositor layers, and asking for them on every rail item costs memory to
- * solve a problem nobody has.
- *
- * ## Why the there-and-back keyframes hold at 40–60%
- *
- * A single midpoint at 50% over half a second reads as a twitch with a long
- * pause either side — the motion is over before the eye has followed it. A held
- * middle gives the extreme a moment to be seen, which is the difference between
- * an animation that is noticed and one that is watched.
- *
- * Driven from `.group:hover` on the link rather than from `svg:hover`, so the
- * animation runs when the whole item is hovered — hovering the label should
- * move the icon, since they are one control.
- *
- * `:has()` is not used, and `prefers-reduced-motion` is honoured by the block
- * at the end of this file, which zeroes `animation-duration` globally.
- */
-[data-anim] {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.group:hover [data-anim],
-.group:focus-visible [data-anim] {
-  animation-duration: var(--duration-rise);
-  /* `standard`, not `arrive`.
-   *
-   * `arrive` is fast-start-and-settle — the curve of something appearing, and
-   * it reads as snappy however long it runs, because most of the distance is
-   * covered in the first third. These animations are meant to be watched, and
-   * most of them go out and come back, so they want a curve that is symmetric:
-   * eased at both ends, even through the middle. */
-  animation-timing-function: var(--ease-standard);
-  animation-fill-mode: both;
-}
-
-/* Staggered by position, so the eye reads left to right rather than seeing
-   everything move at once. */
-.group:hover [data-anim-order="2"],
-.group:focus-visible [data-anim-order="2"] {
-  animation-delay: 90ms;
-}
-.group:hover [data-anim-order="3"],
-.group:focus-visible [data-anim-order="3"] {
-  animation-delay: 180ms;
-}
-
-.group:hover [data-anim="line"],
-.group:focus-visible [data-anim="line"] {
-  animation-name: icon-write;
-}
-.group:hover [data-anim="shutter"],
-.group:focus-visible [data-anim="shutter"] {
-  transform-origin: bottom;
-  animation-name: icon-shutter;
-}
-.group:hover [data-anim="swing"],
-.group:focus-visible [data-anim="swing"] {
-  animation-name: icon-swing;
-}
-.group:hover [data-anim="bob"],
-.group:focus-visible [data-anim="bob"] {
-  animation-name: icon-bob;
-}
-.group:hover [data-anim="bar"],
-.group:focus-visible [data-anim="bar"] {
-  transform-origin: bottom;
-  animation-name: icon-grow;
-}
-.group:hover [data-anim="knob"],
-.group:focus-visible [data-anim="knob"] {
-  animation-name: icon-slide;
-}
-.group:hover [data-anim="leave"],
-.group:focus-visible [data-anim="leave"] {
-  animation-name: icon-leave;
-}
-/* The scooter's wheels. The icon has carried `data-anim="roll"` since it was
-   drawn and there was no rule for it, so Drivers was the one item in the rail
-   that did nothing on hover — the attribute was there, the keyframes were not. */
-.group:hover [data-anim="roll"],
-.group:focus-visible [data-anim="roll"] {
-  animation-name: icon-roll;
-}
-
-/* The line is drawn rather than moved: a dash offset that runs to zero reads as
-   printing, where a slide would read as the line arriving from off-paper. */
-@keyframes icon-write {
-  from {
-    stroke-dasharray: 5;
-    stroke-dashoffset: 5;
-  }
-  to {
-    stroke-dasharray: 5;
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes icon-shutter {
-  from {
-    transform: scaleY(0.2);
-  }
-  to {
-    transform: scaleY(1);
-  }
-}
-
-@keyframes icon-swing {
-  0% {
-    transform: rotate(0deg);
-  }
-  40%,
-  60% {
-    transform: rotate(-9deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-}
-
-@keyframes icon-bob {
-  0% {
-    transform: translateY(0);
-  }
-  40%,
-  60% {
-    transform: translateY(-2px);
-  }
-  100% {
-    transform: translateY(0);
-  }
-}
-
-@keyframes icon-grow {
-  from {
-    transform: scaleY(0.35);
-  }
-  to {
-    transform: scaleY(1);
-  }
-}
-
-@keyframes icon-slide {
-  0% {
-    transform: translateX(0);
-  }
-  40%,
-  60% {
-    transform: translateX(-4px);
-  }
-  100% {
-    transform: translateX(0);
-  }
-}
-
-/* The scooter's wheels turn.
- *
- * The one animation in this set that does not go out and come back, because a
- * wheel that returned to where it started would be a wheel rocking rather than
- * rolling. It turns a half-circle and stops, which reads as the thing having
- * moved off.
- *
- * Each wheel carries its own `<g>` with a spoke in it — see `icons.tsx`. The
- * spoke is load-bearing: without it there is nothing on a stroked circle to
- * show that it turned. */
-@keyframes icon-roll {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(180deg);
-  }
-}
-
-@keyframes icon-leave {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  40%,
-  60% {
-    transform: translateX(4px);
-    opacity: 0.5;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/**
- * Anything that opens over the page.
- *
- * A modal that appears instantly reads as a page change rather than as a layer
- * over the page — the eye has nothing to follow, so it has to re-find where it
- * was. A short fade and a small rise say "this is on top of what you were
- * doing, and it is going away again".
- *
- * ## Why this is more than two rules
- *
- * A `<dialog>` is `display: none` until it opens, and a property that changes
- * at the same moment as `display` normally has nothing to animate from. Three
- * pieces make it work, and all three are load-bearing:
- *
- * - `transition-behavior: allow-discrete` lets `display` and `overlay` — both
- *   discrete properties — participate, so the element stays rendered and on the
- *   top layer for the length of the *closing* transition instead of vanishing
- *   at the first frame.
- * - `@starting-style` gives the browser the state to animate *from* on open.
- *   Without it the open transition simply does not run; the close one still
- *   would, which is the confusing half-working version.
- * - The backdrop is transitioned separately: `::backdrop` is its own box and
- *   inherits none of this.
- *
- * Written here rather than on the component so that every overlay added later
- * — a side panel, a command palette — gets it without having to remember.
- */
-dialog {
-  opacity: 0;
-  transform: translateY(6px) scale(0.98);
-  transition:
-    opacity var(--duration-fade) var(--ease-arrive),
-    transform var(--duration-fade) var(--ease-arrive),
-    overlay var(--duration-fade) var(--ease-arrive) allow-discrete,
-    display var(--duration-fade) var(--ease-arrive) allow-discrete;
-}
-
-dialog[open] {
-  opacity: 1;
-  transform: none;
-}
-
-@starting-style {
-  dialog[open] {
-    opacity: 0;
-    transform: translateY(6px) scale(0.98);
-  }
-}
-
-dialog::backdrop {
-  background: color-mix(in oklab, var(--color-ink) 0%, transparent);
-  transition:
-    background var(--duration-fade) var(--ease-arrive),
-    overlay var(--duration-fade) var(--ease-arrive) allow-discrete,
-    display var(--duration-fade) var(--ease-arrive) allow-discrete;
-}
-
-dialog[open]::backdrop {
-  background: color-mix(in oklab, var(--color-ink) 40%, transparent);
-}
-
-@starting-style {
-  dialog[open]::backdrop {
-    background: color-mix(in oklab, var(--color-ink) 0%, transparent);
-  }
-}
-
-/**
- * The side panel arriving.
- *
- * A slide rather than a fade, because it comes from the edge and the movement
- * says where it came from — which is also where it will go back to. Short, and
- * on the arriving curve: content that eases in slowly reads as loading.
- *
- * There is no matching exit. The panel unmounts on close, and animating that
- * would mean keeping a closed panel in the tree holding stale order data —
- * a cost out of all proportion to a 220ms flourish nobody is waiting for.
- */
-/**
- * The navigation spinner, held back.
- *
- * A route's `loading.tsx` mounts the moment a navigation starts, and Suspense
- * offers no way to defer that — so the spinner is mounted invisible and fades
- * in only once the wait has lasted long enough to be worth reporting. Most
- * navigations against a warm cache finish well inside the delay and the
- * customer sees nothing at all, which is the point: a spinner that flashes for
- * 80ms reads as something breaking.
- *
- * `both`, so it holds at zero opacity for the delay rather than showing first.
- */
-@keyframes loader-in {
+@keyframes fade-in {
   from {
     opacity: 0;
   }
-  to {
-    opacity: 1;
+}
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
   }
 }
-
-.animate-fade-in {
-  animation: loader-in var(--duration-fade) ease-out 200ms both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* The delay is the useful half and it is not motion — keep it, drop the
-     fade. */
-  .animate-fade-in {
-    animation: loader-in 1ms linear 200ms both;
-  }
-}
-
-@keyframes panel-in {
+@keyframes pop-in {
   from {
     opacity: 0;
-    transform: translateX(12px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
+    transform: scale(0.97) translateY(4px);
   }
 }
 
-/**
- * Respect the setting. The app has `use-reduce-motion.ts` for the same reason:
- * the toast that slides in and the row that animates on advance are pleasant,
- * and they are not information.
- */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after,
-  /* `*` does not match a backdrop — it is not an element — so the overlay
-     transitions above would survive the setting without this. */
-  ::backdrop {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/**
- * The time picker, in this project's colours.
- *
- * `react-datepicker` is here for one reason — see `components/ui/time-field.tsx`
- * — and it arrives with a blue-and-grey palette of its own. These rules are the
- * whole of the visual integration: the popup is a surface like any other, the
- * selected time is the accent, and the type is the app's.
- *
- * Deliberately few. Every rule here is one this project has to maintain against
- * somebody else's markup, so this covers what is *seen* and leaves the layout
- * to the library.
- */
-.react-datepicker {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-overlay);
-  font-family: var(--font-sans);
-}
-
-.react-datepicker__header {
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.react-datepicker-time__header {
-  color: var(--color-text-soft);
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.react-datepicker__time-container,
-.react-datepicker__time,
-.react-datepicker__time-box {
-  background: var(--color-surface);
-  border-radius: var(--radius-md);
-}
-
-/* The one layout rule. The library fixes the column at 85px, which fits `21:00`
- * and not `12:00 AM`, so the 12-hour list scrolled sideways. Sized to its
- * widest entry instead, and only ever scrolled up and down. */
-.react-datepicker__time-container,
-.react-datepicker__time-container
-  .react-datepicker__time
-  .react-datepicker__time-box {
-  width: auto;
-}
-
-.react-datepicker__time-container
-  .react-datepicker__time
-  .react-datepicker__time-box
-  ul.react-datepicker__time-list {
-  overflow-x: hidden;
-}
-
-.react-datepicker__time-container
-  .react-datepicker__time
-  .react-datepicker__time-box
-  ul.react-datepicker__time-list
-  li.react-datepicker__time-list-item {
-  padding-inline: 16px;
-  white-space: nowrap;
-}
-
-.react-datepicker__time-list-item {
-  color: var(--color-text);
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
-}
-
-.react-datepicker__time-list-item--selected {
-  background: var(--color-accent) !important;
-  color: var(--color-on-accent) !important;
-  font-weight: 600;
-}
-
-.react-datepicker__time-list-item:hover {
-  background: var(--color-neutral-fill);
-}
-
-/* The arrow points at an input this project has already given a border and a
- * radius; the library's default one is a different white on a different grey. */
-.react-datepicker__triangle {
-  display: none;
-}
-
-/* ===========================================================================
- * Scrolling, eased
- * ===========================================================================
- *
- * Every jump this app makes is to somewhere the operator already knows about:
- * the row they were editing, coming back from its page (`useRowFocus`), the
- * first field with an error after a failed save, a section a tab points at.
- * Landing there instantly is what makes those feel like the page *changed*
- * rather than moved — the eye has no way to tell it is the same list.
- *
- * `scroll-behavior` on the document is not enough here: almost nothing in this
- * app scrolls the document. Each screen is a column with its own
- * `overflow-y-auto`, so the rule has to reach the scrollers themselves.
- *
- * ## And it is off for anybody who asked for that
- *
- * `prefers-reduced-motion` is a medical setting before it is a taste — smooth
- * scrolling is one of the specific things that triggers vestibular symptoms —
- * so the whole block sits behind it. `scrollIntoView({ behavior: "smooth" })`
- * in `useRowFocus` also honours the same preference in every browser that
- * implements it, which is why nothing there has to be conditional either.
- * ======================================================================== */
-@media (prefers-reduced-motion: no-preference) {
+@layer base {
   html {
-    scroll-behavior: smooth;
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
   }
-
-  /* The scrollers themselves — see above. Tailwind's utilities are the only
-   * way any element in this app becomes one, so these three are the whole set;
-   * a bare `*` would apply it to the many elements that never scroll. */
-  .overflow-y-auto,
-  .overflow-auto,
-  .overflow-x-auto {
-    scroll-behavior: smooth;
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* The signed-in shell owns scrolling; the document never does. */
+  body:has([data-app-shell]) {
+    overflow: hidden;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+  [dir="rtl"],
+  :lang(ar) {
+    font-family: var(--font-arabic);
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label[for] {
+    cursor: pointer;
   }
 }
 
-/* ===========================================================================
- * Scroll hints — "there is more below this"
- * ===========================================================================
- *
- * A soft shadow at the edge a pane can still be scrolled towards, and nothing
- * at the edge it cannot. It is the answer to the one question a cut-off list
- * raises — *is that everything?* — asked on every pane in the dashboard, which
- * is why it is a class here rather than an overlay each screen remembers to
- * draw.
- *
- * ## No JavaScript, and that is what makes it reliable
- *
- * The trick is `background-attachment`. Two **cover** layers are `local`, so
- * they travel with the content: at the top of a pane the top cover sits over
- * the top shadow and hides it, and it scrolls away as soon as the content
- * does. Two **shadow** layers are `scroll`, so they stay pinned to the
- * scrollport. The result is a shadow that is revealed and re-covered by the
- * scrolling itself.
- *
- * Nothing listens, so nothing can be out of date: a pane that grows because a
- * query landed, a row that was deleted, a window that was resized and a list
- * that is filtered as somebody types are all correct on the same frame they
- * change, with no observer to wire up and no scroll handler on 37 containers.
- *
- * ## Why the shorthand is avoided
- *
- * `background: …` would take the *colour* too and every pane using a Tailwind
- * `bg-` utility would lose it. The four longhands leave `background-color`
- * alone, so this composes with whatever the element already had.
- *
- * The cover layers do have to be painted in the pane's own ground, and that is
- * this rule's one assumption: a pane sits on `--color-surface`. Every one in
- * the dashboard does — both surface and background are white — and a pane that
- * ever sits on a tint should set `--scroll-hint-ground` to match.
- */
-.scroll-hint {
-  --scroll-hint-ground: var(--color-surface);
-
-  background-image:
-    linear-gradient(to bottom, var(--scroll-hint-ground) 30%, transparent),
-    linear-gradient(to top, var(--scroll-hint-ground) 30%, transparent),
-    radial-gradient(
-      farthest-side at 50% 0,
-      rgb(30 27 24 / 0.16),
-      rgb(30 27 24 / 0)
-    ),
-    radial-gradient(
-      farthest-side at 50% 100%,
-      rgb(30 27 24 / 0.16),
-      rgb(30 27 24 / 0)
-    );
-
-  background-position:
-    top center,
-    bottom center,
-    top center,
-    bottom center;
-  background-repeat: no-repeat;
-  /* The covers are taller than the shadows so a shadow is fully hidden at rest
-     rather than leaving a hairline at the very top of an unscrolled pane. */
-  background-size:
-    100% 32px,
-    100% 32px,
-    100% 12px,
-    100% 12px;
-  background-attachment: local, local, scroll, scroll;
-}
-
-/**
- * The words on top of that shadow — see `ScrollCues`.
- *
- * The shadow above says *this pane scrolls*, which is a convention and reads
- * as one only to somebody who already knows it. This says what it means, in
- * words, and can be pressed to do it.
- *
- * `fixed` and centred on the pane's bottom edge, positioned by the component
- * from a measured rectangle. It is deliberately outside the scroller: a cue
- * placed *inside* one adds its own height to the content the scroller measures
- * to decide whether there is more, which is a feedback loop rather than a cue.
- *
- * Small and quiet on purpose. It sits over content on every pane in the
- * dashboard, so it has to be legible without ever being the thing the eye goes
- * to first — the shadow under it is doing the attracting.
- */
-.scroll-cue {
-  position: fixed;
-  z-index: 30;
-  /* Centred on the edge and lifted clear of it. */
-  transform: translate(-50%, -100%);
-  margin-top: calc(var(--spacing-sm) * -1);
-
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: 2px var(--spacing-sm);
-
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface);
-  color: var(--color-text-soft);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  box-shadow: 0 1px 2px rgb(30 27 24 / 0.08);
-}
-
-/**
- * The same pill at the **top** edge — "back to top".
- *
- * It hangs below its edge where the other hangs above its own, so each sits
- * inside the pane it belongs to rather than over the chrome next to it. The
- * `margin-top` is flipped with it: on the down cue that lifts the pill clear
- * of the bottom edge, and here it has to push down instead.
- */
-.scroll-cue.is-up {
-  transform: translate(-50%, 0);
-  margin-top: var(--spacing-sm);
-}
-
-.scroll-cue:hover {
-  color: var(--color-text);
-  border-color: var(--color-active);
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
 }

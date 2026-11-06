@@ -1,52 +1,34 @@
 "use client";
 
-import { Toggle } from "@/components/ui/toggle";
+import { AlertTriangle, CopyCheck, Moon } from "lucide-react";
+
+import { Badge, Button, Switch, cx } from "@/components/ui";
 import { TimeField } from "@/components/ui/time-field";
-import { cx } from "@/components/ui";
+import type { DayHours } from "@/features/catalog/api/hours";
 import { useClock } from "@/features/settings/use-clock";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { businessTimezone } from "@/lib/time";
 import { isOpenNow, summarise } from "@/lib/week";
-import type { DayHours } from "@/features/catalog/api/hours";
 
 /**
  * A driver's week.
  *
- * ## The same grid a shop gets, and deliberately so
+ * The same decisions the shop's hours make, kept so the two read as one thing
+ * to learn: **a day off is the absence of a row**; **overnight is normal** and
+ * is labelled rather than corrected (18:00–02:00 stores a closing time earlier
+ * than its opening one); **the stored day index stays 0–6 Sunday-first** while
+ * the display starts on Monday, so nothing reaching the database passes through
+ * a display position.
  *
- * Seven rows, Monday first, a switch per day and two pickers behind it. The
- * shop's version made every one of these decisions already and each was argued
- * for there: **closed is the absence of a row**, because that is what the
- * reader expects; **overnight is normal and is labelled rather than
- * corrected**, because a driver working 18:00–02:00 stores a closing time
- * earlier than its opening one and that looks like a bug; **the stored day
- * index stays 0–6 Sunday-first** while the display starts on Monday, so the
- * two orders are kept apart and nothing reaching the database passes through a
- * display position.
- *
- * Repeating them is what makes the two screens one thing to learn. What is
- * *not* repeated is the fetching and saving — this takes a week and hands one
- * back, so the wizard can hold an unsaved draft and the profile can save on
- * demand without either owning the layout.
- *
- * ## The summary is the part that catches mistakes
- *
- * Seven rows of pickers is the right shape for *setting* a week and the wrong
- * one for *checking* it. "Mon–Sat 16:00–23:00, off Sunday" is one line somebody
- * can compare against what the driver actually told them — and it is what
- * catches an overnight window entered the wrong way round, which the grid shows
- * as two perfectly plausible times.
- *
- * It is its own component, `WeekSummary`, so a page can stand it beside the
- * grid rather than above it — the driver editor pins it in its side column,
- * where it stays in view while the seven rows are worked through.
+ * The grid only takes a week and hands one back: the editor page holds it as an
+ * unsaved draft, the profile's sheet saves it on demand.
  */
 
 /** Monday first for reading. The stored index is untouched — see above. */
-const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
+export const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
 /** Keyed by the **stored** index, so nothing here depends on display order. */
-const DAY_LABELS: Record<number, TranslationKey> = {
+export const DAY_LABELS: Record<number, TranslationKey> = {
   0: "hours.sunday",
   1: "hours.monday",
   2: "hours.tuesday",
@@ -56,12 +38,28 @@ const DAY_LABELS: Record<number, TranslationKey> = {
   6: "hours.saturday",
 };
 
+/**
+ * The week a new driver starts on.
+ *
+ * A driver with no working days is never on shift, so a blank default creates
+ * somebody who can never be dispatched. Monday to Saturday, late afternoon into
+ * the night; Sunday is left off rather than guessed at, because a default wrong
+ * in the *absence* direction is corrected the first time somebody looks.
+ */
+export const DEFAULT_WEEK: DayHours[] = [1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+  dayOfWeek,
+  opensAt: "16:00",
+  closesAt: "23:00",
+}));
+
 export function HoursGrid({
   week,
   onChange,
+  disabled,
 }: {
   week: DayHours[];
   onChange: (next: DayHours[]) => void;
+  disabled?: boolean;
 }) {
   const dayOf = (index: number) =>
     week.find((one) => one.dayOfWeek === index) ?? null;
@@ -71,149 +69,170 @@ export function HoursGrid({
       onChange(week.filter((one) => one.dayOfWeek !== index));
       return;
     }
-
     const existing = dayOf(index);
+    // A day switched back on takes the hours of the first working day, so a
+    // driver with one set of hours is not typed in seven times.
+    const template = week
+      .slice()
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek)[0] ?? {
+      opensAt: "16:00",
+      closesAt: "23:00",
+    };
     const next = existing
       ? week.map((one) =>
           one.dayOfWeek === index ? { ...one, ...patch } : one,
         )
       : [
           ...week,
-          { dayOfWeek: index, opensAt: "16:00", closesAt: "23:00", ...patch },
+          {
+            dayOfWeek: index,
+            opensAt: template.opensAt,
+            closesAt: template.closesAt,
+            ...patch,
+          },
         ];
-
     onChange(next.sort((a, b) => a.dayOfWeek - b.dayOfWeek));
   }
 
   return (
-    <div className="flex flex-col gap-sm">
+    <ul className="-my-2 divide-y divide-line">
       {DISPLAY_ORDER.map((index) => {
         const day = dayOf(index);
+        const dayName = t(DAY_LABELS[index]);
         const overnight =
-          day !== null && day.closesAt <= day.opensAt && day.closesAt !== "";
+          day !== null && day.closesAt !== "" && day.closesAt <= day.opensAt;
 
         return (
-          <div
+          <li
             key={index}
-            className="flex flex-wrap items-center gap-lg rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card"
+            className="flex min-h-14 flex-wrap items-center gap-x-4 gap-y-2 py-2"
           >
-            <span className="w-[92px] shrink-0 text-[14px] font-semibold">
-              {t(DAY_LABELS[index])}
-            </span>
-
-            <Toggle
-              on={day !== null}
-              onChange={() => setDay(index, day ? null : {})}
-              labelOn={t("drivers.working")}
-              labelOff={t("drivers.dayOff")}
-              className="w-[104px]"
-            />
+            <div className="flex w-full items-center justify-between gap-3 sm:w-48 sm:justify-start">
+              <span
+                className={cx(
+                  "w-24 text-[14px] font-medium",
+                  day ? "text-ink" : "text-ink-3",
+                )}
+              >
+                {dayName}
+              </span>
+              <span className="flex items-center gap-2">
+                <Switch
+                  checked={day !== null}
+                  disabled={disabled}
+                  onCheckedChange={(on) => setDay(index, on ? {} : null)}
+                  aria-label={dayName}
+                />
+                <span className="w-16 text-[13px] text-ink-3">
+                  {day ? t("drivers.working") : t("drivers.dayOff")}
+                </span>
+              </span>
+            </div>
 
             {day && (
-              <div className="flex flex-wrap items-center gap-sm">
+              <div className="flex flex-wrap items-center gap-2">
                 <TimeField
                   value={day.opensAt}
-                  onChange={(value) => setDay(index, { opensAt: value })}
+                  disabled={disabled}
+                  aria-label={t("drivers.timeLabel", {
+                    day: dayName,
+                    which: t("general.opensAt"),
+                  })}
+                  onChange={(value: string) =>
+                    setDay(index, { opensAt: value })
+                  }
                 />
-                <span className="text-[14px] text-text-soft">
-                  {t("hours.to")}
-                </span>
+                <span className="text-[13px] text-ink-3">{t("hours.to")}</span>
                 <TimeField
                   value={day.closesAt}
-                  onChange={(value) => setDay(index, { closesAt: value })}
+                  disabled={disabled}
+                  aria-label={t("drivers.timeLabel", {
+                    day: dayName,
+                    which: t("general.closesAt"),
+                  })}
+                  onChange={(value: string) =>
+                    setDay(index, { closesAt: value })
+                  }
                 />
-
-                {/* Said out loud, because a closing time earlier than an
-                      opening one looks like a mistake and usually is not — it
-                      is a shift that runs past midnight. Correcting it would
-                      delete the late shift, which is the one that matters. */}
+                {/* Said out loud: a closing time earlier than the opening one
+                    looks like a mistake and is usually a shift past midnight.
+                    Correcting it would delete the late shift. */}
                 {overnight && (
-                  <span className="text-[12px] font-semibold text-active-ink">
+                  <Badge tone="info">
+                    <Moon className="size-3" />
                     {t("hours.overnight")}
-                  </span>
+                  </Badge>
                 )}
               </div>
             )}
-          </div>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
 
 /**
  * The week read back — on shift right now, the timetable in a few lines, and
- * what it adds up to — with the one shortcut that acts on all of it.
+ * what it adds up to.
  *
- * See the note at the top for why this, rather than the grid, is what catches
- * a mistake. What somebody checks is the *shape* of the week — which days are
- * off, whether the weekend differs — and seven separate rows hide exactly
- * that. `onChange` is for "give every day the same hours", which is a change to
- * the whole week and so belongs with the view of the whole week.
+ * Seven rows of pickers is the right shape for *setting* a week and the wrong
+ * one for *checking* it. "Mon–Sat 16:00–23:00, Sunday off" is one line somebody
+ * can compare with what the driver told them, and a total of four hours or of
+ * seventy is wrong in a way the rows do not show.
+ *
+ * `onChange`, when given, offers "apply to all open days" — a change to the
+ * whole week, so it sits with the view of the whole week.
  */
 export function WeekSummary({
   week,
   onChange,
+  showNow = true,
 }: {
   week: DayHours[];
-  onChange: (next: DayHours[]) => void;
+  onChange?: (next: DayHours[]) => void;
+  showNow?: boolean;
 }) {
   const clock = useClock();
-
-  /**
-   * Copies the first working day across every other working day.
-   *
-   * The common case by a distance: a driver works the same hours every day they
-   * work at all, and setting that six times is six chances to fat-finger one of
-   * them into a shift nobody notices for a week.
-   */
-  function applyToAll() {
-    const first = week.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek)[0];
-    if (!first) return;
-    onChange(
-      week.map((one) => ({
-        ...one,
-        opensAt: first.opensAt,
-        closesAt: first.closesAt,
-      })),
-    );
-  }
-
+  const sorted = week.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+  const first = sorted[0];
   const spans = summarise(week, DISPLAY_ORDER);
   const onShift = isOpenNow(week);
-  const first = week.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek)[0];
+  const uniform =
+    !!first &&
+    week.every(
+      (one) => one.opensAt === first.opensAt && one.closesAt === first.closesAt,
+    );
 
   return (
-    <div className="flex flex-col gap-md">
-      <div className="flex flex-wrap items-center gap-sm">
-        <span className="text-[13px] font-semibold">{t("hours.rightNow")}</span>
-        <span
-          className={cx(
-            "rounded-sm px-sm py-[1px] text-[11px] font-semibold",
-            onShift
-              ? "bg-accent-wash text-text"
-              : "bg-neutral-fill text-text-faint",
-          )}
-        >
-          {onShift ? t("drivers.onShift") : t("drivers.offShift")}
-        </span>
-        <span className="text-[11px] text-text-faint">
-          {t("promotions.inZone", { zone: businessTimezone() })}
-        </span>
-      </div>
+    <div className="flex flex-col gap-4">
+      {showNow && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[13px] font-medium text-ink">
+            {t("hours.rightNow")}
+          </span>
+          <Badge tone={onShift ? "success" : "neutral"} dot>
+            {onShift ? t("drivers.onShift") : t("drivers.offShift")}
+          </Badge>
+          <span className="text-[12px] text-ink-4">
+            {t("promotions.inZone", { zone: businessTimezone() })}
+          </span>
+        </div>
+      )}
 
       {week.length === 0 ? (
-        <p className="rounded-md bg-warning-wash px-lg py-md text-[13px] text-text">
+        <p className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning-soft px-3 py-2.5 text-[13px] text-warning-ink">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           {t("drivers.noWeek")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-xxs rounded-md bg-neutral-fill px-lg py-md">
+        <ul className="flex flex-col divide-y divide-line rounded-md border border-line bg-subtle">
           {spans.map((span) => (
             <li
               key={`${span.from}-${span.to}`}
-              className="flex items-baseline justify-between gap-md text-[14px]"
+              className="flex items-baseline justify-between gap-3 px-3 py-2 text-[13.5px]"
             >
-              <span className="font-semibold">
+              <span className="font-medium text-ink">
                 {span.from === span.to
                   ? t(DAY_LABELS[span.from])
                   : t("hours.range", {
@@ -223,9 +242,7 @@ export function WeekSummary({
               </span>
               <span
                 className={
-                  span.open
-                    ? "tabular-nums text-text-soft"
-                    : "text-[13px] text-text-faint"
+                  span.open ? "text-end text-ink-2 tabular-nums" : "text-ink-4"
                 }
               >
                 {span.open
@@ -242,10 +259,8 @@ export function WeekSummary({
         </ul>
       )}
 
-      {/* The week as two numbers. A rota that adds up to four hours, or to
-          seventy, is wrong in a way the rows do not show. */}
       {week.length > 0 && (
-        <p className="text-[13px] text-text-soft">
+        <p className="text-[13px] text-ink-3 tabular-nums">
           {t("drivers.weekTotals", {
             days: week.length,
             hours: formatHours(totalMinutes(week)),
@@ -253,28 +268,33 @@ export function WeekSummary({
         </p>
       )}
 
-      {first && week.length > 1 && (
-        <button
-          type="button"
-          onClick={applyToAll}
-          className="w-fit text-start text-[13px] font-semibold text-primary hover:underline"
+      {onChange && first && week.length > 1 && !uniform && (
+        <Button
+          variant="secondary"
+          size="sm"
+          className="w-fit"
+          onClick={() =>
+            onChange(
+              week.map((one) => ({
+                ...one,
+                opensAt: first.opensAt,
+                closesAt: first.closesAt,
+              })),
+            )
+          }
         >
-          {t("hours.copyToAll", {
-            opens: first.opensAt,
-            closes: first.closesAt,
-          })}
-        </button>
+          <CopyCheck />
+          {t("hours.copyToAll")}
+        </Button>
       )}
     </div>
   );
 }
 
 /**
- * Minutes worked across the week.
- *
- * A closing time at or before the opening one runs past midnight — the same
- * rule `isOpenAt` follows — so 18:00–02:00 is eight hours, not minus sixteen.
- * A day with an unreadable time counts as nothing rather than as a guess.
+ * Minutes worked across the week. A closing time at or before the opening one
+ * runs past midnight — the rule `isOpenAt` follows — so 18:00–02:00 is eight
+ * hours, not minus sixteen. An unreadable time counts as nothing.
  */
 function totalMinutes(week: DayHours[]): number {
   return week.reduce((sum, day) => {

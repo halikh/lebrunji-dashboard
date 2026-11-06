@@ -4,31 +4,21 @@ import { useEffect, useRef } from "react";
 
 import { t } from "@/i18n/translations";
 
+import { Button } from "./button";
+import { Spinner } from "./spinner";
+
 /**
  * Asks for the next page when the end of the list comes into view.
  *
- * ## Why scroll rather than Next and Prev
+ * Scroll rather than page numbers: "page 4" of a live list changes meaning
+ * every time a row arrives (the query underneath is keyset for the same
+ * reason). The next page is requested 400px before the sentinel shows, so
+ * rows usually arrive before the operator reaches the bottom.
  *
- * Page numbers over a live list are a fiction. "Page 4" changes meaning every
- * time an order arrives, and a reader who pressed Next would see rows they had
- * already read and miss rows they had not — the same reason the query underneath
- * is keyset rather than offset. Scrolling asks the only question that stays true:
- * "what comes after the last thing I have seen".
- *
- * ## `rootMargin`, and why it is generous
- *
- * The next page is requested 400px *before* the sentinel is visible, so the rows
- * usually arrive before the operator reaches the bottom. Waiting for the
- * sentinel to actually appear produces a visible stall at the end of every page,
- * which reads as the list ending.
- *
- * ## Why there is still a button
- *
- * An `IntersectionObserver` never fires if the list is short enough not to
- * scroll, if the scroll container is the wrong one, or if the observer is not
- * supported. The button is what the sentinel *is* — the observer just presses it
- * — so the failure mode is one extra click rather than a list that silently
- * stops halfway.
+ * The button is what the sentinel *is* — the observer only presses it. An
+ * observer never fires on a list too short to scroll, inside the wrong
+ * scroll container, or where it is unsupported; then the failure is one
+ * extra click rather than a list that silently stops halfway.
  */
 export function InfiniteSentinel({
   hasMore,
@@ -41,8 +31,8 @@ export function InfiniteSentinel({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
-  // Held in a ref so the observer is not rebuilt on every render — reattaching
-  // it mid-scroll can drop the intersection that was about to fire.
+  // In a ref so the observer is not rebuilt each render — reattaching it
+  // mid-scroll can drop the intersection that was about to fire.
   const loadMoreRef = useRef(onLoadMore);
   useEffect(() => {
     loadMoreRef.current = onLoadMore;
@@ -63,35 +53,27 @@ export function InfiniteSentinel({
 
     observer.observe(element);
     return () => observer.disconnect();
-    // `loading` is a dependency on purpose: the observer is torn down while a
-    // page is in flight, so a fast scroll cannot ask for the same page twice.
+    // `loading` on purpose: torn down while a page is in flight, so a fast
+    // scroll cannot ask for the same page twice.
   }, [hasMore, loading]);
 
   if (!hasMore && !loading) return null;
 
   return (
-    <div ref={ref} className="flex justify-center py-lg">
+    <div ref={ref} className="flex justify-center py-4">
       {loading ? (
+        // Announced: rows appearing below the fold are otherwise invisible.
         <span
-          // Announced, because rows appearing below the fold are otherwise
-          // invisible to anyone not watching the scrollbar.
           role="status"
-          className="flex items-center gap-sm text-[13px] text-text-faint"
+          className="flex h-8 items-center gap-2 text-[13px] text-ink-3"
         >
-          <span
-            aria-hidden
-            className="size-[14px] animate-spin rounded-full border-2 border-border border-t-text-faint"
-          />
+          <Spinner className="size-3.5" />
           {t("common.loading")}
         </span>
       ) : (
-        <button
-          type="button"
-          onClick={onLoadMore}
-          className="rounded-md px-lg py-sm text-[13px] font-semibold text-text hover:bg-primary-wash"
-        >
-          {t("orders.loadMore")}
-        </button>
+        <Button variant="ghost" size="sm" onClick={onLoadMore}>
+          {t("controls.loadMore")}
+        </Button>
       )}
     </div>
   );

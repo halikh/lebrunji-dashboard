@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // A build can be pointed elsewhere (NEXT_DIST_DIR) so it never shares a
+  // folder with a running `next dev` — two writers corrupt it.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   experimental: {
     // Off for `next build`. Railway keeps `.next/cache` between deploys, and a
     // build killed part-way leaves a truncated cache file behind — Turbopack

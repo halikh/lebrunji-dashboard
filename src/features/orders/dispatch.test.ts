@@ -38,6 +38,7 @@ const store = (
   storeId: `shop-${id}`,
   storeName,
   branchName,
+  branchAddress: null,
   storeImageUrl: null,
   storeWhatsapp: null,
   statusSlug: "preparing",

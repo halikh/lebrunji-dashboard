@@ -2,182 +2,147 @@
 
 import { useEffect, useRef } from "react";
 
-import { Button, cx } from "@/components/ui";
+import { Badge, Button, StatusBadge, cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
-import { formatRelative } from "@/lib/time";
 
 import { placeName, type Order, type OrderStatus } from "./api/orders";
-import { StatusPill } from "./status-pill";
+import { OrderAge, urgencyOf } from "./order-age";
 import { nextStatus, orderStatus } from "./use-orders";
 
 /**
- * One order in the queue.
+ * One order in the queue. Reads left to right in the order the operator asks:
+ * which order and how long it has waited, who and where, from which shop, how
+ * much — then the one button that moves it on.
  *
- * ## The order is the unit, not the shop
- *
- * A customer who orders from two shops places one order — one status, one wait,
- * one courier run. So there is **one status and one button**, however many
- * shops are on it. The shops are still named, because the operator has to know
- * who to ring, but they are information rather than separate controls.
- *
- * The status shown is the least advanced portion that can still move: an order
- * is not confirmed until every shop has confirmed it.
- *
- * ## The button names the next step
- *
- * Not "Advance", and not a dropdown. The common case is always forward, and
- * nobody should open a menu to pick the only sensible answer — so it reads
- * "Confirm", then "Send driver", then "Delivered". It is filled ink only on an
- * order still waiting to be confirmed; see the note on it.
+ * The waiting time ticks (`now`) and turns amber, then red, as the order
+ * outstays its step — see `order-age.tsx`. A red order also gets the red edge,
+ * so a long queue can be scanned by colour down its left side.
  */
 export function OrderRow({
   order,
   statuses,
-  focused,
-  selected,
   money,
-  onAdvance,
+  now,
+  selected,
+  focused,
+  compact,
   onOpen,
+  onAdvance,
 }: {
   order: Order;
-  statuses: OrderStatus[] | undefined;
-  focused: boolean;
-  /** The order the receipt beside the queue is showing. */
-  selected: boolean;
+  now: number;
+  statuses: OrderStatus[];
   money: (minorUnits: number, code: string) => string;
-  onAdvance: (to: OrderStatus) => void;
+  selected: boolean;
+  focused: boolean;
+  /** Narrow column beside the receipt: two lines, no inline button. */
+  compact: boolean;
   onOpen: () => void;
+  onAdvance: () => void;
 }) {
   const status = orderStatus(order, statuses);
   const next = status ? nextStatus(statuses, status.slug) : null;
-  // Placed and not yet confirmed: somebody is waiting to hear the shop has
-  // it. The one state on the queue that is the operator's to answer now.
   const waiting = status?.slug === "ordered";
+  const late = urgencyOf(status?.slug, order.placedAt, now) === "late";
 
-  // Into view when it becomes the open order — moved with J/K, or followed
-  // into a new tab after a status change, where it may be below the fold.
-  // `nearest`, so a row already on screen does not make the list jump.
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLLIElement>(null);
   useEffect(() => {
-    if (selected) {
-      ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }, [selected]);
+    if (selected || focused) ref.current?.scrollIntoView({ block: "nearest" });
+  }, [selected, focused]);
 
   return (
-    <div
+    <li
       ref={ref}
-      // A row is not a button — it holds one. `article` with a label keeps it
-      // navigable without claiming to be a control.
-      role="article"
-      aria-label={order.code}
       aria-current={selected || undefined}
       onClick={onOpen}
       className={cx(
-        // The app's order card: white, radius 16, the soft shadow, no border.
-        // `cursor-pointer` stated because this is a `div` that happens to be
-        // clickable, which the global pointer rule rightly does not cover.
-        //
-        // A real 2px border on every row, transparent until it means something,
-        // so choosing a row never shifts its contents by a pixel. A border and
-        // not a box-shadow ring: the hover shadow would replace a ring, and the
-        // open order would lose its outline exactly while the pointer is on it.
-        "relative cursor-pointer rounded-lg border-2 bg-surface py-md pl-xl pr-md shadow-card",
-        // Two shapes, by the width of the queue's column (it is the
-        // `@container`), not the window's. Wide: one line, five columns, as
-        // it was. Narrow — a phone, or the queue squeezed beside the docked
-        // receipt — the three fixed columns alone are wider than the room, so
-        // it becomes a small card: code and total on top, who and where under
-        // them, status and the button at the foot. The placements only bite
-        // in the grid; in the flex row they are ignored.
-        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-lg gap-y-sm",
-        "@[42rem]:flex @[42rem]:gap-lg",
-        "transition-[box-shadow,border-color] duration-[var(--duration-control)] hover:shadow-selected",
-        // Chosen is ink, as it is in the app — the order open in the receipt.
-        selected
-          ? "border-active shadow-selected"
-          : // The keyboard's place, when it is not on the open order.
-            focused
-            ? "border-line"
-            : "border-transparent",
+        "group relative flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors sm:px-6",
+        selected ? "bg-accent-soft/70" : "hover:bg-subtle",
+        focused && !selected && "bg-subtle",
       )}
     >
-      {/* A sun edge on an order still waiting to be confirmed — seen from
-          across the room, before a word of the row is read. */}
-      {waiting && (
+      {(waiting || selected || late) && (
         <span
           aria-hidden
-          className="absolute inset-y-md left-[7px] w-[4px] rounded-full bg-yellow"
+          className={cx(
+            "absolute inset-y-0 start-0 w-[3px]",
+            selected ? "bg-accent" : late ? "bg-danger" : "bg-status-ordered",
+          )}
         />
       )}
 
-      <div className="col-start-1 row-start-1 flex flex-col gap-xxs @[42rem]:w-[132px] @[42rem]:shrink-0">
-        <span className="text-[15px] font-medium tabular-nums">
+      <div className="flex w-[88px] shrink-0 flex-col gap-0.5">
+        <span className="text-[14px] font-semibold text-ink tabular-nums">
           {order.code}
         </span>
+        <OrderAge
+          placedAt={order.placedAt}
+          slug={status?.slug}
+          now={now}
+          className="text-[12px]"
+        />
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span
           className={cx(
-            "text-[12px]",
-            waiting ? "font-medium text-text" : "text-text-faint",
+            "truncate text-[14px]",
+            order.customerName ? "font-medium text-ink" : "text-ink-4 italic",
           )}
         >
-          {formatRelative(order.placedAt)}
+          {order.customerName || t("orders.incompleteSignup")}
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-[12.5px] text-ink-3">
+            {compact
+              ? order.stores.map(placeName).join(", ")
+              : order.addressLine}
+          </span>
+          {order.amendedAt && (
+            <Badge tone="info" className="h-[18px] px-1.5 text-[11px]">
+              {t("orders.amendedBadge")}
+            </Badge>
+          )}
         </span>
       </div>
 
-      <div className="col-span-2 row-start-2 flex min-w-0 flex-col gap-xxs @[42rem]:flex-[1.2]">
-        {order.customerName ? (
-          <span className="truncate text-[15px] font-medium">
-            {order.customerName}
+      {!compact && (
+        <div className="hidden min-w-0 flex-1 flex-col items-start gap-1 lg:flex">
+          {status && <StatusBadge slug={status.slug} />}
+          <span className="max-w-full truncate text-[12.5px] text-ink-3">
+            {order.stores.map(placeName).join(", ")}
           </span>
-        ) : (
-          // An empty name is the app's "setup not finished" flag, not missing
-          // data. Blank would read as a fault in the dashboard.
-          <span className="truncate text-[15px] italic text-text-faint">
-            {t("orders.incompleteSignup")}
-          </span>
-        )}
-        <span className="truncate text-[13px] text-text-soft">
-          {order.addressLine}
-        </span>
-      </div>
+        </div>
+      )}
 
-      <div className="col-start-1 row-start-3 flex min-w-0 flex-col items-start gap-xs @[42rem]:flex-1 @[42rem]:items-stretch">
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <span className="text-[14px] font-semibold text-ink tabular-nums">
+          {money(order.total, order.currencyCode)}
+        </span>
         {status && (
-          <StatusPill slug={status.slug} name={status.name} size="md" />
-        )}
-        {/* The shops, as information. One order, however many of them. */}
-        <span className="truncate text-[13px] text-text-soft">
-          {order.stores.map(placeName).join(" · ")}
-        </span>
-      </div>
-
-      <span className="col-start-2 row-start-1 self-start text-right text-[15px] font-medium tabular-nums @[42rem]:w-[110px] @[42rem]:shrink-0 @[42rem]:self-auto">
-        {money(order.total, order.currencyCode)}
-      </span>
-
-      <div className="col-start-2 row-start-3 @[42rem]:w-[140px] @[42rem]:shrink-0">
-        {next && (
-          <Button
-            fullWidth
-            size="sm"
-            // Ink only where the order is waiting on the shop — that is the
-            // press the queue exists for, and a column of identical black
-            // buttons would make every row shout equally. Everything further
-            // along is the app's secondary.
-            variant={waiting ? "primary" : "secondary"}
-            onClick={(event) => {
-              // The row opens the panel; the button only advances. Without
-              // this, advancing also opens the detail of an order that has just
-              // left the tab.
-              event.stopPropagation();
-              onAdvance(next);
-            }}
-          >
-            {next.name}
-          </Button>
+          <span className={cx(compact ? "block" : "lg:hidden")}>
+            <StatusBadge slug={status.slug} />
+          </span>
         )}
       </div>
-    </div>
+
+      {!compact && (
+        <div className="hidden w-[132px] shrink-0 justify-end md:flex">
+          {next && (
+            <Button
+              size="sm"
+              variant={waiting ? "primary" : "secondary"}
+              className="w-full"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAdvance();
+              }}
+            >
+              {next.name}
+            </Button>
+          )}
+        </div>
+      )}
+    </li>
   );
 }

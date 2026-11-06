@@ -13,8 +13,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { Button } from "@/components/ui";
-import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/overlay";
 import { t } from "@/i18n/translations";
 
 /**
@@ -212,35 +212,24 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     <GuardContext.Provider value={value}>
       {children}
 
-      <Modal
+      <Dialog
         open={asking}
-        // Escape and the backdrop mean "no" — the safe answer, and the one that
-        // keeps the work. A dismissal that discarded would be a trap.
-        onClose={() => settle(false)}
-        labelledBy="unsaved-title"
-        describedBy="unsaved-body"
-      >
-        <h2 id="unsaved-title" className="pe-xxl text-[17px] font-semibold">
-          {t("unsaved.title")}
-        </h2>
-        <p id="unsaved-body" className="mt-sm text-[15px] text-text-soft">
-          {t("unsaved.body")}
-        </p>
-
-        <div className="mt-xxl flex justify-end gap-sm">
-          {/*
-            Keep editing is the safe answer, so it takes focus: Enter on a
-            dialog that appeared unbidden must not be the destructive one. The
-            same rule `ConfirmButton` follows, for the same reason.
-          */}
-          <Button variant="secondary" onClick={() => settle(false)} autoFocus>
-            {t("unsaved.stay")}
-          </Button>
-          <Button variant="danger" onClick={() => settle(true)}>
-            {t("unsaved.discard")}
-          </Button>
-        </div>
-      </Modal>
+        onOpenChange={(open) => !open && settle(false)}
+        title={t("unsaved.title")}
+        description={t("unsaved.body")}
+        size="sm"
+        footer={
+          <>
+            {/* Keep editing is the safe answer, so it takes focus. */}
+            <Button variant="secondary" onClick={() => settle(false)} autoFocus>
+              {t("unsaved.stay")}
+            </Button>
+            <Button variant="danger" onClick={() => settle(true)}>
+              {t("unsaved.discard")}
+            </Button>
+          </>
+        }
+      />
     </GuardContext.Provider>
   );
 }

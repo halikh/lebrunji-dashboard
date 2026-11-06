@@ -132,8 +132,29 @@ export function previousOf(from: Date, to: Date) {
   };
 }
 
-export function useStats(from: Date, to: Date) {
+/**
+ * The same days a year earlier — Shopify's "same period last year".
+ *
+ * Shifted on the calendar, not by 365 × 24 hours, so a year that holds a 29
+ * February or crosses a DST change still lands on the same dates at the same
+ * trading-day hour. A 29 February itself rolls to 1 March, the nearest day
+ * that exists.
+ */
+export function yearBefore(from: Date, to: Date) {
+  const shift = (instant: Date) => {
+    const clock = toWallClock(instant);
+    return fromWallClock({ ...clock, year: clock.year - 1 });
+  };
+  return { from: shift(from), to: shift(to) };
+}
+
+/**
+ * `enabled: false` when there is nothing to compare with — "No comparison"
+ * should not cost a second aggregate over the database.
+ */
+export function useStats(from: Date, to: Date, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: statsKeys.range(from.toISOString(), to.toISOString()),
     queryFn: () => fetchStats(from, to),
     // Aggregates over a window that mostly does not move. A minute of staleness

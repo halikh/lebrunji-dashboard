@@ -1,112 +1,162 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import {
+  AlertCircle,
+  CalendarClock,
+  MessageCircle,
+  Pencil,
+  UserMinus,
+  UserPlus,
+  UserX,
+} from "lucide-react";
+import { useState } from "react";
 
-import { BackLink } from "@/components/ui/back-link";
-import { Button, cx } from "@/components/ui";
-import { Avatar } from "@/components/ui/avatar";
-import { Copyable } from "@/components/ui/copyable";
-import { ROW } from "@/components/ui/row";
-import { Toggle } from "@/components/ui/toggle";
-import { EmptyState } from "@/components/ui/empty-state";
-import { t } from "@/i18n/translations";
+import {
+  Avatar,
+  Button,
+  Card,
+  ConfirmDialog,
+  Copyable,
+  EmptyState,
+  Notice,
+  Page,
+  PageHeader,
+  Section,
+  Segmented,
+  Sheet,
+  Skeleton,
+  Stat,
+  StatusBadge,
+  TBody,
+  THead,
+  Table,
+  Td,
+  Th,
+  Tr,
+  TwoColumn,
+} from "@/components/ui";
+import {
+  changed,
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
+import type { DayHours } from "@/features/catalog/api/hours";
 import { Price } from "@/features/reference/price";
-import { statusTone } from "@/lib/order-status";
-import { formatPhone } from "@/lib/phone";
+import { useMoney } from "@/features/reference/use-currencies";
 import { useClock } from "@/features/settings/use-clock";
+import { t } from "@/i18n/translations";
+import { formatPhone } from "@/lib/phone";
 import { startOfBusinessDay, startOfBusinessDayPlus } from "@/lib/time";
 
-import { isOverridden, isTakingOrders, type Courier } from "./api/couriers";
-import { useCourier, useDispatches, useSaveCourier } from "./use-couriers";
+import type { Courier, Dispatch } from "./api/couriers";
+import { AvailabilityControl, ShiftBadge, ShiftLine } from "./availability";
+import { HoursGrid, WeekSummary } from "./hours-grid";
+import {
+  useCourier,
+  useDispatches,
+  useSaveCourier,
+  useSetCourierActive,
+} from "./use-couriers";
 
 /**
  * One driver, and what they have been given.
  *
- * ## A page, not a panel
- *
- * Same reasoning as the customer profile: a panel is the right shape for a form
- * beside a list and the wrong shape for a record. This carries a history that
- * grows and a rota seven rows tall, and squeezing either into 420px would make
- * the part somebody came to read the smallest thing on the screen.
- *
- ## One page, and the rota is not on it
- *
- * The week briefly had a tab here. It is edited on the same page as the name
- * and the number — one week editor rather than two that drift — and a tab
- * carrying a second copy was a second place for a rota to be half-saved.
- *
- * What stays is the state the rota *produces*: the switch under the name says
- * whether they are taking orders now, which is the question this page is opened
- * to answer.
- *
  * ## What the history actually claims
  *
  * Every row says the operator **opened a chat** about that order with this
- * driver. Not that the message was sent, that it was read, or that the food
- * arrived — WhatsApp tells the dashboard nothing back. The caveat is on screen
- * rather than only in this comment, because the screen is what somebody reads
- * while working out who had an order that went missing.
+ * driver — not that it was read or that the food arrived; WhatsApp tells the
+ * dashboard nothing back (0083). The caveat is on screen because the screen is
+ * what somebody reads while working out who had an order that went missing.
  */
-
 export function DriverProfile({ id }: { id: string }) {
-  const router = useRouter();
-  const clock = useClock();
   const courier = useCourier(id);
   const dispatches = useDispatches(id);
-  const save = useSaveCourier();
-
-  const rows = dispatches.data ?? [];
-
-  // Narrowed once, so the closures below do not each have to re-prove that a
-  // query's `data` is still there: it is `Courier | null | undefined` and
-  // TypeScript cannot follow that into a callback.
   const driver = courier.data ?? null;
 
-  if (courier.isSuccess && !driver) {
+  if (courier.isPending) {
     return (
-      <div className="flex h-full flex-col gap-lg p-lg md:p-xxl">
-        <Back />
-        <EmptyState titleKey="drivers.notFound" mood="lost" />
-      </div>
+      <Page>
+        <PageHeader title={<Skeleton className="h-7 w-48" />} />
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-5" aria-busy>
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
+          ))}
+        </div>
+        <Skeleton className="h-64 rounded-lg" />
+      </Page>
     );
   }
 
+  if (courier.isError || !driver) {
+    return (
+      <Page>
+        <PageHeader title={t("drivers.title")} />
+        <Card>
+          {courier.isError ? (
+            <EmptyState
+              icon={<AlertCircle />}
+              title={t("common.loadFailed")}
+              action={
+                <Button onClick={() => void courier.refetch()}>
+                  {t("common.retry")}
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={<UserX />}
+              title={t("drivers.notFound")}
+              description={t("drivers.notFoundBody")}
+            />
+          )}
+        </Card>
+      </Page>
+    );
+  }
+
+  return (
+    <Loaded
+      driver={driver}
+      rows={dispatches.data ?? []}
+      dispatches={dispatches}
+    />
+  );
+}
+
+function Loaded({
+  driver,
+  rows,
+  dispatches,
+}: {
+  driver: Courier;
+  rows: Dispatch[];
+  dispatches: ReturnType<typeof useDispatches>;
+}) {
+  const clock = useClock();
+  const setActive = useSetCourierActive();
+  const [confirming, setConfirming] = useState(false);
+  const [editingHours, setEditingHours] = useState(false);
+  // Today is the trading day, cut where the stat tiles cut it, so the
+  // "Today" tile and the "Today" list always say the same number.
+  const [range, setRange] = useState<"today" | "all">("all");
+
   /**
-   * Four figures, and two of them are averages on purpose.
-   *
-   * Counts answer "what has happened", which is what somebody checking on
-   * tonight wants. Averages answer "is this normal", which is the question a
-   * count cannot: seven hand-overs today means nothing until you know whether
-   * the usual is three or thirty.
-   *
-   * Both windows are **trading days**, not calendar ones — `startOfBusinessDay`
-   * cuts at 08:00 — so a hand-over at half past midnight counts towards the
-   * evening it belonged to rather than resetting "today" while the kitchen is
-   * still cooking.
+   * Counts answer "what has happened"; averages answer "is this normal", which
+   * a count cannot. Both windows are **trading days** — `startOfBusinessDay`
+   * cuts at the business opening hour — so a hand-over after midnight counts
+   * towards the evening it belonged to.
    */
   const dayStart = startOfBusinessDay().getTime();
   const weekStart = startOfBusinessDayPlus(-6).getTime();
-
-  const today = rows.filter(
-    (one) => new Date(one.dispatchedAt).getTime() >= dayStart,
-  ).length;
-  const thisWeek = rows.filter(
-    (one) => new Date(one.dispatchedAt).getTime() >= weekStart,
-  ).length;
+  const at = (one: Dispatch) => new Date(one.dispatchedAt).getTime();
+  const today = rows.filter((one) => at(one) >= dayStart).length;
+  const thisWeek = rows.filter((one) => at(one) >= weekStart).length;
 
   /**
-   * The averages, over the days this driver has actually been on the books.
-   *
-   * Dividing by a fixed 7 or 30 would punish somebody who started on Tuesday:
-   * their first week reads as a fraction of what they really did. The span runs
-   * from their **earliest hand-over** to today, which is the only window the
-   * dashboard can honestly claim to know about — `couriers` records no start
-   * date, and inventing one from `created_at` would count the days between
-   * being added to the system and first being given an order.
-   *
-   * At least one day, so a driver on their first evening divides by one rather
-   * than by zero.
+   * Averaged over the days since their **earliest hand-over**, not a fixed 7
+   * or 30 — that would punish somebody who started on Tuesday, and `couriers`
+   * records no start date. At least one day, so a first evening divides by one.
    */
   const earliest = rows.length
     ? Math.min(
@@ -120,232 +170,422 @@ export function DriverProfile({ id }: { id: string }) {
     Math.round((dayStart - earliest) / 86_400_000) + 1,
   );
   const perDay = rows.length / daysActive;
-  const perWeek = perDay * 7;
+  const shown =
+    range === "today" ? rows.filter((one) => at(one) >= dayStart) : rows;
 
   return (
-    <div className="relative flex h-full">
-      <div className="flex min-w-0 flex-grow flex-col">
-        <div className="flex shrink-0 flex-col gap-lg border-b border-border bg-surface px-lg py-lg md:px-xxl">
-          <Back />
-
-          {driver && (
-            <div className="flex flex-wrap items-center gap-lg">
-              <Avatar id={driver.id} name={driver.name} size={48} />
-
-              {/* A floor of 12rem on a zero basis: it takes the slack on a
-                  wide header, and on a phone it is Edit that wraps under the
-                  name rather than the name wrapping away from its avatar. */}
-              <div className="flex min-w-[12rem] grow basis-0 flex-col gap-xxs">
-                <h1 className="truncate text-[24px] md:text-[30px]">
-                  {driver.name}
-                </h1>
-                {/* Copy, not dial. This number's job is to be pasted into
-                    WhatsApp, and a `tel:` link on a desktop hands it to
-                    whatever the machine thinks handles calls — usually
-                    nothing, sometimes something nobody wanted opened. */}
-                <Copyable
-                  value={formatPhone(driver.phone)}
-                  label={t("drivers.copyPhone")}
-                  className="text-[13px] tabular-nums"
-                />
-                <Availability
-                  courier={driver}
-                  pending={save.isPending}
-                  onOverride={(value) =>
-                    save.mutate({
-                      id: driver.id,
-                      draft: {
-                        name: driver.name,
-                        phone: driver.phone,
-                        availableOverride: value,
-                      },
-                      name: driver.name,
-                    })
-                  }
-                />
-              </div>
-
-              {/* Blue, not the quiet outline. On the list this is one of three
-                  controls on a row and should not shout; here it is the only
-                  thing on the page you can *do*, and a secondary button beside
-                  nothing else reads as disabled. */}
-              <Button onClick={() => router.push(`/drivers/${driver.id}/edit`)}>
-                {t("drivers.edit")}
+    <Page>
+      <PageHeader
+        title={
+          <span className="flex min-w-0 items-center gap-3">
+            <Avatar name={driver.name} size={40} />
+            <span className="truncate">{driver.name}</span>
+          </span>
+        }
+        meta={
+          <span className="flex flex-wrap items-center gap-2">
+            <ShiftBadge courier={driver} />
+            <ShiftLine courier={driver} />
+          </span>
+        }
+        description={
+          // Copy, not dial: this number's job is to be pasted into WhatsApp,
+          // and a `tel:` link on a desktop opens whatever the machine thinks
+          // handles calls.
+          <Copyable
+            value={formatPhone(driver.phone)}
+            label={t("drivers.copyPhone")}
+            className="text-ink-2 tabular-nums"
+          />
+        }
+        // Rarer and destructive: under ⋯, as Onfleet keeps a worker's
+        // removal away from the buttons used every shift.
+        more={
+          driver.isActive
+            ? [
+                {
+                  label: t("drivers.deactivate"),
+                  icon: <UserMinus />,
+                  tone: "danger",
+                  onSelect: () => setConfirming(true),
+                },
+              ]
+            : undefined
+        }
+        actions={
+          <>
+            <Button variant="secondary" asChild>
+              <a
+                href={`https://wa.me/${driver.phone}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <MessageCircle />
+                {t("drivers.whatsapp")}
+              </a>
+            </Button>
+            {driver.isActive ? (
+              <Button variant="primary" asChild>
+                <Link href={`/drivers/${driver.id}/edit`}>
+                  <Pencil />
+                  {t("drivers.edit")}
+                </Link>
               </Button>
-            </div>
-          )}
-        </div>
+            ) : (
+              <Button
+                variant="primary"
+                pending={setActive.isPending}
+                onClick={() =>
+                  setActive.mutate({
+                    id: driver.id,
+                    active: true,
+                    name: driver.name,
+                  })
+                }
+              >
+                <UserPlus />
+                {t("drivers.reactivate")}
+              </Button>
+            )}
+          </>
+        }
+      />
 
-        {/* Outside the header, so the white surface stops at the rule and the
-            page's own ground carries the content — the same separation every
-            other screen has between the bar that identifies a record and the
-            record itself. */}
-        <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
-          <div className="flex flex-wrap gap-lg">
-            <Stat label={t("drivers.statToday")} value={String(today)} />
-            <Stat label={t("drivers.statThisWeek")} value={String(thisWeek)} />
-            <Stat
-              label={t("drivers.statPerDay")}
-              value={average(perDay)}
-              note={t("drivers.overDays", { count: daysActive })}
-            />
-            <Stat label={t("drivers.statPerWeek")} value={average(perWeek)} />
-            <Stat label={t("drivers.statTotal")} value={String(rows.length)} />
-          </div>
+      {!driver.isActive && <Notice>{t("drivers.inactiveNote")}</Notice>}
 
-          {/* Nothing handed over yet means no section at all. A heading, a
-              caveat about what the rows mean, and a line saying there are no
-              rows is three pieces of furniture around an absence — and the
-              caveat explains a distinction that has not come up yet. */}
-          {rows.length > 0 && (
-            <section className="flex flex-col gap-sm">
-              <h2 className="text-[17px]">{t("drivers.profileHandovers")}</h2>
-              <p className="pb-sm text-[12px] text-text-faint">
-                {t("drivers.profileCaveat")}
-              </p>
-
-              {dispatches.isError && (
-                <p role="alert" className="text-[13px] font-medium text-danger">
-                  {t("content.failed")}
-                </p>
-              )}
-
-              {rows.map((row) => {
-                const tone = statusTone(row.statusSlug);
-
-                return (
-                  <div key={row.id} className={cx(ROW, "border-transparent")}>
-                    <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-                      <Link
-                        href={`/orders/${row.orderId}`}
-                        className="truncate text-[15px] font-semibold after:absolute after:inset-0"
-                      >
-                        {row.orderCode}
-                      </Link>
-                      <span className="truncate text-[12px] text-text-faint">
-                        {t("drivers.handedAt", {
-                          when: clock.dayAndTime(row.dispatchedAt),
-                        })}
-                      </span>
-                    </div>
-
-                    <span
-                      className="relative z-10 flex shrink-0 items-center gap-sm text-[12px] font-semibold"
-                      style={{ color: tone.ink }}
-                    >
-                      <span
-                        aria-hidden
-                        className="size-[7px] shrink-0 rounded-full"
-                        style={{ background: tone.dot }}
-                      />
-                      {row.statusName}
-                    </span>
-
-                    <span className="relative z-10 shrink-0">
-                      <Price
-                        value={row.orderTotal}
-                        code={row.currencyCode}
-                        shopRate={row.shopRate}
-                        align="end"
-                      />
-                    </span>
-                  </div>
-                );
-              })}
-            </section>
-          )}
-        </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+        <StatTile label={t("drivers.statToday")} value={String(today)} />
+        <StatTile label={t("drivers.statThisWeek")} value={String(thisWeek)} />
+        {/* The denominator, said out loud: days since their first order is
+            not the window anybody would assume. */}
+        <StatTile
+          label={t("drivers.statPerDay")}
+          value={average(perDay)}
+          hint={t("drivers.overDays", { count: daysActive })}
+        />
+        <StatTile
+          label={t("drivers.statPerWeek")}
+          value={average(perDay * 7)}
+          hint={t("drivers.overDays", { count: daysActive })}
+        />
+        <StatTile label={t("drivers.statTotal")} value={String(rows.length)} />
       </div>
-    </div>
+
+      <TwoColumn
+        main={
+          <Section
+            title={t("drivers.profileHandovers")}
+            description={
+              rows.length > 0
+                ? `${t("drivers.handoversBlurb")} ${t("drivers.profileCaveat")}`
+                : undefined
+            }
+            bodyClassName="p-0"
+            actions={
+              rows.length > 0 && (
+                <Segmented
+                  size="sm"
+                  value={range}
+                  onChange={setRange}
+                  items={[
+                    {
+                      key: "today",
+                      label: t("drivers.rangeToday", { count: today }),
+                    },
+                    {
+                      key: "all",
+                      label: t("drivers.rangeAll", { count: rows.length }),
+                    },
+                  ]}
+                />
+              )
+            }
+          >
+            {dispatches.isPending ? (
+              <div className="flex flex-col gap-2 p-5" aria-busy>
+                {Array.from({ length: 4 }, (_, i) => (
+                  <Skeleton key={i} className="h-8" />
+                ))}
+              </div>
+            ) : dispatches.isError ? (
+              <EmptyState
+                icon={<AlertCircle />}
+                title={t("common.loadFailed")}
+                action={
+                  <Button onClick={() => void dispatches.refetch()}>
+                    {t("common.retry")}
+                  </Button>
+                }
+              />
+            ) : rows.length === 0 ? (
+              <p className="px-5 py-8 text-center text-[13.5px] text-ink-3">
+                {t("drivers.profileNone")}
+              </p>
+            ) : shown.length === 0 ? (
+              <p className="px-5 py-8 text-center text-[13.5px] text-ink-3">
+                {t("drivers.noneToday")}
+              </p>
+            ) : (
+              <Table>
+                <THead>
+                  <Tr>
+                    <Th>{t("drivers.colOrder")}</Th>
+                    <Th>{t("drivers.colHanded")}</Th>
+                    <Th>{t("drivers.colStatus")}</Th>
+                    <Th className="text-end">{t("drivers.colDelivery")}</Th>
+                    <Th className="text-end">{t("drivers.colTotal")}</Th>
+                  </Tr>
+                </THead>
+                <TBody>
+                  {shown.map((row) => (
+                    <Tr key={row.id} interactive className="relative">
+                      <Td>
+                        <Link
+                          href={`/orders/${row.orderId}`}
+                          className="font-semibold text-ink tabular-nums after:absolute after:inset-0 hover:text-accent"
+                        >
+                          {row.orderCode}
+                        </Link>
+                      </Td>
+                      <Td className="whitespace-nowrap text-ink-2">
+                        {clock.dayAndTime(row.dispatchedAt)}
+                      </Td>
+                      <Td>
+                        <StatusBadge slug={row.statusSlug} />
+                      </Td>
+                      <Td className="text-end tabular-nums">
+                        <Price
+                          value={row.deliveryFee}
+                          code={row.currencyCode}
+                          shopRate={row.shopRate}
+                          align="end"
+                        />
+                      </Td>
+                      <Td className="text-end tabular-nums">
+                        <Price
+                          value={row.orderTotal}
+                          code={row.currencyCode}
+                          shopRate={row.shopRate}
+                          align="end"
+                        />
+                      </Td>
+                    </Tr>
+                  ))}
+                </TBody>
+                <HandoverTotals rows={shown} />
+              </Table>
+            )}
+          </Section>
+        }
+        aside={
+          <>
+            {driver.isActive && (
+              <Section
+                title={t("drivers.nowTitle")}
+                description={t("drivers.nowBlurb")}
+              >
+                <AvailabilityControl courier={driver} layout="card" />
+              </Section>
+            )}
+            <Section
+              title={t("drivers.weekTitle")}
+              actions={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEditingHours(true)}
+                >
+                  <CalendarClock />
+                  {t("drivers.editHours")}
+                </Button>
+              }
+            >
+              <WeekSummary week={driver.hours} showNow={false} />
+            </Section>
+          </>
+        }
+      />
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={t("drivers.deactivateTitle", { name: driver.name })}
+        description={t("drivers.deactivateBody")}
+        confirmLabel={t("drivers.deactivateConfirm")}
+        tone="danger"
+        onConfirm={() =>
+          setActive.mutateAsync({
+            id: driver.id,
+            active: false,
+            name: driver.name,
+          })
+        }
+      />
+
+      {editingHours && (
+        <HoursSheet driver={driver} onClose={() => setEditingHours(false)} />
+      )}
+    </Page>
   );
 }
 
 /**
- * Taking orders, and whether that is the rota talking.
- *
- * The switch shows the *effective* state and flipping it writes an override
- * rather than editing the week — editing the week to describe one evening is
- * the thing that would quietly become permanent.
- *
- * An override is invisible from the outside, so the line under it says which
- * way the rota is being overruled and offers to stop. An override left behind
- * is exactly the failure the rota was introduced to end.
+ * The week, edited without leaving the profile. Mounted only while open, so it
+ * always starts from the saved week rather than a draft abandoned earlier.
  */
-function Availability({
-  courier,
-  pending,
-  onOverride,
+function HoursSheet({
+  driver,
+  onClose,
 }: {
-  courier: Courier;
-  pending: boolean;
-  onOverride: (value: boolean | null) => void;
+  driver: Courier;
+  onClose: () => void;
 }) {
-  const taking = isTakingOrders(courier);
-  const overridden = isOverridden(courier);
+  const save = useSaveCourier();
+  const [hours, setHours] = useState<DayHours[]>(driver.hours);
+  const dirty = changed(hours, driver.hours);
+  useUnsavedChanges(dirty);
+  const guard = useGuardedAction();
+  const close = guard(onClose);
 
   return (
-    <div className="flex flex-col items-start gap-xxs pt-xs">
-      <Toggle
-        on={taking}
-        onChange={() => onOverride(!taking)}
-        disabled={pending}
-        labelOn={t("drivers.onShift")}
-        labelOff={t("drivers.offShift")}
-        className="w-[124px]"
-      />
-      {overridden && (
-        <span className="flex flex-wrap items-center gap-sm text-[11px] text-text-faint">
-          {taking ? t("drivers.overrideOn") : t("drivers.overrideOff")}
-          <button
-            type="button"
-            onClick={() => onOverride(null)}
-            className="font-semibold text-primary hover:underline"
+    <Sheet
+      open
+      onOpenChange={(open) => !open && close()}
+      title={t("drivers.hoursTitle")}
+      description={t("drivers.hoursSheetBlurb")}
+      width="lg"
+      footer={
+        <>
+          <Button variant="secondary" onClick={close} disabled={save.isPending}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            variant="primary"
+            disabled={!dirty || hours.length === 0}
+            pending={save.isPending}
+            onClick={() =>
+              save.mutate(
+                {
+                  id: driver.id,
+                  draft: { name: driver.name, phone: driver.phone, hours },
+                  name: driver.name,
+                },
+                { onSuccess: onClose },
+              )
+            }
           >
-            {t("drivers.followRota")}
-          </button>
-        </span>
-      )}
-    </div>
+            {t("drivers.saveHours")}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-6">
+        <HoursGrid week={hours} onChange={setHours} disabled={save.isPending} />
+        <div className="border-t border-line pt-5">
+          <WeekSummary week={hours} onChange={setHours} />
+        </div>
+      </div>
+    </Sheet>
   );
 }
 
-function Back() {
-  return <BackLink href="/drivers">{t("drivers.backToList")}</BackLink>;
-}
-
-function Stat({
+function StatTile({
   label,
   value,
-  note,
+  hint,
 }: {
   label: string;
   value: string;
-  note?: string;
+  hint?: string;
 }) {
   return (
-    // Grows on a phone, where the five wrap two to a line: left at their own
-    // width they leave a ragged gap at the end of every line. Not from `md`,
-    // where they sit in one row and stretching would spread four digits
-    // across a third of the screen.
-    <div className="flex min-w-[140px] flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card max-md:grow">
-      <span className="text-[24px] font-bold tabular-nums">{value}</span>
-      <span className="text-[12px] text-text-faint">{label}</span>
-      {/* What the average is over. An average with no denominator on screen is
-          a number somebody has to take on trust, and this one's denominator is
-          unusual — days since their first order, not a fixed week. */}
-      {note && <span className="text-[11px] text-text-faint">{note}</span>}
-    </div>
+    <Card className="p-4">
+      <Stat label={label} value={value} hint={hint} />
+    </Card>
   );
 }
 
 /**
- * An average, to one decimal, with the decimal dropped when it is a whole
- * number.
+ * The sums of the two money columns, under the rows they add up.
  *
- * `2.0` reads as a measurement and `2` reads as a count; the first is what this
- * is, so the point stays wherever it carries information and goes when it does
- * not. Two decimals would imply a precision that four hand-overs over three
- * days does not have.
+ * - **Cancelled orders are left out.** Nothing was collected on them, and a
+ *   total that counted them would be a figure the driver could never hand in.
+ * - **One line per currency.** An order is recorded in what it was priced in,
+ *   and lira and dollars are never added together.
+ * - **The converted line only when it is honest.** Each order converts at its
+ *   own shop's rate; when the orders in a currency do not share one, a single
+ *   converted figure would be a rate nobody quoted, so it is left off.
+ * - **It adds up what the table shows** — the latest hand-overs, not every one
+ *   ever — so the totals and the rows above them always agree.
+ */
+function HandoverTotals({ rows }: { rows: Dispatch[] }) {
+  const { format } = useMoney();
+  const counted = rows.filter((row) => row.statusSlug !== "cancelled");
+  const skipped = rows.length - counted.length;
+
+  const byCurrency = new Map<
+    string,
+    { fee: number; total: number; rates: Set<number | null> }
+  >();
+  for (const row of counted) {
+    const sum = byCurrency.get(row.currencyCode) ?? {
+      fee: 0,
+      total: 0,
+      rates: new Set<number | null>(),
+    };
+    sum.fee += row.deliveryFee;
+    sum.total += row.orderTotal;
+    sum.rates.add(row.shopRate);
+    byCurrency.set(row.currencyCode, sum);
+  }
+  const sums = [...byCurrency.entries()];
+
+  const amount = (value: number, code: string, rates: Set<number | null>) =>
+    rates.size === 1 ? (
+      <Price value={value} code={code} shopRate={[...rates][0]} align="end" />
+    ) : (
+      <span className="tabular-nums">{format(value, code)}</span>
+    );
+
+  return (
+    <tfoot className="border-t-2 border-line-strong bg-subtle font-semibold">
+      <Tr>
+        <Td colSpan={3}>
+          <span className="flex flex-col">
+            {t("drivers.totalsRow")}
+            {skipped > 0 && (
+              <span className="text-[12px] font-normal text-ink-4">
+                {t("drivers.totalsSkipped")}
+              </span>
+            )}
+          </span>
+        </Td>
+        <Td className="py-2 text-end">
+          <span className="flex flex-col items-end gap-1">
+            {sums.length === 0
+              ? "—"
+              : sums.map(([code, sum]) => (
+                  <span key={code}>{amount(sum.fee, code, sum.rates)}</span>
+                ))}
+          </span>
+        </Td>
+        <Td className="py-2 text-end">
+          <span className="flex flex-col items-end gap-1">
+            {sums.length === 0
+              ? "—"
+              : sums.map(([code, sum]) => (
+                  <span key={code}>{amount(sum.total, code, sum.rates)}</span>
+                ))}
+          </span>
+        </Td>
+      </Tr>
+    </tfoot>
+  );
+}
+
+/**
+ * One decimal, dropped when whole: `2.0` reads as a measurement and `2` as a
+ * count. Two decimals would claim a precision four hand-overs do not have.
  */
 function average(value: number): string {
   const rounded = Math.round(value * 10) / 10;

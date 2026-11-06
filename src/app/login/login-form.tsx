@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
-import { Button, Card, Field, FormError, Input } from "@/components/ui";
+import { Button, Checkbox, Field, FormError, Input } from "@/components/ui";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { safeNextPath } from "@/lib/auth/next-path";
 import { unlock } from "@/lib/chime";
@@ -16,6 +17,7 @@ export function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -25,11 +27,6 @@ export function LoginForm() {
     setPending(true);
     setError(null);
 
-    // Posted to a route handler rather than called on a browser Supabase
-    // client, and that is the whole design: the response sets the refresh token
-    // as an `HttpOnly` cookie, so it never exists anywhere this code could read
-    // it. The client cannot sign in even by accident — `supabase.auth.*` throws
-    // when the `accessToken` option is set.
     let response: Response;
     try {
       response = await fetch("/auth/sign-in", {
@@ -38,8 +35,6 @@ export function LoginForm() {
         body: JSON.stringify({ email: email.trim(), password, remember }),
       });
     } catch {
-      // The request never left. "Your password is wrong" would be untrue, and
-      // would send the operator off to reset a password that was fine.
       setError(t("login.offline"));
       setPending(false);
       return;
@@ -51,34 +46,24 @@ export function LoginForm() {
       return;
     }
 
-    // The token the page will use lives in memory from here on. Dropping any
-    // stale one first, so the first query does not go out with a token from a
-    // previous session.
+    // A token cached from a previous account must not outlive this sign-in.
     forgetAccessToken();
-
-    // The chime on a new order is Web Audio, and a browser will not let a page
-    // make a sound until it has been interacted with. This click is the first
-    // interaction there is, so it is where the context gets unlocked — do it
-    // any later and the first order of the day arrives silently. It has to be
-    // chime's own context: a fresh one resumed here unlocks nothing the chime
-    // will ever play through.
+    // The click is the user gesture browsers want before they allow sound, so
+    // the new-order chime can play later.
     unlock();
 
-    // Only somewhere on this dashboard — `safeNextPath` has why a prefix check
-    // is not enough to say so.
     router.replace(safeNextPath(params.get("next"), window.location.origin));
     router.refresh();
   }
 
   return (
-    <Card>
-      <form onSubmit={onSubmit} className="flex flex-col gap-lg">
-        <h1 className="text-[26px]">{t("login.title")}</h1>
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
+      <FormError>{error}</FormError>
 
-        <FormError>{error}</FormError>
-
-        <Field label={t("login.email")}>
+      <Field label={t("login.email")}>
+        {(props) => (
           <Input
+            {...props}
             type="email"
             name="email"
             placeholder={t("login.emailPlaceholder")}
@@ -88,63 +73,66 @@ export function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-        </Field>
+        )}
+      </Field>
 
-        <Field label={t("login.password")}>
+      <Field
+        label={
+          <span className="flex w-full items-baseline justify-between">
+            {t("login.password")}
+            <Link
+              href="/forgot-password"
+              className="text-[13px] font-medium text-accent hover:text-accent-hover"
+            >
+              {t("login.forgot")}
+            </Link>
+          </span>
+        }
+      >
+        {(props) => (
           <Input
-            type="password"
+            {...props}
+            type={showPassword ? "text" : "password"}
             name="password"
-            placeholder={t("login.passwordPlaceholder")}
             autoComplete="current-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            trailing={
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={t(
+                  showPassword ? "login.hidePassword" : "login.showPassword",
+                )}
+                className="flex size-7 items-center justify-center rounded text-ink-4 hover:text-ink"
+              >
+                {showPassword ? <EyeOff /> : <Eye />}
+              </button>
+            }
           />
-        </Field>
+        )}
+      </Field>
 
-        {/* Explicit: the global rule matches `label[for]`, and this one wraps
-            its input rather than pointing at it by id. */}
-        <label className="flex cursor-pointer items-center gap-sm text-[14px] text-text-soft">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={(e) => setRemember(e.target.checked)}
-            className="size-[16px] accent-[var(--color-active)]"
-          />
-          {t("login.rememberMe")}
-        </label>
+      <Checkbox
+        checked={remember}
+        onCheckedChange={setRemember}
+        label={t("login.rememberMe")}
+      />
 
-        <Button type="submit" pending={pending}>
-          {t("login.submit")}
-        </Button>
-
-        <Link
-          href="/forgot-password"
-          className="text-center text-[14px] font-medium text-primary hover:underline"
-        >
-          {t("login.forgot")}
-        </Link>
-      </form>
-    </Card>
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        pending={pending}
+        className="w-full"
+      >
+        {t("login.submit")}
+      </Button>
+    </form>
   );
 }
 
-/**
- * Which sentence to show for a failed sign-in.
- *
- * There are only two answers here because `/auth/sign-in` only gives two, and
- * that is deliberate — every distinction the endpoint draws is a distinction it
- * discloses to anyone who can reach it, and this page is reachable signed out.
- *
- * - **429 is said plainly.** Rate limiting reveals nothing about whether an
- *   account exists, and collapsing it was actively harmful: someone who had
- *   been throttled was told their password was wrong, so they retried, which
- *   extended the throttle.
- * - **Everything else is one message.** "No such account" and "wrong password"
- *   as separate answers would turn this form into a way of asking which email
- *   address is the operator's. "Email not confirmed" is folded in for the same
- *   reason — it confirms the account exists.
- */
 function messageFor(status: number): TranslationKey {
   return status === 429 ? "login.tooManyAttempts" : "login.failed";
 }

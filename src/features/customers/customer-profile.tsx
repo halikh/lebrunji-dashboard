@@ -2,38 +2,62 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, type ReactNode } from "react";
+import {
+  AlertCircle,
+  MapPin,
+  MapPinOff,
+  Phone,
+  Receipt,
+  Tag,
+} from "lucide-react";
+import { useCallback, useMemo, type ReactNode } from "react";
 
-import { EmptyState } from "@/components/ui/empty-state";
-import { BackLink } from "@/components/ui/back-link";
-import { Button, cx } from "@/components/ui";
-import { ROW } from "@/components/ui/row";
-import { Copyable } from "@/components/ui/copyable";
-import { Avatar } from "@/components/ui/avatar";
-import { OrderPanel } from "@/features/orders/order-panel";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  Copyable,
+  DescriptionList,
+  EmptyState,
+  ListSkeleton,
+  MapView,
+  Notice,
+  Page,
+  PageHeader,
+  RecordSkeleton,
+  Section,
+  Sheet,
+  Skeleton,
+  StatusBadge,
+  TBody,
+  THead,
+  Table,
+  Td,
+  Th,
+  Tr,
+  TwoColumn,
+  cx,
+} from "@/components/ui";
 import { BarChart, HeatStrip } from "@/components/ui/chart";
 import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
-import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
-// Aliased, and not for taste: imported as `Map` it shadows the built-in, and
-// `new Map<string, number>()` below then fails to compile with an error that
-// points at the arithmetic rather than at the import.
-import { Map as PinMap } from "@/components/ui/map";
+import { OrderPanel } from "@/features/orders/order-panel";
 import { Price } from "@/features/reference/price";
 import { useMoney } from "@/features/reference/use-currencies";
-import { useConfirmLeave } from "@/components/unsaved-changes";
-import { t, type TranslationKey } from "@/i18n/translations";
-import { statusTone } from "@/lib/order-status";
-import { formatPhone } from "@/lib/phone";
 import { useClock } from "@/features/settings/use-clock";
-import { formatDate, formatMonthKey } from "@/lib/time";
+import { t, type TranslationKey } from "@/i18n/translations";
+import { formatPhone } from "@/lib/phone";
+import { formatDate, formatMonthKey, formatRelative } from "@/lib/time";
 
+import { useAccountActions } from "./account-actions";
 import type {
   CustomerAddress,
+  CustomerDetail,
   CustomerOrder,
   CustomerRedemption,
+  CustomerStats,
 } from "./api/customers";
-import { AccountActions } from "./account-actions";
-import { StatusChip, nameOf } from "./customers-screen";
+import { CustomerStatus, nameOf } from "./customer-status";
 import {
   useCustomer,
   useCustomerOrders,
@@ -41,746 +65,746 @@ import {
   useCustomerStats,
 } from "./use-customers";
 
-/**
- * One customer, in full.
- *
- * ## Why this is a page and not a panel
- *
- * A panel is the right shape for a form beside a list, and the wrong shape for
- * a record. This carries a history, a set of addresses that only mean anything
- * on a map, everything the customer has ever ordered, and two actions that end
- * with somebody signed out of their account. None of that fits a 420px column,
- * and squeezing it in would make the map — the one part of the screen where
- * more pixels are more information — the smallest thing on it.
- *
- * It is also a URL, which is the practical half: an operator on the phone can
- * send a colleague exactly the person they are looking at.
- *
- * ## Three queries, not one
- *
- * The profile, the totals and the orders load separately and paint as they
- * arrive. The name and the phone number are what somebody on a call needs
- * *now*; totalling a hundred orders to show a lifetime figure should not hold
- * them up. Each block says which of the four states it is in rather than the
- * page having one.
- *
- * ## Two columns, split by what each half wants
- *
- * The same reasoning as the store's details tab. Who they are and what they
- * have bought reads as a column; where they are wants width. Stretching the
- * text across the whole page would make a phone number a thousand pixels wide,
- * which is harder to read, not easier.
- */
-/**
- * The profile's own tabs.
- *
- * Not a nicety: any one of these lists is unbounded. A customer who has ordered
- * weekly for two years has a hundred orders, and stacking that under their
- * addresses means the map — which is the reason the addresses are worth
- * showing at all — sits below a screen and a half of order rows nobody scrolled
- * past to reach it. Overview is what somebody on a call needs in the first five
- * seconds; the rest are things you go and look at.
- */
-const TABS: { key: ProfileTab; labelKey: TranslationKey }[] = [
-  { key: "overview", labelKey: "customers.tabOverview" },
-  { key: "orders", labelKey: "customers.orders" },
-  { key: "addresses", labelKey: "customers.addresses" },
-  { key: "promotions", labelKey: "customers.promotions" },
+/** Sunday-first, matching the stored index of `byWeekday`. */
+const WEEKDAY_SHORT: TranslationKey[] = [
+  "customers.weekdayShort.sun",
+  "customers.weekdayShort.mon",
+  "customers.weekdayShort.tue",
+  "customers.weekdayShort.wed",
+  "customers.weekdayShort.thu",
+  "customers.weekdayShort.fri",
+  "customers.weekdayShort.sat",
 ];
 
-type ProfileTab = "overview" | "orders" | "addresses" | "promotions";
-
-/** What a uuid looks like. Anything else is not an order this can link to. */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
- * An order code, or nothing.
+ * One customer, in full: who they are, how to reach them, what they have
+ * bought, where they live, what promotions they have had.
  *
- * The code arrives in the URL as a label rather than being fetched, which saves
- * a round trip for four words of chrome — and means it is a string somebody
- * else could have written. It is only ever rendered as text, so the risk is not
- * injection but nonsense: this keeps it to the shape a code actually has, and
- * an unrecognisable one becomes an empty label rather than whatever was pasted.
+ * - **A page, not a panel**, so it is a URL an operator on the phone can send
+ *   to a colleague, and the maps get room.
+ * - **Four queries that paint as they arrive.** The name and the phone are what
+ *   somebody on a call needs now; totalling a hundred orders should not hold
+ *   them up. Each block has its own loading and error state.
+ * - **One page, two columns** (Shopify, Stripe): what they have done on the
+ *   left, who they are and where they live on the right. No tabs — see
+ *   `ProfileBody`.
+ * - **An order opens over the page** (`?order=`) in the queue's own receipt,
+ *   so reading one line of a history does not lose the history.
+ * - **Back is the header's**, which goes to the page before — the order, the
+ *   queue or the list, whichever it was.
  */
-function label(code: string | null): string {
-  return code && /^#?[A-Za-z0-9-]{1,32}$/.test(code) ? code : "";
-}
-
 export function CustomerProfile({ id }: { id: string }) {
-  const clock = useClock();
   const router = useRouter();
-  const confirmLeave = useConfirmLeave();
   const pathname = usePathname();
   const params = useSearchParams();
 
-  const requested = params.get("tab");
-  const tab: ProfileTab = TABS.some((one) => one.key === requested)
-    ? (requested as ProfileTab)
-    : "overview";
-
-  /**
-   * The tab lives in the URL, `replace` rather than `push`.
-   *
-   * Switching a tab is not a journey: Back should return to the customers list
-   * rather than walk through the tabs somebody looked at on the way.
-   */
-  /**
-   * Switching tabs unmounts whatever is in the current one, so it is a way out
-   * of a form even though the URL barely moves. Guarded here rather than on
-   * each tab button: there is one `show`.
-   */
-  function show(next: ProfileTab) {
-    void confirmLeave().then((leave) => {
-      if (!leave) return;
-      const query = new URLSearchParams(params);
-      if (next === "overview") query.delete("tab");
-      else query.set("tab", next);
-      const search = query.toString();
-      router.replace(search ? `${pathname}?${search}` : pathname, {
-        scroll: false,
-      });
-    });
-  }
-
-  const customer = useCustomer(id);
-  const stats = useCustomerStats(id);
-  const orders = useCustomerOrders(id);
-  const redemptions = useCustomerRedemptions(id);
-  const { format } = useMoney();
-
-  /**
-   * The order whose receipt is open, over this page.
-   *
-   * In the URL rather than in state, like every other panel here: a view can be
-   * reloaded or sent, and Back closes the receipt instead of leaving the
-   * customer entirely.
-   *
-   * It opens **here** rather than navigating to the queue, which is what these
-   * rows used to do. Sending somebody to a different screen to read one line of
-   * a history they are already looking at loses their tab, their scroll and
-   * their place in it.
-   */
   const openOrder = params.get("order");
 
-  /**
-   * Where "back" goes.
-   *
-   * A profile reached from an order should lead back to *that order* — the
-   * operator was reading a receipt, followed the customer's name to check their
-   * history, and wants to return to what they were doing. Sending them to the
-   * customers list instead is the same wrong answer a browser Back button would
-   * be right about, and this link is what they will press.
-   *
-   * Only an id is accepted, and the path is built here: a return *URL* taken
-   * from a query parameter is a destination somebody else chooses.
-   */
-  const fromOrder = params.get("fromOrder");
-  const fromQueue = params.get("fromQueue");
-  const back = UUID.test(fromOrder ?? "")
-    ? {
-        href: `/orders/${fromOrder}`,
-        // Named, because a page has no list behind it to go "back" to — and
-        // the code is what the operator was reading a second ago.
-        label: t("customers.backToOrder", { code: label(params.get("code")) }),
-      }
-    : UUID.test(fromQueue ?? "")
-      ? // Where the panel was open, still open. Exactly the link the order's
-        // own page offers, so leaving a receipt lands in the same place from
-        // either side of it.
-        { href: `/orders?order=${fromQueue}`, label: t("orders.backToQueue") }
-      : { href: "/customers", label: t("customers.backToList") };
-
-  const setOpenOrder = useCallback(
-    (orderId: string | null) => {
+  const replace = useCallback(
+    (edit: (query: URLSearchParams) => void) => {
       const query = new URLSearchParams(params);
-      if (orderId) query.set("order", orderId);
-      else query.delete("order");
-      const search = query.toString();
-      router.replace(search ? `${pathname}?${search}` : pathname, {
+      edit(query);
+      const text = query.toString();
+      router.replace(text ? `${pathname}?${text}` : pathname, {
         scroll: false,
       });
     },
     [params, pathname, router],
   );
 
+  const setOpenOrder = useCallback(
+    (orderId: string | null) =>
+      replace((q) => (orderId ? q.set("order", orderId) : q.delete("order"))),
+    [replace],
+  );
+
+  const customer = useCustomer(id);
+  const stats = useCustomerStats(id);
+  const orders = useCustomerOrders(id);
+  const redemptions = useCustomerRedemptions(id);
+
+  const orderRows = useMemo(
+    () => orders.data?.pages.flatMap((page) => page.orders) ?? [],
+    [orders.data],
+  );
+
+  /**
+   * What promotions have taken off, per currency — a sum across two
+   * currencies is a number in no currency at all (`0028`).
+   */
+  const saved = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const one of redemptions.data ?? []) {
+      totals.set(
+        one.currencyCode,
+        (totals.get(one.currencyCode) ?? 0) + one.amount,
+      );
+    }
+    return [...totals.entries()];
+  }, [redemptions.data]);
+
   if (customer.isPending) {
     return (
-      <div className="flex h-full items-center justify-center text-[13px] text-text-faint">
-        {t("common.loading")}
-      </div>
+      <Page>
+        <RecordSkeleton />
+      </Page>
     );
   }
 
   if (customer.isError || !customer.data) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-lg text-center">
-        <h1 className="text-[18px]">{t("customers.failedTitle")}</h1>
-        <div className="flex gap-sm">
-          <Button variant="secondary" onClick={() => void customer.refetch()}>
-            {t("common.retry")}
-          </Button>
-          <Link href="/customers">
-            <Button variant="secondary">{t("customers.backToList")}</Button>
-          </Link>
-        </div>
-      </div>
+      <Page>
+        <PageHeader title={t("customers.title")} />
+        <Card padded={false}>
+          <EmptyState
+            icon={<AlertCircle />}
+            title={t("customers.profileFailedTitle")}
+            description={t("customers.profileFailedBody")}
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button onClick={() => void customer.refetch()}>
+                  {t("common.retry")}
+                </Button>
+                <Button asChild variant="ghost">
+                  <Link href="/customers">{t("customers.backToList")}</Link>
+                </Button>
+              </div>
+            }
+          />
+        </Card>
+      </Page>
     );
   }
 
   const row = customer.data;
-  const closed = row.deletedAt !== null;
-  const name = nameOf(row);
-  const orderRows = orders.data?.pages.flatMap((page) => page.orders) ?? [];
-
-  /**
-   * What the promotions have actually cost, per currency.
-   *
-   * Per currency for the same reason the spend tiles are: `0028` lets a
-   * customer order from shops pricing differently, and a sum across two is a
-   * number in no currency at all.
-   */
-  const saved = [
-    ...(redemptions.data ?? [])
-      .reduce((totals, one) => {
-        totals.set(
-          one.currencyCode,
-          (totals.get(one.currencyCode) ?? 0) + one.amount,
-        );
-        return totals;
-      }, new Map<string, number>())
-      .entries(),
-  ];
 
   return (
-    <div className="flex h-full min-w-0 flex-col">
-      <header className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-lg py-lg md:px-xxl">
-        {/* The same back control the store and the order carry — one
-            component now, because "two spellings of go up a level are two
-            things to recognise" was written here first and then copied three
-            times, which is how a convention decays. */}
-        <BackLink href={back.href}>{back.label}</BackLink>
+    <Page>
+      <ProfileBody
+        row={row}
+        name={nameOf(row)}
+        closed={row.deletedAt !== null}
+        stats={stats}
+        saved={saved}
+        orders={orders}
+        orderRows={orderRows}
+        redemptions={redemptions}
+        onOpenOrder={setOpenOrder}
+      />
 
-        <div className="flex flex-wrap items-center gap-lg">
-          {/* The same colour this customer wears on the list, because it is
-              hashed from their id rather than picked at render. */}
-          <Avatar id={row.id} name={row.name} size={52} />
-
-          {/* Everything that identifies the person, in one column, read
-              downward: who they are, how to reach them, since when, whether
-              the account works, and how they read the app.
-
-              The phone is here rather than in a Contact block on the Overview
-              tab because it is the single most-wanted fact on the page — the
-              operator is usually already dialling — and a fact you have to
-              change tabs for is one the tabs have hidden. The preferences sit
-              last and small: they qualify everything above without being
-              something anybody came for.
-
-              A floor of 12rem on a zero basis, so the column takes the slack
-              on a wide header and, on a phone, the two actions are what wrap
-              to a line of their own — not the identity, which would otherwise
-              leave the avatar alone on the first line. */}
-          <div className="flex min-w-[12rem] grow basis-0 flex-col items-start gap-xs">
-            <h1
-              className={cx(
-                "truncate text-[24px]",
-                !row.name.trim() && "italic text-text-soft",
-              )}
-            >
-              {name}
-            </h1>
-
-            {/* A `tel:` link, because the operator is usually about to ring
-                them — and copyable, because half the time they are reading it
-                into something else. */}
-            <Copyable
-              value={formatPhone(row.phone)}
-              href={`tel:${formatPhone(row.phone)}`}
-              label={t("customers.copyPhone")}
-            />
-
-            <span className="text-[12px] text-text-faint">
-              {t("customers.joined", { when: clock.dateTime(row.createdAt) })}
-            </span>
-
-            <StatusChip customer={row} />
-
-            <span className="flex flex-wrap items-center gap-x-md gap-y-xxs text-[12px] text-text-faint">
-              <span>
-                {t("customers.prefLanguage", {
-                  value: row.locale ?? t("customers.notSet"),
-                })}
-              </span>
-              <span>
-                {t("customers.prefCurrency", {
-                  // Null is not "unset" here: `0028` says it means *show each
-                  // store's own pricing currency*, which is a real answer.
-                  value: row.currencyCode ?? t("customers.shopsOwn"),
-                })}
-              </span>
-            </span>
-          </div>
-
-          {/* The same pair the list row carries — one component, so the
-              confirmation copy cannot say two different things about the same
-              act depending on which screen you reached it from. */}
-          <AccountActions customer={row} />
-        </div>
-      </header>
-
-      {/* Section tabs, not filter tabs — the underline the store screen uses,
-          because these are chapters of one record rather than buckets of a
-          list. The count rides in the label, where a chapter can carry one
-          without pretending to be a status.
-
-          The strip sits under the header, so the name and the actions stay put
-          while the content beneath them changes. */}
-      <div
-        role="tablist"
-        // The customer's own name, not a generic "tabs": a screen reader
-        // announcing "Rami Haddad, tab list" says which record these belong to.
-        aria-label={name}
-        // Scrolls sideways when four chapter names outrun a phone, without a
-        // visible scrollbar — the tab half under the edge says there is more.
-        className="-mb-px flex shrink-0 gap-lg overflow-x-auto border-b border-border bg-surface px-lg [scrollbar-width:none] md:px-xxl"
+      {/* The queue's own receipt, over the profile — same component, so a
+          field added there appears here without anybody remembering to. */}
+      <Sheet
+        open={openOrder !== null}
+        onOpenChange={(open) => !open && setOpenOrder(null)}
+        title={t("orders.panelLabel")}
+        width="lg"
       >
-        {TABS.map(({ key, labelKey }) => (
-          <SectionTab
-            key={key}
-            label={t(labelKey)}
-            active={tab === key}
-            onClick={() => show(key)}
-            onKeyDown={tabArrowHandler(
-              TABS.map((one) => one.key),
-              tab,
-              show,
-            )}
-          />
-        ))}
-      </div>
-
-      {/* Siblings rather than one swapped child, and `hidden` rather than
-          unmounting. Remounting would refetch, lose the operator's scroll
-          position, and flash a skeleton at somebody returning to a list they
-          were just reading — and on this page it would do that to an infinite
-          list they had scrolled a long way down. */}
-      <div className="min-h-0 flex-grow overflow-y-auto scroll-hint">
-        <div className={cx("p-lg md:p-xxl", tab !== "overview" && "hidden")}>
-          {/* A size container: the tiles and the charts lay themselves out by
-              the pane's width rather than the window's. */}
-          <div className="@container flex flex-col gap-xxl">
-            {closed && (
-              <p className="rounded-md border border-border bg-neutral-fill px-lg py-md text-[13px] text-text-soft">
-                {t("customers.closedNote", {
-                  when: formatDate(row.deletedAt as string),
-                })}
-              </p>
-            )}
-
-            <Block title={t("customers.summary")}>
-              {stats.isPending && (
-                <p className="text-[13px] text-text-faint">
-                  {t("common.loading")}
-                </p>
-              )}
-              {stats.isError && (
-                <p role="alert" className="text-[13px] text-danger">
-                  {t("customers.statsFailed")}
-                </p>
-              )}
-              {stats.isSuccess && (
-                <>
-                  {/* One column on a phone, where half of 330px cannot hold a
-                      spend figure in a long currency at this size. */}
-                  <div className="grid grid-cols-1 gap-md @sm:grid-cols-2 @5xl:grid-cols-4">
-                    <Tile
-                      label={t("customers.tileOrders")}
-                      value={String(stats.data.orderCount)}
-                    />
-                    {/* Per currency, because `0028` lets a customer order from
-                        shops pricing differently and a sum across two is a
-                        number in no currency at all. Usually one tile. */}
-                    {stats.data.totals.map((total) => (
-                      <Tile
-                        key={total.code}
-                        label={t("customers.tileSpent", { code: total.code })}
-                        value={
-                          <Price
-                            value={total.amount}
-                            code={total.code}
-                            className="text-[20px] font-semibold"
-                          />
-                        }
-                      />
-                    ))}
-                    {saved.map(([code, amount]) => (
-                      <Tile
-                        key={`saved-${code}`}
-                        label={t("customers.tileSaved", { code })}
-                        value={
-                          <Price
-                            value={amount}
-                            code={code}
-                            className="text-[20px] font-semibold"
-                          />
-                        }
-                      />
-                    ))}
-                    <Tile
-                      label={t("customers.tileFirst")}
-                      value={
-                        stats.data.firstOrderAt
-                          ? formatDate(stats.data.firstOrderAt)
-                          : t("customers.never")
-                      }
-                    />
-                    <Tile
-                      label={t("customers.tileLast")}
-                      value={
-                        stats.data.lastOrderAt
-                          ? formatDate(stats.data.lastOrderAt)
-                          : t("customers.never")
-                      }
-                    />
-                  </div>
-
-                  {/* The cap is the assumption, made visible. Quietly
-                      under-reporting a lifetime figure is worse than saying it
-                      is a floor. */}
-                  {stats.data.truncated && (
-                    <p className="text-[12px] text-text-faint">
-                      {t("customers.statsTruncated")}
-                    </p>
-                  )}
-                </>
-              )}
-            </Block>
-
-            {/* The tiles say how much; the charts say the two things a figure
-                cannot — whether they are still ordering, and when. A customer
-                who stopped in March is four flat bars, which no total on this
-                page would ever reveal. */}
-            {stats.isSuccess && stats.data.orderCount > 0 && (
-              <div className="grid gap-xxl @5xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <Block
-                  title={
-                    stats.data.seriesCurrency
-                      ? t("customers.chartMonthsMoney", {
-                          code: stats.data.seriesCurrency,
-                        })
-                      : t("customers.chartMonths")
-                  }
-                >
-                  <BarChart
-                    // `active` here rather than the overview's `accent`: this
-                    // is about the person in front of you, and the app's accent
-                    // is what says so. The business-wide charts stay green.
-                    tone="active"
-                    title={t("customers.chartMonthsAria")}
-                    bars={stats.data.months.map((month) => {
-                      const code = stats.data.seriesCurrency;
-                      // Height follows the money when there is one currency to
-                      // draw, and the order count when there is not — a bar
-                      // whose height mixed dollars and lira would be a chart of
-                      // nothing.
-                      const value = code ? month.amount : month.orders;
-                      return {
-                        key: month.key,
-                        label: formatMonthKey(month.key),
-                        value,
-                        title: code
-                          ? t("customers.chartMonthTitleMoney", {
-                              month: formatMonthKey(month.key),
-                              orders: month.orders,
-                              amount: format(month.amount, code),
-                            })
-                          : t("customers.chartMonthTitle", {
-                              month: formatMonthKey(month.key),
-                              orders: month.orders,
-                            }),
-                      };
-                    })}
-                  />
-                </Block>
-
-                <Block title={t("customers.chartWeekdays")}>
-                  <HeatStrip
-                    // The same `info` the overview's hours grid uses — a
-                    // pattern of time reads the same way whoever it is about.
-                    tone="info"
-                    title={t("customers.chartWeekdaysAria")}
-                    // Rotated to Monday-first here, in the presentation layer.
-                    // The stored order is Sunday-first because that is what
-                    // `Date#getDay` and `store_hours.day_of_week` both use, and
-                    // the two orders are kept deliberately separate so nothing
-                    // reaching the database passes through a display position.
-                    cells={[1, 2, 3, 4, 5, 6, 0].map((day) => ({
-                      key: String(day),
-                      label: WEEKDAYS[day],
-                      value: stats.data.byWeekday[day] ?? 0,
-                    }))}
-                  />
-                </Block>
-              </div>
-            )}
+        {openOrder && (
+          <div className="-mx-6 -my-5 h-[calc(100dvh-65px)]">
+            <OrderPanel
+              orderId={openOrder}
+              embedded
+              onClose={() => setOpenOrder(null)}
+            />
           </div>
-        </div>
-
-        <div className={cx("p-lg md:p-xxl", tab !== "orders" && "hidden")}>
-          {/* A size container, for the rows' own wrapping. */}
-          <div className="@container flex flex-col gap-sm">
-            {orders.isPending && (
-              <div aria-hidden className="flex flex-col gap-sm">
-                {[0, 1, 2, 3].map((one) => (
-                  <div key={one} className="h-[62px] rounded-lg bg-line-soft" />
-                ))}
-              </div>
-            )}
-
-            {orders.isError && (
-              <p role="alert" className="text-[13px] font-medium text-danger">
-                {t("customers.ordersFailed")}
-              </p>
-            )}
-
-            {orders.isSuccess && orderRows.length === 0 && (
-              <EmptyState titleKey="customers.noOrders" mood="waiting" />
-            )}
-
-            {orderRows.map((order) => (
-              <OrderRow key={order.id} order={order} onOpen={setOpenOrder} />
-            ))}
-
-            {orders.isSuccess && orderRows.length > 0 && (
-              <InfiniteSentinel
-                hasMore={orders.hasNextPage}
-                loading={orders.isFetchingNextPage}
-                onLoadMore={() => void orders.fetchNextPage()}
-              />
-            )}
-          </div>
-        </div>
-
-        <div className={cx("p-lg md:p-xxl", tab !== "addresses" && "hidden")}>
-          {row.addresses.length === 0 ? (
-            <EmptyState titleKey="customers.noAddresses" mood="waiting" />
-          ) : (
-            // A grid, because each card is a map and a map wants width. One
-            // column of full-width maps would be one address per screen.
-            <ul className="grid gap-lg md:grid-cols-2 2xl:grid-cols-3">
-              {row.addresses.map((address) => (
-                <AddressCard key={address.id} address={address} />
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className={cx("p-lg md:p-xxl", tab !== "promotions" && "hidden")}>
-          <div className="flex flex-col gap-sm">
-            {redemptions.isPending && (
-              <p className="text-[13px] text-text-faint">
-                {t("common.loading")}
-              </p>
-            )}
-
-            {redemptions.isError && (
-              <p role="alert" className="text-[13px] font-medium text-danger">
-                {t("customers.promotionsFailed")}
-              </p>
-            )}
-
-            {redemptions.isSuccess && redemptions.data.length === 0 && (
-              <EmptyState titleKey="customers.noPromotions" mood="waiting" />
-            )}
-
-            {redemptions.isSuccess && redemptions.data.length > 0 && (
-              <>
-                <p className="flex items-baseline gap-sm ps-md pb-sm text-[13px] text-text-soft">
-                  {t("customers.savedTotal")}
-                  {saved.map(([code, amount]) => (
-                    <Price
-                      key={code}
-                      value={amount}
-                      code={code}
-                      className="text-[13px] font-semibold"
-                    />
-                  ))}
-                </p>
-                <ul className="flex flex-col gap-sm">
-                  {redemptions.data.map((one) => (
-                    <RedemptionRow
-                      key={one.id}
-                      redemption={one}
-                      onOpen={setOpenOrder}
-                    />
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* The queue's own receipt, opened over the profile. Same component, so
-          a field added there appears here without anybody remembering to. */}
-      <OrderPanel orderId={openOrder} onClose={() => setOpenOrder(null)} />
-    </div>
-  );
-}
-
-function AddressCard({ address }: { address: CustomerAddress }) {
-  return (
-    <li className="flex flex-col gap-md rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
-      <div className="flex items-center gap-sm">
-        <span className="min-w-0 flex-grow truncate text-[13px] font-semibold">
-          {address.label ?? t("customers.unlabelled")}
-        </span>
-        {address.isSelected && (
-          <span className="shrink-0 rounded-sm bg-accent-wash px-sm text-[11px] font-semibold">
-            {t("customers.defaultAddress")}
-          </span>
         )}
-      </div>
-
-      <p className="text-[13px] text-text-soft">{address.line}</p>
-      {/* Who answers at this door, when it is not the account's own phone. */}
-      {address.phone && (
-        <p className="text-[13px] text-text-soft">
-          {t("customers.addressPhone")}: <span dir="ltr">+{address.phone}</span>
-        </p>
-      )}
-
-      {/* The map is why the addresses are in the wide column. A line of text is
-          an address somebody typed; the pin is where a courier is actually
-          sent, and the two disagree more often than anyone expects.
-
-          No pin, no map. An empty 180px placeholder saying "no location saved"
-          is a large piece of furniture carrying one sentence — and the warning
-          below already says the same thing, in red, with the consequence
-          attached. Two of them is one too many. */}
-      {address.latitude !== null && (
-        <PinMap
-          latitude={address.latitude}
-          longitude={address.longitude}
-          label={address.label ?? address.line}
-          className="h-[180px] w-full rounded-md"
-        />
-      )}
-
-      {/* An address with no pin falls to the top delivery band —
-          `delivery_fee_for_km` treats an unknown distance that way — so it
-          silently overcharges every order to it. */}
-      {address.latitude === null && (
-        <p className="w-fit rounded-sm bg-warning-wash px-sm text-[12px] text-text">
-          {t("customers.noPinWarning")}
-        </p>
-      )}
-    </li>
-  );
-}
-
-function OrderRow({
-  order,
-  onOpen,
-}: {
-  order: CustomerOrder;
-  onOpen: (id: string) => void;
-}) {
-  return (
-    <li
-      className={cx(
-        ROW,
-        // Wraps on a narrow list; see the group below.
-        "flex-wrap gap-y-sm border-transparent @xl:flex-nowrap",
-      )}
-    >
-      <span className="flex min-w-0 flex-grow flex-col gap-xxs">
-        {/* Opens the receipt **over this page**, rather than sending the
-            operator to the queue. They are already looking at this customer's
-            history; navigating away to read one line of it loses their tab,
-            their scroll and their place in it. */}
-        <button
-          type="button"
-          onClick={() => onOpen(order.id)}
-          className="truncate text-start tabular-nums text-[13px] font-semibold after:absolute after:inset-0"
-        >
-          {order.code}
-        </button>
-        <span className="truncate text-[12px] text-text-faint">
-          {order.addressLine}
-        </span>
-      </span>
-
-      {/* One chip per shop on the order. An order spanning two shops has two
-          statuses, and showing only the first would be a claim about the order
-          that is true only when it has one shop on it.
-
-          Painted from the order-status ramp, so "Delivered" here is the same
-          green as "Delivered" in the queue. Grey chips would have made a
-          cancelled order and a delivered one look alike on the one screen where
-          somebody is scanning a history for the odd one out — and a status
-          colour that is defined twice is a status colour that will differ.
-
-          The chips, the date and the total are one group: a line of their own
-          under the code on a narrow list, and `contents` — the row's own items,
-          as before — once there is room beside it. */}
-      <span className="flex basis-full flex-wrap items-center gap-x-lg gap-y-sm @xl:contents">
-        <span className="flex shrink-0 flex-wrap items-center gap-xs">
-          {order.statuses.map((status) => {
-            const tone = statusTone(status.slug);
-            return (
-              <span
-                key={status.slug}
-                // A dot as well as the ground, for the reason the queue's tabs
-                // carry one: colour alone is not a distinction a colour-blind
-                // operator can rely on.
-                style={{ background: tone.wash, color: tone.ink }}
-                className="flex items-center gap-xs rounded-sm px-sm py-[1px] text-[11px] font-semibold"
-              >
-                <span
-                  aria-hidden
-                  className="size-[6px] shrink-0 rounded-full"
-                  style={{ background: tone.dot }}
-                />
-                {status.name}
-              </span>
-            );
-          })}
-        </span>
-
-        <span className="shrink-0 text-[12px] text-text-faint">
-          {formatDate(order.placedAt)}
-        </span>
-
-        {/* This one order's own shop rate — `0120`. The tiles above
-            deliberately do not take one: a lifetime total spans shops, and no
-            single shop's rate is right for a sum of other shops' money.
-
-            Wrapped, because `Price` hands its class to the figure inside it
-            and the margin has to be on the box: it holds the total to the end
-            of the line when the group has one to itself. */}
-        <span className="ms-auto shrink-0 @xl:ms-0">
-          <Price
-            value={order.total}
-            code={order.currencyCode}
-            shopRate={order.shopRate}
-            align="end"
-            className="text-[13px] font-semibold"
-          />
-        </span>
-      </span>
-    </li>
+      </Sheet>
+    </Page>
   );
 }
 
 /**
- * Sunday-first, matching the stored index.
+ * The record itself, laid out the way Shopify and Stripe lay out a customer:
+ * the header names them and carries the account actions under ⋯; the main
+ * column is what they have done (lifetime figures, the shape of their
+ * ordering, every order, every promotion); the side column is who they are
+ * and where they live, which is what somebody on a call reads first.
  *
- * Not translated: they are two-letter axis labels on a chart, and the chrome is
- * English by decision. When a second language arrives they become keys like
- * everything else — the array is the seam.
+ * One scrolling page rather than tabs, because nothing here is long enough
+ * to hide behind one, and the operator should not have to click to learn
+ * that a customer's address has no pin.
  */
-const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+function ProfileBody({
+  row,
+  name,
+  closed,
+  stats,
+  saved,
+  orders,
+  orderRows,
+  redemptions,
+  onOpenOrder,
+}: {
+  row: CustomerDetail;
+  name: string;
+  closed: boolean;
+  stats: ReturnType<typeof useCustomerStats>;
+  saved: [string, number][];
+  orders: ReturnType<typeof useCustomerOrders>;
+  orderRows: CustomerOrder[];
+  redemptions: ReturnType<typeof useCustomerRedemptions>;
+  onOpenOrder: (id: string) => void;
+}) {
+  const actions = useAccountActions(row);
+  const phone = formatPhone(row.phone);
+  const unnamed = !row.name.trim();
+  // Shopify leaves out what a customer has never had; an empty promotions
+  // card on most profiles would be noise. A failed read still shows, so
+  // "none" and "could not tell" never look alike.
+  const usedPromotions =
+    redemptions.isError || (redemptions.data?.length ?? 0) > 0;
+
+  return (
+    <>
+      <PageHeader
+        title={
+          <span className="flex min-w-0 items-center gap-3">
+            <Avatar name={unnamed ? "" : row.name} size={40} />
+            <span
+              className={cx(
+                "break-words",
+                unnamed && "font-medium text-ink-3 italic",
+              )}
+            >
+              {name}
+            </span>
+          </span>
+        }
+        meta={<CustomerStatus customer={row} />}
+        more={actions.items}
+        actions={
+          phone && !closed ? (
+            // The most-wanted action on the page: the operator is usually
+            // already dialling.
+            <Button variant="secondary" asChild>
+              <a href={`tel:${phone}`}>
+                <Phone />
+                {t("customers.call")}
+              </a>
+            </Button>
+          ) : undefined
+        }
+      />
+      {actions.dialogs}
+
+      {closed && (
+        <Notice>
+          {t("customers.closedNote", {
+            when: formatDate(row.deletedAt as string),
+          })}
+        </Notice>
+      )}
+
+      <TwoColumn
+        main={
+          <>
+            <SummaryTiles stats={stats} saved={saved} />
+            {stats.isSuccess && stats.data.orderCount > 0 && (
+              <Charts stats={stats.data} />
+            )}
+            <Section
+              title={t("customers.ordersCount", { count: row.orderCount })}
+              description={t("customers.ordersBlurb")}
+              bodyClassName="p-0"
+            >
+              <OrdersTable
+                query={orders}
+                rows={orderRows}
+                onOpen={onOpenOrder}
+                paged
+              />
+            </Section>
+            {usedPromotions && (
+              <Section
+                title={t("customers.promotions")}
+                description={t("customers.promotionsBlurb")}
+                actions={
+                  saved.length > 0 ? (
+                    <span className="flex items-baseline gap-2 text-[13px] text-ink-3">
+                      {t("customers.savedTotal")}
+                      {saved.map(([code, amount]) => (
+                        <Price
+                          key={code}
+                          value={amount}
+                          code={code}
+                          className="text-[14px] font-semibold text-success-ink"
+                        />
+                      ))}
+                    </span>
+                  ) : undefined
+                }
+                bodyClassName="p-0"
+              >
+                <PromotionsTable query={redemptions} onOpen={onOpenOrder} />
+              </Section>
+            )}
+          </>
+        }
+        aside={
+          <>
+            <ContactCard customer={row} phone={phone} />
+            <AddressesCard addresses={row.addresses} />
+          </>
+        }
+      />
+    </>
+  );
+}
+
+/**
+ * Who they are. The phone first and copyable — it is what somebody on a call
+ * needs — then the facts that qualify the account.
+ */
+function ContactCard({
+  customer,
+  phone,
+}: {
+  customer: CustomerDetail;
+  phone: string;
+}) {
+  const clock = useClock();
+  return (
+    <Section title={t("customers.contact")}>
+      <DescriptionList
+        className="grid-cols-[minmax(0,7rem)_1fr]"
+        items={[
+          {
+            label: t("customers.colPhone"),
+            value: phone ? (
+              <Copyable
+                value={phone}
+                href={`tel:${phone}`}
+                label={t("customers.copyPhone")}
+                className="font-medium tabular-nums"
+              >
+                <span dir="ltr">{phone}</span>
+              </Copyable>
+            ) : (
+              <span className="text-ink-4">{t("customers.notSet")}</span>
+            ),
+          },
+          {
+            label: t("customers.joinedLabel"),
+            value: clock.dateTime(customer.createdAt),
+          },
+          {
+            label: t("customers.language"),
+            value: customer.locale ?? (
+              <span className="text-ink-3">{t("customers.notSet")}</span>
+            ),
+          },
+          {
+            label: t("customers.currency"),
+            // Null is a real answer (`0028`): each shop's own currency.
+            value: customer.currencyCode ?? (
+              <span className="text-ink-3">{t("customers.shopsOwn")}</span>
+            ),
+          },
+        ]}
+      />
+    </Section>
+  );
+}
+
+/**
+ * Where their orders go: the selected address in full, with its map; the
+ * others as lines. A missing pin is flagged on every one, because it means an
+ * overcharge on every order there.
+ */
+function AddressesCard({ addresses }: { addresses: CustomerAddress[] }) {
+  const selected = addresses.find((one) => one.isSelected) ?? null;
+  const others = addresses.filter((one) => one !== selected);
+
+  return (
+    <Section title={t("customers.addresses")} bodyClassName="p-0">
+      {addresses.length === 0 ? (
+        <EmptyState
+          icon={<MapPin />}
+          title={t("customers.noAddresses")}
+          description={t("customers.noAddressesBody")}
+        />
+      ) : (
+        <div className="flex flex-col divide-y divide-line">
+          {selected && (
+            <div className="p-5">
+              <AddressCard address={selected} />
+            </div>
+          )}
+          {others.length > 0 && (
+            <div className="flex flex-col gap-3 p-5">
+              <p className="text-[12.5px] font-medium text-ink-3">
+                {t("customers.otherAddresses", { count: others.length })}
+              </p>
+              <ul className="flex flex-col gap-3">
+                {others.map((address) => {
+                  const noPin =
+                    address.latitude === null || address.longitude === null;
+                  return (
+                    <li key={address.id} className="flex items-start gap-2">
+                      {noPin ? (
+                        <MapPinOff
+                          aria-hidden
+                          className="mt-0.5 size-4 shrink-0 text-warning"
+                        />
+                      ) : (
+                        <MapPin
+                          aria-hidden
+                          className="mt-0.5 size-4 shrink-0 text-ink-4"
+                        />
+                      )}
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-[13.5px] font-medium text-ink">
+                          {address.label ?? t("customers.unlabelled")}
+                        </span>
+                        <span className="text-[13px] text-ink-3">
+                          {address.line}
+                        </span>
+                        {noPin && (
+                          <span className="text-[12.5px] text-warning-ink">
+                            {t("customers.noPin")}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function Tile({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 rounded-lg border border-line bg-surface px-4 py-3.5 shadow-xs">
+      <span className="text-[12.5px] font-medium text-ink-3">{label}</span>
+      <span className="text-[20px] font-semibold tracking-tight break-words text-ink tabular-nums">
+        {children}
+      </span>
+    </div>
+  );
+}
+
+function SummaryTiles({
+  stats,
+  saved,
+}: {
+  stats: ReturnType<typeof useCustomerStats>;
+  saved: [string, number][];
+}) {
+  if (stats.isPending) {
+    return (
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((one) => (
+          <Skeleton key={one} className="h-[76px] rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+  if (stats.isError) {
+    return (
+      <p
+        role="alert"
+        className="flex items-center gap-2 rounded-lg border border-danger/20 bg-danger-soft px-4 py-3 text-[13.5px] text-danger-ink"
+      >
+        <AlertCircle className="size-4" />
+        {t("customers.statsFailed")}
+        <button
+          type="button"
+          onClick={() => void stats.refetch()}
+          className="ms-auto font-medium underline underline-offset-2"
+        >
+          {t("common.retry")}
+        </button>
+      </p>
+    );
+  }
+  const data = stats.data;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4">
+        <Tile label={t("customers.tileOrders")}>{data.orderCount}</Tile>
+        {/* Per currency: usually one tile, and never a sum across two. */}
+        {data.totals.map((total) => (
+          <Tile
+            key={total.code}
+            label={t("customers.tileSpent", { code: total.code })}
+          >
+            <Price
+              value={total.amount}
+              code={total.code}
+              className="text-[20px] font-semibold"
+            />
+          </Tile>
+        ))}
+        {saved.map(([code, amount]) => (
+          <Tile
+            key={`saved-${code}`}
+            label={t("customers.tileSaved", { code })}
+          >
+            <Price
+              value={amount}
+              code={code}
+              className="text-[20px] font-semibold"
+            />
+          </Tile>
+        ))}
+        {/* Average order value, Shopify's third lifetime figure — only in
+            one currency, over the same rows the total is, so it is never an
+            average of dollars and lira. */}
+        {data.totals.length === 1 && data.orderCount > 0 && (
+          <Tile
+            label={t("customers.tileAverage", { code: data.totals[0]!.code })}
+          >
+            <Price
+              value={Math.round(data.totals[0]!.amount / data.orderCount)}
+              code={data.totals[0]!.code}
+              className="text-[20px] font-semibold"
+            />
+          </Tile>
+        )}
+        <Tile label={t("customers.tileLast")}>
+          {data.lastOrderAt ? (
+            <span className="flex flex-col">
+              {formatRelative(data.lastOrderAt)}
+              <span className="text-[12.5px] font-normal text-ink-3">
+                {t("customers.firstOrderOn", {
+                  when: formatDate(data.firstOrderAt ?? data.lastOrderAt),
+                })}
+              </span>
+            </span>
+          ) : (
+            t("customers.never")
+          )}
+        </Tile>
+      </div>
+      {/* The cap made visible: a lifetime figure that is a floor says so. */}
+      {data.truncated && (
+        <p className="text-[12.5px] text-ink-3">
+          {t("customers.statsTruncated")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The two things a total cannot say: whether they are still ordering, and
+ * when. A customer who stopped in March is four flat bars.
+ */
+function Charts({ stats }: { stats: CustomerStats }) {
+  const { format } = useMoney();
+  const code = stats.seriesCurrency;
+  return (
+    <div className="grid gap-6 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <Section
+        title={
+          code
+            ? t("customers.chartMonthsMoney", { code })
+            : t("customers.chartMonths")
+        }
+      >
+        <BarChart
+          tone="accent"
+          title={t("customers.chartMonthsAria")}
+          bars={stats.months.map((month) => ({
+            key: month.key,
+            label: formatMonthKey(month.key),
+            // Money when there is one currency to draw, orders when there is
+            // not — a bar mixing dollars and lira is a chart of nothing.
+            value: code ? month.amount : month.orders,
+            title: code
+              ? t("customers.chartMonthTitleMoney", {
+                  month: formatMonthKey(month.key),
+                  orders: month.orders,
+                  amount: format(month.amount, code),
+                })
+              : t("customers.chartMonthTitle", {
+                  month: formatMonthKey(month.key),
+                  orders: month.orders,
+                }),
+          }))}
+        />
+      </Section>
+      <Section
+        title={t("customers.chartWeekdays")}
+        description={t("customers.chartWeekdaysHint")}
+      >
+        <HeatStrip
+          tone="info"
+          title={t("customers.chartWeekdaysAria")}
+          // Rotated to Monday-first here, for reading; the stored order is
+          // Sunday-first and stays that way.
+          cells={[1, 2, 3, 4, 5, 6, 0].map((day) => ({
+            key: String(day),
+            label: t(WEEKDAY_SHORT[day]),
+            value: stats.byWeekday[day] ?? 0,
+          }))}
+        />
+      </Section>
+    </div>
+  );
+}
+
+function OrdersTable({
+  query,
+  rows,
+  onOpen,
+  paged,
+}: {
+  query: ReturnType<typeof useCustomerOrders>;
+  rows: CustomerOrder[];
+  onOpen: (id: string) => void;
+  paged: boolean;
+}) {
+  const clock = useClock();
+
+  if (query.isPending) return <ListSkeleton rows={paged ? 6 : 3} />;
+  if (query.isError) {
+    return (
+      <EmptyState
+        icon={<AlertCircle />}
+        title={t("customers.ordersFailed")}
+        action={
+          <Button onClick={() => void query.refetch()}>
+            {t("common.retry")}
+          </Button>
+        }
+      />
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        icon={<Receipt />}
+        title={t("customers.noOrders")}
+        description={t("customers.noOrdersBody")}
+      />
+    );
+  }
+
+  return (
+    <>
+      <Table>
+        <THead>
+          <tr>
+            <Th>{t("customers.colOrder")}</Th>
+            <Th className="hidden sm:table-cell">{t("customers.colPlaced")}</Th>
+            <Th>{t("customers.colStatus")}</Th>
+            <Th className="hidden lg:table-cell">
+              {t("customers.colDeliveredTo")}
+            </Th>
+            <Th className="text-end">{t("customers.colTotal")}</Th>
+          </tr>
+        </THead>
+        <TBody>
+          {rows.map((order) => (
+            <Tr key={order.id} interactive onClick={() => onOpen(order.id)}>
+              <Td>
+                {/* A button, so the row is reachable by keyboard; the row's
+                    click is the bigger target for a mouse. */}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpen(order.id);
+                  }}
+                  className="font-medium text-ink tabular-nums hover:underline"
+                  aria-label={t("customers.openOrder", { code: order.code })}
+                >
+                  {order.code}
+                </button>
+                <span className="block text-[12.5px] text-ink-3 sm:hidden">
+                  {clock.dateTime(order.placedAt)}
+                </span>
+              </Td>
+              <Td className="hidden whitespace-nowrap text-ink-2 sm:table-cell">
+                {clock.dateTime(order.placedAt)}
+              </Td>
+              <Td>
+                {/* One chip per shop: an order across two shops has two. */}
+                <div className="flex flex-wrap gap-1">
+                  {order.statuses.map((status) => (
+                    <StatusBadge key={status.slug} slug={status.slug} />
+                  ))}
+                </div>
+              </Td>
+              <Td className="hidden max-w-[18rem] truncate text-ink-3 lg:table-cell">
+                {order.addressLine}
+              </Td>
+              <Td className="text-end">
+                {/* This one order's shop rate (`0120`). */}
+                <Price
+                  value={order.total}
+                  code={order.currencyCode}
+                  shopRate={order.shopRate}
+                  align="end"
+                  className="font-medium"
+                />
+              </Td>
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
+      {paged && (
+        <div className="border-t border-line">
+          <InfiniteSentinel
+            hasMore={query.hasNextPage}
+            loading={query.isFetchingNextPage}
+            onLoadMore={() => void query.fetchNextPage()}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+function PromotionsTable({
+  query,
+  onOpen,
+}: {
+  query: ReturnType<typeof useCustomerRedemptions>;
+  onOpen: (id: string) => void;
+}) {
+  if (query.isPending) return <ListSkeleton rows={3} />;
+  if (query.isError) {
+    return (
+      <EmptyState
+        icon={<AlertCircle />}
+        title={t("customers.promotionsFailed")}
+        action={
+          <Button onClick={() => void query.refetch()}>
+            {t("common.retry")}
+          </Button>
+        }
+      />
+    );
+  }
+  if (query.data.length === 0) {
+    return <EmptyState icon={<Tag />} title={t("customers.noPromotions")} />;
+  }
+  return (
+    <Table>
+      <THead>
+        <tr>
+          <Th>{t("customers.colPromotion")}</Th>
+          <Th>{t("customers.colOrder")}</Th>
+          <Th className="hidden sm:table-cell">{t("customers.colDate")}</Th>
+          <Th className="text-end">{t("customers.colSaved")}</Th>
+        </tr>
+      </THead>
+      <TBody>
+        {query.data.map((one) => (
+          <RedemptionRow key={one.id} redemption={one} onOpen={onOpen} />
+        ))}
+      </TBody>
+    </Table>
+  );
+}
 
 function RedemptionRow({
   redemption,
@@ -790,70 +814,82 @@ function RedemptionRow({
   onOpen: (id: string) => void;
 }) {
   return (
-    <li className={cx(ROW, "border-transparent")}>
-      <span className="flex min-w-0 flex-grow flex-col gap-xxs">
-        {/* The label is the promotion's name **as it was at the time** —
-            `0016` calls a redemption a receipt line, history rather than
-            content, so it is never re-translated or renamed after the fact.
-            Reading the discount's current name here would let a merchant
-            silently rewrite what a customer was told. */}
-        <span className="truncate text-[13px] font-semibold">
-          {redemption.label || t("customers.unnamedPromotion")}
-        </span>
+    <Tr interactive onClick={() => onOpen(redemption.orderId)}>
+      {/* The label as it was when given (`0016`: a receipt line), never the
+          promotion's name today. */}
+      <Td className="max-w-[16rem] truncate font-medium">
+        {redemption.label || (
+          <span className="font-normal text-ink-3 italic">
+            {t("customers.unnamedPromotion")}
+          </span>
+        )}
+      </Td>
+      <Td>
         <button
           type="button"
-          onClick={() => onOpen(redemption.orderId)}
-          className="truncate text-start tabular-nums text-[12px] text-text-faint after:absolute after:inset-0"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(redemption.orderId);
+          }}
+          className="text-ink-2 tabular-nums hover:underline"
+          aria-label={t("customers.openOrder", { code: redemption.orderCode })}
         >
           {redemption.orderCode}
         </button>
-      </span>
-
-      <span className="shrink-0 text-[12px] text-text-faint">
+      </Td>
+      <Td className="hidden whitespace-nowrap text-ink-3 sm:table-cell">
         {formatDate(redemption.redeemedAt)}
-      </span>
-
-      {/* Negative, because this is what came *off*. A bare figure in a column
-          beside the order totals would read as another thing they paid. */}
-      <span className="shrink-0 text-accent-deep">
+      </Td>
+      <Td className="text-end text-success-ink">
+        {/* What came off, not something they paid. */}
         <Price
           value={redemption.amount}
           code={redemption.currencyCode}
           align="end"
-          className="text-[13px] font-semibold"
+          className="font-medium"
         />
-      </span>
-    </li>
+      </Td>
+    </Tr>
   );
 }
 
-function Block({
-  title,
-  aside,
-  children,
-}: {
-  title: string;
-  aside?: ReactNode;
-  children: ReactNode;
-}) {
+function AddressCard({ address }: { address: CustomerAddress }) {
+  const noPin = address.latitude === null || address.longitude === null;
   return (
-    <section className="flex min-w-0 flex-col gap-md">
-      <div className="flex flex-wrap items-baseline justify-between gap-md">
-        <h2 className="text-[19px]">{title}</h2>
-        {aside}
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <MapPin className="size-4 shrink-0 text-ink-3" />
+        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">
+          {address.label ?? t("customers.unlabelled")}
+        </span>
+        {address.isSelected && (
+          <Badge tone="accent">{t("customers.defaultAddress")}</Badge>
+        )}
       </div>
-      {children}
-    </section>
-  );
-}
-
-function Tile({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-xxs rounded-lg border-2 border-transparent bg-surface px-lg py-md shadow-card">
-      <span className="text-[12px] text-text-faint">{label}</span>
-      <span className="break-words text-[20px] font-semibold tabular-nums">
-        {value}
-      </span>
+      <p className="text-[13.5px] text-ink-2">{address.line}</p>
+      {/* Who answers at this door, when it is not the account's own phone. */}
+      {address.phone && (
+        <p className="text-[13px] text-ink-3">
+          {t("customers.addressPhone")}{" "}
+          <span dir="ltr" className="text-ink-2 tabular-nums">
+            {formatPhone(address.phone)}
+          </span>
+        </p>
+      )}
+      {noPin ? (
+        // No pin falls to the top delivery band, so every order here is
+        // overcharged — said with the consequence, not as an empty frame.
+        <p className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning-soft px-3 py-2 text-[12.5px] text-warning-ink">
+          <MapPinOff className="mt-px size-4 shrink-0" />
+          {t("customers.noPinWarning")}
+        </p>
+      ) : (
+        <MapView
+          latitude={address.latitude}
+          longitude={address.longitude}
+          label={address.label ?? address.line}
+        />
+      )}
     </div>
   );
 }

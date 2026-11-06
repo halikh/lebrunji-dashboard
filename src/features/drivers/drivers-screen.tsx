@@ -2,80 +2,66 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import {
+  MessageCircle,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  SearchX,
+  Truck,
+  UserMinus,
+  UserPlus,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
-import { Button, cx } from "@/components/ui";
-import { Avatar } from "@/components/ui/avatar";
-import { ConfirmButton } from "@/components/ui/confirm-button";
-import { FOCUS_RING, useRowFocus } from "@/components/ui/row-focus";
-import { ROW } from "@/components/ui/row";
-import { Toggle } from "@/components/ui/toggle";
-import { ListHeader } from "@/components/ui/list-header";
-import { FilterTab, tabArrowHandler, type TabTone } from "@/components/ui/tab";
-import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Avatar,
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  ListCard,
+  Menu,
+  Page,
+  PageHeader,
+  QueryState,
+  SearchInput,
+  Tabs,
+  cx,
+} from "@/components/ui";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
 import { formatPhone } from "@/lib/phone";
 
-import { isOverridden, isTakingOrders, type Courier } from "./api/couriers";
-
-import {
-  useCouriers,
-  useSaveCourier,
-  useSetCourierActive,
-} from "./use-couriers";
+import { isTakingOrders, type Courier } from "./api/couriers";
+import { AvailabilityControl, ShiftBadge, ShiftLine } from "./availability";
+import { useCouriers, useSetCourierActive } from "./use-couriers";
 
 type Scope = "all" | "active" | "off" | "inactive";
 
-const TABS: { key: Scope; labelKey: TranslationKey; tone?: TabTone }[] = [
-  { key: "all", labelKey: "drivers.tabAll" },
-  {
-    key: "active",
-    labelKey: "drivers.tabActive",
-    tone: {
-      wash: "var(--color-accent-wash)",
-      ink: "var(--color-text)",
-      dot: "var(--color-accent)",
-    },
-  },
-  {
-    key: "off",
-    labelKey: "drivers.tabOff",
-    tone: {
-      wash: "var(--color-neutral-fill)",
-      ink: "var(--color-text)",
-      dot: "var(--color-text-faint)",
-    },
-  },
-  {
-    key: "inactive",
-    labelKey: "drivers.tabInactive",
-    tone: {
-      wash: "var(--color-neutral-fill)",
-      ink: "var(--color-text)",
-      dot: "var(--color-text-faint)",
-    },
-  },
+const SCOPES: { key: Scope; label: TranslationKey }[] = [
+  { key: "all", label: "drivers.tabAll" },
+  { key: "active", label: "drivers.tabActive" },
+  { key: "off", label: "drivers.tabOff" },
+  { key: "inactive", label: "drivers.tabInactive" },
 ];
+
+const EMPTY: Record<Scope, { title: TranslationKey; body?: TranslationKey }> = {
+  all: { title: "drivers.empty", body: "drivers.emptyBody" },
+  active: { title: "drivers.emptyActive", body: "drivers.emptyActiveBody" },
+  off: { title: "drivers.emptyOff" },
+  inactive: { title: "drivers.emptyInactive" },
+};
 
 /**
  * Who an order can be handed to.
  *
- * ## It was a settings tab, and outgrew one
+ * The search is a query, not a local filter: today the list is a handful of
+ * rows, but a local filter fails silently once it is not — it finds only what
+ * is loaded and reads as "we do not have that person".
  *
- * A name and a number is a setting. A person with a history of orders is not —
- * and once a driver has a page worth opening, the list that leads to it belongs
- * on the rail beside customers rather than four clicks inside the app's prose.
- * The shape follows customers deliberately: a heading, a search that fills the
- * bar, and rows that *are* the link.
- *
- * ## The search is a query, even here
- *
- * The whole list is usually a handful of rows already in the browser, so
- * filtering them locally would work today. It is still a query, because the
- * failure of the local version is silent: a shop that grows to a dozen drivers
- * across two shifts gets a search that only finds what is already loaded, shows
- * nothing, and reads as "we do not have that person".
+ * The scope lives in the URL like every other filter, so a view can be linked
+ * or reloaded. `?focus=` brings a row back into view after an edit started
+ * from this list.
  */
 export function DriversScreen() {
   const router = useRouter();
@@ -85,62 +71,39 @@ export function DriversScreen() {
   const [search, setSearch] = useState("");
   const couriers = useCouriers(search);
 
-  // In the URL, like every other filter in the dashboard, so a view can be
-  // linked, reloaded or sent.
   const requested = params.get("scope");
-  const scope: Scope = TABS.some((one) => one.key === requested)
+  const scope: Scope = SCOPES.some((one) => one.key === requested)
     ? (requested as Scope)
     : "all";
+  const focusId = params.get("focus");
 
   function show(next: Scope) {
     const query = new URLSearchParams(params);
     if (next === "all") query.delete("scope");
     else query.set("scope", next);
-    // Not `search`: that name is the search *term* three lines up, and a
-    // shadowed variable in a function that writes the URL is the kind of slip
-    // that puts somebody's half-typed query into the address bar.
-    const nextQuery = query.toString();
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
-      scroll: false,
-    });
+    query.delete("focus");
+    const text = query.toString();
+    router.replace(text ? `${pathname}?${text}` : pathname, { scroll: false });
   }
-
-  const save = useSaveCourier();
-  const setActive = useSetCourierActive();
-
-  /** Which row to bring back into view — see `useRowFocus`. */
-  const focus = useRowFocus();
 
   const searching = search.trim().length >= SEARCH.minTerm;
   const matching = couriers.data ?? [];
 
   /**
-   * The counts, taken from what was fetched — and that is the exception rather
-   * than the rule.
+   * Counted from what was fetched — exact here, because this list is not
+   * paginated: every driver matching the term is in hand. They follow the
+   * search, so "Taking orders 2" beside a filtered list means two matches.
    *
-   * Every other list in the dashboard counts with a `head` request, because a
-   * paginated list's local count is a count of *one page* and every tab would
-   * read "50". This list is not paginated: `fetchCouriers` returns every driver
-   * matching the term, so the rows in hand **are** the whole set and counting
-   * them is exact.
-   *
-   * They also follow the search, which is what makes the strip honest while
-   * somebody is typing: "Taking orders 2" beside a filtered list means two of
-   * the matches, not two in the business.
+   * "All" and the two shift tabs are people who work here; "Not active" is
+   * people who used to, so they are kept out of the first three.
    */
-  // Two different questions, and the tabs answer both. "All" and the two shift
-  // tabs are about people who work here; "Not active" is about people who used
-  // to — which is why they are excluded from the first three rather than
-  // sitting in them switched off.
   const onBooks = matching.filter((one) => one.isActive);
-
   const counts: Record<Scope, number> = {
     all: onBooks.length,
     active: onBooks.filter((one) => isTakingOrders(one)).length,
     off: onBooks.filter((one) => !isTakingOrders(one)).length,
     inactive: matching.filter((one) => !one.isActive).length,
   };
-
   const rows =
     scope === "inactive"
       ? matching.filter((one) => !one.isActive)
@@ -150,275 +113,281 @@ export function DriversScreen() {
             scope === "active" ? isTakingOrders(one) : !isTakingOrders(one),
           );
 
+  const empty = EMPTY[scope];
+
+  /**
+   * On "All", the roster splits into who is taking orders and who is not —
+   * Onfleet's on-duty / off-duty grouping — so the people a dispatcher can
+   * hand to right now are the top of the list, not scattered through it.
+   */
+  const groups =
+    scope === "all"
+      ? [
+          {
+            key: "on",
+            label: t("drivers.groupOn", { count: counts.active }),
+            rows: rows.filter((one) => isTakingOrders(one)),
+          },
+          {
+            key: "off",
+            label: t("drivers.groupOff", { count: counts.off }),
+            rows: rows.filter((one) => !isTakingOrders(one)),
+          },
+        ].filter((group) => group.rows.length > 0)
+      : [{ key: scope, label: null, rows }];
+
   return (
-    <div className="flex h-full flex-col">
-      <ListHeader
+    <Page>
+      <PageHeader
         title={t("drivers.title")}
-        search={{
-          value: search,
-          onChange: setSearch,
-          placeholder: t("drivers.search"),
-        }}
-        action={
-          <Button onClick={() => router.push("/drivers/new")}>
-            {t("drivers.add")}
+        description={t("drivers.blurb")}
+        actions={
+          <Button variant="primary" asChild>
+            <Link href="/drivers/new">
+              <Plus />
+              {t("drivers.add")}
+            </Link>
           </Button>
         }
       />
 
-      {/* The same strip the queue and the customers list use — same shape,
-            same place, same keyboard behaviour — because these are the same
-            kind of control and two spellings of it would be two things to
-            learn.
-
-            Including how it behaves on a phone: it scrolls sideways rather
-            than wrapping, and its rule is an inset shadow rather than a border
-            so the scroller does not clip the tabs' underlines — see the note on
-            the customers list. */}
-      <div
-        role="tablist"
-        aria-label={t("drivers.title")}
-        className="flex shrink-0 gap-xxs overflow-x-auto bg-surface px-lg pb-px shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] md:px-xxl"
+      <ListCard
+        tabs={
+          <Tabs
+            items={SCOPES.map(({ key, label }) => ({
+              key,
+              label: t(label),
+              count: couriers.isSuccess ? counts[key] : null,
+            }))}
+            value={scope}
+            onChange={show}
+          />
+        }
+        search={
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={t("drivers.search")}
+          />
+        }
+        footer={
+          couriers.isSuccess && rows.length > 0 ? (
+            <span className="tabular-nums">
+              {t("drivers.shownCount", { count: rows.length })}
+            </span>
+          ) : undefined
+        }
       >
-        {TABS.map(({ key, labelKey, tone }) => (
-          <FilterTab
-            key={key}
-            label={t(labelKey)}
-            count={counts[key]}
-            active={scope === key}
-            tone={tone}
-            onClick={() => show(key)}
-            onKeyDown={tabArrowHandler(
-              TABS.map((one) => one.key),
-              scope,
-              show,
-            )}
-          />
-        ))}
-      </div>
+        <QueryState
+          status={
+            couriers.isPending
+              ? "pending"
+              : couriers.isError
+                ? "error"
+                : rows.length === 0
+                  ? "empty"
+                  : "ready"
+          }
+          rows={5}
+          failedTitle={t("drivers.failed")}
+          onRetry={() => void couriers.refetch()}
+          empty={
+            // The term is named: an empty list with no explanation looks the
+            // same as one that failed to load.
+            <EmptyState
+              icon={searching ? <SearchX /> : <Truck />}
+              title={
+                searching
+                  ? t("drivers.searchNone", { term: search.trim() })
+                  : t(empty.title)
+              }
+              description={
+                searching
+                  ? t("drivers.noneBody")
+                  : empty.body
+                    ? t(empty.body)
+                    : undefined
+              }
+              action={
+                !searching && scope === "all" ? (
+                  <Button variant="primary" asChild>
+                    <Link href="/drivers/new">
+                      <Plus />
+                      {t("drivers.add")}
+                    </Link>
+                  </Button>
+                ) : undefined
+              }
+            />
+          }
+        />
 
-      {/* A size container: whether a row's controls fit beside the name is a
-          question about the list's width, not the window's. */}
-      <div className="@container flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
-        <p className="ps-md pb-sm text-[13px] text-text-soft">
-          {t("drivers.blurb")}
-        </p>
-
-        {couriers.isError && (
-          <p role="alert" className="text-[13px] font-medium text-danger">
-            {t("content.failed")}
-          </p>
-        )}
-
-        {couriers.isSuccess && rows.length === 0 && (
-          // The term is named. An empty list with no explanation is
-          // indistinguishable from one that failed to load.
-          <EmptyState
-            titleKey={searching ? "drivers.searchNone" : "drivers.empty"}
-            params={{ term: search.trim() }}
-            mood={searching ? "lost" : "waiting"}
-          />
-        )}
-
-        {rows.map((courier) => (
-          <DriverRow
-            key={courier.id}
-            courier={courier}
-            open={focus.isFocused(courier.id)}
-            anchor={focus.attach(courier.id)}
-            onEdit={() =>
-              // `?from=list` so Back returns here rather than to the driver's
-              // own page — see `DriverEditor`.
-              router.push(`/drivers/${courier.id}/edit?from=list`)
-            }
-            onOverride={(value) =>
-              save.mutate({
-                id: courier.id,
-                draft: {
-                  name: courier.name,
-                  phone: courier.phone,
-                  availableOverride: value,
-                },
-                name: courier.name,
-              })
-            }
-            onSetActive={(active) =>
-              active
-                ? setActive.mutate({
-                    id: courier.id,
-                    active: true,
-                    name: courier.name,
-                  })
-                : undefined
-            }
-            onDeactivate={async () => {
-              await setActive.mutateAsync({
-                id: courier.id,
-                active: false,
-                name: courier.name,
-              });
-            }}
-          />
-        ))}
-      </div>
-    </div>
+        {rows.length > 0 &&
+          groups.map((group) => (
+            <section key={group.key}>
+              {group.label && (
+                <h2 className="border-y border-line bg-subtle px-4 py-1.5 text-[12.5px] font-medium text-ink-3 first:border-t-0 sm:px-5">
+                  {group.label}
+                </h2>
+              )}
+              <ul className="divide-y divide-line">
+                {group.rows.map((courier) => (
+                  <DriverRow
+                    key={courier.id}
+                    courier={courier}
+                    focused={courier.id === focusId}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+      </ListCard>
+    </Page>
   );
 }
 
 /**
- * One driver.
+ * One driver. The name is a stretched link to their page — the row's main
+ * purpose — so every control on the right sits above it with `relative z-10`.
  *
- * The name is a stretched link to their page, which is the row's main purpose —
- * so the largest target on the row opens it, and the accessible name is "Ali"
- * rather than "row".
- *
- * Everything to the right needs `relative z-10` to sit above that overlay, or
- * it stops responding. A stretched link copied without its second half is a row
- * where only the navigation works, and the failure looks like a broken button.
- *
- * ## Whether they are taking orders is read, not set
- *
- * There used to be a switch here. It had to be remembered twice a day by the
- * person who is busiest at exactly those moments, and both of its failures were
- * silent: left on at midnight, a sleeping driver is offered for dispatch; left
- * off, they are invisible through a whole shift and nobody finds out until an
- * order needs sending.
- *
- * So it is a badge computed from their hours (migration 0084) — a *state* the
- * row reports rather than a control it offers.
+ * There is no delete. A driver who has left still appears on every order they
+ * carried; removing the row would leave that history pointing at nobody.
+ * Deactivating asks first (it takes somebody out of dispatch, and nothing here
+ * looks different afterwards); bringing back does not, because it restores.
  */
 function DriverRow({
   courier,
-  open,
-  anchor,
-  onEdit,
-  onOverride,
-  onSetActive,
-  onDeactivate,
+  focused,
 }: {
   courier: Courier;
-  open: boolean;
-  anchor: (node: HTMLElement | null) => void;
-  onEdit: () => void;
-  onOverride: (value: boolean | null) => void;
-  onSetActive: (active: boolean) => void;
-  onDeactivate: () => Promise<void>;
+  focused: boolean;
 }) {
-  const taking = isTakingOrders(courier);
-  const overridden = isOverridden(courier);
+  const router = useRouter();
+  const setActive = useSetCourierActive();
+  const [confirming, setConfirming] = useState(false);
+  const ref = useRef<HTMLLIElement>(null);
+
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ block: "center" });
+  }, [focused]);
 
   return (
-    <div
-      ref={anchor}
+    <li
+      ref={ref}
       className={cx(
-        ROW,
-        // Wraps on a narrow list so the controls can drop under the name; see
-        // the group below.
-        "flex-wrap gap-y-sm @2xl:flex-nowrap",
-        open ? FOCUS_RING : "border-transparent",
+        "relative flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-subtle sm:flex-nowrap",
+        focused && "bg-accent-soft/60 hover:bg-accent-soft/60",
       )}
     >
-      <Avatar id={courier.id} name={courier.name} />
-
-      <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-        <Link
-          href={`/drivers/${courier.id}`}
-          className="truncate text-[15px] font-semibold after:absolute after:inset-0"
-        >
-          {courier.name}
-        </Link>
-        <span className="truncate text-[12px] tabular-nums text-text-faint">
-          {formatPhone(courier.phone)}
-        </span>
-        {/* Under the phone, with the identity. Whether somebody is still on the
-            books is a fact about *them*; the shift switch beside it is a fact
-            about tonight. Stacked in the same column as the rota controls the
-            two read as one setting with two states, which they are not. */}
-        {!courier.isActive && (
-          <span className="w-fit rounded-sm bg-neutral-fill px-sm py-[1px] text-[11px] font-semibold text-text-soft">
-            {t("drivers.inactive")}
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <Avatar name={courier.name} />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Link
+            href={`/drivers/${courier.id}`}
+            className="truncate text-[14px] font-semibold text-ink after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-md focus-visible:after:ring-2 focus-visible:after:ring-accent focus-visible:after:ring-inset"
+          >
+            {courier.name}
+          </Link>
+          <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
+            <span
+              dir="ltr"
+              className="truncate text-[13px] text-ink-3 tabular-nums"
+            >
+              {formatPhone(courier.phone)}
+            </span>
+            <ShiftLine courier={courier} />
           </span>
-        )}
+        </div>
       </div>
 
-      {/* The rota is the standing answer and this is tonight's exception, so
-          the switch shows the *effective* state and flipping it writes an
-          override rather than editing the week. Editing the week to describe
-          one evening is the thing that would quietly become permanent.
-
-          An override is invisible from the outside — the badge reads the same
-          either way — so the row says when one is in force and offers to stop.
-          An override left behind is the failure the rota was meant to end.
-
-          The switch and the buttons are one group, which on a narrow list is a
-          line of its own under the name and on a wide one is `contents` — its
-          children back in the row as they always were. A switch and two
-          buttons beside a name in 300px left the name a letter or two wide. */}
-      <span className="flex basis-full flex-wrap items-center justify-between gap-sm @2xl:contents">
-        {courier.isActive && (
-          <span className="relative z-10 flex shrink-0 flex-col items-start gap-xxs @2xl:items-end">
-            <Toggle
-              on={taking}
-              onChange={() => onOverride(!taking)}
-              labelOn={t("drivers.onShift")}
-              labelOff={t("drivers.offShift")}
-              className="w-[124px]"
-            />
-            {overridden && (
-              <button
-                type="button"
-                onClick={() => onOverride(null)}
-                className="text-[11px] font-semibold text-primary hover:underline"
-              >
-                {t("drivers.followRota")}
-              </button>
-            )}
-          </span>
-        )}
-
-        <span className="relative z-10 ms-auto flex items-center gap-sm @2xl:ms-0">
-          <Button variant="secondary" size="sm" onClick={onEdit}>
-            {t("drivers.edit")}
+      <div className="relative z-10 flex w-full items-center justify-between gap-3 ps-12 sm:w-auto sm:justify-end sm:ps-0">
+        <ShiftBadge courier={courier} />
+        <div className="flex items-center gap-2">
+          {/* Tookan's one-tap contact: the number is stored the way wa.me
+              takes it, digits with the country code. */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            asChild
+            aria-label={t("drivers.whatsapp")}
+          >
+            <a
+              href={`https://wa.me/${courier.phone}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <MessageCircle />
+            </a>
           </Button>
-
-          {/* There is no delete. A driver who has left still appears on every
-              order they carried, and removing the row would leave that history
-              pointing at a name nobody can look up.
-
-              Switching off asks first — it takes somebody out of dispatch, and
-              from this side of the screen nothing looks different afterwards.
-              Switching back on does not: it restores, and a confirmation on a
-              reversal is a question with one sensible answer. */}
           {courier.isActive ? (
-            <ConfirmButton
-              onConfirm={onDeactivate}
-              titleKey="drivers.deactivateTitle"
-              bodyKey="drivers.deactivateBody"
-              confirmKey="drivers.deactivateConfirm"
-              params={{ name: courier.name }}
-              variant="danger"
-              // Filled, like every other destructive control on a row. `quiet`
-              // is transparent, so beside a filled Edit it read as text rather
-              // than as a button — and the one control here with a consequence
-              // should not be the one that looks least like a control.
-              triggerVariant="danger"
-              size="sm"
-            >
-              {t("drivers.deactivate")}
-            </ConfirmButton>
+            <AvailabilityControl courier={courier} />
           ) : (
-            // Mint, the theme's "going well". Grey beside a red Deactivate said
-            // the two were peers; this one puts somebody back on the rota.
             <Button
-              variant="accent"
+              variant="secondary"
               size="sm"
-              onClick={() => onSetActive(true)}
+              pending={setActive.isPending}
+              onClick={() =>
+                setActive.mutate({
+                  id: courier.id,
+                  active: true,
+                  name: courier.name,
+                })
+              }
             >
+              <UserPlus />
               {t("drivers.reactivate")}
             </Button>
           )}
-        </span>
-      </span>
-    </div>
+          <Menu
+            label={courier.name}
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("drivers.rowActions", { name: courier.name })}
+              >
+                <MoreHorizontal />
+              </Button>
+            }
+            items={[
+              {
+                label: t("drivers.edit"),
+                icon: <Pencil />,
+                // `?from=list` so Back returns here rather than to their page.
+                onSelect: () =>
+                  router.push(`/drivers/${courier.id}/edit?from=list`),
+              },
+              ...(courier.isActive
+                ? [
+                    "separator" as const,
+                    {
+                      label: t("drivers.deactivate"),
+                      icon: <UserMinus />,
+                      tone: "danger" as const,
+                      onSelect: () => setConfirming(true),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={t("drivers.deactivateTitle", { name: courier.name })}
+        description={t("drivers.deactivateBody")}
+        confirmLabel={t("drivers.deactivateConfirm")}
+        tone="danger"
+        onConfirm={() =>
+          setActive.mutateAsync({
+            id: courier.id,
+            active: false,
+            name: courier.name,
+          })
+        }
+      />
+    </li>
   );
 }

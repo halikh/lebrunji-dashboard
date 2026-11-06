@@ -1,4 +1,4 @@
-# lebrunji-dashboard
+# lebrunji-admin
 
 The operator's tool for [lebrunji](https://github.com/halikh/lebrunji) — the
 web app the person running the business signs into to work orders, edit the

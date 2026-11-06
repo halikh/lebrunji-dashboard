@@ -40,6 +40,12 @@ export type OrderStore = {
    * See `placeName`.
    */
   branchName: string | null;
+  /**
+   * That branch's written address — on a chain, what tells two places of the
+   * same name apart for an operator and a driver. Null under the same rule as
+   * `branchName`, or when the branch has none.
+   */
+  branchAddress: string | null;
   storeImageUrl: string | null;
   /**
    * Where this kitchen is sent its half of the order, or null.
@@ -236,10 +242,10 @@ export async function fetchOrders(options: {
   // queue and the panel must not disagree about that.
   const embed = filterSlugs
     ? `order_stores!inner ( id, store_id, subtotal, status,
-         branches ( id, name ),
+         branches ( id, name, address ),
          stores ( name, exchange_rate, branches ( id, deleted_at ) ) )`
     : `order_stores ( id, store_id, subtotal, status,
-         branches ( id, name ),
+         branches ( id, name, address ),
          stores ( name, exchange_rate, branches ( id, deleted_at ) ) )`;
 
   let query = getClient()
@@ -306,7 +312,7 @@ export async function fetchOrder(
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal, status,
-         branches ( id, name, branch_contacts ( whatsapp_phone ) ),
+         branches ( id, name, address, branch_contacts ( whatsapp_phone ) ),
          stores ( name, image_url, exchange_rate,
            branches ( id, sort_order, created_at, deleted_at, branch_contacts ( whatsapp_phone ) ) ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
@@ -617,6 +623,16 @@ function branchNameOf(
   return localized(branch.name, locale) || null;
 }
 
+/** The branch's address, under the same rule as its name. */
+function branchAddressOf(
+  portion: Record<string, unknown>,
+  locale: string,
+): string | null {
+  if (branchNameOf(portion, locale) === null) return null;
+  const branch = asRecord(portion.branches);
+  return localized(branch?.address, locale) || null;
+}
+
 /** "Azzurrini — Hamra" on a chain, "Azzurrini" otherwise. */
 export function placeName(
   store: Pick<OrderStore, "storeName" | "branchName">,
@@ -670,6 +686,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
         storeId: store.store_id as string,
         storeName: localized(asRecord(store.stores)?.name, locale),
         branchName: branchNameOf(store, locale),
+        branchAddress: branchAddressOf(store, locale),
         storeWhatsapp: kitchenPhone(store),
         storeImageUrl:
           (asRecord(store.stores)?.image_url as string | null) ?? null,

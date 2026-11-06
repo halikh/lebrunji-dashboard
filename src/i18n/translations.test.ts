@@ -23,19 +23,19 @@ describe("t", () => {
   });
 
   it("substitutes a placeholder", () => {
-    expect(t("shell.notBuiltBody", { phase: 4 })).toContain("phase 4");
+    expect(t("shell.newOrders", { count: 4 })).toBe("4 new");
   });
 
   it("leaves an unmatched placeholder visible", () => {
-    // A missing parameter should show up on screen as `{phase}` rather than as
+    // A missing parameter should show up on screen as `{count}` rather than as
     // a blank that reads like a finished sentence and nobody notices.
-    expect(t("shell.notBuiltBody")).toContain("{phase}");
-    expect(t("shell.notBuiltBody", { other: 1 })).toContain("{phase}");
+    expect(t("shell.newOrders")).toContain("{count}");
+    expect(t("shell.newOrders", { other: 1 })).toContain("{count}");
   });
 
   it("takes numbers as well as strings", () => {
-    expect(t("shell.notBuiltBody", { phase: "4" })).toBe(
-      t("shell.notBuiltBody", { phase: 4 }),
+    expect(t("shell.newOrders", { count: "4" })).toBe(
+      t("shell.newOrders", { count: 4 }),
     );
   });
 

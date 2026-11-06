@@ -57,6 +57,51 @@ export async function fetchBranchHours(branchId: string): Promise<DayHours[]> {
 }
 
 /**
+ * Several branches' weeks in one request — for the shop page's header, which
+ * says whether the shop is open in the app right now without a request per
+ * branch. Keyed by branch id; a branch with no rows is absent, which the reader
+ * must take as open around the clock (`0170`), not as closed.
+ */
+export async function fetchHoursForBranches(
+  branchIds: readonly string[],
+): Promise<Map<string, DayHours[]>> {
+  const byBranch = new Map<string, DayHours[]>();
+  if (branchIds.length === 0) return byBranch;
+
+  // In slices: the shops list asks about every trading branch at once, and
+  // an `in.(…)` of a few hundred ids is a URL some proxies refuse.
+  const ids = [...branchIds];
+  const slices: string[][] = [];
+  for (let at = 0; at < ids.length; at += 100) {
+    slices.push(ids.slice(at, at + 100));
+  }
+  const results = await Promise.all(
+    slices.map((slice) =>
+      getClient()
+        .from("branch_hours")
+        .select("branch_id, day_of_week, opens_at, closes_at")
+        .in("branch_id", slice),
+    ),
+  );
+
+  const data = results.flatMap((result) => {
+    if (result.error) throw new Error(result.error.message);
+    return result.data ?? [];
+  });
+
+  for (const row of data) {
+    const id = row.branch_id as string;
+    const list = byBranch.get(id) ?? [];
+    list.push({
+      dayOfWeek: row.day_of_week as number,
+      opensAt: (row.opens_at as string).slice(0, 5),
+      closesAt: (row.closes_at as string).slice(0, 5),
+    });
+    byBranch.set(id, list);
+  }
+  return byBranch;
+}
+
 /**
  * A new shop's week, written to the branch it was created with.
  *

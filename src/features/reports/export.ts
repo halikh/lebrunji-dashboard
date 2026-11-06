@@ -28,7 +28,7 @@ import type { Stats } from "./api/stats";
  * want to compute, labelled so it cannot be mistaken for the amount.
  */
 
-export type ExportFormat = "csv" | "xlsx" | "pdf";
+export type ExportFormat = "csv" | "xlsx";
 
 type Sheet = { name: string; rows: (string | number)[][] };
 
@@ -203,79 +203,4 @@ export async function exportReport(
     );
     return;
   }
-
-  printPdf(tables, range);
-}
-
-/**
- * A PDF, via the browser's own print dialogue.
- *
- * ## Why not a PDF library
- *
- * `jspdf` and friends are hundreds of kilobytes and each brings its own font
- * handling — and this report has **Arabic** in it, which is where every
- * lightweight PDF library falls down: right-to-left runs and glyph shaping are
- * exactly what they skip. A browser already does both correctly, has the fonts,
- * and offers "Save as PDF" in every print dialogue on every platform.
- *
- * The cost is honest and worth stating: the operator gets a print dialogue
- * rather than a file appearing. That is one extra step, in exchange for a
- * document whose Arabic is not mangled.
- *
- * The window is written to and printed, not left behind — an orphan tab full of
- * a report is litter.
- */
-function printPdf(tables: Sheet[], range: { from: string; to: string }) {
-  const win = window.open("", "_blank");
-  if (!win) {
-    // Blocked by a popup blocker. Nothing to do but say so; silently doing
-    // nothing is the failure people report as "the button is broken".
-    throw new Error(t("reports.printBlocked"));
-  }
-
-  const escape = (value: string | number) =>
-    String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;");
-
-  const body = tables
-    .map(
-      (sheet) => `
-        <h2>${escape(sheet.name)}</h2>
-        <table>
-          <thead><tr>${sheet.rows[0]?.map((cell) => `<th>${escape(cell)}</th>`).join("") ?? ""}</tr></thead>
-          <tbody>
-            ${sheet.rows
-              .slice(1)
-              .map(
-                (row) =>
-                  `<tr>${row.map((cell) => `<td>${escape(cell)}</td>`).join("")}</tr>`,
-              )
-              .join("")}
-          </tbody>
-        </table>`,
-    )
-    .join("");
-
-  win.document.write(`<!doctype html>
-<html><head><meta charset="utf-8"><title>${escape(t("reports.title"))} ${escape(range.from)} — ${escape(range.to)}</title>
-<style>
-  body { font: 13px/1.5 system-ui, sans-serif; margin: 24px; color: #1f1915; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  h2 { font-size: 14px; margin: 24px 0 8px; }
-  p { color: #4a423c; margin: 0 0 8px; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { border-bottom: 1px solid #ece6dd; padding: 6px 8px; text-align: start; }
-  th { font-weight: 600; }
-  /* A section is not split across a page break where it can be helped. */
-  h2, table { break-inside: avoid; }
-</style></head>
-<body>
-  <h1>${escape(t("reports.title"))}</h1>
-  <p>${escape(range.from)} — ${escape(range.to)}</p>
-  ${body}
-</body></html>`);
-
-  win.document.close();
-  win.focus();
-  win.print();
-  win.close();
 }

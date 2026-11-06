@@ -82,7 +82,7 @@ export function Price({
         {format(value, code)}
       </span>
       {converted && (
-        <span className="text-[12px] font-normal text-text-faint tabular-nums">
+        <span className="text-[12px] font-normal text-ink-4 tabular-nums">
           {converted}
         </span>
       )}

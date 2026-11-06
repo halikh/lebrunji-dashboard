@@ -12,56 +12,40 @@ import {
 } from "@/lib/text-format";
 import { FALLBACK_LANGUAGE, type Localized } from "@/lib/validation";
 
-import { cx, Input } from "./index";
+import { cx } from "./cx";
+import { Skeleton } from "./display";
 
 /**
  * A field with one input per language.
  *
  * ## English is required; the rest are optional
  *
- * Each translated column is one `jsonb` object, and since `0128` its
- * `<table>_<col>_locales` CHECK constraint requires English and nothing else.
- * Every reader — the app, this dashboard, the menu RPC — shows English where a
- * language is blank, so an empty Arabic box is a translation still to do rather
- * than a blank line on a phone.
+ * Each translated column is one `jsonb` object whose `<table>_<col>_locales`
+ * CHECK (`0128`) requires English and nothing else; every reader falls back to
+ * English where a language is blank. So the English box is the one that gets
+ * flagged — a value typed in Arabic only would otherwise come back as a
+ * constraint name instead of "Still needed in: en".
  *
- * English is the one box that is flagged: a value typed in Arabic only would
- * submit and come back with a constraint name, and naming the box here is the
- * difference between that and "still needed in: en".
+ * ## The list comes from the database
  *
- * ## Why the list comes from the database
+ * `languages` is a table, so a third language is a row rather than a release:
+ * every content form grows a box without being touched. Until it loads the
+ * field is a skeleton — not an English-only field that changes shape under
+ * somebody already typing.
  *
- * `languages` is a table. Rendering from it is what makes a third language a
- * row rather than a release: every content form in the dashboard grows a field
- * without being touched.
+ * ## `filter` holds a name to its characters, live (QA-025)
  *
- * ## One layout for now
- *
- * Stacked: every language visible at once. That is right for the short fields
- * this is used on — switching tabs to write the same short thing twice is
- * slower than reading two rows.
- *
- * The flow study settled that long-form content wants the other shape — one
- * language at a time, because two paragraphs side by side halves the width of
- * each until neither is readable. That arrives with the help and legal screens
- * in Phase 7, and is deliberately **not** stubbed here: an unused `variant`
- * prop is a promise the component does not keep.
- *
- * ## `filter` holds a name to its characters, live — and a title to its case
- *
- * Opt-in per call site, and the line it draws is catalogue **names** against
- * long-form **content**. A help answer or a privacy section is prose, and the
- * characters a name may not hold are ones prose legitimately contains.
+ * Opt-in per call site; names, not prose.
  *
  * - `"name"` drops the machine punctuation `lib/text-format.ts` lists.
- * - `"title"` does the same and also puts the name in Title Case — "MILK
- *   BASED" becomes "Milk Based". Shop, category, section and dish names.
- * - `"letters"` keeps letters and single spaces only — a tag's name, held to
- *   the same set `menu_item_tags_name_letters` checks.
+ * - `"title"` does the same and puts the name in Title Case ("MILK BASED" →
+ *   "Milk Based") — shop, category, section and dish names.
+ * - `"letters"` keeps letters and single spaces — a tag's name, the set
+ *   `menu_item_tags_name_letters` checks.
  *
- * It applies as the operator types, not on save, so the box always shows what
- * will be stored. Only `"title"` changes case; the api applies the same rule
- * again on save (`titleLocalized`).
+ * It applies as the operator types, so the box always shows what will be
+ * stored, and the characters a keystroke lost are named under the field — a
+ * key that silently does nothing gets pressed harder.
  */
 export function LocalizedField({
   label,
@@ -81,58 +65,23 @@ export function LocalizedField({
   multiline?: boolean;
   maxLength?: number;
   /**
-   * An **example**, never the label — and one per language.
-   *
-   * A placeholder disappears the moment somebody types, so a field carrying its
-   * name only there is a field nobody can check afterwards. The label above says
-   * what it is; this shows what a good answer looks like.
-   *
-   * Keyed by language code, because an English example above an Arabic input is
-   * worse than none: it shows the wrong script in the wrong direction, and
-   * quietly suggests that English is what belongs in the box.
-   *
-   * A language with no example gets no placeholder rather than the English one.
+   * An example per language code, never the label. A language with no
+   * example gets no placeholder rather than the English one.
    */
   placeholder?: Record<string, string>;
-  /**
-   * Standing advice for the whole field, not per language.
-   *
-   * One sentence under a set of inputs that are the same value in different
-   * words — repeating it per language would say the same thing twice and push
-   * the fields apart.
-   */
+  /** Standing advice for the whole field, not per language. */
   hint?: string;
   error?: string | null;
   optional?: boolean;
-  /**
-   * Which characters this field keeps. See the note on the component.
-   *
-   * Unset means the value is kept exactly as typed, which is what every
-   * long-form field wants.
-   */
+  /** Which characters this field keeps. Unset keeps the value as typed. */
   filter?: "name" | "title" | "letters";
 }) {
   const id = useId();
   const languages = useLanguages();
 
-  /**
-   * The characters the last keystroke lost, if any.
-   *
-   * A filter that silently eats a character is the worst version of this: the
-   * key does nothing, and the operator presses it harder. Naming them — "+ and
-   * / cannot be used here" — is what turns a dead key into a rule. It clears
-   * itself on the next change that loses nothing, so it reads as feedback on
-   * what was just typed rather than as a standing error.
-   */
+  /** What the last keystroke lost; cleared by the next change that loses nothing. */
   const [dropped, setDropped] = useState<string[]>([]);
 
-  /**
-   * One language's value, on its way in.
-   *
-   * Filtered here rather than in `onChange` at each call site: there are
-   * seven of those and there will be more, and the one that forgot would be a
-   * field that quietly kept its own rules.
-   */
   function change(
     code: string,
     next: string,
@@ -154,9 +103,8 @@ export function LocalizedField({
       const kept = withoutRejected(next);
       const cased = titleCase(kept);
       onChange({ ...value, [code]: cased });
-      // Re-casing keeps the length but still replaces the input's value, which
-      // sends the caret to the end. Put it back where it was, so typing a space
-      // in the middle of a word does not throw the cursor away.
+      // Re-casing replaces the input's value, which sends the caret to the
+      // end. Put it back, so a space typed mid-word does not lose the cursor.
       if (cased !== kept) {
         const { selectionStart, selectionEnd } = input;
         requestAnimationFrame(() => {
@@ -169,96 +117,87 @@ export function LocalizedField({
     onChange({ ...value, [code]: next });
   }
 
+  const labelId = `${id}-label`;
+  const messageId = `${id}-message`;
+
+  const heading = (
+    <div className="flex items-baseline justify-between gap-2">
+      <span id={labelId} className="text-[13px] font-medium text-ink">
+        {label}
+      </span>
+      {optional && (
+        <span className="text-[12px] text-ink-4">{t("form.optional")}</span>
+      )}
+    </div>
+  );
+
   if (!languages.data) {
-    // A skeleton, not an English-only field. Rendering one input and adding the
-    // rest a moment later would let somebody start typing into a form that is
-    // about to change shape under them.
     return (
-      <div className="flex flex-col gap-xs">
-        <span className="ps-md text-[13px] font-semibold text-text-soft">
-          {label}
-        </span>
-        <div aria-hidden className="h-[42px] rounded-md bg-neutral-fill" />
+      <div className="flex flex-col gap-1.5">
+        {heading}
+        <Skeleton className={multiline ? "h-24" : "h-9"} />
       </div>
     );
   }
 
   const isBlank = (code: string) => (value[code] ?? "").trim().length === 0;
 
-  // Empty is a legitimate state for an optional column, and a blank Arabic is
-  // a legitimate state for any column. What the constraint refuses is something
-  // written with the English left out.
+  // Empty is fine for an optional column, and a blank Arabic is fine for any.
+  // What the constraint refuses is something written with English left out.
   const partial =
     isBlank(FALLBACK_LANGUAGE) &&
     languages.data.some((language) => !isBlank(language.code));
 
-  // The one message slot below, tied to every input. Without it the error is
-  // drawn under the boxes and never read out from inside them.
-  const labelId = `${id}-label`;
-  const messageId = `${id}-message`;
-  const hasMessage = Boolean(error) || dropped.length > 0 || partial || !!hint;
+  // One message slot, in priority order: a value that will not save, then
+  // what was just refused, then the missing English, then standing advice.
+  const message: { text: string; alert: boolean } | null = error
+    ? { text: error, alert: true }
+    : dropped.length > 0
+      ? {
+          text: t("form.rejectedChars", { chars: dropped.join(" ") }),
+          alert: true,
+        }
+      : partial
+        ? {
+            text: t("form.stillNeeded", { languages: FALLBACK_LANGUAGE }),
+            alert: true,
+          }
+        : hint
+          ? { text: hint, alert: false }
+          : null;
+
+  const control =
+    "w-full rounded-md border border-line-strong bg-surface text-[14px] text-ink shadow-xs transition-[border-color,box-shadow] placeholder:text-ink-4 hover:border-ink-4 focus:border-accent focus:shadow-focus focus:outline-none aria-invalid:border-danger aria-invalid:focus:shadow-[0_0_0_3px_rgb(217_45_32/0.15)]";
 
   return (
-    // A group, so the field's name is announced once on the way in rather
-    // than being something each box has to repeat to make sense.
+    // A group, so the field's name is announced once on the way in.
     <div
       role="group"
       aria-labelledby={labelId}
-      className="flex flex-col gap-xs"
+      className="flex flex-col gap-1.5"
     >
-      {/* `ps-md`, the same inset `Field` gives its label and hint.
-          These inputs have horizontal padding, so their text starts some way
-          inside the left edge; a label flush at zero lines up with the border
-          and, against a pill-shaped field whose edge curves away, reads as
-          misaligned. This file draws its own label rather than using `Field`,
-          which is how it came to be the one place in the dashboard where that
-          column did not line up. */}
-      <div className="flex items-baseline gap-sm ps-md">
-        <span id={labelId} className="text-[13px] font-semibold text-text-soft">
-          {label}
-        </span>
-        {optional && (
-          <span className="text-[12px] text-text-faint">
-            {t("form.optional")}
-          </span>
-        )}
-      </div>
+      {heading}
 
-      <div className={cx("flex flex-col gap-xs")}>
+      <div className="flex flex-col gap-2">
         {languages.data.map((language) => {
           const inputId = `${id}-${language.code}`;
           const text = value[language.code] ?? "";
           const isMissing = partial && language.code === FALLBACK_LANGUAGE;
+          const invalid = isMissing || Boolean(error);
 
           return (
-            // `dir` on the wrapper rather than only on the input, so the
-            // logical properties below flip with the language: the code sits at
-            // the *start* of the reading direction, which is the right edge for
-            // Arabic.
+            // `dir` on the wrapper so the code sits at the *start* of the
+            // reading direction — the right edge for Arabic.
             <div
               key={language.code}
               dir={language.rtl ? "rtl" : "ltr"}
               className="relative"
             >
-              {/*
-                The code sits inside the field, not in a box beside it.
-                A separate tile made every row two objects with a seam down the
-                middle, and the inputs no longer lined up with the single-value
-                fields above and below them. Inside, each row reads as one
-                control that happens to be labelled.
-
-                `pointer-events-none` so a click lands on the input underneath —
-                the label still focuses it via `htmlFor`, and text selection is
-                not interrupted by a dead patch.
-
-                The code is what is seen; what is heard is "Name, English".
-                A bare "en" names the language but not the field, and once
-                focus is inside a box the field's name is nowhere else.
-              */}
+              {/* Seen: the code. Heard: "Name, English". */}
               <label
                 htmlFor={inputId}
                 title={language.name}
-                className="pointer-events-none absolute start-[13px] top-[14px] z-10 text-[10px] font-bold uppercase tracking-[0.08em] text-text-faint"
+                className="pointer-events-none absolute start-2 top-2 z-10 flex h-5 min-w-7 items-center justify-center rounded bg-subtle px-1 text-[10.5px] font-semibold tracking-wide text-ink-3 uppercase"
               >
                 <span aria-hidden>{language.code}</span>
                 <span className="sr-only">
@@ -269,9 +208,6 @@ export function LocalizedField({
               {multiline ? (
                 <textarea
                   id={inputId}
-                  // `lang` and `dir` so an RTL language is typed right-to-left
-                  // even though the page is not — and so a screen reader
-                  // switches voice for it.
                   lang={language.code}
                   dir={language.rtl ? "rtl" : "ltr"}
                   rows={4}
@@ -281,17 +217,17 @@ export function LocalizedField({
                   onChange={(event) =>
                     change(language.code, event.target.value, event.target)
                   }
-                  aria-invalid={isMissing || undefined}
-                  aria-describedby={hasMessage ? messageId : undefined}
+                  aria-invalid={invalid || undefined}
+                  aria-describedby={message ? messageId : undefined}
                   className={cx(
-                    "w-full rounded-md border bg-cream py-md pe-md ps-[42px] text-[15px] text-text",
-                    "placeholder:text-text-faint focus:bg-field-focus",
-                    isMissing || error ? "border-danger" : "border-line",
+                    control,
+                    "min-h-24 py-2 pe-3 ps-11 leading-relaxed",
                   )}
                 />
               ) : (
-                <Input
+                <input
                   id={inputId}
+                  type="text"
                   lang={language.code}
                   dir={language.rtl ? "rtl" : "ltr"}
                   maxLength={maxLength}
@@ -300,9 +236,9 @@ export function LocalizedField({
                   onChange={(event) =>
                     change(language.code, event.target.value, event.target)
                   }
-                  invalid={isMissing || Boolean(error)}
-                  aria-describedby={hasMessage ? messageId : undefined}
-                  padding="ps-[42px] pe-md"
+                  aria-invalid={invalid || undefined}
+                  aria-describedby={message ? messageId : undefined}
+                  className={cx(control, "h-9 pe-3 ps-11")}
                 />
               )}
             </div>
@@ -310,43 +246,17 @@ export function LocalizedField({
         })}
       </div>
 
-      {error ? (
+      {message && (
         <p
           id={messageId}
-          role="alert"
-          className="ps-md text-[13px] font-medium text-danger"
+          role={message.alert ? "alert" : undefined}
+          className={cx(
+            "text-[12.5px] leading-snug",
+            message.alert ? "text-danger-ink" : "text-ink-3",
+          )}
         >
-          {error}
+          {message.text}
         </p>
-      ) : dropped.length > 0 ? (
-        // Above the hint and below the error, in the one slot this field has
-        // for a message: what was just refused matters more than standing
-        // advice and less than a value that will not save.
-        <p
-          id={messageId}
-          role="alert"
-          className="ps-md text-[13px] font-medium text-danger"
-        >
-          {t("form.rejectedChars", { chars: dropped.join(" ") })}
-        </p>
-      ) : partial ? (
-        // Names the languages rather than saying "incomplete". The operator has
-        // done most of the work; what they need is which box is empty.
-        <p
-          id={messageId}
-          role="alert"
-          className="ps-md text-[13px] font-medium text-danger"
-        >
-          {t("form.stillNeeded", { languages: FALLBACK_LANGUAGE })}
-        </p>
-      ) : (
-        // The same slot as the error, never a second line: showing both means
-        // reading advice about a value already reported as wrong.
-        hint && (
-          <p id={messageId} className="ps-md text-[13px] text-text-faint">
-            {hint}
-          </p>
-        )
       )}
     </div>
   );

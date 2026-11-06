@@ -1,5 +1,5 @@
 {
-  "name": "lebrunji-dashboard",
+  "name": "lebrunji-admin",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -29,16 +29,20 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1123.0",
     "@aws-sdk/s3-request-presigner": "^3.1123.0",
+    "@dnd-kit/core": "^6.3.1",
     "@supabase/supabase-js": "^2.110.8",
     "@tanstack/react-query": "^5.101.4",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.47.0",
     "next": "16.3.3",
+    "radix-ui": "^1.8.1",
     "react": "19.2.8",
-    "react-datepicker": "^9.1.0",
     "react-dom": "19.2.8",
-    "react-select": "^5.10.2",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

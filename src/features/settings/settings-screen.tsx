@@ -1,105 +1,130 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import {
+  CircleHelp,
+  Clock,
+  FileText,
+  HardDrive,
+  Smartphone,
+  type LucideIcon,
+} from "lucide-react";
 
-import { EmptyState } from "@/components/ui/empty-state";
-import { Button, cx } from "@/components/ui";
-import { SearchInput } from "@/components/ui/search-input";
-import { ConfirmButton } from "@/components/ui/confirm-button";
-import { ConfirmToggle } from "@/components/ui/confirm-toggle";
-import { useRowFocus } from "@/components/ui/row-focus";
-import { GripIcon, useReorder } from "@/components/ui/reorderable";
-import { ROW, ROW_ABOVE, ROW_TARGET } from "@/components/ui/row";
-import { Select } from "@/components/ui/select";
-import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
-
+import { Page, PageHeader, Tabs, cx } from "@/components/ui";
 import { useConfirmLeave } from "@/components/unsaved-changes";
-import { pickLocalized } from "@/i18n/db-text";
 import { t, type TranslationKey } from "@/i18n/translations";
-import { SEARCH } from "@/lib/limits";
 
-import { applyOrder } from "../catalog/api/menu";
-import {
-  POLICY_DOCUMENTS,
-  type HelpTopic,
-  type PolicyDocument,
-  type PolicySection,
-} from "./api/content";
 import { AdvancedTab } from "./advanced-tab";
+import { CustomerAppTab } from "./customer-app-tab";
 import { GeneralTab } from "./general-tab";
-import {
-  useDeleteHelpTopic,
-  useDeletePolicySection,
-  useHelpTopics,
-  usePolicySections,
-  useReorderHelpTopics,
-  useReorderPolicySections,
-  useUpdateHelpTopic,
-} from "./use-content";
+import { HelpTab } from "./help-tab";
+import { LegalTab } from "./legal-tab";
 
 /**
- * Settings — how the shop runs, and the writing the app does.
+ * Settings — how the business runs, and the writing the app does.
  *
- * ## What is here, and what is not
+ * ## Laid out the way Linear and Stripe lay out settings
  *
- * Everything that belongs to the business as a whole rather than to a row:
+ * A short list of pages down the side, grouped by what they are about, and
+ * one page at a time beside it. The list is always in view on a desk, so the
+ * operator sees every place a setting can live without opening each one; on
+ * a phone it folds into tabs across the top.
  *
- * - **General** — the clock, the time zone, the ordering hours and the
+ * Inside a page, each setting is a row that says what it changes beside the
+ * control (`SettingRow`), and each saves on its own — see `GeneralTab`.
+ *
+ * - **General**: the clock, the time zone, the ordering hours and the
  *   new-order sound. First, because it is what a shop comes back to change.
- * - **Help** and **Legal** — the app's *prose*. Each is a short ordered list of
- *   localised text, visited rarely, and neither is big enough to deserve a
- *   place on the rail.
- * - **Advanced** — set once and left alone: the oldest customer app still
- *   served, and clearing unused pictures out of storage.
+ * - **Customer app**: the oldest app version still served and where its
+ *   Update button goes. Its own page because a careless change locks
+ *   customers out.
+ * - **Help topics** and **Legal**: the app's prose (`0016` moved it into the
+ *   database precisely so it could be edited here).
+ * - **Advanced**: clearing unused pictures out of storage.
  *
- * Not here: money (Pricing, which `delivery_quote` reads as one errand) and the
- * operator's own sign-in (Your account, at the foot of the rail — it is about
- * *you*, not the shop). General used to be a tab on Your account, which meant
- * the opening hours were filed under somebody's password.
- *
- * `0016` moved the prose out of translation keys and into the database
- * **precisely so it could be edited**, and then nothing could edit it. The Help
- * and Legal tabs are what that sentence was written for.
- *
- * ## Section tabs, not filter tabs
- *
- * These are chapters of one subject rather than buckets of one list — the same
- * distinction the store screen and the customer profile draw, and the reason
- * `SectionTab` exists separately from `FilterTab`.
+ * The page is in the URL (`?tab=`, replaced rather than pushed) so the editors
+ * can come back to the list they were opened from. Switching unmounts the
+ * current page, so it is a way out of a form: it goes through `confirmLeave`.
  */
 
-type TabKey = "general" | "help" | "legal" | "advanced";
+export type SettingsTab = "general" | "app" | "help" | "legal" | "advanced";
 
-const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
-  { key: "general", labelKey: "general.tab" },
-  { key: "help", labelKey: "content.tabHelp" },
-  { key: "legal", labelKey: "content.tabLegal" },
-  { key: "advanced", labelKey: "content.tabAdvanced" },
+type Entry = {
+  key: SettingsTab;
+  labelKey: TranslationKey;
+  blurbKey: TranslationKey;
+  icon: LucideIcon;
+};
+
+const GROUPS: { labelKey: TranslationKey; entries: Entry[] }[] = [
+  {
+    labelKey: "content.navBusiness",
+    entries: [
+      {
+        key: "general",
+        labelKey: "general.tab",
+        blurbKey: "general.pageBlurb",
+        icon: Clock,
+      },
+      {
+        key: "app",
+        labelKey: "general.tabCustomerApp",
+        blurbKey: "general.customerAppBlurb",
+        icon: Smartphone,
+      },
+    ],
+  },
+  {
+    labelKey: "content.navAppText",
+    entries: [
+      {
+        key: "help",
+        labelKey: "content.tabHelpTopics",
+        blurbKey: "content.helpBlurb",
+        icon: CircleHelp,
+      },
+      {
+        key: "legal",
+        labelKey: "content.tabLegal",
+        blurbKey: "content.legalBlurb",
+        icon: FileText,
+      },
+    ],
+  },
+  {
+    labelKey: "content.navSystem",
+    entries: [
+      {
+        key: "advanced",
+        labelKey: "content.tabAdvanced",
+        blurbKey: "content.advancedBlurb",
+        icon: HardDrive,
+      },
+    ],
+  },
 ];
+
+const ENTRIES = GROUPS.flatMap((group) => group.entries);
 
 export function SettingsScreen() {
   const router = useRouter();
-  const confirmLeave = useConfirmLeave();
   const pathname = usePathname();
   const params = useSearchParams();
+  const confirmLeave = useConfirmLeave();
 
   const requested = params.get("tab");
-  const tab: TabKey = TABS.some((one) => one.key === requested)
-    ? (requested as TabKey)
-    : "general";
+  const current =
+    ENTRIES.find((one) => one.key === requested) ?? (ENTRIES[0] as Entry);
+  const tab = current.key;
 
-  /**
-   * Switching tabs unmounts whatever is in the current one, so it is a way out
-   * of a form even though the URL barely moves. Guarded here rather than on each
-   * tab button: there is one `show`, and every tab goes through it.
-   */
-  function show(next: TabKey) {
+  function show(next: SettingsTab) {
+    if (next === tab) return;
     void confirmLeave().then((leave) => {
       if (!leave) return;
-      const query = new URLSearchParams(params);
-      if (next === "general") query.delete("tab");
-      else query.set("tab", next);
+      // Only the tab survives a switch: `doc` and `focus` belong to the page
+      // being left.
+      const query = new URLSearchParams();
+      if (next !== "general") query.set("tab", next);
       const search = query.toString();
       router.replace(search ? `${pathname}?${search}` : pathname, {
         scroll: false,
@@ -108,544 +133,81 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="flex h-full min-w-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pt-lg md:px-xxl">
-        <h1 className="text-[26px] md:text-[30px]">{t("content.title")}</h1>
+    <Page>
+      <PageHeader title={t("content.title")} description={t("content.blurb")} />
 
-        {/* Scrolls sideways rather than wrapping on a phone. Four chapters fit
-            at 360px in English, but a translation or a larger text setting can
-            push the last one over, and a second row of tabs reads as a second,
-            unrelated strip. `shrink-0` and `nowrap` on each tab because
-            `SectionTab` sets neither — in a strip that cannot scroll it never
-            needed to. */}
-        <div
-          role="tablist"
-          className="-mb-px flex gap-lg overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap"
-        >
-          {TABS.map(({ key, labelKey }) => (
-            <SectionTab
-              key={key}
-              label={t(labelKey)}
-              active={tab === key}
-              onClick={() => show(key)}
-              onKeyDown={tabArrowHandler(
-                TABS.map((one) => one.key),
-                tab,
-                show,
-              )}
-            />
-          ))}
-        </div>
-      </div>
-      {/* Mounted only while open. General's ordering window is a draft and
-          the tab switch is guarded, so nothing is lost; Advanced lists the
-          whole storage bucket, which should not happen on every visit to the
-          help topics. */}
-      {tab === "general" && (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <GeneralTab />
-        </div>
-      )}
-      {tab === "advanced" && (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <AdvancedTab />
-        </div>
-      )}
-
-      {/* Siblings rather than one swapped child, so a half-scrolled document
-          survives a look at the FAQ and back. */}
-      <div className={cx("min-h-0 flex-1", tab !== "help" && "hidden")}>
-        <HelpTab />
-      </div>
-      <div className={cx("min-h-0 flex-1", tab !== "legal" && "hidden")}>
-        <LegalTab />
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Help
-// ---------------------------------------------------------------------------
-
-/**
- * The FAQ.
- *
- * ## The group name is edited on every row at once
- *
- * `group_name` is stored per topic and the app groups by `group_slug`, taking
- * the heading from whichever row it reads first. So renaming it on one topic
- * splits the group in two and which name shows depends on sort order — a bug
- * that looks like a caching problem. The form edits the group as a group.
- */
-function HelpTab() {
-  const router = useRouter();
-  /**
-   * The term, and the mode it puts the list in.
-   *
-   * Searching and reordering are different jobs on one list and cannot both be
-   * on: a position among matches is not a position in the FAQ, so dragging
-   * while filtered would write a `sort_order` nobody chose. The handles go away
-   * and the list says why.
-   */
-  const [search, setSearch] = useState("");
-  const searching = search.trim().length >= SEARCH.minTerm;
-
-  const topics = useHelpTopics(searching ? search : "");
-  const update = useUpdateHelpTopic();
-  const remove = useDeleteHelpTopic();
-  const reorder = useReorderHelpTopics();
-
-  /** Which row to bring back into view — see `useRowFocus`. */
-  const focus = useRowFocus();
-
-  const rows = topics.data ?? [];
-
-  const order = useReorder({
-    ids: rows.map((row) => row.id),
-    onReorder: (ids) => {
-      const { updates } = applyOrder(rows, ids);
-      reorder.mutate({ updates });
-    },
-    labelOf: (id) =>
-      pickLocalized(rows.find((row) => row.id === id)?.question ?? {}),
-    disabled: searching,
-  });
-
-  return (
-    <div className="relative flex h-full">
-      <div className="flex min-w-0 flex-grow flex-col">
-        {/* The same bar every list here carries: search on the right, the add
-            button beside it. The header does not scroll, so this is the one
-            copy of "add one" — no in-list button and no pinned bar, which were
-            two more ways to reach an action that is now always visible. */}
-        <div className="flex shrink-0 items-start gap-sm border-b border-border bg-surface px-lg py-lg md:gap-lg md:px-xxl">
-          {/* The field takes the slack. These two bars have no title to hold
-              it — unlike the catalogue's, where the heading grows — so a fixed
-              width left a stretch of empty white between the search and the
-              button, which reads as something missing rather than as space. */}
-          <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder={t("content.searchHelp")}
-            />
-            {/* Gone when there is nothing to sort — one row, or a filtered
-                list. An instruction nobody can follow reads as a control that
-                is broken. See `sortable` on `useReorder`. */}
-            {order.sortable ? (
-              <span className="ps-md text-[12px] text-text-faint">
-                {t("content.reorderHint")}
-              </span>
-            ) : null}
-          </div>
-          <Button onClick={() => router.push("/settings/help/new")}>
-            {t("content.addTopic")}
-          </Button>
-        </div>
-
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
-          <p className="ps-md pb-sm text-[13px] text-text-soft">
-            {t("content.helpBlurb")}
-          </p>
-
-          {topics.isPending && (
-            <div aria-hidden className="flex flex-col gap-sm">
-              {[0, 1, 2].map((one) => (
-                <div key={one} className="h-[58px] rounded-lg bg-line-soft" />
-              ))}
-            </div>
-          )}
-
-          {topics.isError && (
-            <p role="alert" className="text-[13px] font-medium text-danger">
-              {t("content.failed")}
-            </p>
-          )}
-
-          {order.instructions}
-
-          {searching && rows.length === 0 && (
-            <EmptyState
-              titleKey="content.searchNone"
-              params={{ term: search.trim() }}
-              mood="lost"
-            />
-          )}
-
-          {order
-            .ordered(rows, (row) => row.id)
-            .map((row) => (
-              <HelpRow
-                key={row.id}
-                topic={row}
-                open={focus.isFocused(row.id)}
-                anchor={focus.attach(row.id)}
-                rowProps={order.rowProps}
-                handleProps={order.handleProps}
-                onEdit={() => router.push(`/settings/help/${row.id}`)}
-                onToggle={() => {
-                  update.mutate({
-                    id: row.id,
-                    patch: { isActive: !row.isActive },
-                  });
-                }}
-                onRemove={async () => {
-                  await remove.mutateAsync({
-                    id: row.id,
-                    name: pickLocalized(row.question),
-                  });
-                }}
-              />
-            ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type ReorderProps = {
-  rowProps: (
-    id: string,
-    className?: string,
-  ) => { "data-reorder-id": string; className: string };
-  handleProps: (id: string) => Record<string, unknown>;
-};
-
-function HelpRow({
-  topic,
-  open,
-  anchor,
-  rowProps,
-  handleProps,
-  onEdit,
-  onToggle,
-  onRemove,
-}: {
-  topic: HelpTopic;
-  /** Whether this is the row just returned from. Draws the ring. */
-  open: boolean;
-  /** Scrolls this row back into view when it is the one returned to. */
-  anchor: (node: HTMLElement | null) => void;
-  onEdit: () => void;
-  onToggle: () => void;
-  onRemove: () => Promise<void>;
-} & ReorderProps) {
-  const name = pickLocalized(topic.question);
-
-  const row = rowProps(
-    topic.id,
-    cx(
-      ROW,
-      // Three lines on a phone: the grip, then the question, then the switch
-      // and Remove. On one line the 104px switch and the
-      // button left the question about six characters, which is not enough
-      // to tell one FAQ from the next.
-      "max-md:flex-wrap max-md:gap-x-sm max-md:gap-y-xs max-md:px-md",
-      !topic.isActive && "border-transparent bg-neutral-fill/60 shadow-none",
-      open && "shadow-selected",
-      topic.isActive && !open && "border-transparent",
-      topic.isActive && open && "border-active",
-    ),
-  );
-
-  return (
-    <div {...row} ref={anchor}>
-      <button {...handleProps(topic.id)}>
-        <GripIcon />
-      </button>
-
-      <button
-        type="button"
-        onClick={onEdit}
-        // `ROW_TARGET` stretches this button's hit area over the whole row —
-        // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
-        className={cx(
-          ROW_TARGET,
-          // A line of its own on a phone, under the grip, so the controls are
-          // pushed onto the next rather than squeezing it.
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left max-md:basis-full",
-        )}
-      >
-        <span className="truncate text-[15px] font-semibold">{name}</span>
-        <span className="truncate text-[12px] text-text-faint">
-          {pickLocalized(topic.groupName)}
-        </span>
-      </button>
-
-      <ConfirmToggle
-        on={topic.isActive}
-        onChange={onToggle}
-        labelOn={t("content.live")}
-        labelOff={t("content.hidden")}
-        params={{ name }}
-        whenTurningOn={{
-          titleKey: "content.showTitle",
-          bodyKey: "content.showBody",
-          confirmKey: "content.showConfirm",
-        }}
-        whenTurningOff={{
-          titleKey: "content.hideTitle",
-          bodyKey: "content.hideBody",
-          confirmKey: "content.hideConfirm",
-        }}
-        // Indented under the question on a phone, and 40px tall there: the
-        // switch is drawn 22px high, which is a fine target for a pointer and
-        // a poor one for a thumb.
-        className={cx(
-          ROW_ABOVE,
-          "w-[104px] max-md:ms-[36px] max-md:min-h-[40px]",
-        )}
+      {/* Phones and tablets: the same pages as tabs across the top. */}
+      <Tabs
+        className="lg:hidden"
+        value={tab}
+        onChange={show}
+        items={ENTRIES.map(({ key, labelKey }) => ({
+          key,
+          label: t(labelKey),
+        }))}
       />
 
-      <ConfirmButton
-        className={cx(ROW_ABOVE, "max-md:ms-auto")}
-        onConfirm={onRemove}
-        titleKey="content.removeTopicTitle"
-        // Says "cannot be undone" and means it: `help_topics` has no
-        // `deleted_at`, so unlike every catalogue row this is a real delete.
-        bodyKey="content.removeTopicBody"
-        confirmKey="content.removeConfirm"
-        params={{ name }}
-        variant="danger"
-        triggerVariant="danger"
-        size="sm"
-      >
-        {t("content.remove")}
-      </ConfirmButton>
-    </div>
-  );
-}
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <nav
+          aria-label={t("content.title")}
+          className="sticky top-0 hidden flex-col gap-5 lg:flex"
+        >
+          {GROUPS.map((group) => (
+            <div key={group.labelKey} className="flex flex-col gap-0.5">
+              <p className="px-2.5 pb-1 text-[12px] font-medium text-ink-4">
+                {t(group.labelKey)}
+              </p>
+              {group.entries.map((entry) => {
+                const active = entry.key === tab;
+                const Icon = entry.icon;
+                return (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => show(entry.key)}
+                    className={cx(
+                      "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-start text-[13.5px] font-medium transition-colors",
+                      active
+                        ? "bg-accent-soft text-accent-ink"
+                        : "text-ink-2 hover:bg-hover hover:text-ink",
+                    )}
+                  >
+                    <Icon
+                      aria-hidden
+                      className={cx(
+                        "size-4 shrink-0",
+                        active ? "text-accent" : "text-ink-4",
+                      )}
+                    />
+                    {t(entry.labelKey)}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
 
-// ---------------------------------------------------------------------------
-// Legal
-// ---------------------------------------------------------------------------
-
-/**
- * Privacy and terms.
- *
- * A document editor with section reordering, not a table of rows — the flow
- * study's call, and the reason is that a legal document is *read in order*. The
- * order is the content, so dragging a section is the most consequential control
- * on the tab.
- */
-function LegalTab() {
-  const router = useRouter();
-  const params = useSearchParams();
-
-  /**
-   * Which policy is on screen, seeded from the URL.
-   *
-   * The editor is a page now, and it comes back here by href — so it has to be
-   * able to say *which* document it was editing, or returning from a terms
-   * section would land on privacy and the row it asked to focus would not be in
-   * the list. See `?doc=` in `policy-section-editor.tsx`.
-   */
-  const [document, setDocument] = useState<PolicyDocument>(
-    params.get("doc") === "terms" ? "terms" : "privacy",
-  );
-
-  const [search, setSearch] = useState("");
-  const searching = search.trim().length >= SEARCH.minTerm;
-
-  const sections = usePolicySections(document, searching ? search : "");
-  const remove = useDeletePolicySection(document);
-  const reorder = useReorderPolicySections(document);
-
-  /** Which row to bring back into view — see `useRowFocus`. */
-  const focus = useRowFocus();
-
-  const rows = sections.data ?? [];
-
-  const order = useReorder({
-    ids: rows.map((row) => row.id),
-    onReorder: (ids) => {
-      const { updates } = applyOrder(rows, ids);
-      reorder.mutate({ updates });
-    },
-    labelOf: (id) =>
-      pickLocalized(rows.find((row) => row.id === id)?.title ?? {}),
-    disabled: searching,
-  });
-
-  return (
-    <div className="relative flex h-full">
-      <div className="flex min-w-0 flex-grow flex-col">
-        {/* Wraps on a phone: the document picker takes a line of its own and
-            the search and the add button share the next. Three controls in
-            one row leave the search a few characters wide at 360px. */}
-        <div className="flex shrink-0 flex-wrap items-start gap-sm border-b border-border bg-surface px-lg py-lg md:flex-nowrap md:gap-lg md:px-xxl">
-          <div className="w-full shrink-0 md:w-[240px]">
-            <Select
-              value={document}
-              onChange={(next) => {
-                setDocument(next as PolicyDocument);
-                // The open section belongs to the document being left, and so
-                // does the search — a term that matched in privacy has no
-                // standing in terms.
-                setSearch("");
-              }}
-              options={POLICY_DOCUMENTS.map((one) => ({
-                value: one,
-                label: t(`content.document.${one}`),
-              }))}
-            />
-          </div>
-
-          <div className="flex min-w-0 flex-grow basis-0 flex-col gap-xxs">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder={t("content.searchLegal")}
-            />
-            {/* Gone when there is nothing to sort — one row, or a filtered
-                list. An instruction nobody can follow reads as a control that
-                is broken. See `sortable` on `useReorder`. */}
-            {order.sortable ? (
-              <span className="ps-md text-[12px] text-text-faint">
-                {t("content.reorderHint")}
-              </span>
-            ) : null}
-          </div>
-
-          <Button
-            onClick={() => router.push(`/settings/legal/new?doc=${document}`)}
-          >
-            {t("content.addSection")}
-          </Button>
-        </div>
-
-        <div className="flex min-h-0 min-w-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
-          <p className="ps-md pb-sm text-[13px] text-text-soft">
-            {t("content.legalBlurb")}
-          </p>
-
-          {sections.isError && (
-            <p role="alert" className="text-[13px] font-medium text-danger">
-              {t("content.failed")}
+        <div className="flex min-w-0 flex-col gap-6">
+          {/* The page's own heading, so what is being changed is named above
+              the controls rather than only in the menu beside them. The lists
+              below it carry no second description. */}
+          <div className="flex flex-col gap-1">
+            <h2 className="text-[17px] font-semibold text-ink">
+              {t(current.labelKey)}
+            </h2>
+            <p className="max-w-2xl text-[13.5px] text-ink-3">
+              {t(current.blurbKey)}
             </p>
-          )}
+          </div>
 
-          {order.instructions}
-
-          {searching && rows.length === 0 && (
-            <EmptyState
-              titleKey="content.searchNone"
-              params={{ term: search.trim() }}
-              mood="lost"
-            />
-          )}
-
-          {order
-            .ordered(rows, (row) => row.id)
-            .map((row, index) => (
-              <PolicyRow
-                key={row.id}
-                section={row}
-                index={index}
-                open={focus.isFocused(row.id)}
-                anchor={focus.attach(row.id)}
-                rowProps={order.rowProps}
-                handleProps={order.handleProps}
-                onEdit={() =>
-                  router.push(`/settings/legal/${row.id}?doc=${document}`)
-                }
-                onRemove={async () => {
-                  await remove.mutateAsync({
-                    id: row.id,
-                    name: pickLocalized(row.title),
-                  });
-                }}
-              />
-            ))}
+          {tab === "general" && <GeneralTab />}
+          {tab === "app" && <CustomerAppTab />}
+          {tab === "help" && <HelpTab />}
+          {tab === "legal" && <LegalTab />}
+          {tab === "advanced" && <AdvancedTab />}
         </div>
       </div>
-    </div>
-  );
-}
-
-function PolicyRow({
-  section,
-  index,
-  open,
-  anchor,
-  rowProps,
-  handleProps,
-  onEdit,
-  onRemove,
-}: {
-  section: PolicySection;
-  index: number;
-  /** Whether this is the row just returned from. Draws the ring. */
-  open: boolean;
-  /** Scrolls this row back into view when it is the one returned to. */
-  anchor: (node: HTMLElement | null) => void;
-  onEdit: () => void;
-  onRemove: () => Promise<void>;
-} & ReorderProps) {
-  const name = pickLocalized(section.title);
-
-  const row = rowProps(
-    section.id,
-    cx(
-      ROW,
-      // Tighter on a phone, where the four fixed things in this row — grip,
-      // number, Remove and the gaps between them — would otherwise take
-      // half its width from the title.
-      // Wrapping, so the grip can take its own line above — see
-      // `handleProps`.
-      "max-md:flex-wrap max-md:gap-sm max-md:px-md",
-      open ? "border-active shadow-selected" : "border-transparent",
-    ),
-  );
-
-  return (
-    <div {...row} ref={anchor}>
-      <button {...handleProps(section.id)}>
-        <GripIcon />
-      </button>
-
-      {/* The position, because in a legal document the order *is* content and
-          "section 4" is how somebody refers to it out loud. */}
-      <span
-        aria-hidden
-        className="w-[20px] shrink-0 tabular-nums text-[13px] text-text-faint"
-      >
-        {index + 1}
-      </span>
-
-      <button
-        type="button"
-        onClick={onEdit}
-        // `ROW_TARGET` stretches this button's hit area over the whole row —
-        // see `row.ts`. The row's own controls carry `ROW_ABOVE`.
-        className={cx(
-          ROW_TARGET,
-          "flex min-w-0 flex-grow flex-col gap-xxs text-left",
-        )}
-      >
-        <span className="truncate text-[15px] font-semibold">{name}</span>
-        {/* One line of the body, as a reminder of which section this is — a
-            policy body is paragraphs, so it is truncated hard rather than
-            wrapped into a row three times the height of its neighbours. */}
-        <span className="truncate text-[12px] text-text-faint">
-          {pickLocalized(section.body)}
-        </span>
-      </button>
-
-      <ConfirmButton
-        className={ROW_ABOVE}
-        onConfirm={onRemove}
-        titleKey="content.removeSectionTitle"
-        bodyKey="content.removeSectionBody"
-        confirmKey="content.removeConfirm"
-        params={{ name }}
-        variant="danger"
-        triggerVariant="danger"
-        size="sm"
-      >
-        {t("content.remove")}
-      </ConfirmButton>
-    </div>
+    </Page>
   );
 }

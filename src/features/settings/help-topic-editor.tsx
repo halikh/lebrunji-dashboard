@@ -1,15 +1,26 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { AlertCircle, SearchX } from "lucide-react";
 import { useState } from "react";
 
-import { Button, Field } from "@/components/ui";
-import { EditorPage } from "@/components/ui/editor-page";
+import {
+  Button,
+  EmptyState,
+  Field,
+  NativeSelect,
+  Page,
+  PageHeader,
+  Section,
+  Skeleton,
+  Switch,
+} from "@/components/ui";
 import { LocalizedField } from "@/components/ui/localized-field";
-import { Select } from "@/components/ui/select";
-import { Toggle } from "@/components/ui/toggle";
-import { EmptyState, LoadFailed } from "@/components/ui/empty-state";
-import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
+import {
+  changed,
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -17,6 +28,7 @@ import { TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import type { HelpTopic } from "./api/content";
+import { SaveBar } from "./settings-parts";
 import {
   useCreateHelpTopic,
   useHelpTopics,
@@ -25,18 +37,7 @@ import {
 
 const LIST_HREF = "/settings?tab=help";
 
-/**
- * One help topic, on a page of its own.
- *
- * ## This is one of the two that had no header at all
- *
- * `PanelHeader`'s own note records it: every panel in the dashboard carried its
- * own copy of the same title-and-close bar, and the two settings panels had
- * none — so a form opened here with nothing saying what it was editing and no
- * button to close it, on the one screen reached from a list of near-identical
- * rows. The shared component fixed that; a route makes it structural, because
- * `EditorPage` cannot be rendered without a title and a way back.
- */
+/** One help topic, new (`id` null) or existing, on a page of its own. */
 export function HelpTopicEditor({ id }: { id: string | null }) {
   const router = useRouter();
 
@@ -47,26 +48,42 @@ export function HelpTopicEditor({ id }: { id: string | null }) {
   const create = useCreateHelpTopic();
   const update = useUpdateHelpTopic();
 
-  const back = (focusId: string | null) => {
-    const focus = focusId ? `&focus=${focusId}` : "";
-    router.replace(`${LIST_HREF}${focus}`);
-  };
+  const back = (focusId: string | null) =>
+    router.replace(focusId ? `${LIST_HREF}&focus=${focusId}` : LIST_HREF);
 
-  if (id && !initial) {
+  // A new topic needs the list too: it is where the groups come from, and its
+  // length is where the new one goes.
+  if (topics.isPending) {
     return (
-      <EditorPage
-        title={t("content.addTopic")}
-        backHref={LIST_HREF}
-        backLabel={t("content.tabHelp")}
-      >
-        {topics.isPending ? (
-          <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
-        ) : topics.isError ? (
-          <LoadFailed onRetry={() => void topics.refetch()} />
+      <Page width="narrow">
+        <PageHeader title={t(id ? "common.loading" : "content.addTopic")} />
+        <Skeleton className="h-64 rounded-lg" />
+      </Page>
+    );
+  }
+
+  if (topics.isError || (id && !initial)) {
+    return (
+      <Page width="narrow">
+        <PageHeader title={t("content.topicForm")} />
+        {topics.isError ? (
+          <EmptyState
+            icon={<AlertCircle />}
+            title={t("content.failed")}
+            action={
+              <Button onClick={() => void topics.refetch()}>
+                {t("common.retry")}
+              </Button>
+            }
+          />
         ) : (
-          <EmptyState titleKey="content.notFound" mood="lost" />
+          <EmptyState
+            icon={<SearchX />}
+            title={t("content.notFound")}
+            description={t("content.notFoundBody")}
+          />
         )}
-      </EditorPage>
+      </Page>
     );
   }
 
@@ -96,6 +113,14 @@ export function HelpTopicEditor({ id }: { id: string | null }) {
   );
 }
 
+type Draft = {
+  groupSlug: string;
+  groupName: Localized;
+  question: Localized;
+  answer: Localized;
+  isActive: boolean;
+};
+
 function Form({
   initial,
   groups,
@@ -106,52 +131,45 @@ function Form({
   initial?: HelpTopic;
   groups: HelpTopic[];
   pending: boolean;
-  onSave: (draft: {
-    groupSlug: string;
-    groupName: Localized;
-    question: Localized;
-    answer: Localized;
-    isActive: boolean;
-  }) => void;
+  onSave: (draft: Draft) => void;
   onCancel: () => void;
 }) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
+  const guarded = useGuardedAction();
 
-  // One entry per group that exists, so a new topic joins an existing heading
-  // rather than inventing a near-duplicate of it.
+  /**
+   * One entry per group that exists. `group_name` is stored per topic and the
+   * app groups by `group_slug`, so a name typed here would split a heading in
+   * two — choosing from what exists is what keeps that from happening.
+   */
   const known = [
     ...new Map(
       groups.map((one) => [one.groupSlug, one.groupName] as const),
     ).entries(),
   ];
 
-  const [groupSlug, setGroupSlug] = useState(
-    initial?.groupSlug ?? known[0]?.[0] ?? "",
-  );
+  const startGroup = initial?.groupSlug ?? known[0]?.[0] ?? "";
+  const [groupSlug, setGroupSlug] = useState(startGroup);
   const [question, setQuestion] = useState<Localized>(initial?.question ?? {});
   const [answer, setAnswer] = useState<Localized>(initial?.answer ?? {});
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
-
   const [errors, setErrors] = useState<{
     question?: string;
     answer?: string;
     group?: string;
   }>({});
 
-  // The guard that used to belong to the panel: a page is left by navigating,
-  // which nothing intercepts on its own. See `CategoryEditor`.
-  useUnsavedChanges(
-    changed(
-      { groupSlug, question, answer, isActive },
-      {
-        groupSlug: initial?.groupSlug ?? known[0]?.[0] ?? "",
-        question: initial?.question ?? {},
-        answer: initial?.answer ?? {},
-        isActive: initial?.isActive ?? true,
-      },
-    ),
+  const dirty = changed(
+    { groupSlug, question, answer, isActive },
+    {
+      groupSlug: startGroup,
+      question: initial?.question ?? {},
+      answer: initial?.answer ?? {},
+      isActive: initial?.isActive ?? true,
+    },
   );
+  useUnsavedChanges(dirty);
 
   const groupName =
     known.find(([slug]) => slug === groupSlug)?.[1] ?? ({} as Localized);
@@ -163,7 +181,6 @@ function Form({
       TEXT.helpQuestion,
     );
     const answerCheck = validateLocalizedText(answer, codes, TEXT.helpAnswer);
-
     const found = {
       question: questionCheck.ok
         ? undefined
@@ -173,81 +190,105 @@ function Form({
         : t(answerCheck.key, answerCheck.params),
       group: groupSlug ? undefined : t("content.groupRequired"),
     };
-
     setErrors(found);
     if (found.question || found.answer || found.group) return;
-
     onSave({ groupSlug, groupName, question, answer, isActive });
   }
 
   return (
-    <EditorPage
-      title={initial ? pickLocalized(initial.question) : t("content.addTopic")}
-      backHref={initial ? `${LIST_HREF}&focus=${initial.id}` : LIST_HREF}
-      backLabel={t("content.tabHelp")}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onCancel} disabled={pending}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={submit} pending={pending}>
-            {t("content.save")}
-          </Button>
-        </>
-      }
-    >
-      <Field
-        label={t("content.group")}
-        hint={t("content.groupHint")}
-        error={errors.group}
-      >
-        <Select
-          value={groupSlug}
-          onChange={setGroupSlug}
-          placeholder={t("content.pickGroup")}
-          options={known.map(([slug, name]) => ({
-            value: slug,
-            label: pickLocalized(name) || slug,
-          }))}
-        />
-      </Field>
-
-      <LocalizedField
-        label={t("content.question")}
-        value={question}
-        onChange={setQuestion}
-        maxLength={TEXT.helpQuestion}
-        error={errors.question}
-        placeholder={{
-          en: "How do I track my order?",
-          ar: "كيف أتتبع طلبي؟",
-        }}
+    <Page width="narrow">
+      <PageHeader
+        title={
+          initial
+            ? pickLocalized(initial.question) || t("content.topicForm")
+            : t("content.addTopic")
+        }
+        description={t("content.helpBlurb")}
       />
 
-      <LocalizedField
-        label={t("content.answer")}
-        value={answer}
-        onChange={setAnswer}
-        maxLength={TEXT.helpAnswer}
-        multiline
-        error={errors.answer}
-        placeholder={{
-          en: "Open the order from the Orders tab.",
-          ar: "افتح الطلب من تبويب الطلبات.",
-        }}
-      />
-
-      <Field
-        label={t("content.visibility")}
-        hint={isActive ? t("content.liveHint") : t("content.hiddenHint")}
+      <Section
+        title={t("content.groupSectionTitle")}
+        description={t("content.groupHint")}
       >
-        <Toggle
-          on={isActive}
-          onChange={() => setIsActive((current) => !current)}
-          labelOn={t("content.live")}
-          labelOff={t("content.hidden")}
+        <Field
+          label={t("content.group")}
+          error={errors.group}
+          hint={known.length === 0 ? t("content.noGroups") : undefined}
+        >
+          {(props) => (
+            <NativeSelect
+              {...props}
+              value={groupSlug}
+              disabled={known.length === 0}
+              onChange={(event) => setGroupSlug(event.target.value)}
+            >
+              {!groupSlug && (
+                <option value="" disabled>
+                  {t("content.pickGroup")}
+                </option>
+              )}
+              {known.map(([slug, name]) => (
+                <option key={slug} value={slug}>
+                  {pickLocalized(name) || slug}
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+        </Field>
+      </Section>
+
+      <Section
+        title={t("content.topicSectionTitle")}
+        description={t("content.topicSectionBlurb")}
+      >
+        <div className="flex flex-col gap-5">
+          <LocalizedField
+            label={t("content.question")}
+            value={question}
+            onChange={setQuestion}
+            maxLength={TEXT.helpQuestion}
+            error={errors.question}
+            placeholder={{
+              en: "How do I track my order?",
+              ar: "كيف أتتبع طلبي؟",
+            }}
+          />
+          <LocalizedField
+            label={t("content.answer")}
+            value={answer}
+            onChange={setAnswer}
+            maxLength={TEXT.helpAnswer}
+            multiline
+            error={errors.answer}
+            placeholder={{
+              en: "Open the order from the Orders tab.",
+              ar: "افتح الطلب من تبويب الطلبات.",
+            }}
+          />
+        </div>
+      </Section>
+
+      <Section
+        title={t("content.visibility")}
+        description={t("content.visibilityBlurb")}
+      >
+        <Switch
+          checked={isActive}
+          onCheckedChange={setIsActive}
+          label={isActive ? t("content.live") : t("content.hidden")}
+          description={
+            isActive ? t("content.liveHint") : t("content.hiddenHint")
+          }
         />
-      </Field>
-    </EditorPage>
+      </Section>
+
+      <SaveBar
+        dirty={dirty}
+        pending={pending}
+        saveLabel={t("content.save")}
+        onSave={submit}
+        onCancel={guarded(onCancel)}
+      />
+    </Page>
   );
 }

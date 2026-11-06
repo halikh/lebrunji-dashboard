@@ -1,0 +1,308 @@
+"use client";
+
+import { useState } from "react";
+
+import { Button, Dialog, Field } from "@/components/ui";
+import { ImageUploader } from "@/components/ui/image-uploader";
+import { LocalizedField } from "@/components/ui/localized-field";
+import { Select } from "@/components/ui/select";
+import {
+  changed,
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
+import { useLanguages } from "@/features/reference/use-languages";
+import { pickLocalized } from "@/i18n/db-text";
+import { t } from "@/i18n/translations";
+import { ARTWORK_SHAPES } from "@/lib/image-shape";
+import { TEXT } from "@/lib/limits";
+import { validateLocalizedText, type Localized } from "@/lib/validation";
+
+/** What the section form edits — its name, and its aisle picture. */
+export type SectionFields = { title: Localized; imageUrl: string | null };
+
+/**
+ * Naming a section — new, a new sub-aisle, or a rename. One form for all three,
+ * because two would drift and the way they would drift is that one grows a
+ * field the other does not.
+ *
+ * No slug field: the trigger from migration 0071 derives one from the English
+ * title and keeps it unique within the shop.
+ *
+ * The picture is asked of every shop's sections, not only supermarkets': it is
+ * read only when the shop's layout is Aisles, and asking regardless lets the
+ * pictures be in place before the layout is switched.
+ */
+export function SectionDialog({
+  open,
+  onOpenChange,
+  title,
+  initial,
+  placeholder = { en: "Starters", ar: "المقبلات" },
+  pending,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  initial?: SectionFields;
+  placeholder?: Localized;
+  pending: boolean;
+  /** Called with valid fields; the caller closes the dialog on success. */
+  onSave: (fields: SectionFields) => void;
+}) {
+  const guarded = useGuardedAction();
+  // Closing asks first when something was typed; a save that landed closes
+  // through the caller's `onSuccess` and asks nothing.
+  const close = guarded(() => onOpenChange(false));
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+      title={title}
+      size="md"
+    >
+      {open && (
+        <SectionForm
+          initial={initial}
+          placeholder={placeholder}
+          pending={pending}
+          onSave={onSave}
+          onCancel={close}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+function SectionForm({
+  initial,
+  placeholder,
+  pending,
+  onSave,
+  onCancel,
+}: {
+  initial?: SectionFields;
+  placeholder: Localized;
+  pending: boolean;
+  onSave: (fields: SectionFields) => void;
+  onCancel: () => void;
+}) {
+  const languages = useLanguages();
+  const codes = languages.data?.map((language) => language.code) ?? [];
+
+  const [title, setTitle] = useState<Localized>(initial?.title ?? {});
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    initial?.imageUrl ?? null,
+  );
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  const dirty = changed(
+    { title, imageUrl },
+    { title: initial?.title ?? {}, imageUrl: initial?.imageUrl ?? null },
+  );
+  useUnsavedChanges(dirty);
+
+  function submit() {
+    const result = validateLocalizedText(title, codes, TEXT.title);
+    if (!result.ok) {
+      setError(t(result.key, result.params));
+      return;
+    }
+    setError(undefined);
+    onSave({ title, imageUrl });
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <LocalizedField
+        label={t("menu.sectionTitle")}
+        value={title}
+        onChange={setTitle}
+        maxLength={TEXT.title}
+        hint={t("menu.sectionTitleHint")}
+        error={error}
+        filter="title"
+        placeholder={placeholder}
+      />
+      <Field label={t("menu.sectionImage")} hint={t("menu.sectionImageHint")}>
+        <ImageUploader
+          value={imageUrl}
+          onChange={setImageUrl}
+          folder="menu-sections"
+          shape={ARTWORK_SHAPES.aisle}
+          cutout
+          disabled={pending}
+        />
+      </Field>
+      <div className="-mx-6 -mb-5 flex justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
+        <Button variant="secondary" onClick={onCancel} disabled={pending}>
+          {t("common.cancel")}
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          pending={pending}
+          disabled={!dirty}
+        >
+          {t("menu.saveSection")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** The Move dialog's two choices that are not an existing aisle. */
+const NEW_AISLE = "new";
+const OWN_AISLE = "own";
+
+export type SectionMoves = {
+  /** The aisles it can go under. */
+  targets: { id: string; title: Localized }[];
+  /** Offer "a new aisle" — an aisle only. */
+  canGroup: boolean;
+  /** Offer "an aisle of its own" — a sub-aisle the database will let out. */
+  canUnnest: boolean;
+  pending: boolean;
+  /** Under `target`, or out to an aisle of its own when null. */
+  move: (target: string | null, done: () => void) => void;
+  /** Into a new aisle called `title`. */
+  group: (title: Localized, done: () => void) => void;
+};
+
+/**
+ * Moving a section around the aisles tree (0196): under another aisle, into a
+ * new aisle made for it, or — for a sub-aisle the database will let out — back
+ * to an aisle of its own.
+ */
+export function MoveSectionDialog({
+  open,
+  onOpenChange,
+  name,
+  isSub,
+  moves,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  name: string;
+  isSub: boolean;
+  moves: SectionMoves;
+}) {
+  const guarded = useGuardedAction();
+  const close = guarded(() => onOpenChange(false));
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+      title={t("menu.moveSectionTitle", { name })}
+      description={t("menu.moveHint")}
+    >
+      {open && (
+        <MoveForm
+          isSub={isSub}
+          moves={moves}
+          onCancel={close}
+          onDone={() => onOpenChange(false)}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+function MoveForm({
+  isSub,
+  moves,
+  onCancel,
+  onDone,
+}: {
+  isSub: boolean;
+  moves: SectionMoves;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  const languages = useLanguages();
+  const codes = languages.data?.map((language) => language.code) ?? [];
+
+  const [target, setTarget] = useState("");
+  const [title, setTitle] = useState<Localized>({});
+  const [error, setError] = useState<string | undefined>(undefined);
+
+  useUnsavedChanges(changed({ target, title }, { target: "", title: {} }));
+
+  const options = [
+    ...(moves.canGroup
+      ? [{ value: NEW_AISLE, label: t("menu.moveNewAisle") }]
+      : []),
+    ...(moves.canUnnest
+      ? [{ value: OWN_AISLE, label: t("menu.moveOwnAisle") }]
+      : []),
+    ...moves.targets.map((aisle) => ({
+      value: aisle.id,
+      label: pickLocalized(aisle.title),
+    })),
+  ];
+
+  function submit() {
+    if (!target) {
+      setError(t("menu.moveChoose"));
+      return;
+    }
+    if (target === NEW_AISLE) {
+      const result = validateLocalizedText(title, codes, TEXT.title);
+      if (!result.ok) {
+        setError(t(result.key, result.params));
+        return;
+      }
+      setError(undefined);
+      moves.group(title, onDone);
+      return;
+    }
+    setError(undefined);
+    moves.move(target === OWN_AISLE ? null : target, onDone);
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <Field
+        label={isSub ? t("menu.moveSubAisleTo") : t("menu.moveAisleInto")}
+        error={target === NEW_AISLE ? undefined : error}
+      >
+        <Select
+          value={target}
+          onChange={setTarget}
+          options={options}
+          disabled={moves.pending}
+          placeholder={t("menu.moveChoose")}
+          aria-label={
+            isSub ? t("menu.moveSubAisleTo") : t("menu.moveAisleInto")
+          }
+        />
+      </Field>
+      {target === NEW_AISLE && (
+        <LocalizedField
+          label={t("menu.newAisleName")}
+          value={title}
+          onChange={setTitle}
+          maxLength={TEXT.title}
+          error={error}
+          filter="title"
+          placeholder={{ en: "Dairy & Eggs", ar: "ألبان وبيض" }}
+        />
+      )}
+      <div className="-mx-6 -mb-5 flex justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
+        <Button variant="secondary" onClick={onCancel} disabled={moves.pending}>
+          {t("common.cancel")}
+        </Button>
+        <Button variant="primary" onClick={submit} pending={moves.pending}>
+          {t("menu.moveConfirm")}
+        </Button>
+      </div>
+    </div>
+  );
+}

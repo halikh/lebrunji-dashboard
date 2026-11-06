@@ -1,57 +1,53 @@
 "use client";
 
-import { cx } from "./index";
+import { useState } from "react";
+
+import { cx } from "./cx";
 
 /**
- * Charts, drawn here rather than pulled from a library.
+ * Charts, drawn here rather than pulled from a library: a few known shapes,
+ * in the kit's own tokens, so a colour in a chart is the colour everywhere.
  *
- * The plan's reasoning, and it still holds: these are a few known shapes, not
- * an exploration tool. A charting library arrives with its own palette, type
- * scale and tooltip styling, and the work becomes bending it back toward the
- * app's — which is more effort than drawing the shapes. Drawn here they read
- * the palette tokens like everything else, so a colour in a chart is the same
- * colour as in the queue.
+ * ## Calm by default
  *
- * ## They are figures, not pictures
+ * Every chart here is one series, so it is one hue: the accent for the data,
+ * neutral greys for everything that is not data (the previous period, empty
+ * cells, tracks). Status colours appear only where a row *is* a status (the
+ * order funnel, via `fill`). Text is always ink, never the series colour.
  *
- * Every chart here carries the numbers as text somewhere a screen reader can
- * reach — a `<title>` on the SVG, and a visible label under each bar where
- * there is room. A chart that only exists as geometry is a chart some of the
- * operators cannot read at all, and the same information in words costs a line.
+ * ## Figures, not pictures
+ *
+ * Each chart carries its numbers as text a screen reader can reach (a visually
+ * hidden list), and every mark shows its exact value on hover or focus.
  */
 
 /**
- * The colours a chart may be drawn in.
- *
- * ## Why charts get the whole ramp when controls do not
- *
- * The palette reserves blue for *what you press* and red for alarm, and that
- * discipline is what makes both mean something. A chart is neither: nothing on
- * it is clickable and nothing on it is a warning, so the reservation does not
- * apply — and having six charts in one blue would waste the one screen where
- * colour is carrying information rather than decorating it.
- *
- * ## Each is chosen for what the chart is about, not for variety
- *
- * Money uses `accent`, which is the palette's "going well". Volume uses `sun`.
- * Patterns of time use `info` — sun too, in the second edition, since a heat
- * map is a shape rather than a judgement and sun is the palette's accent. `active` is kept for the charts about *this* — the customer in
- * front of you — so a profile reads as the app's accent and the business-wide
- * overview does not.
- *
- * Referenced as CSS variables, never Tailwind class names: a class assembled at
- * runtime is one Tailwind never sees in the source and therefore never
- * generates, and the bar comes out transparent with no error anywhere.
+ * The colours a chart may be drawn in. The old names are all accepted; they
+ * map onto the calm palette — the accent for the data, `info` kept for the
+ * one chart that wants to read apart from money, `neutral` for context.
  */
-export type ChartTone = "accent" | "sun" | "info" | "active" | "primary";
+export type ChartTone =
+  "accent" | "sun" | "info" | "active" | "primary" | "neutral";
 
-const TONE: Record<ChartTone, { fill: string; wash: string }> = {
-  accent: { fill: "var(--color-accent)", wash: "var(--color-accent-wash)" },
-  sun: { fill: "var(--color-yellow)", wash: "var(--color-yellow-wash)" },
-  info: { fill: "var(--color-info)", wash: "var(--color-info-wash)" },
-  active: { fill: "var(--color-active)", wash: "var(--color-active-wash)" },
-  primary: { fill: "var(--color-primary)", wash: "var(--color-primary-wash)" },
+const TONE: Record<ChartTone, string> = {
+  accent: "var(--color-accent)",
+  active: "var(--color-accent)",
+  primary: "var(--color-accent)",
+  sun: "var(--color-accent)",
+  info: "var(--color-info)",
+  neutral: "var(--color-ink-3)",
 };
+
+function describeCell(cell: { label: string; value: number }): string {
+  return `${cell.label}: ${cell.value}`;
+}
+
+/** A sequential shade of one hue: faint for little, full for the most. */
+function shade(colour: string, value: number, max: number): string {
+  if (value <= 0) return "var(--color-hover)";
+  const strength = Math.round(14 + (value / max) * 76);
+  return `color-mix(in srgb, ${colour} ${strength}%, var(--color-surface))`;
+}
 
 export type Bar = {
   /** Sorts and identifies. */
@@ -59,39 +55,54 @@ export type Bar = {
   /** Drawn under the bar. Keep it two or three characters. */
   label: string;
   value: number;
-  /**
-   * The same bucket in the period before, drawn as a ghost behind this one.
-   *
-   * The comparison is the point of a revenue chart — "are we growing" is not a
-   * question a single series can answer, and bars with nothing to measure
-   * against are decoration. Absent where there is no previous period to show.
-   */
+  /** The same bucket in the period before, drawn as a grey ghost behind. */
   ghost?: number;
-  /** What a screen reader is told, and the hover title. Say the units. */
+  /** What a screen reader is told, and the tooltip. Say the units. */
   title: string;
 };
+
+/** A small dark tooltip anchored above a mark. */
+function Tip({
+  text,
+  align,
+}: {
+  text: string;
+  align: "start" | "center" | "end";
+}) {
+  return (
+    <span
+      role="presentation"
+      className={cx(
+        "pointer-events-none absolute bottom-full z-20 mb-1.5 w-max max-w-56 rounded-md bg-ink px-2 py-1 text-[12px] leading-snug text-white tabular-nums shadow-md animate-fade-in",
+        align === "start" && "start-0",
+        align === "end" && "end-0",
+        align === "center" && "start-1/2 -translate-x-1/2 rtl:translate-x-1/2",
+      )}
+    >
+      {text}
+    </span>
+  );
+}
+
+function alignAt(index: number, count: number): "start" | "center" | "end" {
+  if (count <= 2) return "center";
+  if (index < count * 0.15) return "start";
+  if (index >= count * 0.85) return "end";
+  return "center";
+}
 
 /**
  * A row of bars over a shared baseline.
  *
- * ## Empty buckets are drawn, not skipped
- *
- * A zero renders as a hairline rather than as nothing, because the *gap* is
- * usually the finding: a customer who stopped ordering in March is a run of
- * flat months, and a chart built only from the months that have data would show
- * them as a continuous, healthy-looking series.
- *
- * ## The scale starts at zero
- *
- * Always. A bar chart whose baseline is the smallest value exaggerates every
- * difference on it, and this one is read by somebody deciding whether a
- * customer is drifting away. `max` is the largest value or 1 — never 0, which
- * would divide every height by nothing.
+ * Empty buckets are drawn as a hairline, not skipped — the gap is usually the
+ * finding. The scale always starts at zero, and the ghosts are in the scale
+ * too, so the comparison is drawn to one ruler. The best bucket is full
+ * strength; the rest a shade back.
  */
 export function BarChart({
   bars,
   title,
-  tone = "active",
+  tone = "accent",
   height = 120,
   className,
 }: {
@@ -102,84 +113,83 @@ export function BarChart({
   height?: number;
   className?: string;
 }) {
+  const [hover, setHover] = useState<number | null>(null);
   const colour = TONE[tone];
-  // The ghosts are in the scale too. Scaling to the current period alone would
-  // make a bad month look like a good one whenever the previous period was
-  // taller — the comparison would then be drawn to two different rulers.
   const max = Math.max(
     1,
     ...bars.map((bar) => bar.value),
     ...bars.map((bar) => bar.ghost ?? 0),
   );
-  // The gutter between bars shrinks as they multiply. A fixed 4px is right
-  // for a week and wrong for a quarter: ninety bars spend 356px on gaps alone,
-  // which is a whole phone, and leave the bars themselves nothing. The labels
-  // use the same gap so each one stays under its own bar.
+  // The gutter shrinks as bars multiply: ninety bars at 4px is a phone of gaps.
   const gap =
-    bars.length > 48 ? "gap-0" : bars.length > 16 ? "gap-px" : "gap-xs";
+    bars.length > 48 ? "gap-0" : bars.length > 16 ? "gap-px" : "gap-1";
 
   return (
-    <figure className={cx("flex flex-col gap-xs", className)}>
+    <figure className={cx("flex flex-col gap-1.5", className)}>
+      <ul className="sr-only" aria-label={title}>
+        {bars.map((bar) => (
+          <li key={bar.key}>{bar.title}</li>
+        ))}
+      </ul>
       <div
-        role="img"
-        aria-label={title}
-        className={cx("flex items-end", gap)}
+        aria-hidden
+        className={cx(
+          "relative flex items-end border-b border-line-strong",
+          gap,
+        )}
         style={{ height }}
+        onMouseLeave={() => setHover(null)}
       >
-        {bars.map((bar) => {
+        {/* Recessive guides at a half and the top, so heights can be read. */}
+        <span className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-line" />
+        <span className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-line" />
+        {bars.map((bar, index) => {
           const share = bar.value / max;
+          const active = hover === index;
           return (
             <div
               key={bar.key}
-              title={bar.title}
-              className="flex h-full flex-1 items-end"
+              onMouseEnter={() => setHover(index)}
+              className="relative flex h-full min-w-0 flex-1 items-end"
             >
-              {/* The ghost sits behind, not beside. Two bars per bucket
-                  doubles the width and halves how many buckets fit, and the
-                  question being asked is "taller or shorter than last time"
-                  rather than "how do these two compare as objects". */}
               <div className="relative h-full w-full">
+                {active && (
+                  <span className="absolute inset-0 rounded-sm bg-hover" />
+                )}
                 {bar.ghost !== undefined && (
                   <div
-                    aria-hidden
-                    className="absolute inset-x-0 bottom-0 rounded-t-sm bg-border"
+                    className="absolute inset-x-[8%] bottom-0 rounded-t-[4px] bg-line"
                     style={{ height: `${(bar.ghost / max) * 100}%` }}
                   />
                 )}
                 <div
-                  className="absolute inset-x-[22%] bottom-0 rounded-t-sm"
+                  className="absolute inset-x-[24%] bottom-0 rounded-t-[4px] transition-[height]"
                   style={{
-                    // A zero still draws a hairline: absent bars and zero bars
-                    // look identical otherwise, and only one of them is a fact.
                     height: `${Math.max(share * 100, 1.5)}%`,
-                    // The best bucket in the range is drawn at full strength
-                    // and the rest a shade back. It costs nothing and it
-                    // answers "when was our best day" without anybody
-                    // comparing heights by eye.
+                    minWidth: 2,
                     background:
                       bar.value === 0
-                        ? "var(--color-border)"
-                        : bar.value === max
-                          ? colour.fill
-                          : `color-mix(in srgb, ${colour.fill} 72%, var(--color-surface))`,
+                        ? "var(--color-line-strong)"
+                        : bar.value === max || active
+                          ? colour
+                          : `color-mix(in srgb, ${colour} 70%, var(--color-surface))`,
                   }}
                 />
               </div>
+              {active && (
+                <Tip text={bar.title} align={alignAt(index, bars.length)} />
+              )}
             </div>
           );
         })}
       </div>
 
-      <div className={cx("flex", gap)}>
+      <div aria-hidden className={cx("flex", gap)}>
         {bars.map((bar) => (
           <span
             key={bar.key}
-            aria-hidden
-            // Centred on its bar and allowed to spill past it, not truncated.
-            // At ninety bars on a phone a bar is about 3px — a truncated label
-            // was an ellipsis — and callers keep the labels sparse enough
-            // that the empty neighbours give it the room.
-            className="flex min-w-0 flex-1 justify-center overflow-visible whitespace-nowrap text-[10px] text-text-faint"
+            // Centred on its bar and allowed to spill; callers keep labels sparse.
+            className="flex min-w-0 flex-1 justify-center overflow-visible text-[11px] whitespace-nowrap text-ink-3 tabular-nums"
           >
             {bar.label}
           </span>
@@ -190,25 +200,13 @@ export function BarChart({
 }
 
 /**
- * A strip of cells shaded by value — "when do they order".
- *
- * ## Shade rather than height
- *
- * Seven bars of a week is a bar chart; seven *cells* is a pattern, and a
- * pattern is what the eye reads at a glance for "Fridays and Saturdays". It
- * also stays legible at a fraction of the height a bar chart needs, which is
- * what lets it sit under the tiles rather than pushing the orders off screen.
- *
- * ## Never shade alone
- *
- * The count is printed in every cell. Shade is a summary, not the data: a
- * colour-blind operator, a dim screen and a printed page all lose it, and the
- * number costs nothing.
+ * A strip of cells shaded by value — "when do they order". The count is
+ * printed in every cell: shade is a summary, not the data.
  */
 export function HeatStrip({
   cells,
   title,
-  tone = "info",
+  tone = "accent",
   className,
 }: {
   cells: readonly { key: string; label: string; value: number }[];
@@ -220,60 +218,47 @@ export function HeatStrip({
   const colour = TONE[tone];
 
   return (
-    <figure className={cx("flex flex-col gap-xs", className)}>
-      <div role="img" aria-label={title} className="flex gap-xs">
+    <figure className={cx("flex flex-col gap-1", className)}>
+      <ul className="sr-only" aria-label={title}>
         {cells.map((cell) => (
-          <div
-            key={cell.key}
-            title={`${cell.label}: ${cell.value}`}
-            className="flex flex-1 flex-col items-center gap-xxs"
-          >
-            <div
-              className="flex h-[34px] w-full items-center justify-center rounded-sm text-[11px] font-semibold tabular-nums"
-              style={{
-                // The wash at full strength for the busiest cell, fading to
-                // nothing — one token, so the strip is in the palette rather
-                // than beside it.
-                background:
-                  cell.value === 0
-                    ? "var(--color-neutral-fill)"
-                    : `color-mix(in srgb, ${colour.fill} ${Math.round(
-                        18 + (cell.value / max) * 62,
-                      )}%, var(--color-surface))`,
-              }}
-            >
-              {cell.value > 0 ? cell.value : ""}
-            </div>
-            <span aria-hidden className="text-[10px] text-text-faint">
-              {cell.label}
-            </span>
-          </div>
+          <li key={cell.key}>{describeCell(cell)}</li>
         ))}
+      </ul>
+      <div aria-hidden className="flex gap-1">
+        {cells.map((cell) => {
+          const strong = cell.value / max > 0.55;
+          return (
+            <div
+              key={cell.key}
+              title={describeCell(cell)}
+              className="flex min-w-0 flex-1 flex-col items-center gap-1"
+            >
+              <div
+                className={cx(
+                  "flex h-9 w-full items-center justify-center rounded-md text-[12px] font-medium tabular-nums",
+                  strong ? "text-white" : "text-ink-2",
+                )}
+                style={{ background: shade(colour, cell.value, max) }}
+              >
+                {cell.value > 0 ? cell.value : ""}
+              </div>
+              <span className="text-[11px] text-ink-3">{cell.label}</span>
+            </div>
+          );
+        })}
       </div>
     </figure>
   );
 }
 
 /**
- * A list of horizontal bars — "what actually sells".
- *
- * ## Horizontal because the labels are words
- *
- * A dish is called "Kibbeh plate with garlic sauce", and vertical bars give a
- * label the width of a bar: two characters, or the text turned on its side.
- * Horizontal bars give it the width of the row, which is the whole reason to
- * draw this shape rather than print a table — the names stay readable *and* the
- * lengths stay comparable.
- *
- * ## The value is printed, not only drawn
- *
- * The bar answers "which is biggest" at a glance; the number answers "by how
- * much", which is the next question every single time.
+ * Horizontal bars — "what actually sells". Horizontal because the labels are
+ * words; the value is printed beside the label, not only drawn.
  */
 export function HBarList({
   rows,
   title,
-  tone = "active",
+  tone = "accent",
   className,
 }: {
   rows: readonly {
@@ -282,12 +267,8 @@ export function HBarList({
     value: number;
     note: string;
     /**
-     * A colour for this row alone, as a CSS value.
-     *
-     * For the one chart where the rows are not interchangeable: the order
-     * funnel's bars *are* statuses, so each wears the colour it wears in the
-     * queue and on the overview's tiles. Anywhere else a colour per row would
-     * be decoration pretending to be information.
+     * A colour for this row alone, as a CSS value — only where a row *is* a
+     * status (the order funnel), so it wears the colour it wears in the queue.
      */
     fill?: string;
   }[];
@@ -299,23 +280,26 @@ export function HBarList({
   const colour = TONE[tone];
 
   return (
-    <ul aria-label={title} className={cx("flex flex-col gap-sm", className)}>
+    <ul aria-label={title} className={cx("flex flex-col gap-3", className)}>
       {rows.map((row) => (
-        <li key={row.key} className="flex flex-col gap-xxs">
-          <div className="flex items-baseline justify-between gap-md">
-            <span className="min-w-0 truncate text-[13px]">{row.label}</span>
-            <span className="shrink-0 tabular-nums text-[13px] font-semibold">
+        <li key={row.key} className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate text-[13px] text-ink-2">
+              {row.label}
+            </span>
+            <span className="shrink-0 text-[13px] font-medium text-ink tabular-nums">
               {row.note}
             </span>
           </div>
-          <div className="h-[8px] w-full overflow-hidden rounded-sm bg-neutral-fill">
+          <div
+            aria-hidden
+            className="h-2 w-full overflow-hidden rounded-full bg-hover"
+          >
             <div
-              className="h-full rounded-sm"
+              className="h-full rounded-full transition-[width]"
               style={{
-                // A hairline for a real zero, so an empty row still reads as a
-                // row rather than as a rendering fault.
                 width: `${Math.max((row.value / max) * 100, 1)}%`,
-                background: row.fill ?? colour.fill,
+                background: row.fill ?? colour,
               }}
             />
           </div>
@@ -328,25 +312,15 @@ export function HBarList({
 /**
  * The week against the hours of the day, shaded by volume.
  *
- * ## The empty grid is drawn
- *
- * The server sends only the buckets that have something in them, and this fills
- * the rest with zeroes. Deliberate: the shape of *when nothing happens* is half
- * the answer to "when do we need staff", and a chart with holes cannot show it.
- *
- * ## Rows read Monday-first; the data is Sunday-indexed
- *
- * `store_hours.day_of_week` and `Date#getDay` both count from Sunday, so that
- * is what arrives. A week a person reads starts on Monday. The rotation happens
- * here, in the presentation layer, and nowhere else — so nothing reaching the
- * database has passed through a display position.
+ * The empty grid is drawn — when nothing happens is half the answer. Rows
+ * read Monday-first; the data is Sunday-indexed (`[dayOfWeek 0-6][hour 0-23]`)
+ * and the rotation happens here only.
  */
 export function HeatGrid({
-  /** `[dayOfWeek 0-6][hour 0-23]`, Sunday-indexed as the data is. */
   values,
   dayLabels,
   title,
-  tone = "info",
+  tone = "accent",
   className,
 }: {
   values: readonly (readonly number[])[];
@@ -355,39 +329,57 @@ export function HeatGrid({
   tone?: ChartTone;
   className?: string;
 }) {
+  const [hover, setHover] = useState<{ day: number; hour: number } | null>(
+    null,
+  );
   const max = Math.max(1, ...values.flatMap((row) => [...row]));
   const colour = TONE[tone];
   const rows = [1, 2, 3, 4, 5, 6, 0];
+  const at = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
+  const describeDay = (day: number) =>
+    `${dayLabels[day]}: ${(values[day] ?? [])
+      .map((value, hour) => (value > 0 ? `${at(hour)} ${value}` : null))
+      .filter(Boolean)
+      .join(", ")}`;
 
   return (
-    <figure className={cx("flex flex-col gap-xs", className)}>
-      <div role="img" aria-label={title} className="flex flex-col gap-xxs">
+    <figure className={cx("flex flex-col gap-1.5", className)}>
+      <ul className="sr-only" aria-label={title}>
         {rows.map((day) => (
-          <div key={day} className="flex items-center gap-xs">
-            <span
-              aria-hidden
-              className="w-[22px] shrink-0 text-[10px] text-text-faint"
-            >
+          <li key={day}>{describeDay(day)}</li>
+        ))}
+      </ul>
+      <div
+        aria-hidden
+        className="flex flex-col gap-[3px]"
+        onMouseLeave={() => setHover(null)}
+      >
+        {rows.map((day) => (
+          <div key={day} className="flex items-center gap-2">
+            <span className="w-8 shrink-0 text-[11px] text-ink-3">
               {dayLabels[day]}
             </span>
             <div className="flex flex-1 gap-[2px]">
               {Array.from({ length: 24 }, (_, hour) => {
                 const value = values[day]?.[hour] ?? 0;
-                const at = String(hour).padStart(2, "0");
+                const active = hover?.day === day && hover.hour === hour;
                 return (
                   <div
                     key={hour}
-                    title={`${dayLabels[day]} ${at}:00 — ${value}`}
-                    className="h-[14px] flex-1 rounded-[2px]"
-                    style={{
-                      background:
-                        value === 0
-                          ? "var(--color-neutral-fill)"
-                          : `color-mix(in srgb, ${colour.fill} ${Math.round(
-                              18 + (value / max) * 62,
-                            )}%, var(--color-surface))`,
-                    }}
-                  />
+                    onMouseEnter={() => setHover({ day, hour })}
+                    className={cx(
+                      "relative h-4 min-w-0 flex-1 rounded-[3px]",
+                      active && "ring-2 ring-ink/70",
+                    )}
+                    style={{ background: shade(colour, value, max) }}
+                  >
+                    {active && (
+                      <Tip
+                        text={`${dayLabels[day]} ${at(hour)} — ${value}`}
+                        align={alignAt(hour, 24)}
+                      />
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -395,12 +387,10 @@ export function HeatGrid({
         ))}
       </div>
 
-      {/* Four marks rather than twenty-four: an axis labelling every hour is
-          unreadable at this width, and the quarters are enough to place a band
-          by eye. */}
+      {/* Quarter marks: an axis labelling every hour is unreadable here. */}
       <div
         aria-hidden
-        className="flex gap-xs ps-[26px] text-[10px] text-text-faint"
+        className="flex gap-2 ps-10 text-[11px] text-ink-3 tabular-nums"
       >
         {["00", "06", "12", "18"].map((mark) => (
           <span key={mark} className="flex-1">

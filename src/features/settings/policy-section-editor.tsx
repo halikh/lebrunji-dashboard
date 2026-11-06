@@ -1,13 +1,24 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { AlertCircle, SearchX } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "@/components/ui";
-import { EditorPage } from "@/components/ui/editor-page";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Page,
+  PageHeader,
+  Section,
+  Skeleton,
+} from "@/components/ui";
 import { LocalizedField } from "@/components/ui/localized-field";
-import { EmptyState, LoadFailed } from "@/components/ui/empty-state";
-import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
+import {
+  changed,
+  useGuardedAction,
+  useUnsavedChanges,
+} from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -15,24 +26,13 @@ import { TEXT } from "@/lib/limits";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import type { PolicyDocument, PolicySection } from "./api/content";
+import { useDocumentParam } from "./legal-tab";
+import { SaveBar } from "./settings-parts";
 import {
   useCreatePolicySection,
   usePolicySections,
   useUpdatePolicySection,
 } from "./use-content";
-
-/**
- * Which of the two policies a section belongs to, out of the URL.
- *
- * The legal tab keeps the chosen document in its own state, so the editor has
- * to be told which one the row came from — otherwise saving a *terms* section
- * would read and write the privacy list. It travels as `?doc=`, and goes back
- * on the return href so the list reopens on the document it was left on rather
- * than snapping to privacy.
- */
-function useDocument(): PolicyDocument {
-  return useSearchParams().get("doc") === "terms" ? "terms" : "privacy";
-}
 
 function listHref(document: PolicyDocument) {
   return `/settings?tab=legal&doc=${document}`;
@@ -41,16 +41,14 @@ function listHref(document: PolicyDocument) {
 /**
  * One section of a policy, on a page of its own.
  *
- * The other panel that had no header — see `HelpTopicEditor`.
- *
- * It also has the most to gain from the width: a section is a title and a
- * *body*, and the body is prose. Editing a paragraph of a privacy policy in a
- * 420pt column meant a textarea about forty characters wide, which is a shape
- * nobody writes in.
+ * The document comes from `?doc=` — the list keeps it in the URL — so saving a
+ * *terms* section reads and writes the terms list, and the way back reopens
+ * the document it was left on. A section belongs to the policy it was opened
+ * from and cannot be moved between them here.
  */
 export function PolicySectionEditor({ id }: { id: string | null }) {
   const router = useRouter();
-  const document = useDocument();
+  const document = useDocumentParam();
   const LIST_HREF = listHref(document);
 
   const sections = usePolicySections(document);
@@ -60,26 +58,40 @@ export function PolicySectionEditor({ id }: { id: string | null }) {
   const create = useCreatePolicySection(document);
   const update = useUpdatePolicySection(document);
 
-  const back = (focusId: string | null) => {
-    const focus = focusId ? `&focus=${focusId}` : "";
-    router.replace(`${LIST_HREF}${focus}`);
-  };
+  const back = (focusId: string | null) =>
+    router.replace(focusId ? `${LIST_HREF}&focus=${focusId}` : LIST_HREF);
 
-  if (id && !initial) {
+  if (sections.isPending) {
     return (
-      <EditorPage
-        title={t("content.addSection")}
-        backHref={LIST_HREF}
-        backLabel={t("content.tabLegal")}
-      >
-        {sections.isPending ? (
-          <div aria-hidden className="h-[64px] rounded-md bg-neutral-fill" />
-        ) : sections.isError ? (
-          <LoadFailed onRetry={() => void sections.refetch()} />
+      <Page width="narrow">
+        <PageHeader title={t(id ? "common.loading" : "content.addSection")} />
+        <Skeleton className="h-64 rounded-lg" />
+      </Page>
+    );
+  }
+
+  if (sections.isError || (id && !initial)) {
+    return (
+      <Page width="narrow">
+        <PageHeader title={t("content.sectionForm")} />
+        {sections.isError ? (
+          <EmptyState
+            icon={<AlertCircle />}
+            title={t("content.failed")}
+            action={
+              <Button onClick={() => void sections.refetch()}>
+                {t("common.retry")}
+              </Button>
+            }
+          />
         ) : (
-          <EmptyState titleKey="content.notFound" mood="lost" />
+          <EmptyState
+            icon={<SearchX />}
+            title={t("content.notFound")}
+            description={t("content.notFoundBody")}
+          />
         )}
-      </EditorPage>
+      </Page>
     );
   }
 
@@ -87,12 +99,10 @@ export function PolicySectionEditor({ id }: { id: string | null }) {
     <Form
       key={initial?.id ?? "new"}
       initial={initial ?? undefined}
-      listHref={LIST_HREF}
+      document={document}
       pending={create.isPending || update.isPending}
       onSave={(draft) => {
         const name = pickLocalized(draft.title);
-        // The document is the route's, not the form's — a section belongs to
-        // the policy it was opened from and cannot be moved between them here.
         const patch = { ...draft, document };
         const done = () => back(initial?.id ?? null);
         if (initial) {
@@ -111,85 +121,92 @@ export function PolicySectionEditor({ id }: { id: string | null }) {
 
 function Form({
   initial,
-  listHref: LIST_HREF,
+  document,
   pending,
   onSave,
   onCancel,
 }: {
   initial?: PolicySection;
-  listHref: string;
+  document: PolicyDocument;
   pending: boolean;
   onSave: (draft: { title: Localized; body: Localized }) => void;
   onCancel: () => void;
 }) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
+  const guarded = useGuardedAction();
 
   const [title, setTitle] = useState<Localized>(initial?.title ?? {});
   const [body, setBody] = useState<Localized>(initial?.body ?? {});
   const [errors, setErrors] = useState<{ title?: string; body?: string }>({});
 
-  // The guard that used to belong to the panel: a page is left by navigating,
-  // which nothing intercepts on its own. See `CategoryEditor`.
-  useUnsavedChanges(
-    changed(
-      { title, body },
-      { title: initial?.title ?? {}, body: initial?.body ?? {} },
-    ),
+  const dirty = changed(
+    { title, body },
+    { title: initial?.title ?? {}, body: initial?.body ?? {} },
   );
+  useUnsavedChanges(dirty);
 
   function submit() {
     const titleCheck = validateLocalizedText(title, codes, TEXT.policyTitle);
     const bodyCheck = validateLocalizedText(body, codes, TEXT.policyBody);
-
     const found = {
       title: titleCheck.ok ? undefined : t(titleCheck.key, titleCheck.params),
       body: bodyCheck.ok ? undefined : t(bodyCheck.key, bodyCheck.params),
     };
-
     setErrors(found);
     if (found.title || found.body) return;
-
     onSave({ title, body });
   }
 
+  const documentName = t(`content.document.${document}`);
+
   return (
-    <EditorPage
-      title={initial ? pickLocalized(initial.title) : t("content.addSection")}
-      backHref={initial ? `${LIST_HREF}&focus=${initial.id}` : LIST_HREF}
-      backLabel={t("content.tabLegal")}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onCancel} disabled={pending}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={submit} pending={pending}>
-            {t("content.save")}
-          </Button>
-        </>
-      }
-    >
-      <LocalizedField
-        label={t("content.sectionTitle")}
-        value={title}
-        onChange={setTitle}
-        maxLength={TEXT.policyTitle}
-        error={errors.title}
-        placeholder={{ en: "What we collect", ar: "ما الذي نجمعه" }}
+    <Page width="narrow">
+      <PageHeader
+        title={
+          initial
+            ? pickLocalized(initial.title) || t("content.sectionForm")
+            : t("content.addSection")
+        }
+        meta={<Badge>{documentName}</Badge>}
+        description={t("content.inDocument", { document: documentName })}
       />
 
-      <LocalizedField
-        label={t("content.sectionBody")}
-        value={body}
-        onChange={setBody}
-        maxLength={TEXT.policyBody}
-        multiline
-        error={errors.body}
-        placeholder={{
-          en: "We keep your name, phone number and delivery addresses.",
-          ar: "نحتفظ باسمك ورقم هاتفك وعناوين التوصيل.",
-        }}
+      <Section
+        title={t("content.sectionSectionTitle")}
+        description={t("content.sectionSectionBlurb")}
+      >
+        <div className="flex flex-col gap-5">
+          <LocalizedField
+            label={t("content.sectionTitle")}
+            value={title}
+            onChange={setTitle}
+            maxLength={TEXT.policyTitle}
+            error={errors.title}
+            placeholder={{ en: "What we collect", ar: "ما الذي نجمعه" }}
+          />
+          <LocalizedField
+            label={t("content.sectionBody")}
+            value={body}
+            onChange={setBody}
+            maxLength={TEXT.policyBody}
+            multiline
+            error={errors.body}
+            placeholder={{
+              en: "We keep your name, phone number and delivery addresses.",
+              ar: "نحتفظ باسمك ورقم هاتفك وعناوين التوصيل.",
+            }}
+          />
+        </div>
+      </Section>
+
+      <SaveBar
+        dirty={dirty}
+        pending={pending}
+        saveLabel={t("content.save")}
+        onSave={submit}
+        onCancel={guarded(onCancel)}
       />
-    </EditorPage>
+    </Page>
   );
 }

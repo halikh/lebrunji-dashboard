@@ -54,6 +54,14 @@ const en = {
      */
     scrollTop: "Back to top",
     signOut: "Sign out",
+    search: "Search",
+    clear: "Clear",
+    edit: "Edit",
+    delete: "Delete",
+    add: "Add",
+    back: "Back",
+    more: "More",
+    viewAll: "View all",
     somethingWentWrong: "Something went wrong. Try again.",
     close: "Close",
     /** The drag handle on a side panel's edge, for a screen reader. */
@@ -62,6 +70,8 @@ const en = {
     retry: "Try again",
     /** A read failed — not the same as the thing not existing. */
     loadFailed: "Could not load this.",
+    loadFailedBody:
+      "The connection may have dropped. Nothing has been changed.",
     loading: "Loading",
     copied: "Copied",
   },
@@ -114,6 +124,27 @@ const en = {
     failed: "Could not load this list.",
     truncated:
       "Only the first part of this list is shown. Fix these and the rest will appear.",
+    // The badge on the one group that costs something today, not at launch.
+    urgent: "Urgent",
+    done: "Done",
+    allDoneTitle: "Nothing left to do",
+    allDoneBody:
+      "Every shop has its hours, every branch its address, and everything has a picture.",
+    // The line under the header: the whole job in one sentence, so the page
+    // answers "how much is left" before anything is opened.
+    remaining: "{count} things left to fix",
+    remainingOne: "1 thing left to fix",
+    show: "Show",
+    hide: "Hide",
+    // The setup-guide card (2026-11): progress by group, and one next step.
+    progress: "{done} of {total} done",
+    progressLabel: "Catalogue checklist progress",
+    nextUp: "Next:",
+    startNext: "Start",
+    nextHours: "set the opening hours for {name}",
+    nextAddress: "add the address for {name}",
+    nextStoreImage: "add a picture for {name}",
+    nextItemImage: "add a picture for {name} ({shop})",
   },
 
   customers: {
@@ -243,6 +274,67 @@ const en = {
     gone: "That customer no longer exists.",
     isOperator:
       "That account belongs to an operator, so it cannot be closed from here.",
+
+    // ---- the redesigned list and profile (lebrunji-admin) -------------------
+    blurb:
+      "Everyone who has signed in on the app. Search by name or number to find the person on the phone.",
+    failedBody: "Check your connection and try again.",
+    emptySuspendedTitle: "Nobody is suspended",
+    emptySuspendedBody:
+      "Suspending someone from their profile signs them out until you lift it.",
+    emptyClosedTitle: "No closed accounts",
+    emptyClosedBody:
+      "Accounts closed from here, or by the customer in the app, are listed here with their orders.",
+    colCustomer: "Customer",
+    colPhone: "Phone",
+    colOrders: "Orders",
+    colLastOrder: "Last order",
+    colJoined: "Joined",
+    colStatus: "Status",
+    colActions: "Actions",
+    actionsFor: "Actions for {name}",
+    profileFailedTitle: "Could not load this customer",
+    profileFailedBody:
+      "The link may be old, or the connection dropped. Try again, or go back to the list.",
+    recentOrders: "Recent orders",
+    seeAllOrders: "See all {count}",
+    ordersBlurb:
+      "Newest first. Click an order to read its receipt without leaving this page.",
+    noOrdersBody: "Their orders appear here as soon as they place one.",
+    noAddressesBody:
+      "Addresses are added by the customer in the app, at checkout or in their profile.",
+    promotionsBlurb:
+      "Each discount that came off one of their orders, under the name it had at the time.",
+    chartWeekdaysHint: "In the business time zone, Monday first.",
+    colOrder: "Order",
+    colPlaced: "Placed",
+    colDeliveredTo: "Delivered to",
+    colTotal: "Total",
+    colPromotion: "Promotion",
+    colDate: "Date",
+    colSaved: "Saved",
+    openOrder: "Open order {code}",
+    // The best-in-class pass (2026-11): list footer and the two-column profile.
+    shownCount: "{count} shown",
+    shownOf: "{shown} of {total}",
+    tileAverage: "Average order ({code})",
+    lastOrderAgo: "Last ordered {when}",
+    call: "Call",
+    otherAddresses: "Other addresses ({count})",
+    accountTitle: "Account",
+    statusLabel: "Status",
+    joinedLabel: "Joined",
+    ordersCount: "Orders ({count})",
+    firstOrderOn: "First order {when}",
+    weekdayShort: {
+      sun: "Sun",
+      mon: "Mon",
+      tue: "Tue",
+      wed: "Wed",
+      thu: "Thu",
+      fri: "Fri",
+      sat: "Sat",
+    },
   },
 
   /**
@@ -322,6 +414,21 @@ const en = {
     kitchenSent: "Opened",
     driverTab: "Driver",
 
+    // The dialog's three steps, in the order they happen.
+    stepKitchen: "Tell the kitchen",
+    stepDriver: "Choose a driver",
+    stepDriverHint: "Only drivers on shift right now are listed.",
+    stepPreview: "Check the message and send",
+    previewTo: "To {name}, {phone}",
+    chooseFirst: "Choose a driver to see the message they will get.",
+    sendTo: "Send to {name}",
+    // On the row of the driver who already has the order.
+    holderBadge: "Has it",
+    showMessage: "Message",
+    hideMessage: "Hide",
+    copyMessage: "Copy the message",
+    popupCopySettings: "Copy the settings address",
+
     // A lira total the server rounded to its cash step (0173), so the lines
     // above the amount to collect add up to it.
     rounding: "Rounding: {amount}",
@@ -384,7 +491,7 @@ const en = {
     hoursTitle: "When they work",
     // The editor's side column: the week read back, and what it adds up to.
     weekTitle: "Their week",
-    weekTotals: "{days} working day(s) · {hours} hours a week",
+    weekTotals: "{days} working day(s), {hours} hours a week",
     hoursSaved: "Hours saved",
     saveHours: "Save hours",
     discardHours: "Discard changes",
@@ -450,6 +557,62 @@ const en = {
     // more, so the message is about the part they did type.
     badPhone: "That is not a full Lebanese number.",
     empty: "No drivers yet.",
+
+    // The rebuilt screens (2026-11).
+    failed: "Could not load the drivers.",
+    emptyBody:
+      "Add the people who carry orders. Each one is offered on the order screen while they are on shift.",
+    noneBody: "Try part of the name, or the last few digits of the number.",
+    emptyActive: "Nobody is taking orders right now.",
+    emptyActiveBody:
+      "Drivers appear here while they are inside their hours, or switched on for tonight.",
+    emptyOff: "Everyone on the books is taking orders.",
+    emptyInactive: "Nobody has been deactivated.",
+    rowActions: "Actions for {name}",
+    rotaNote: "Following their hours.",
+    notFoundBody: "They may have been removed, or the link is wrong.",
+    newBlurb:
+      "A name, the WhatsApp number orders are sent to, and the hours they work.",
+    editBlurb:
+      "Changes apply straight away: the order screen offers drivers by these hours.",
+    detailsTitle: "Details",
+    detailsBlurb:
+      "The name the team knows them by, and the number the order goes to on WhatsApp.",
+    nameRequired: "Enter their name.",
+    hoursBlurb:
+      "They are offered on orders only inside these hours, in the business time zone. A shift may run past midnight. For a one-off evening, use the switch on their page instead of changing the week.",
+    nowTitle: "Right now",
+    nowBlurb:
+      "Whether the order screen offers them for an order at this moment.",
+    weekBlurb: "The week read back. Check it against what they told you.",
+    editHours: "Edit hours",
+    hoursSheetBlurb:
+      "Switch a day off to leave them out that day. Saving replaces the whole week.",
+    handoversBlurb: "The latest orders sent to them, newest first.",
+    colOrder: "Order",
+    colHanded: "Handed over",
+    colStatus: "Status",
+    colDelivery: "Delivery fee",
+    colTotal: "Total",
+    totalsRow: "Totals",
+    totalsSkipped: "Cancelled orders not counted",
+    rangeToday: "Today ({count})",
+    rangeAll: "All ({count})",
+    noneToday: "Nothing handed to them today yet.",
+    timeLabel: "{day}, {which}",
+    inactiveNote:
+      "Deactivated: they are not offered on orders. Bring them back to put them on the rota again.",
+    // The roster's shift line (Onfleet/Tookan style).
+    onUntil: "Until {time}",
+    nextShift: "Next shift {day} {time}",
+    nextShiftToday: "Starts today {time}",
+    noHours: "No hours set",
+    overruled: "Overruled tonight",
+    whatsapp: "Message on WhatsApp",
+    shownCount: "{count} driver(s)",
+    groupOn: "Taking orders ({count})",
+    groupOff: "Off shift ({count})",
+    statsTitle: "Hand-overs",
   },
 
   /**
@@ -505,6 +668,21 @@ const en = {
       "The exchange rate this order needs is missing. Set it under Pricing, then try again.",
     tooLate:
       "This order can no longer be changed — it is on its way, delivered or cancelled.",
+
+    // The before/after under the form, and the question Save asks.
+    before: "Was",
+    unchanged: "Set what is coming",
+    review: "Review the change",
+    keepEditing: "Keep editing",
+    confirmTitle: "Save the change to {code}?",
+    confirmBody:
+      "The customer is charged the new total. Make sure they agreed to it on the phone.",
+    summaryNone: "{name} — not coming",
+    summaryShort: "{name} — {to} instead of {from}",
+    summarySwap: "{name} sent instead of {original}",
+    // Every line is already the result of an earlier change.
+    nothingLeft:
+      "Every line has already been changed once. There is nothing left to change here.",
   },
 
   /**
@@ -527,6 +705,16 @@ const en = {
     // nothing back — see migration 0083.
     caveat: "This is when the chat was opened, not when it arrived.",
     nothing: "Nothing has happened to this order since it was placed.",
+    tabReceipt: "Receipt",
+    title: "Activity",
+    description: "Changes and hand-overs, newest first.",
+    now: "Now",
+    // Status moves are not stored one by one — only where the order stands.
+    statusNote:
+      "Where the order stands now. Each status change is not recorded separately.",
+    placed: "Order placed",
+    placedBy: "By {name}",
+    failed: "Could not load this order's activity.",
   },
 
   /**
@@ -628,6 +816,69 @@ const en = {
     // used from unused, and deleting on a guess would empty the app.
     unusedMismatch:
       "Storage and the database do not look like the same environment, so nothing was deleted. Check S3_BUCKET against the Supabase project this dashboard is using.",
+
+    // The redesigned Settings screen (lebrunji-admin).
+    tabCustomerApp: "Customer app",
+    clockBlurb:
+      "How times are written, here and in the customer app, and which clock every day is measured by.",
+    clockFormatAria: "Clock format",
+    zoneConfirmTitle: "Switch the business clock to {zone}?",
+    zoneConfirmBody:
+      "Every time in the dashboard and the customer app moves to {zone}, and every report day is cut by it from now on. Opening hours stay the same numbers, now read in the new zone.",
+    zoneConfirm: "Switch time zone",
+    shiftZone: "Hours are read in {zone} time.",
+    shiftSameHour:
+      "Opening and closing at the same hour means orders are taken around the clock.",
+    customerAppMissing:
+      "This database does not have the customer-app settings yet (migration 0178), so there is nothing to set here.",
+    versionsTitle: "Oldest version still allowed",
+    versionsBlurb:
+      "Customers on an older version are stopped at an “Update the app” screen and cannot order until they update.",
+    storeLinksTitle: "Store links",
+    storeLinksBlurb:
+      "Where the “Update” button on that screen sends customers. Set these before raising a minimum.",
+    minVersionConfirmTitle: "Block older versions of the app?",
+    minVersionConfirmBody:
+      "From the next launch, customers below {versions} see the update screen and cannot order until they update. Make sure that build is already live in the store.",
+    minVersionConfirm: "Save and block older versions",
+    unusedFailedTitle: "Could not check storage",
+    pageBlurb:
+      "The business clock, the hours you take orders, and how a new order is announced. Each setting saves on its own.",
+    hoursLabel: "Ordering hours",
+    alertsTitle: "Alerts",
+
+    // Pausing orders (0256): the customer app keeps browsing and says why.
+    pauseTitle: "Pause orders",
+    pauseBlurb:
+      "Stop taking orders right now, whatever the hours say — rain, no riders, a holiday. Customers can still browse; the app tells them orders are paused and when you’ll be back. Orders already placed carry on.",
+    pauseLabel: "New orders",
+    pauseTaking: "Taking orders",
+    pauseClosed: "Outside your hours — the app says when you open",
+    pausedUntil: "Paused until {time}",
+    pausedOpen: "Paused until you resume",
+    pauseButton: "Pause orders…",
+    resumeButton: "Resume orders",
+    pauseDialogTitle: "Pause new orders?",
+    pauseDialogBody:
+      "Customers can still browse and keep their baskets, but nobody can place an order until the pause ends.",
+    pauseFor: "For how long",
+    pause30: "30 min",
+    pause60: "1 hour",
+    pause120: "2 hours",
+    pauseRest: "Rest of tonight",
+    pauseManual: "Until I resume",
+    pauseRestHint: "Lifts by itself at your opening hour, {time}.",
+    pauseLiftsAt: "Lifts by itself at {time}.",
+    pauseManualHint: "Stays on until somebody presses Resume.",
+    pauseNoteEn: "Message in English",
+    pauseNoteAr: "Message in Arabic",
+    pauseNoteHint:
+      "Shown in the app instead of the standard words. Leave blank to use those.",
+    pauseConfirm: "Pause orders",
+    savedPause: "Orders paused",
+    savedResume: "Orders resumed",
+    pauseMissing:
+      "This database does not have migration 0256 yet, so orders cannot be paused from here.",
   },
 
   /**
@@ -645,7 +896,7 @@ const en = {
 
   orders: {
     title: "Orders",
-    searchPlaceholder: "Code, name or phone",
+    searchPlaceholder: "Search by order code",
     all: "All",
     scopeLive: "Live",
     scopeToday: "Today",
@@ -705,6 +956,11 @@ const en = {
     cancelBody:
       "The customer is told immediately, and this cannot be undone. Nothing else on the order changes.",
     cancelConfirm: "Cancel the order",
+    keepOrder: "Keep the order",
+    collapsePanel: "Collapse the order",
+    expandPanel: "Expand the order",
+    resizePanel: "Resize the order panel",
+    moveTo: "Mark as {status}",
     detailFailed: "Could not load this order.",
     noPhone: "No phone number",
     copyPhone: "Copy phone number",
@@ -723,6 +979,41 @@ const en = {
     movedElsewhere:
       "This order was moved by someone else. The screen now shows where it is.",
     wasCancelled: "This order was cancelled. Nothing was moved.",
+
+    // The order's own page.
+    changedAt: "Changed {when}",
+    detailFailedBody:
+      "The connection may have dropped, or the link is wrong. Nothing has been changed.",
+    atAGlance: "At a glance",
+    phone: "Phone",
+    shops: "Shops",
+
+    // How long an order has waited, counted from placement (order-age.tsx).
+    waitJustNow: "Just now",
+    waitMinutes: "{count} min",
+    waitHours: "{hours} h",
+    waitHoursMinutes: "{hours} h {minutes} min",
+    waitDays: "{count} d",
+    waitHint: "Waiting {time} since it was placed",
+    waitLateHint: "Waiting {time} since it was placed. Overdue.",
+    waitLateShort: ", overdue",
+    // The browser tab's title while orders are unanswered, so a tab in the
+    // background still says there is work.
+    tabTitleWaiting: "({count}) {title}",
+    lateCount: "{count} overdue",
+    columnCount: "({count})",
+    // Board and list.
+    viewLabel: "Layout",
+    viewList: "List",
+    viewBoard: "Board",
+    boardEmptyOrdered:
+      "No new orders. New ones land here and the dashboard chimes.",
+    boardEmptyConfirmed: "Nothing confirmed is waiting for a driver.",
+    boardEmptyDriverSent: "No order is on the road.",
+    boardFailed: "Could not load this column.",
+    amendedBadge: "Changed",
+    // Live orders are worked oldest first, like a ticket rail.
+    oldestFirst: "Oldest first",
   },
 
   /**
@@ -804,6 +1095,11 @@ const en = {
 
   form: {
     optional: "optional",
+    requiredSr: "(required)",
+    requiredLegend: "Fields marked * are required.",
+    unsaved: "Unsaved changes",
+    discard: "Discard",
+    save: "Save",
     // Names the languages rather than saying "incomplete": the operator has
     // done most of the work, and what they need is which box is empty.
     stillNeeded: "Still needed in: {languages}",
@@ -858,6 +1154,44 @@ const en = {
     reorderHint:
       "Drag to set the order shops appear in the app — in Featured, Open now and every list.",
     openMenu: "Menu",
+
+    // ---- the shops list, rebuilt -----------------------------------------
+    shopsTitle: "Shops",
+    shopsDescription:
+      "Every shop in the app, in the order customers see them. Open one to edit its menu, branches and hours.",
+    filter: {
+      all: "All ({count})",
+      live: "Live ({count})",
+      hidden: "Hidden ({count})",
+    },
+    filterEmpty: {
+      all: "No shops yet",
+      live: "No shop is live",
+      hidden: "No hidden shops",
+    },
+    showAll: "Show all shops",
+    count: "{count} shops",
+    countOne: "1 shop",
+    // Why the handles went away — said only when there is something to sort.
+    reorderOff: "Clear the search and show all shops to change the order.",
+    // A chain's row, where more than one place is unpinned.
+    noPinCount:
+      "{count} branches have no pin — their deliveries are charged at the top band",
+    archiveTitleNamed: "Archive {name}?",
+    moreFor: "More actions for {name}",
+    openShop: "Open shop",
+    archiveShop: "Archive shop",
+    // The state a customer meets right now, under each shop's name.
+    branchCount: "{count} branches",
+    editHours: "Edit hours",
+    filter2: {
+      openNow: "Open now ({count})",
+      closedNow: "Closed now ({count})",
+    },
+    filterEmpty2: {
+      openNow: "No shop is open right now",
+      closedNow: "Every live shop is open right now",
+    },
   },
 
   /**
@@ -910,6 +1244,43 @@ const en = {
     // The heading over the full-size view, for the few call sites with no name
     // to put there.
     preview: "Picture",
+
+    // Shop and dish photos: cropped to their shape on upload, then the
+    // subject marked, so the app crops around it (`ImageFramer`).
+    adjust: "Adjust framing",
+    frame: {
+      title: "Frame the picture",
+      titleAdjust: "Adjust the framing",
+      description:
+        "Crop it to {shape}, then click the dish or the shopfront. The app keeps that point in view wherever it shows the picture.",
+      descriptionAdjust:
+        "Click the dish or the shopfront. The app keeps that point in view wherever it shows the picture.",
+      crop: "Crop",
+      cropHint:
+        "Drag the frame, or use the arrow keys, to choose what is kept.",
+      zoom: "Zoom",
+      focus: "Subject",
+      focusHint: "Click where the subject is",
+      reset: "Back to the middle",
+      inTheApp: "How it looks in the app",
+      use: "Use this picture",
+      // The crop has too few pixels for the page's cover, the largest place
+      // the photo is shown. Live: zooming in too far brings it up.
+      softShop:
+        "This picture is {pixels} pixels wide. The shop page needs about {needed} to look sharp, so it will look soft there. Use a bigger photo, or zoom out.",
+      softDish:
+        "This picture is {pixels} pixels wide. The dish page needs about {needed} to look sharp, so it will look soft there. Use a bigger photo, or zoom out.",
+      cannotOpen:
+        "This file could not be opened as a picture. Try a JPEG, PNG or WebP.",
+      // The app's frames, named as the team knows them.
+      card: "Menu card",
+      rail: "Home rail",
+      dishPage: "Dish page",
+      homeCard: "Home card",
+      featured: "Featured",
+      thumb: "Thumbnail",
+      shopPage: "Shop page",
+    },
   },
 
   /**
@@ -917,8 +1288,8 @@ const en = {
    */
   store: {
     // ---- adding one -------------------------------------------------------
-    add: "New store",
-    create: "Create the store",
+    add: "New shop",
+    create: "Create shop",
     stepDetails: "Shop details",
     stepPlace: "Where it is",
     stepHours: "Opening hours",
@@ -1140,6 +1511,51 @@ const en = {
     noPinYet: "No pin yet. Paste the coordinates above to see the shop here.",
     save: "Save changes",
     saved: "{name} saved",
+
+    // ---- the rebuilt shop pages -----------------------------------------
+    addDescription:
+      "Everything a shop needs before it can take an order. It is created hidden, so nothing reaches customers until you turn it on.",
+    stepShop: "The shop",
+    stepShopHint: "Its name, what kind of shop it is, and its picture.",
+    stepPrices: "Prices",
+    stepPricesHint: "What its menu is priced in.",
+    stepPlaceHint:
+      "Where an order reaches the kitchen. A chain adds its other branches afterwards.",
+    currencyHintNew: "Every price on its menu is in this currency.",
+    pinHintNew:
+      "Paste a Google Maps link, or right-click the shop in Maps and paste the coordinates. Delivery is charged from here — without a pin every order is charged at the top distance band.",
+    pinPlaceholder: "33.8938, 35.5018",
+    namePlaceholder: "Nara Kitchen",
+    namePlaceholderAr: "مطبخ نارا",
+    optional: "Optional",
+    visibilityLive: "Live in the app",
+    discard: "Discard changes",
+    identitySection: "The shop",
+    nameHintSole:
+      "What customers see at the top of the shop. Its only branch is renamed with it.",
+    detailsIntroSole:
+      "The shop and the one place it trades from. Add a second branch on the Branches tab and each place is then edited on its own.",
+    pricesSectionHint: "What the menu is priced in, and how it converts.",
+    currencyMovedNoSample:
+      "Every price in this shop will be rewritten in {code}. Choose what should happen to them:",
+    currencyConfirmTitle: "Rewrite every price in {code}?",
+    currencyConfirmBody: "Every price in this shop is rewritten in one go.",
+    currencyConfirm: "Rewrite the prices",
+    plusPrice: "+ {price}",
+    // The header of a shop's page.
+    liveInApp: "Live",
+    hiddenInApp: "Hidden",
+    orderPhoneHint:
+      "Where orders are sent — the first branch's WhatsApp number.",
+    readyTitle: "Before you create",
+    readyCount: "{done} of {total} done",
+    readyDone: "done",
+    readyMissing: "still needed",
+    statusHidden: "Hidden — customers cannot find this shop",
+    statusNoBranch: "No branch is trading, so it cannot take orders",
+    statusClosedNow: "Closed right now — outside its opening hours",
+    statusOpenNow: "Open now — customers can order",
+    statusOpenAt: "Open now at {open} of {total} trading branches",
   },
 
   /**
@@ -1150,9 +1566,6 @@ const en = {
    * on a screen somebody visits twice a year.
    */
   hours: {
-    // Only drawn when a shop has more than one, so it never appears on a shop
-    // that is not a chain.
-    forBranch: "Hours for",
     tab: "Hours",
     sunday: "Sunday",
     monday: "Monday",
@@ -1176,7 +1589,7 @@ const en = {
     // Seven closed days saves as no hours, and no hours is open around the
     // clock (`0170`), so the week is refused and the real off switch named.
     allClosed:
-      "Open at least one day. A week with every day closed counts as no hours, and the app treats a shop with no hours as open around the clock. To stop orders, set the shop to Hidden on its Details tab, or set a branch to Closed indefinitely.",
+      "Open at least one day. A week with every day closed counts as no hours, and the app treats a shop with no hours as open around the clock. To stop orders, set the shop to Hidden, or set a branch to Closed indefinitely.",
     // The read-back for a branch that has no rows yet.
     noHours:
       "No hours set, so the app shows this branch as open around the clock. Set its hours and save.",
@@ -1200,6 +1613,50 @@ const en = {
     range: "{from}–{to}",
     unsaved:
       "This is what you are about to save. The app still has the old hours until you do.",
+
+    // ---- the rebuilt week grid -----------------------------------------
+    gridTitle: "Each day",
+    openOn: "Open on {day}",
+    opensAt: "{day} opens at",
+    closesAt: "{day} closes at",
+    removeShiftOn: "Remove this shift on {day}",
+    branchNotTrading:
+      "{name} is set to Closed indefinitely, so it takes no orders whatever these hours say.",
+    noHoursTitle: "Open around the clock",
+    unsavedShort: "Unsaved changes",
+
+    // ---- Google-style status and day actions -----------------------------
+    // 00:00 to 00:00, which the app and `place_order` read as the whole day.
+    allDay: "Open 24 hours",
+    setHours: "Set opening hours",
+    dayActions: "More for {day}",
+    // Google Business Profile's "Copy to…": one day's hours onto the days
+    // ticked. Closed days are offered too, unticked — ticking one opens it.
+    copyTo: "Copy to…",
+    copyToTitle: "Copy {day}'s hours to",
+    copyToAllDays: "Select all",
+    copyToApply: "Apply",
+    copyToHint: "Closed days you tick open with these hours.",
+    back: "Back",
+    // Loads another branch's week into the grid; nothing is saved until Save.
+    useBranchHours: "Use another branch's hours",
+    useBranchHoursNone: "No hours set",
+    copiedFromBranch: "{name}'s week is in the grid. Check it, then save.",
+    // The line under a place's name: state, then the next change.
+    status: {
+      allDay: "Open 24 hours",
+      noHours: "No hours set, open around the clock",
+      closesToday: "Open, closes {time}",
+      closesTomorrow: "Open, closes tomorrow at {time}",
+      closesOn: "Open, closes {day} at {time}",
+      opensToday: "Closed, opens {time}",
+      opensTomorrow: "Closed, opens tomorrow at {time}",
+      opensOn: "Closed, opens {day} at {time}",
+      someOpen: "Open at {open} of {total} branches",
+      notTrading: "Closed indefinitely",
+      hidden: "Hidden from the app",
+      noBranch: "No branch is trading",
+    },
   },
 
   /**
@@ -1314,6 +1771,36 @@ const en = {
     searchNone: "No category matches {term}.",
     formLabel: "Category details",
     failedTitle: "Could not load the categories",
+
+    // ---- the redesigned list and sheet ----
+    blurb:
+      "The tiles customers pick from before they pick a shop. The order here is the order on the home screen.",
+    reorderOff: "Clear the search to reorder.",
+    reorderOffFiltered: "Show All and clear the search to reorder.",
+    filters: {
+      all: "All ({count})",
+      live: "Live ({count})",
+      hidden: "Hidden ({count})",
+    },
+    filterNames: {
+      all: "All",
+      live: "Live",
+      hidden: "Hidden",
+    },
+    noneInFilter: "No category in this view",
+    count: "{count} categories",
+    searchNoneBody: "Try another word, or clear the search to see them all.",
+    emptyTitle: "No categories yet",
+    emptyBody:
+      "Add the first one — every shop belongs to a category, so this comes before shops.",
+    noMenuTabs: "No menu tabs",
+    actionsFor: "Actions for {name}",
+    cannotArchiveTitle: "{name} still has shops",
+    edit: "Category",
+    newHint:
+      "A tile on the app's home screen. It goes to the end of the order.",
+    backToList: "Back to categories",
+    create: "Add category",
   },
 
   tags: {
@@ -1389,6 +1876,31 @@ const en = {
     itemPlaceholder: "Add a tag",
     itemNone: "No tags have been set up yet. Add some on the Tags tab.",
     alreadyOnDish: "This item already carries that tag.",
+
+    // ---- the redesigned list and sheet ----
+    edit: "Tag",
+    newHint: "A chip customers see beside a dish's name.",
+    backToList: "Back to tags",
+    create: "Add tag",
+    count: "{count} tags",
+    searchNoneBody: "Try another word, or clear the search to see them all.",
+    emptyTitle: "No tags yet",
+    emptyBody: "Add one, then put it on dishes from a shop's menu.",
+    actionsFor: "Actions for {name}",
+    // ---- status tabs ----
+    filters: {
+      all: "All ({count})",
+      live: "Live ({count})",
+      hidden: "Hidden ({count})",
+      unused: "Unused ({count})",
+    },
+    filterNames: {
+      all: "All",
+      live: "Live",
+      hidden: "Hidden",
+      unused: "Unused",
+    },
+    noneInFilter: "No tag in this view",
   },
 
   /**
@@ -1438,12 +1950,12 @@ const en = {
     // The heading over one kind, carrying the server's count — "SHOPS · 40"
     // over the ten that have been paged in. A bare heading would say less than
     // the number does.
-    groupHeading: "{title} · {count}",
+    groupHeading: "{title} ({count})",
     // Says where it would return to, which is the fact that decides whether
     // pressing the button is safe.
     inSection: "in {name}",
     onDish: "on {name}",
-    inQuestion: "{question} · {dish}",
+    inQuestion: "{question}, {dish}",
     archivedOn: "Archived {when}",
     // A branch is *closed*, not archived — that is what the button on the
     // Branches tab says, and the archive should not rename the thing it is
@@ -1490,9 +2002,9 @@ const en = {
     // The catalogue-level archive, above the per-shop one.
     catalogueTitle: "Put away",
     catalogueHint:
-      "Archived shops, categories, tags and promotions. Nothing here is deleted — bring back what you need.",
+      "Archived shops, categories, tags, promotions and bundles. Nothing here is deleted — bring back what you need.",
     catalogueEmptyBody:
-      "Archived shops, categories, tags and promotions collect here.",
+      "Archived shops, categories, tags, promotions and bundles collect here.",
     inCategory: "in {name}",
     // A promotion has no customer-facing name, so the slug is the handle — the
     // same one the promotions list shows.
@@ -1505,6 +2017,22 @@ const en = {
     emptyBody:
       "Archived sections and items, withdrawn questions and choices, and closed branches collect here.",
     failedTitle: "Could not load the archive",
+
+    // A shop whose category is archived — the badge in place of the button.
+    restoreCategoryFirst: "Category archived",
+    restoreNamed: "Bring back {name}",
+    // Bundles (`0204`) have no section, so the shop archive never listed them
+    // and an archived bundle had no way back. They live here now.
+    bundles: "Bundles",
+    restoreBundle:
+      "It comes back with its dishes, price and dates as they were. It shows in the app again if it is switched on, inside its dates, and every dish in it is on sale.",
+    ofShop: "from {name}",
+    restoreShopFirst: "Shop archived",
+    shopGoneFirst:
+      "Bring back {name} first — a bundle cannot return to an archived shop.",
+    notABundle: "That is not a bundle.",
+    // The tab strip's label with its count, in brackets like every other list.
+    tabCount: "{label} ({count})",
   },
 
   /**
@@ -1571,6 +2099,8 @@ const en = {
     // A dish that is archived cannot be ticked: the question would be asked on
     // something no menu shows.
     archivedItem: "archived",
+    manageDishes: "Choose dishes",
+    pickSearch: "Find a dish",
   },
 
   /**
@@ -1618,7 +2148,7 @@ const en = {
     // One stop on that range: what the customer gets, and what they pay for it.
     // The pair is the whole point — an amount with no price beside it is the
     // half of this that was never in doubt.
-    stepPreviewStop: "{size} · {price}",
+    stepPreviewStop: "{size}, {price}",
   },
 
   options: {
@@ -1746,6 +2276,35 @@ const en = {
       "This is the last choice for a required question — make the question optional or add another choice first.",
     rangeImpossible:
       "At least cannot be more than At most — nobody could satisfy that.",
+
+    // The Options tab, redesigned (2026-11).
+    filterLabel: "Asked on",
+    filterAll: "Every dish",
+    filterSection: "Everything in {name}",
+    questionCount: "{count} questions",
+    newQuestion: "New question",
+    renameQuestion: "Rename question",
+    moreFor: "More actions for {name}",
+    emptyAll: "No questions yet",
+    emptyAllBody:
+      "A question is what a customer answers when adding a dish — a size, a choice of bread, extras.",
+    emptyDish: "This dish asks nothing yet",
+    emptyDishBody:
+      "Create a question for it, or add it to an existing one with Choose dishes.",
+    rules: "Rules",
+    atMostInvalid: "A whole number of 1 or more, or leave it empty.",
+    defaultBadge: "Opens on this",
+    choiceMore: "More actions for {name}",
+    addChoice: "Add choice",
+    choicesHeading: "Choices",
+    // Best-in-class pass (2026-11): what a question is asked on, in names, and
+    // its choices in the order customers read them.
+    askedOn: "Asked on",
+    askedOnMore: "and {count} more",
+    askedOnNone: "No dish asks this yet. Choose dishes to start asking it.",
+    choicePrice: "{name} +{price}",
+    reorderChoicesHint:
+      "Drag to set the order customers see. It is the same on every dish.",
   },
 
   /**
@@ -1819,8 +2378,12 @@ const en = {
     isRadius: "Delivery radius",
     // What the label means, in consequences. Two of them, and neither is
     // visible anywhere else in the dashboard.
+    // Since `0193` a missing pin is refused rather than priced at the top
+    // band, so "or one whose distance cannot be worked out" is gone. What the
+    // top band does now: the edge for one shop's leg, and the longest ride one
+    // multi-shop order may take.
     radiusMeans:
-      "You do not deliver past {km} km. An order this far, or one whose distance cannot be worked out, is charged this fee.",
+      "You do not deliver past {km} km. It is also the longest ride one order from several shops may take.",
     addBand: "Add a band",
     remove: "Remove",
     removeConfirm: "Remove it",
@@ -1832,11 +2395,12 @@ const en = {
     ladderSave: "Save the ladder",
     ladderSaved: "Delivery ladder saved",
 
-    // The surcharge for a multi-shop order (0133). Said as the sum it is part
-    // of, because on its own "per extra shop" does not say what it is added to.
+    // The stop fee for a multi-shop order. `0133` added it to the farthest
+    // leg; since `0193` it is added to the price of the whole route, and the
+    // total is capped at what separate orders would cost.
     extraTitle: "Each extra shop",
     extraBody:
-      "An order from several shops pays the band for the farthest one, plus this for every shop after the first.",
+      "Added once for every shop after the first, for the courier's time at the counter.",
     extraLabel: "Per extra shop",
     extraSave: "Save",
     extraSaved: "Extra shop fee saved",
@@ -1846,6 +2410,15 @@ const en = {
     bandDuplicate:
       "Two bands share a distance. Each one is the top of its own.",
     unsavedBand: "Not saved yet",
+    // Best-in-class pass (2026-11): each band read as the range it covers,
+    // as delivery-fee tiers are stated by DoorDash and Uber Eats.
+    bandCovers: "{from} to {to} km",
+    bandClash: "Same distance as another band",
+    cheaperFartherTitle: "A longer ride costs less",
+    cheaperFarther: "up to {far} km is cheaper than up to {near} km",
+    stripTitle: "The ladder to scale",
+    stripBand: "{from} to {to} km: {fee}",
+    stripKm: "{km} km",
 
     // The ladder read back. A table is right for setting prices and wrong for
     // checking them: "what does someone four kilometres away pay" is the
@@ -1864,6 +2437,37 @@ const en = {
     tryNoBands: "Add a band and this will price it.",
     tryUnsaved:
       "Pricing the ladder as you have edited it. Save to make it real.",
+
+    description:
+      "What delivery costs, and what the second currency is worth. Both apply to every basket straight away.",
+    tabDelivery: "Delivery",
+    tabRate: "Exchange rate",
+    tryShops: "Shops on the order",
+    // For several shops the distance is the route — shop to shop to door —
+    // not the door's distance from any one shop (`0193`).
+    tryRouteLabel: "Route (km)",
+    tryRouteHint:
+      "The whole ride: from the first shop, past the others, to the door.",
+    tryRide: "Ride, by the ladder",
+    tryStops: "Extra shops ({count} × {fee})",
+    tryTotal: "Delivery",
+    tryCap:
+      "Never more than ordering from each shop separately. If that is cheaper, the customer pays that instead.",
+    tryRouteTooLong:
+      "Refused. One ride may not be longer than {km} km, so the customer is asked to take a shop off the order.",
+    howTitle: "How an order is priced",
+    howBody: "What the app charges for delivery, in plain words.",
+    howOne:
+      "One shop: the band for the distance from the shop's branch to the customer's pin.",
+    howMany:
+      "Several shops: the band for the whole route, plus the extra-shop fee for every shop after the first.",
+    howCap: "It never costs more than ordering from each shop separately.",
+    howPin:
+      "No pin, no price: if the customer or a shop has no pin on the map, the order is refused rather than guessed.",
+    bandsCount: "{count} bands",
+    removeBand: "Remove the {km} km band",
+    rateNowTitle: "Current rate",
+    rateConversions: "Sample amounts",
   },
 
   /**
@@ -2019,6 +2623,107 @@ const en = {
       "It stops discounting anything straight away, and any pictures linked to it come down from the app.",
     hideConfirm: "Hide it",
     formLabel: "Promotion details",
+
+    // ---- the redesigned list and editor ----
+    blurb:
+      "Free delivery that applies on its own when a basket qualifies — there are no codes. Higher in the list is tried first.",
+    edit: "Promotion",
+    create: "Add promotion",
+    newDescription:
+      "Free delivery for the orders you choose. It applies automatically; customers never type a code.",
+    failedTitle: "Could not load the promotions",
+    emptyTitle: "No promotions yet",
+    emptyBody:
+      "Add one to give free delivery on the orders you choose — over a minimum spend, from certain shops, or on a first order.",
+    noneInFilter: "No promotion in this view",
+    noneInFilterBody: "Try another status, or clear the search.",
+    reorderOff: "Show All and clear the search to reorder.",
+    filters: {
+      all: "All ({count})",
+      live: "Live ({count})",
+      scheduled: "Scheduled ({count})",
+      paused: "Paused ({count})",
+      ended: "Ended ({count})",
+    },
+    status: {
+      all: "All",
+      live: "Live",
+      scheduled: "Scheduled",
+      paused: "Paused",
+      ended: "Ended",
+    },
+    columns: {
+      promotion: "Promotion",
+      status: "Status",
+      dates: "Dates",
+      used: "Used",
+    },
+    noEnd: "No end date",
+    actionsFor: "Actions for {name}",
+    basicsSection: "Basics",
+    namePlaceholder: "ramadan-2026",
+    discountSectionHint:
+      "Every promotion takes the delivery fee off. Set a minimum spend to decide which baskets qualify.",
+    whenSectionHint: "Dates follow the business calendar (Beirut).",
+    capWhole: "Use a whole number of 1 or more, or leave it empty.",
+    noCodes: "Applied automatically when a basket qualifies — no code needed.",
+    artworkSaveFirst: "Save first, then add a picture for it.",
+    tapSection: "When a picture is tapped",
+    // ---- Shopify-style choices: a decision first, a number once chosen ----
+    minimumQuestion: "Minimum spend",
+    minSubtotalAmount: "Amount",
+    minimumRequired: "Enter the minimum spend, or choose No minimum.",
+    limitsSectionHint: "Leave both unticked for no limit.",
+    usedSoFar: "Used {count} time(s) so far.",
+    totalCapOn: "Limit how many times it can be used in total",
+    perUserOn: "Limit how many times one customer can use it",
+    capRequired: "Enter a number, or untick the limit.",
+    // ---- the summary card beside the form ----
+    summaryTitle: "Summary",
+    summaryNoName: "No reference yet",
+    summaryDraft: "Not saved yet",
+    summaryDetails: "Details",
+    summaryPerformance: "Performance",
+    details: {
+      over: "Free delivery on orders over {amount}",
+      everyOrder: "Free delivery on every order",
+      anyShop: "Any shop",
+      fromShops: "Orders from {names}",
+      noShops: "No shop chosen yet",
+      inCategories: "Orders in {names}",
+      noCategories: "No category chosen yet",
+      withItems: "Orders containing {names}",
+      noItems: "No item chosen yet",
+      mixed: "A mix of shops, categories and items",
+      firstOrder: "First order only",
+      anyone: "Any customer",
+      dates: "Runs {dates}",
+      noDates: "Runs while switched on, with no end date",
+      total: "Up to {count} use(s) in total",
+      perUser: "Up to {count} use(s) per customer",
+      noLimits: "No usage limits",
+    },
+    // The plain-language sentence beside the form and under each row.
+    summary: {
+      freeDelivery: "Free delivery",
+      over: "on orders over {amount}",
+      everyOrder: "on every order",
+      fromShops: "from {names}",
+      inCategories: "in {names}",
+      withItems: "containing {names}",
+      mixed: "for a mix of shops, categories and items",
+      firstOrder: ", first order only",
+      dates: ", {dates}",
+      until: "until {to}",
+      starting: "starting {from}",
+      perUser: "{count} time(s) per customer",
+      total: "{count} in total",
+      limits: "Up to {limits}.",
+      and: " and ",
+      count: "{count} chosen",
+      either: "{a} or {b}",
+      andMore: "{names} and {count} more",
+    },
   },
 
   /**
@@ -2053,7 +2758,7 @@ const en = {
     archive: "Archive",
     archiveTitle: "Archive {name}?",
     archiveBody:
-      "It leaves the app and this list, and its pictures stop showing. Past orders keep what was in it.",
+      "It leaves the app and this list, and its pictures stop showing. Past orders keep what was in it, and it can be brought back from Archive.",
     archiveConfirm: "Archive",
     added: "{name} added",
     saved: "{name} saved",
@@ -2061,7 +2766,8 @@ const en = {
     always: "On offer with no end date",
     ended: "Live, but its end date has passed, so customers can't see it",
     // `bundle_is_sellable` refusing it for a dish rather than for its dates.
-    offSale: "Live, but customers can't see it. Off the menu: {dishes}",
+    offSale:
+      "Off the menu: {dishes}. Show it again, or take it out of the bundle.",
     dishOffSale: "Off the menu",
     itemsOffSale:
       "Customers can't see this bundle while a dish in it is hidden or archived on the menu. Show the dish again, or take it out of the bundle.",
@@ -2136,6 +2842,41 @@ const en = {
     artworkChange: "Change",
     artworkAdd: "Add a picture",
     artworkOpen: "Save first, then add a picture from the Artwork tab",
+
+    // ---- the redesigned list and editor ----
+    reorderOff: "Clear the search to reorder.",
+    notShowingCount: "{count} not showing — a dish in each is off the menu",
+    failedTitle: "Could not load the bundles",
+    searchNoneBody: "Try another word, or clear the search.",
+    emptyTitle: "No bundles yet",
+    actionsFor: "Actions for {name}",
+    // What a customer sees right now. "Not showing" is a bundle that is on,
+    // inside its dates, with a dish off the menu (QA-021).
+    status: {
+      live: "Live",
+      scheduled: "Scheduled",
+      ended: "Ended",
+      paused: "Off sale",
+      notShowing: "Not showing",
+    },
+    quantityTimes: "{count}× {name}",
+    allShops: "All shops",
+    filterShop: "Filter by shop",
+    backToShop: "Back to the shop",
+    newDescription: "A few of one shop's dishes, sold together for less.",
+    create: "Add bundle",
+    detailsSection: "Bundle",
+    fewer: "One fewer {name}",
+    more: "One more {name}",
+    removeDish: "Take {name} out of the bundle",
+    choiceWithPrice: "{name} +{price}",
+    // ---- status tabs and the saving on each row ----
+    filterAll: "All",
+    filterCount: "{label} ({count})",
+    reorderOffFiltered: "Show All and clear the search to reorder.",
+    noneInFilter: "No bundle in this view",
+    noneInFilterBody: "Try another tab, or clear the search.",
+    savePercent: "Save {percent}%",
   },
   links: {
     label: "When tapped, go to",
@@ -2246,7 +2987,7 @@ const en = {
     },
     formatNotes: {
       banner: "Wide, 21:9",
-      tile: "Square, 1:1",
+      tile: "Portrait, 4:5",
     },
     formatUnknown: "That format is not one the app can draw.",
 
@@ -2385,10 +3126,48 @@ const en = {
     deleteBody:
       "It comes out of the app immediately and cannot be brought back. The promotion it advertised is not affected.",
     deleteConfirm: "Delete",
+
+    // ---- the redesigned gallery and editor ----
+    blurb:
+      "The banners and tiles customers see in the app. Each card shows where it is placed and whether it is showing right now.",
+    reorder: "Reorder",
+    reorderTitle: "Order of pictures",
+    failedTitle: "Could not load the artwork",
+    filters: {
+      all: "All ({count})",
+      showing: "Showing ({count})",
+      notShowing: "Not showing ({count})",
+    },
+    noneInFilter: "None in this view.",
+    editNamed: "Edit {name}",
+    actionsFor: "Actions for {name}",
+    // Whether a customer sees it right now — the badge on each card.
+    status: {
+      live: "Showing",
+      scheduled: "Scheduled",
+      ended: "Ended",
+      off: "Off",
+      promotionArchived: "Promotion archived",
+      bundleArchived: "Bundle archived",
+    },
+    newDescription:
+      "A banner or tile for the app — on its own, or advertising a promotion or a bundle.",
+    create: "Add artwork",
+    tapSection: "When tapped",
+    // ---- the gallery's screen filter and section headings ----
+    allScreens: "Every screen",
+    filterScreen: "Filter by screen",
+    sectionCount: "{title} ({count})",
   },
 
   reports: {
-    title: "Overview",
+    title: "Reports",
+    description:
+      "How the business did over a period, compared with the period before.",
+    vsBefore: "vs the period before",
+    rangeLabel: "Period",
+    otherFigures: "Also in this period",
+    colRank: "Rank",
 
     // Deliberately not date-filtered: an order still unconfirmed from Tuesday
     // is not Tuesday's business, it is the most urgent thing on the screen.
@@ -2400,6 +3179,20 @@ const en = {
     range7: "7 days",
     range30: "30 days",
     range90: "90 days",
+    range365: "12 months",
+    // Shopify's "compare to": the period before, or the same days a year
+    // earlier, which is the fair one across Ramadan and the summer.
+    compareLabel: "Compare with",
+    compare: {
+      previous: "Compare with the period before",
+      year: "Compare with last year",
+      none: "No comparison",
+    },
+    rangeNoteCompared:
+      "{from} to {to}, Beirut time, compared with {beforeFrom} to {beforeTo}",
+    // Beside the change pill: the old figure, so "+50%" can be read.
+    was: "from {value}",
+    storesHint: "Open a shop to see more.",
     rangeClear: "Back to presets",
 
     exportLabel: "Export",
@@ -2409,12 +3202,7 @@ const en = {
     export: {
       csv: "CSV",
       xlsx: "Excel",
-      pdf: "PDF",
     },
-    // The browser's own print dialogue is what writes the PDF — see `export.ts`
-    // on why, and this is the one way it can fail that is worth explaining.
-    printBlocked:
-      "Your browser blocked the print window. Allow pop-ups for this site and try again.",
 
     sheetSummary: "Summary",
     sheetDaily: "By day",
@@ -2445,7 +3233,7 @@ const en = {
     tileDelivery: "Delivery fees",
     // A percentage against zero is infinite and means "we started", so it is
     // named rather than computed.
-    fromNothing: "up from nothing",
+    fromNothing: "New",
     flat: "no change",
     discountsGiven: "Promotions cost",
     cancelled: "{count} cancelled",
@@ -2474,6 +3262,20 @@ const en = {
     chartBands: "What each delivery band collected",
     chartBandsAria: "Delivery fees collected, by distance band.",
     bandLabel: "Up to {km} km",
+
+    // The trend chart: one figure at a time, chosen above it.
+    metric: {
+      revenue: "Revenue",
+      orders: "Orders",
+      average: "Average order",
+    },
+    chartByDay: "{metric} by day",
+    chartByMonth: "{metric} by month",
+    chartAria:
+      "{metric} for each bar in the range, with the comparison period behind it.",
+    chartBar: "{when}: {value}",
+    chartBarCompared: "{when}: {value}, compared with {before}",
+    ghostNoteYear: "The grey bars are the same days last year.",
   },
 
   account: {
@@ -2510,6 +3312,15 @@ const en = {
     changeEmail: "Send the confirmation",
     emailPending:
       "Check the new inbox — the change lands when you follow the link",
+    // The rows of the security card (Google/Stripe style).
+    unknownEmail: "Unknown",
+    signInTitle: "Signing in",
+    signInBlurb:
+      "How you get into the dashboard. Both changes ask for your current password first.",
+    emailRow: "Email",
+    passwordRow: "Password",
+    passwordMasked: "••••••••••",
+    change: "Change",
   },
 
   content: {
@@ -2577,6 +3388,45 @@ const en = {
     removeSectionTitle: "Remove {name}?",
     removeSectionBody:
       "This cannot be undone — the section is deleted outright rather than archived.",
+
+    // The redesigned Settings screen (lebrunji-admin).
+    blurb:
+      "How the business runs, and the words customers read in the app. Changes here reach the app straight away.",
+    tabHelpTopics: "Help topics",
+    helpListTitle: "Questions and answers",
+    helpCountOne: "1 question",
+    helpCount: "{count} questions",
+    helpEmptyTitle: "No questions yet",
+    helpEmptyBody:
+      "Add the first one. Customers read these in the Help screen of the app.",
+    legalListTitle: "Sections",
+    legalCountOne: "1 section",
+    legalCount: "{count} sections",
+    legalEmptyTitle: "This document has no sections yet",
+    legalEmptyBody:
+      "Add its first section. Customers read it in the app top to bottom, in this order.",
+    documentLabel: "Document",
+    moreFor: "More for {name}",
+    visibilityAria: "Show {name} in the app",
+    notFoundBody:
+      "It may have been removed by somebody else. Go back to the list to see what is there now.",
+    // The settings side menu (Linear/Stripe style).
+    navBusiness: "Business",
+    navAppText: "In the app",
+    navSystem: "System",
+    advancedBlurb: "Housekeeping that is rarely needed.",
+    topicSectionTitle: "Question and answer",
+    topicSectionBlurb:
+      "Write it in every language the app speaks. Customers see the language their phone is set to.",
+    groupSectionTitle: "Where it sits",
+    visibilityBlurb:
+      "Hidden topics stay here, so you can bring one back without writing it again.",
+    sectionSectionTitle: "Section text",
+    sectionSectionBlurb:
+      "One heading and its paragraphs, in every language the app speaks.",
+    inDocument: "Part of the {document}.",
+    noGroups:
+      "There are no groups yet. Groups are added with a migration, so ask whoever looks after the database.",
   },
 
   reorder: {
@@ -2677,6 +3527,19 @@ const en = {
     sectionRenamed: "Renamed to {name}",
     sectionArchived: "{name} archived",
     renameSection: "Rename",
+    mergeSubAisle: "Move products into another sub-aisle…",
+    mergeSection: "Move products into another section…",
+    mergeTitle: "Move everything in {name}",
+    mergeBody:
+      "Its {count} product(s) go into the section you choose, after what is already there, in the same order.",
+    mergeTo: "Move them into",
+    mergeHint: "Any sub-aisle or section, in any aisle.",
+    mergeConfirm: "Move {count} product(s)",
+    mergeArchive: "Archive {name} once it is empty",
+    mergeArchiveHint:
+      "You'll be asked to confirm. It can be brought back from the Archive.",
+    mergePartial:
+      "{count} product(s) could not be moved, so the section is not empty. The reason is in the message above.",
     sectionArchiveTitle: "Archive this section?",
     sectionArchiveBody:
       "It disappears from the app immediately. It can be brought back.",
@@ -2688,7 +3551,7 @@ const en = {
     // products live in those.
     aisleNotEmpty:
       "This aisle still holds {count} sub-aisle(s). Move or archive them first, or they would disappear from the app without being deleted.",
-    aisleCount: "{subAisles} sub-aisles · {items} items",
+    aisleCount: "{subAisles} sub-aisles, {items} items",
     subAisleLabel: "Sub-aisle",
     addSubAisle: "Add a sub-aisle",
     aisleNeedsSubAisle:
@@ -2746,6 +3609,115 @@ const en = {
     descriptionPlaceholderAr: "كبة لحم مشوية، طحينة، كبيس",
     pricePlaceholder: "380000",
     slugPlaceholder: "kibbeh-plate",
+
+    // The Menu tab, redesigned (2026-11). The list is the work surface: price
+    // and availability change from the row, everything else on the dish page.
+    addDish: "Add dish",
+    addDishTo: "Add a dish to {section}",
+    addSectionFirst: "Add a section first, then put dishes in it.",
+    showInMenu: "Show in menu",
+    summary: "{items} dishes in {sections} sections",
+    summaryHidden: "{count} hidden",
+    filterLabel: "Show",
+    filterAll: "All",
+    filterLive: "Live",
+    filterHidden: "Hidden",
+    filterNoDrag: "Show all dishes to reorder.",
+    filterNone: "No dish in this view.",
+    filterNoneBody: "Switch back to All to see the whole menu.",
+    expandAll: "Expand all",
+    collapseAll: "Collapse all",
+    emptyAction:
+      "Start with a section — Starters, Mains, Drinks — then add dishes to it.",
+    sectionMore: "More actions for {name}",
+    dishMore: "More actions for {name}",
+    editDish: "Edit dish",
+    changePrice: "Change price",
+    priceOf: "Price of {name}",
+    savePrice: "Save price",
+    priceFieldHint: "Customers see the new price straight away.",
+    newSectionTitle: "New section",
+    newSubAisleTitle: "New sub-aisle in {name}",
+    renameSectionTitle: "Rename {name}",
+    moveSectionTitle: "Move {name}",
+    sectionEmptyAdd: "No dishes yet. Add the first one.",
+    dragHint: "Drag the handles to change the order customers see.",
+    hideEverywhere: "Hide from customers",
+    showEverywhere: "Show to customers",
+    // The dish page.
+    pageNewDescription: "Adding to {section} at {shop}.",
+    pageDescription: "{shop}, {section}",
+    basics: "Basics",
+    basicsHint: "What the dish is called, and the line under its name.",
+    priceSection: "Price and unit",
+    priceSectionHint: "What it costs, and what that price buys.",
+    optionsSection: "Options",
+    optionsSectionHint:
+      "Questions the customer answers when adding it — a size, extras.",
+    optionsNone: "This dish asks nothing yet.",
+    optionsManage: "Manage options",
+    optionsManageHint:
+      "Options are shared across a shop's dishes, so they are set up on the shop's Options tab.",
+    tagsSection: "Tags",
+    tagsSectionHint: "Labels customers see beside the dish, like Spicy.",
+    availability: "Availability",
+    availabilityHint: "Whether customers can see and order it.",
+    showInApp: "Show in the app",
+    branchesSection: "At each branch",
+    branchesSectionHint:
+      "What each branch serves and charges. Each is changed on that branch's menu.",
+    branchSamePrice: "Shop price",
+    branchNoPrice: "No price",
+    branchSectionOff: "Section off here",
+    editAtBranch: "Edit at {name}",
+    // On a chain's Menu tab, where the branch picker used to be.
+    branchesNote:
+      "This is the menu every branch shares. What each branch serves and what it charges are set on that branch's own menu:",
+    branchesSaveFirst:
+      "Save the dish first, then set what each branch serves and charges.",
+    branchesOne:
+      "This shop has one branch, so the shop's price and availability are the whole story.",
+    preview: "Preview",
+    previewHint: "Roughly how the dish reads on the menu.",
+    previewName: "Dish name",
+    unsaved: "Unsaved changes",
+    noChanges: "No changes",
+    archiveDish: "Archive dish",
+    fixErrors: "Fix the highlighted fields, then save again.",
+
+    // Best-in-class pass (2026-11): a section rail, bulk edits, duplicating.
+    // The rail beside the list on a wide screen — where each section is.
+    jumpTo: "Go to {name}",
+    // Bulk edits, from ticked rows. Both directions ask, as a single switch does.
+    selectDish: "Select {name}",
+    selectSection: "Select every dish in {name}",
+    selected: "{count} selected",
+    bulkShow: "Show",
+    bulkHide: "Hide",
+    bulkMove: "Move to…",
+    bulkClear: "Clear selection",
+    bulkShowTitle: "Show {count} dishes to customers?",
+    bulkShowBody:
+      "They appear on the shop's menu straight away and can be ordered.",
+    bulkHideTitle: "Hide {count} dishes from customers?",
+    bulkHideBody:
+      "They disappear from the shop's menu straight away. Orders already placed are not affected, and you can show them again at any time.",
+    bulkHideInBundlesBody:
+      "They disappear from the shop's menu straight away, and so do the bundles they're in: {bundles}. Orders already placed are not affected, and you can show them again at any time.",
+    bulkMoveTitle: "Move {count} dishes",
+    bulkMoveLabel: "Section",
+    bulkMoveHint:
+      "They go to the end of that section, in the order they are in now.",
+    bulkMoveConfirm: "Move dishes",
+    // Duplicating — starts hidden, the way a copied product starts as a draft.
+    duplicate: "Duplicate",
+    pageDuplicateDescription: "A copy of {name}, in {section} at {shop}.",
+    duplicateNote:
+      "The copy starts hidden so customers never see two of the same dish. Its options and branch prices are not copied — set them once it is saved.",
+    // The dish page's side column.
+    status: "Status",
+    organisation: "Organisation",
+    media: "Picture",
   },
 
   map: {
@@ -2781,6 +3753,7 @@ const en = {
   branches: {
     notFound: "That branch is not here any more.",
     tab: "Branches",
+    tabCount: "Branches ({count})",
     // There were two headings here — "The shop" and "This branch" — from when
     // the branch editor carried both records. It carries one now, so the page
     // needs no heading to say which: see `store-details.tsx`.
@@ -2796,16 +3769,11 @@ const en = {
     currencyHint:
       "What this branch charges in. Changing it converts its prices at today's rate and makes every one of them this branch's own, so they no longer follow the shop's. Leave it on the shop's unless this place really does trade in another.",
     currencySame: "Same as the shop ({code})",
-    // Said once at the top, because "why is there a Branches tab on a shop with
-    // one branch" is the first question this screen gets.
-    intro:
-      "Where this shop trades from. The menu is shared by all of them — each branch can hide what it does not serve and charge its own prices.",
     searchPlaceholder: "Search branches",
     // A term that matched nothing, said as its own state — the list simply
     // emptying reads as a shop that has lost its branches.
     noMatches: "No branch matches that.",
     add: "New branch",
-    edit: "Edit branch",
     name: "Branch name",
     // The place, not the brand — the shop's name is already above.
     nameHint: "The area or street, not the shop's name.",
@@ -2848,7 +3816,6 @@ const en = {
       it is worded as a state the operator has to come back and undo.
     */
     visibility: "Branch status",
-    live: "Trading",
     hidden: "Closed indefinitely",
     // The badge on the row, where the switch's own words are too long — and
     // where "Closed" alone would be read as the shop being shut for the
@@ -2879,6 +3846,69 @@ const en = {
     // A shop always has at least one after `0101`, so this is a schema that
     // has not been migrated rather than an empty state to design for.
     noneYet: "This shop has no branches yet.",
+
+    // ---- the rebuilt branch pages -----------------------------------------
+    introSole:
+      "This shop trades from one place, edited on its Details tab. Add a branch to trade from a second address — the menu is shared, and each branch can hide dishes and charge its own prices.",
+    failed: "Could not load the branches",
+    noAddress: "No address",
+    // Under a branch's name in a picker, where the address tells branches
+    // apart and a blank line would look like a fault.
+    noAddressYet: "No address yet",
+    editedOnDetails: "Edited on Details",
+    backToList: "Back to branches",
+    addDescription:
+      "A new place {shop} trades from. It shares the shop's menu; what it serves and charges can differ once it exists.",
+    ofShop: "A branch of {shop}",
+    detailsTab: "Details",
+    menuTab: "Menu",
+    hoursTab: "Hours",
+    identitySection: "The branch",
+    placeHint: "Where an order from this branch reaches the kitchen.",
+    namePlaceholderAr: "الحمرا",
+    addressPlaceholderAr: "شارع الحمرا، قرب بوابة الجامعة الأميركية",
+    differsSection: "Prices and picture",
+    differsHint: "Both follow the shop unless this branch is given its own.",
+    hoursNew:
+      "When this branch takes orders. Open at least one day — a branch with no hours is open around the clock.",
+    editHours: "Edit hours",
+    create: "Create branch",
+    hoursNotSaved:
+      "The branch was created, but its hours could not be saved. Set them here — until then the app shows it as open around the clock.",
+    currencyConfirmTitle: "Price this branch in {code}?",
+    currencyConfirmBody:
+      "Every price at this branch is converted to {code} at today's rate and becomes this branch's own, so it no longer follows the shop's prices. Past orders are unaffected.",
+    currencyBackBody:
+      "This branch goes back to the shop's currency ({code}). Its prices are converted back at today's rate and stay its own — clear a price on Menu and prices to follow the shop's again.",
+    currencyConfirm: "Convert the prices",
+
+    // ---- a branch managed like a store of its own (2026-11) ----------------
+    // Uber Eats Manager and Shopify's locations: every place has its own page
+    // with its menu, hours and details, and the shop is the brand above them.
+    breadcrumb: "Where you are",
+    shops: "Shops",
+    switchBranch: "Other branches ({count})",
+    switchBranchLabel: "Go to another branch of {shop}",
+    // The Live switch on a branch: whether it trades at all, not its hours.
+    liveOnTitle: "Start trading at {name}?",
+    liveOnBody:
+      "Customers can order from {name} again, during its opening hours.",
+    liveOnConfirm: "Start trading",
+    liveOffTitle: "Stop trading at {name}?",
+    liveOffBody:
+      "Customers cannot order from {name} until it is turned back on, whatever its opening hours say. The shop's other branches keep trading, and orders already placed are not affected.",
+    liveOffConfirm: "Stop trading",
+    openBranch: "Open branch",
+    editDetails: "Edit details",
+    editMenu: "Edit menu and prices",
+    // A branch of a shop that is itself hidden from the app.
+    shopHidden: "The shop is hidden, so this branch is not in the app",
+    lastOneHint: "The only branch a shop has cannot be closed.",
+    showBranches: "Show the branches of {name}",
+    hideBranches: "Hide the branches of {name}",
+    // The Branches tab of a chain, said once above the list.
+    introChain:
+      "Each branch is managed on its own page: its menu and prices, its hours and its details. The menu itself, the options and the bundles are the shop's and shared by all of them.",
   },
 
   /**
@@ -2889,8 +3919,6 @@ const en = {
    * at the airport.
    */
   branchMenu: {
-    // Heads each branch strip and the section's branch switch.
-    at: "At {name}",
     served: "Served",
     notServed: "Not served",
     // Said once under a section that is off, rather than on each row beneath
@@ -2904,12 +3932,9 @@ const en = {
      * word implying a standing link would promise that later changes follow,
      * which they do not.
      */
-    copySection: "Copy section",
-    copyItem: "Copy",
     // Says how many, because a bare "done" on something that rewrites a price
     // list is not checkable.
     copied: "{count} dishes now match {name}",
-    copyNone: "This shop has no other branch to copy from.",
     // The expander on a dish. Loaded only when opened: most dishes are never
     // asked about, and a menu is a lot of questions to fetch up front.
     options: "Options",
@@ -2924,6 +3949,82 @@ const en = {
     lastChoiceRefused:
       "That would leave a required question with nothing to choose at this branch. Turn the question off here instead, or the dish.",
     optionPriceFor: "Price for {name} at this branch",
+
+    // ---- the branch's Menu and prices tab -----------------------------------
+    failed: "Could not load this branch's menu",
+    emptyTitle: "The menu is empty",
+    emptyBody:
+      "Add dishes on the shop's Menu tab; each branch can then hide them or charge its own price.",
+    toMenu: "Go to the menu",
+    intro:
+      "What {name} serves and charges. Changes here are saved as you make them. An empty price means the shop's price.",
+    introOwnCurrency:
+      "What {name} serves and charges, in {code}. Every dish has its own price here, because this branch prices in a currency of its own. Changes are saved as you make them.",
+    searchPlaceholder: "Search dishes",
+    noMatches: "No dish matches that.",
+    // ---- the one way to copy prices: a dialog from the Menu tab's toolbar ---
+    copyPrices: "Copy prices",
+    copyTitle: "Copy prices into {name}",
+    copyBody:
+      "Each dish and choice takes the price {from} charges. Where {from} charges the shop's price, {to} goes back to it too.",
+    copyFrom: "From",
+    copyWhat: "What",
+    copyWhole: "The whole menu",
+    copySection: "One section",
+    copySectionLabel: "Section",
+    // A branch in another currency, in the From list. `copy_branch_prices`
+    // refuses it (0229): a price is digits with no currency of its own.
+    copyOtherCurrency: "Prices in {code}",
+    copyCurrencyRefused:
+      "{from} charges in {fromCode} and {to} in {toCode}. Prices can only be copied between branches that charge in the same currency, so set these by hand.",
+    copyLoading: "Working out what would change…",
+    copyFailed: "Could not read {name}'s prices.",
+    dishCount: "{count} dishes",
+    dishCountOne: "1 dish",
+    choiceCount: "{count} choices",
+    choiceCountOne: "1 choice",
+    copyAnd: "{a} and {b}",
+    copyWillChange: "{what} will change price.",
+    copyWillGoBack: "{what} will go back to the shop's price.",
+    copySame: "{count} are already the same.",
+    copySameOne: "1 is already the same.",
+    copyNothing:
+      "Everything here already matches {from}, so there is nothing to copy.",
+    copyShowChanges: "Show changes",
+    copyHideChanges: "Hide changes",
+    copyBackToShop: "Shop's price",
+    copyConfirm: "Copy {count} prices",
+    copyConfirmOne: "Copy 1 price",
+    sectionServed: "{name} served at this branch",
+    servedFor: "{name} served at this branch",
+    offEverywhere: "Off everywhere",
+    shopPrice: "Shop price {price}",
+    ownPrice: "Own price",
+  },
+
+  /** The shared form controls in `components/ui` — pickers, uploaders, charts. */
+  controls: {
+    noMatches: "Nothing matches that search.",
+    allChosen: "Everything is already chosen.",
+    remove: "Remove {name}",
+    loadMore: "Load more",
+    // The phone field shows only the national digits, so its spoken name
+    // carries the country.
+    phoneLabel: "Phone number, country code +{code}",
+    imageRules: "JPEG, PNG or WebP, up to {mb} MB",
+    imageShape: "shape {shape}",
+    // A shop or dish photo: any size goes in, because it is cropped and
+    // shrunk in the browser before it is uploaded.
+    imagePhotoRules: "JPEG, PNG or WebP — you crop it to {shape} next",
+    imageCutout: "transparent background",
+    // Comma-separated, January first / Monday first. Split by the calendar.
+    months:
+      "January,February,March,April,May,June,July,August,September,October,November,December",
+    weekdays: "Mo,Tu,We,Th,Fr,Sa,Su",
+    prevMonth: "Previous month",
+    nextMonth: "Next month",
+    time: "Time",
+    done: "Done",
   },
 
   confirm: {
@@ -2941,12 +4042,42 @@ const en = {
   },
 
   shell: {
-    // Every section but the queue is unbuilt. Saying which phase it belongs to
-    // is more use than "coming soon", which tells the operator nothing about
-    // whether to wait or to go and use the SQL editor.
     notBuiltTitle: "Not built yet",
-    notBuiltBody:
-      "This section is on the plan, in phase {phase}, and has not been built.",
+    notBuiltBody: "This section has not been built yet.",
+    groupOperate: "Operate",
+    groupCatalogue: "Catalogue",
+    groupMarketing: "Marketing",
+    groupPeople: "People",
+    groupBusiness: "Business",
+    shops: "Shops",
+    library: "Menu library",
+    collapse: "Collapse sidebar",
+    expand: "Expand sidebar",
+    openMenu: "Open menu",
+    search: "Search or jump to…",
+    searchShort: "Search",
+    searchEmpty: "Nothing matches.",
+    goTo: "Go to",
+    actions: "Actions",
+    signedInAs: "Signed in as",
+    keyboard: "Keyboard shortcuts",
+    newOrders: "{count} new",
+    soundLocked:
+      "Sound is off: the browser keeps the page silent until you click on it, so new orders won't chime.",
+    soundTurnOn: "Turn on sound",
+    live: "Live",
+  },
+
+  commandPalette: {
+    find: "Find",
+    findOrder: "Orders matching “{query}”",
+    findCustomer: "Customers matching “{query}”",
+    findShop: "Shops matching “{query}”",
+    newShop: "New shop",
+    newDriver: "New driver",
+    newPromotion: "New promotion",
+    newBundle: "New bundle",
+    newCategory: "New category",
   },
 
   // Which deployment this is, on the sign-in pages and the strip across the top
@@ -2972,6 +4103,8 @@ const en = {
     passwordPlaceholder: "••••••••••••",
     password: "Password",
     rememberMe: "Keep me signed in on this device",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     submit: "Sign in",
     forgot: "Forgotten your password?",
     // Deliberately does not distinguish "no such account" from "wrong

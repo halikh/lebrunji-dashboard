@@ -156,6 +156,8 @@ export type Dispatch = {
   dispatchedAt: string;
   orderId: string;
   orderCode: string;
+  /** What delivery cost on that order, inside `orderTotal`. */
+  deliveryFee: number;
   orderTotal: number;
   currencyCode: string;
   /** The rate this order's total is read at — see `oneShopRate`. */
@@ -173,7 +175,7 @@ export async function fetchDispatches(
     .from("order_dispatches")
     .select(
       `id, dispatched_at,
-       orders ( id, code, total, currency_code,
+       orders ( id, code, delivery_fee, total, currency_code,
          order_stores ( store_id, status, stores ( exchange_rate ) ) )`,
     )
     .eq("courier_id", courierId)
@@ -201,6 +203,7 @@ export async function fetchDispatches(
         dispatchedAt: row.dispatched_at as string,
         orderId: order.id as string,
         orderCode: order.code as string,
+        deliveryFee: Number(order.delivery_fee),
         orderTotal: Number(order.total),
         currencyCode: order.currency_code as string,
         shopRate: oneShopRate(asArray(order.order_stores)),

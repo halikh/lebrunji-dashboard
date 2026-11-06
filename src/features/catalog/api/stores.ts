@@ -119,6 +119,23 @@ export type Store = {
    * which is a real state, and the one the list flags.
    */
   orderPhone: string | null;
+  /**
+   * How many of the shop's trading branches have no pin.
+   *
+   * The pin moved to the branch in `0101` and `stores.latitude` above is no
+   * longer kept in step with it, so a list that warned off the store's column
+   * missed a branch whose pin was cleared, and a chain whose second branch was
+   * never pinned. Counted from the same embed `orderPhone` reads — no extra
+   * request. An unpinned branch charges every order at the top band.
+   */
+  unpinnedBranches: number;
+  /**
+   * The ids of the shop's live (not archived) branches, and which of them
+   * trade — read off the same embed, so the shops list can ask for every
+   * trading branch's week in one request and say which shops are open now.
+   */
+  branchIds: string[];
+  tradingBranchIds: string[];
 };
 
 /**
@@ -165,7 +182,7 @@ export async function fetchStores(
        latitude, longitude, prep_min_minutes, prep_max_minutes,
        categories!category_id ( name ),
        store_categories ( category_id, categories ( name ) ),
-       branches ( sort_order, created_at, deleted_at, branch_contacts ( whatsapp_phone ) )`,
+       branches ( id, sort_order, created_at, deleted_at, is_active, latitude, longitude, branch_contacts ( whatsapp_phone ) )`,
     )
     .is("deleted_at", null)
     // The order the app shows too: a drag writes this and `sort_order`
@@ -207,7 +224,7 @@ export async function fetchStore(id: string): Promise<Store> {
        latitude, longitude, prep_min_minutes, prep_max_minutes,
        categories!category_id ( name ),
        store_categories ( category_id, categories ( name ) ),
-       branches ( sort_order, created_at, deleted_at, branch_contacts ( whatsapp_phone ) )`,
+       branches ( id, sort_order, created_at, deleted_at, is_active, latitude, longitude, branch_contacts ( whatsapp_phone ) )`,
     )
     .eq("id", id)
     .single();
@@ -831,6 +848,11 @@ function toStore(row: Record<string, unknown>): Store {
     latitude: (row.latitude as number | null) ?? null,
     longitude: (row.longitude as number | null) ?? null,
     orderPhone: orderPhone(row),
+    unpinnedBranches: unpinnedBranches(row),
+    branchIds: liveBranches(row).map((one) => one.id as string),
+    tradingBranchIds: liveBranches(row)
+      .filter((one) => one.is_active !== false)
+      .map((one) => one.id as string),
     prepMinMinutes: row.prep_min_minutes as number,
     prepMaxMinutes: row.prep_max_minutes as number,
   };
@@ -905,6 +927,34 @@ export function orderPhone(row: Record<string, unknown>): string | null {
     if (phone) return phone;
   }
   return null;
+}
+
+/**
+ * Trading branches with no pin — see `Store.unpinnedBranches`. Archived and
+ * not-trading branches are skipped: neither quotes a delivery.
+ */
+function unpinnedBranches(row: Record<string, unknown>): number {
+  const branches = Array.isArray(row.branches)
+    ? (row.branches as Record<string, unknown>[])
+    : row.branches
+      ? [row.branches as Record<string, unknown>]
+      : [];
+  return branches.filter(
+    (one) =>
+      one.deleted_at == null &&
+      one.is_active !== false &&
+      (one.latitude == null || one.longitude == null),
+  ).length;
+}
+
+/** The embed's branches that are not archived — see `orderPhone` on why here. */
+function liveBranches(row: Record<string, unknown>): Record<string, unknown>[] {
+  const branches = Array.isArray(row.branches)
+    ? (row.branches as Record<string, unknown>[])
+    : row.branches
+      ? [row.branches as Record<string, unknown>]
+      : [];
+  return branches.filter((one) => one.deleted_at == null && one.id != null);
 }
 
 /** One readable string out of a translated column, for a label. */

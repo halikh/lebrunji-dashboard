@@ -2,348 +2,311 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { SearchX, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { Button, cx } from "@/components/ui";
-import { Avatar } from "@/components/ui/avatar";
-
-import { AccountActions } from "./account-actions";
-import { ListHeader } from "@/components/ui/list-header";
-import { ROW } from "@/components/ui/row";
-import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Avatar,
+  EmptyState,
+  ListCard,
+  Page,
+  PageHeader,
+  SearchInput,
+  TBody,
+  THead,
+  Table,
+  Tabs,
+  Td,
+  Th,
+  Tr,
+  QueryState,
+  cx,
+} from "@/components/ui";
 import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
-import { FilterTab, tabArrowHandler, type TabTone } from "@/components/ui/tab";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { SEARCH } from "@/lib/limits";
 import { formatPhone } from "@/lib/phone";
-import { formatDate } from "@/lib/time";
+import { formatDate, formatRelative } from "@/lib/time";
 
+import { AccountActions } from "./account-actions";
 import type { Customer, CustomerScope } from "./api/customers";
+import { CustomerStatus, nameOf } from "./customer-status";
 import { useCustomerCounts, useCustomers } from "./use-customers";
+
+const SCOPES: { key: CustomerScope; label: TranslationKey }[] = [
+  { key: "all", label: "customers.tabAll" },
+  { key: "active", label: "customers.tabActive" },
+  { key: "suspended", label: "customers.tabSuspended" },
+  { key: "closed", label: "customers.tabClosed" },
+];
+
+const EMPTY: Record<
+  CustomerScope,
+  { title: TranslationKey; body: TranslationKey }
+> = {
+  all: { title: "customers.emptyTitle", body: "customers.emptyBody" },
+  active: { title: "customers.emptyTitle", body: "customers.emptyBody" },
+  suspended: {
+    title: "customers.emptySuspendedTitle",
+    body: "customers.emptySuspendedBody",
+  },
+  closed: {
+    title: "customers.emptyClosedTitle",
+    body: "customers.emptyClosedBody",
+  },
+};
+
+/** The term, once the operator has stopped typing for a moment. */
+function useSettled(value: string, delay = 250) {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return settled;
+}
 
 /**
  * Customers — search first, then open one.
  *
- * ## The search box is the screen, not a filter above it
+ * The job is "somebody rings up, find *that* person", so the search box takes
+ * focus on arrival and the list underneath is the fallback. A `?q=` (the
+ * command palette links here with one) seeds the box; the tab is `?show=`,
+ * written with `replace` so Back leaves the screen rather than walking back
+ * through the tabs.
  *
- * The flow study calls this "read-mostly; search then look", and that is the
- * whole shape of the job: somebody rings up, and the operator needs *that*
- * person. Browsing the list in order is not something anybody does — it is
- * newest-first because a list needs an order, not because the newest customer
- * is who you were after.
- *
- * So the box takes focus on arrival and the list underneath is the fallback.
- *
- * ## A row leads to a page, not a panel
- *
- * A customer is not a form beside a list — it is a record with a history, a set
- * of addresses on a map, and everything they have ever ordered. That does not
- * fit a panel and it should not have to: the row navigates to
- * `/customers/<id>`, which is linkable, reloadable and sendable to somebody
- * else, and has room for the map the addresses actually need.
- *
- * The row's name is the anchor, stretched over the whole row with
- * `after:absolute after:inset-0`. That gives the largest target on the row
- * *and* an accessible name of "Rami Haddad" rather than "row", and keeps
- * open-in-new-tab working — which a click handler on a `div` would quietly have
- * taken away.
+ * Counts on the tabs come from `head` requests, so they are the size of each
+ * set, not of what has been fetched. Closed accounts stay listed — their
+ * orders still trace back to somebody.
  */
-
-/**
- * The tabs, and the colour each wears when selected.
- *
- * The dot is on every tab, selected or not, for the reason the queue's tabs
- * carry one: colour alone is not a distinction a colour-blind operator can rely
- * on, and the dot is what ties a tab to the chip in the rows beneath it. The
- * tabs are the legend.
- *
- * "All" has no tone, because it is not a state — it keeps the press blue, the
- * same way the queue's "All" does.
- */
-const TABS: {
-  key: CustomerScope;
-  labelKey: TranslationKey;
-  tone?: TabTone;
-}[] = [
-  { key: "all", labelKey: "customers.tabAll" },
-  {
-    key: "active",
-    labelKey: "customers.tabActive",
-    tone: {
-      wash: "var(--color-accent-wash)",
-      ink: "var(--color-text)",
-      dot: "var(--color-accent)",
-    },
-  },
-  {
-    key: "suspended",
-    labelKey: "customers.tabSuspended",
-    tone: {
-      wash: "var(--color-warning-wash)",
-      ink: "var(--color-text)",
-      dot: "var(--color-warning)",
-    },
-  },
-  {
-    key: "closed",
-    labelKey: "customers.tabClosed",
-    tone: {
-      wash: "var(--color-neutral-fill)",
-      ink: "var(--color-text)",
-      dot: "var(--color-text-faint)",
-    },
-  },
-];
-
 export function CustomersScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
 
-  const [search, setSearch] = useState("");
-  // Below the minimum, nothing is sent: one letter matches most of a table,
-  // which is a round trip to tell somebody nothing.
-  const term = search.trim().length >= SEARCH.minTerm ? search : "";
-
   const requested = params.get("show");
-  const scope: CustomerScope = TABS.some((tab) => tab.key === requested)
+  const scope: CustomerScope = SCOPES.some((one) => one.key === requested)
     ? (requested as CustomerScope)
     : "all";
 
+  // Seeded from `?q=`, and re-seeded when a new one arrives while the screen
+  // is already open (the palette, pressed twice). Adjusted during render
+  // rather than in an effect, so the box never paints the old term.
+  const incoming = params.get("q") ?? "";
+  const [seed, setSeed] = useState(incoming);
+  const [search, setSearch] = useState(incoming);
+  if (incoming !== seed) {
+    setSeed(incoming);
+    setSearch(incoming);
+  }
+
+  const settled = useSettled(search.trim());
+  // Below the minimum nothing is sent: one letter matches most of a table.
+  const term = settled.length >= SEARCH.minTerm ? settled : "";
+
   const customers = useCustomers(scope, term);
   const counts = useCustomerCounts();
+  const rows = customers.data?.pages.flatMap((page) => page.customers) ?? [];
 
-  /**
-   * The tab lives in the URL, `replace` rather than `push`.
-   *
-   * Switching a filter is not a journey: Back should leave the customers screen
-   * rather than walk through the tabs somebody looked at on the way.
-   */
   function show(next: CustomerScope) {
     const query = new URLSearchParams(params);
     if (next === "all") query.delete("show");
     else query.set("show", next);
-    const query_string = query.toString();
-    router.replace(query_string ? `${pathname}?${query_string}` : pathname, {
-      scroll: false,
-    });
+    const text = query.toString();
+    router.replace(text ? `${pathname}?${text}` : pathname, { scroll: false });
   }
 
-  const rows = customers.data?.pages.flatMap((page) => page.customers) ?? [];
+  const empty = term
+    ? ({ title: "customers.noneTitle", body: "customers.noneBody" } as const)
+    : EMPTY[scope];
+
+  const total = counts.data?.[scope] ?? null;
 
   return (
-    <div className="flex h-full min-w-0 flex-col">
-      {/* No action, deliberately: this is the one screen where the box *is*
-          the point — a customer is found by typing, not by scrolling — so it
-          runs to the end of the bar rather than stopping short of a button. */}
-      <ListHeader
+    <Page>
+      <PageHeader
         title={t("customers.title")}
-        search={{
-          value: search,
-          onChange: setSearch,
-          placeholder: t("customers.search"),
-        }}
+        description={t("customers.blurb")}
       />
 
-      {/* The same strip the order queue uses — same shape, same place, same
-          keyboard behaviour — because these are the same kind of control and
-          two spellings of it would be two things to learn.
-
-          Counts come from `head` requests, so a tab says how many rows are in a
-          set the screen has not loaded. Counting what was fetched would make
-          every tab read "50", which is worse than no number: it looks like an
-          answer.
-
-          It scrolls sideways when four tabs and their counts outrun a phone,
-          with no visible scrollbar — the last tab half under the edge already
-          says there is more, as it does on the rail. The rule under the strip
-          is an inset shadow plus a pixel of padding rather than a border,
-          because a scroller clips at its padding edge: a real border would cut
-          off the pixel of each tab's underline that is meant to sit over it,
-          and the overhang would give the strip a one-pixel vertical scroll. */}
-      <div
-        role="tablist"
-        aria-label={t("customers.title")}
-        className="flex shrink-0 gap-xxs overflow-x-auto bg-surface px-lg pb-px shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] md:px-xxl"
+      {/* Shopify's customer index: one card holding the saved views, the
+          search and the table, with the count of the set at its foot. */}
+      <ListCard
+        tabs={
+          <Tabs
+            value={scope}
+            onChange={show}
+            items={SCOPES.map((one) => ({
+              key: one.key,
+              label: t(one.label),
+              count: counts.data?.[one.key] ?? null,
+            }))}
+          />
+        }
+        search={
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={t("customers.search")}
+            // The screen's one job is finding a person, so the cursor starts
+            // here.
+            autoFocus
+          />
+        }
+        footer={
+          customers.isSuccess && rows.length > 0 ? (
+            <>
+              <span className="tabular-nums">
+                {term || total === null
+                  ? t("customers.shownCount", { count: rows.length })
+                  : t("customers.shownOf", { shown: rows.length, total })}
+              </span>
+              <InfiniteSentinel
+                hasMore={customers.hasNextPage}
+                loading={customers.isFetchingNextPage}
+                onLoadMore={() => void customers.fetchNextPage()}
+              />
+            </>
+          ) : undefined
+        }
       >
-        {TABS.map(({ key, labelKey, tone }) => (
-          <FilterTab
-            key={key}
-            label={t(labelKey)}
-            count={counts.data?.[key]}
-            active={scope === key}
-            tone={tone}
-            onClick={() => show(key)}
-            onKeyDown={tabArrowHandler(
-              TABS.map((one) => one.key),
-              scope,
-              show,
-            )}
-          />
-        ))}
-      </div>
+        <QueryState
+          status={
+            customers.isPending
+              ? "pending"
+              : customers.isError
+                ? "error"
+                : rows.length === 0
+                  ? "empty"
+                  : "ready"
+          }
+          rows={8}
+          failedTitle={t("customers.failedTitle")}
+          onRetry={() => void customers.refetch()}
+          empty={
+            <EmptyState
+              icon={term ? <SearchX /> : <Users />}
+              title={t(empty.title)}
+              description={t(empty.body)}
+            />
+          }
+        />
 
-      {/* A size container, so each row can decide by the list's width — not
-          the window's — whether its facts fit beside the name. */}
-      <div className="@container flex min-h-0 flex-grow flex-col gap-sm overflow-y-auto scroll-hint p-lg md:p-xxl">
-        {customers.isPending && (
-          <div aria-hidden className="flex flex-col gap-sm">
-            {[0, 1, 2, 3].map((row) => (
-              <div key={row} className="h-[58px] rounded-lg bg-line-soft" />
-            ))}
-          </div>
+        {rows.length > 0 && (
+          <Table aria-busy={customers.isFetching || undefined}>
+            <THead>
+              <tr>
+                <Th>{t("customers.colCustomer")}</Th>
+                <Th className="hidden md:table-cell">
+                  {t("customers.colPhone")}
+                </Th>
+                <Th className="hidden sm:table-cell">
+                  {t("customers.colStatus")}
+                </Th>
+                <Th className="text-end">{t("customers.colOrders")}</Th>
+                <Th className="hidden lg:table-cell">
+                  {t("customers.colLastOrder")}
+                </Th>
+                <Th className="hidden xl:table-cell">
+                  {t("customers.colJoined")}
+                </Th>
+                <Th className="w-12">
+                  <span className="sr-only">{t("customers.colActions")}</span>
+                </Th>
+              </tr>
+            </THead>
+            <TBody>
+              {rows.map((customer) => (
+                <CustomerRow
+                  key={customer.id}
+                  customer={customer}
+                  onOpen={() => router.push(`/customers/${customer.id}`)}
+                />
+              ))}
+            </TBody>
+          </Table>
         )}
-
-        {customers.isError && (
-          <div className="flex flex-col items-center gap-lg py-huge text-center">
-            <h2 className="text-[19px]">{t("customers.failedTitle")}</h2>
-            <Button
-              variant="secondary"
-              onClick={() => void customers.refetch()}
-            >
-              {t("common.retry")}
-            </Button>
-          </div>
-        )}
-
-        {rows.map((row) => (
-          <Row key={row.id} customer={row} />
-        ))}
-
-        {customers.isSuccess && rows.length === 0 && (
-          <EmptyState
-            mood="lost"
-            titleKey={term ? "customers.noneTitle" : "customers.emptyTitle"}
-            bodyKey={term ? "customers.noneBody" : "customers.emptyBody"}
-          />
-        )}
-
-        {customers.isSuccess && rows.length > 0 && (
-          <InfiniteSentinel
-            hasMore={customers.hasNextPage}
-            loading={customers.isFetchingNextPage}
-            onLoadMore={() => void customers.fetchNextPage()}
-          />
-        )}
-      </div>
-    </div>
+      </ListCard>
+    </Page>
   );
 }
 
-/**
- * The name, or what to say instead of one.
- *
- * `users.name = ''` is this schema's record of "signed in, never finished
- * setup" — the constraint in `0045`/`0046` exists to permit exactly that state.
- * Rendering it as a blank makes the row look broken; naming it makes it a
- * status, which is what it is.
- */
-export function nameOf(customer: { name: string }): string {
-  return customer.name.trim() || t("customers.incomplete");
-}
-
-function Row({ customer }: { customer: Customer }) {
-  const closed = customer.deletedAt !== null;
-
-  return (
-    <div
-      className={cx(
-        ROW,
-        // Wraps on a narrow list so the facts can drop under the name — see
-        // the group below. Never wraps once they fit, so a long name truncates
-        // rather than pushing the row onto two lines on a desktop.
-        "flex-wrap gap-y-sm @2xl:flex-nowrap",
-        // Marked rather than dimmed. A faded row reads as disabled, and these
-        // are the rows most likely to be the one somebody is looking for.
-        closed || !customer.isActive
-          ? "border-transparent bg-neutral-fill/60 shadow-none"
-          : "border-transparent",
-      )}
-    >
-      <Avatar id={customer.id} name={customer.name} />
-
-      <span className="flex min-w-0 flex-grow flex-col gap-xxs">
-        <Link
-          href={`/customers/${customer.id}`}
-          className={cx(
-            "truncate text-[15px] font-semibold after:absolute after:inset-0",
-            !customer.name.trim() && "italic text-text-soft",
-          )}
-        >
-          {nameOf(customer)}
-        </Link>
-        <span className="truncate tabular-nums text-[12px] text-text-faint">
-          {formatPhone(customer.phone)}
-        </span>
-        {/* Under the phone, with the identity, rather than out in the row of
-            facts. Whether an account is suspended is a property of *this
-            person* — the same kind of thing as their name — while the order
-            count and the join date are measurements taken of them. Out on the
-            right it also sat between two figures and read as a third. */}
-        <StatusChip customer={customer} />
-      </span>
-
-      {/* The facts and the actions, as one group on a narrow list and as
-          nothing at all on a wide one.
-
-          Below `@2xl` it is a full-width line of its own under the identity —
-          the name, the count, the date and two buttons do not share 300px, and
-          squeezing them truncated the name to a letter or two, which is the one
-          thing on the row somebody is looking for. From `@2xl` it is
-          `contents`, so its children are the row's own items again and the
-          desktop row is exactly what it was. */}
-      <span className="flex basis-full flex-wrap items-center gap-x-lg gap-y-sm @2xl:contents">
-        <span className="shrink-0 text-[12px] text-text-faint">
-          {customer.orderCount === 0
-            ? t("customers.noOrders")
-            : t("customers.orderCount", { count: customer.orderCount })}
-        </span>
-
-        {/* The fixed width is a column, and columns only mean something when
-            the rows line up — which they do not once they wrap. */}
-        <span className="shrink-0 text-[12px] text-text-faint @2xl:w-[110px]">
-          {t("customers.joined", { when: formatDate(customer.createdAt) })}
-        </span>
-
-        {/* `relative z-10`, above the stretched link that covers the row — the
-            second half of that pattern, and the half whose absence looks like
-            a broken button rather than a misplaced layer. `ms-auto` holds the
-            buttons to the end when the group is a line of its own. */}
-        <span className="relative z-10 ms-auto @2xl:ms-0">
-          <AccountActions customer={customer} />
-        </span>
-      </span>
-    </div>
-  );
-}
-
-/** A state, not a switch. The switch lives on the profile, where it has room. */
-export function StatusChip({
+function CustomerRow({
   customer,
-  className,
+  onOpen,
 }: {
-  customer: { isActive: boolean; deletedAt: string | null };
-  className?: string;
+  customer: Customer;
+  onOpen: () => void;
 }) {
-  const closed = customer.deletedAt !== null;
+  const unnamed = !customer.name.trim();
+  const phone = formatPhone(customer.phone);
 
   return (
-    <span
-      className={cx(
-        "w-[92px] shrink-0 rounded-sm px-sm py-[2px] text-center text-[12px] font-semibold",
-        closed
-          ? "bg-neutral-fill text-text-soft"
-          : customer.isActive
-            ? "bg-accent-wash text-text"
-            : "bg-warning-wash text-text",
-        className,
-      )}
+    <Tr
+      interactive
+      onClick={onOpen}
+      className={cx(customer.deletedAt !== null && "bg-subtle/60")}
     >
-      {closed
-        ? t("customers.closedLabel")
-        : customer.isActive
-          ? t("customers.activeLabel")
-          : t("customers.suspendedLabel")}
-    </span>
+      <Td className="min-w-0">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar name={unnamed ? "" : customer.name} size={32} />
+          <div className="flex min-w-0 flex-col">
+            {/* A real link: keyboard-reachable, and open-in-new-tab works.
+                The row's own click is the larger, mouse-only target. */}
+            <Link
+              href={`/customers/${customer.id}`}
+              onClick={(event) => event.stopPropagation()}
+              className={cx(
+                "max-w-[16rem] truncate font-medium text-ink hover:underline",
+                unnamed && "font-normal text-ink-3 italic",
+              )}
+            >
+              {nameOf(customer)}
+            </Link>
+            {/* The phone moves under the name where its column is hidden. */}
+            <span
+              dir="ltr"
+              className="truncate text-start text-[12.5px] text-ink-3 tabular-nums md:hidden"
+            >
+              {phone}
+            </span>
+            <span className="sm:hidden">
+              <CustomerStatus customer={customer} />
+            </span>
+          </div>
+        </div>
+      </Td>
+      <Td className="hidden whitespace-nowrap text-ink-2 tabular-nums md:table-cell">
+        <span dir="ltr">{phone}</span>
+      </Td>
+      <Td className="hidden sm:table-cell">
+        <CustomerStatus customer={customer} />
+      </Td>
+      <Td
+        className={cx(
+          "text-end tabular-nums",
+          customer.orderCount === 0 && "text-ink-4",
+        )}
+      >
+        {customer.orderCount}
+      </Td>
+      <Td className="hidden whitespace-nowrap text-ink-2 lg:table-cell">
+        {customer.lastOrderAt ? (
+          // "3 weeks ago" is what tells somebody has gone quiet; the date is
+          // there on hover for when the exact day matters.
+          <span title={formatDate(customer.lastOrderAt)}>
+            {formatRelative(customer.lastOrderAt)}
+          </span>
+        ) : (
+          <span className="text-ink-4">{t("customers.never")}</span>
+        )}
+      </Td>
+      <Td className="hidden whitespace-nowrap text-ink-3 xl:table-cell">
+        {formatDate(customer.createdAt)}
+      </Td>
+      <Td className="text-end" onClick={(event) => event.stopPropagation()}>
+        <AccountActions customer={customer} />
+      </Td>
+    </Tr>
   );
 }

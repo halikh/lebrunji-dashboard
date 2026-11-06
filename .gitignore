@@ -42,3 +42,6 @@ next-env.d.ts
 
 # ...but the example is documentation, and belongs in the repo.
 !.env.example
+
+# a verification build kept apart from the dev server
+/.next-verify/

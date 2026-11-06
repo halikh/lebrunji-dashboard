@@ -1,70 +1,145 @@
+import {
+  BarChart3,
+  Bike,
+  ClipboardList,
+  FolderTree,
+  Gift,
+  Image as ImageIcon,
+  ListChecks,
+  type LucideIcon,
+  Archive,
+  Percent,
+  Settings,
+  Store,
+  Tags,
+  Truck,
+  Users,
+} from "lucide-react";
+
 import type { TranslationKey } from "@/i18n/translations";
 
 /**
- * The sections, declared once.
- *
- * The rail renders this, and the command palette will search it. Two lists
- * would drift the first time a section was added — and the one that drifted
- * would be the palette, because nobody notices a missing entry in a search box.
+ * Every section, declared once. The sidebar renders it, the command palette
+ * searches it, and the top bar reads the current section's name from it.
  */
-export type Section = {
+export type NavItem = {
   href: string;
   labelKey: TranslationKey;
-  /** Which phase of the plan builds it. `null` means it is here now. */
-  phase: number | null;
-  icon: IconName;
+  icon: LucideIcon;
+  /** Extra words the command palette should match on. */
+  keywords?: string;
 };
 
-export type IconName =
-  | "orders"
-  | "catalogue"
-  | "pricing"
-  | "customers"
-  | "drivers"
-  | "reports"
-  | "todo"
-  | "settings"
-  | "sign-out";
+export type NavGroup = { labelKey: TranslationKey; items: NavItem[] };
 
-export const SECTIONS: readonly Section[] = [
-  // The queue is first and is home: signing in lands on live orders, not on a
-  // statistics page. Statistics are something you go and look at; orders are
-  // something that happens to you.
-  { href: "/", labelKey: "nav.orders", phase: null, icon: "orders" },
+export const NAV: NavGroup[] = [
   {
-    href: "/catalogue",
-    labelKey: "nav.catalogue",
-    phase: null,
-    icon: "catalogue",
+    labelKey: "shell.groupOperate",
+    items: [
+      {
+        href: "/orders",
+        labelKey: "nav.orders",
+        icon: ClipboardList,
+        keywords: "queue live home today",
+      },
+      {
+        href: "/todo",
+        labelKey: "nav.todo",
+        icon: ListChecks,
+        keywords: "missing tasks",
+      },
+    ],
   },
-  { href: "/pricing", labelKey: "nav.pricing", phase: 5, icon: "pricing" },
   {
-    href: "/customers",
-    labelKey: "nav.customers",
-    phase: 6,
-    icon: "customers",
+    labelKey: "shell.groupCatalogue",
+    items: [
+      {
+        href: "/shops",
+        labelKey: "shell.shops",
+        icon: Store,
+        keywords: "stores restaurants menu branches hours",
+      },
+      { href: "/categories", labelKey: "categories.tab", icon: FolderTree },
+      { href: "/tags", labelKey: "tags.tab", icon: Tags },
+      {
+        href: "/artworks",
+        labelKey: "artworks.tab",
+        icon: ImageIcon,
+        keywords: "pictures images",
+      },
+      {
+        href: "/archive",
+        labelKey: "archive.tab",
+        icon: Archive,
+        keywords: "restore deleted",
+      },
+    ],
   },
-  // Beside customers rather than under settings, because it is the same kind of
-  // thing: a list of people, searched by name or number, each with a page. It
-  // started as a settings tab and outgrew it the moment a driver had a history
-  // worth reading.
-  { href: "/drivers", labelKey: "nav.drivers", phase: null, icon: "drivers" },
-  { href: "/reports", labelKey: "nav.reports", phase: 6, icon: "reports" },
-  { href: "/todo", labelKey: "nav.todo", phase: null, icon: "todo" },
-  { href: "/settings", labelKey: "nav.settings", phase: 7, icon: "settings" },
+  {
+    labelKey: "shell.groupMarketing",
+    items: [
+      {
+        href: "/promotions",
+        labelKey: "promotions.tab",
+        icon: Percent,
+        keywords: "discounts offers",
+      },
+      {
+        href: "/bundles",
+        labelKey: "bundles.tab",
+        icon: Gift,
+        keywords: "combos deals",
+      },
+    ],
+  },
+  {
+    labelKey: "shell.groupPeople",
+    items: [
+      { href: "/customers", labelKey: "nav.customers", icon: Users },
+      {
+        href: "/drivers",
+        labelKey: "nav.drivers",
+        icon: Bike,
+        keywords: "couriers riders",
+      },
+    ],
+  },
+  {
+    labelKey: "shell.groupBusiness",
+    items: [
+      {
+        href: "/pricing",
+        labelKey: "nav.pricing",
+        icon: Truck,
+        keywords: "delivery fees bands",
+      },
+      {
+        href: "/reports",
+        labelKey: "nav.reports",
+        icon: BarChart3,
+        keywords: "stats sales export",
+      },
+    ],
+  },
 ];
 
-/**
- * Which section a path belongs to.
- *
- * Longest match wins, so `/catalogue/menu-items` marks Catalogue rather than
- * falling back to `/`. Exported so the palette and the rail agree about what
- * "here" means.
- */
-export function activeSection(pathname: string): Section | undefined {
-  return SECTIONS.filter((section) =>
-    section.href === "/"
+export const SETTINGS_ITEM: NavItem = {
+  href: "/settings",
+  labelKey: "nav.settings",
+  icon: Settings,
+  keywords: "help legal general app",
+};
+
+export const ALL_NAV_ITEMS: NavItem[] = [
+  ...NAV.flatMap((group) => group.items),
+  SETTINGS_ITEM,
+];
+
+/** The section a path belongs to. Longest match wins. */
+export function activeItem(pathname: string): NavItem | undefined {
+  return ALL_NAV_ITEMS.filter((item) =>
+    item.href === "/"
       ? pathname === "/"
-      : pathname === section.href || pathname.startsWith(`${section.href}/`),
+      : pathname === item.href || pathname.startsWith(`${item.href}/`),
   ).sort((a, b) => b.href.length - a.href.length)[0];
 }

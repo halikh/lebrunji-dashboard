@@ -1,197 +1,141 @@
 "use client";
 
 import Link from "next/link";
+import { AlertCircle, Maximize2, PanelRightClose, X } from "lucide-react";
 
-import { Button } from "@/components/ui";
-import { Copyable } from "@/components/ui/copyable";
-import { Panel } from "@/components/ui/panel";
-import { t } from "@/i18n/translations";
+import {
+  Button,
+  Copyable,
+  EmptyState,
+  Skeleton,
+  StatusBadge,
+  Tooltip,
+} from "@/components/ui";
 import { useClock } from "@/features/settings/use-clock";
+import { t } from "@/i18n/translations";
+import { isFinishedSlug } from "@/lib/order-status";
 
-import { OrderActions, OrderBody, PanelSkeleton } from "./order-detail";
-import { StatusPill } from "./status-pill";
+import { OrderAge, useTick } from "./order-age";
+import { OrderActions, OrderBody } from "./order-detail";
 import { orderStatus, useOrder, useOrderStatuses } from "./use-orders";
 
-/**
- * The receipt, opened beside the queue.
- *
- * The queue carries what is needed to *triage*; this carries what is needed to
- * *act* — the number to ring, the note the courier has to read, the pictures to
- * check a bag against, and where the door is.
- *
- * It never replaces the queue. Advancing must not cost the operator their place
- * in the list, which is the whole reason this is a panel and not a page.
- *
- * ## And there is also a page
- *
- * `/orders/<id>` renders the same receipt with room around it. The panel is for
- * working *through* orders; the page is for sending one to somebody, opening it
- * in a second tab, or reading it without a list moving beside it. The link at
- * the top is how you get from one to the other — small and quiet, because it is
- * a way out of the thing you are already doing rather than the thing to do.
- *
- * Both render `OrderBody` and `OrderActions`, so a field added to the receipt
- * cannot appear in one and not the other.
- */
+/** The open order's receipt, docked beside the queue. */
 export function OrderPanel({
   orderId,
-  docked = false,
-  opened = orderId !== null,
   onClose,
   onMoved,
+  embedded,
+  onCollapse,
 }: {
-  /** The order to show — on the queue, the selected one or the first. */
-  orderId: string | null;
-  /**
-   * The queue's mode: on a wide screen the panel is always there and has no
-   * close. Elsewhere (a customer's profile) it is opened over the screen and
-   * closed again, as before.
-   */
-  docked?: boolean;
-  /**
-   * Whether the operator picked it. When docked this only decides the phone
-   * overlay, which has to be dismissable or the queue underneath could never
-   * be reached.
-   */
-  opened?: boolean;
+  orderId: string;
   onClose: () => void;
-  /** See `OrderActions` — the queue follows a moved order into its new tab. */
   onMoved?: (toSlug: string) => void;
+  /** Folds the docked panel to a strip, keeping the order open. */
+  onCollapse?: () => void;
+  /** Inside a sheet that already has its own title and close button. */
+  embedded?: boolean;
 }) {
   const clock = useClock();
+  const now = useTick();
   const statuses = useOrderStatuses();
   const order = useOrder(orderId);
   const status = order.data ? orderStatus(order.data, statuses) : null;
 
-  return (
-    <Panel
-      docked={docked}
-      open={opened}
-      onClose={onClose}
-      label={t("orders.panelLabel")}
-    >
-      {orderId !== null && order.isPending && <PanelSkeleton />}
+  if (order.isPending) {
+    return (
+      <div className="flex flex-col gap-4 p-6" aria-busy>
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="mt-4 h-24 w-full" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-28 w-full" />
+      </div>
+    );
+  }
 
-      {order.isError && (
-        <div className="flex flex-col gap-lg p-lg md:p-xxl">
-          <p role="alert" className="text-[14px] font-medium text-danger">
-            {t("orders.detailFailed")}
-          </p>
-          <Button variant="secondary" onClick={() => void order.refetch()}>
+  if (order.isError || !order.data) {
+    return (
+      <EmptyState
+        icon={<AlertCircle />}
+        title={t("orders.detailFailed")}
+        action={
+          <Button onClick={() => void order.refetch()}>
             {t("common.retry")}
           </Button>
-        </div>
-      )}
+        }
+      />
+    );
+  }
 
-      {order.isSuccess && (
-        <>
-          <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pb-md pt-lg">
-            <div className="flex items-start gap-md">
-              <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-                {/* Copy only: there is nowhere for a code to go, and it is
-                    pasted into messages constantly. Reading sixteen characters
-                    back off a screen by hand is where mistakes come from. */}
-                <h2 className="flex items-center gap-sm text-[22px]">
-                  <Copyable
-                    value={order.data.code}
-                    label={t("orders.copyCode")}
-                  />
-                </h2>
-                <span className="text-[13px] text-text-faint">
-                  {t("orders.placed")} {clock.dayAndTime(order.data.placedAt)}
-                </span>
-              </div>
-              {status && <StatusPill slug={status.slug} name={status.name} />}
-              {/* Docked too: the queue's column can be put away for room, and
-                  picking a row brings it back. */}
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label={t("common.close")}
-                className="hidden size-[30px] shrink-0 items-center justify-center rounded-full border border-border text-text-soft lg:flex"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  aria-hidden
-                >
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
+  const data = order.data;
 
-            {/* The ways out, as two quiet chips on one line. They leave the
-                screen the operator is working on, which is almost never what
-                they want next — but when it is, hunting for it is worse. */}
-            <div className="flex flex-wrap items-center gap-sm">
-              <Link href={`/orders/${order.data.id}`} className={CHIP}>
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  {/* A box with an arrow leaving it — "this goes somewhere
-                      else". */}
-                  <path d="M14 4h6v6" />
-                  <path d="M20 4l-8 8" />
-                  <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
-                </svg>
-                {t("orders.openPage")}
-              </Link>
-
-              {/* Straight to the history rather than to the page's first tab.
-                  Somebody following this link has a question about what
-                  happened — landing them on the receipt they were already
-                  reading would cost a second click for nothing. */}
-              <Link
-                href={`/orders/${order.data.id}?tab=history`}
-                className={CHIP}
-              >
-                {/* A clock with its hand turned back — "what has happened to
-                    this". */}
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                  <path d="M3 3v5h5" />
-                  <path d="M12 8v4l3 2" />
-                </svg>
-                {t("history.open")}
-              </Link>
-            </div>
+  return (
+    <div className="flex h-full flex-col">
+      <header className="flex shrink-0 items-start gap-3 border-b border-line px-5 py-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-[18px] font-semibold text-ink tabular-nums">
+              <Copyable value={data.code} label={t("orders.copyCode")} />
+            </h2>
+            {status && <StatusBadge slug={status.slug} />}
           </div>
+          <span className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-ink-3">
+            <span>
+              {t("orders.placed")} {clock.dayAndTime(data.placedAt)}
+            </span>
+            {status && !isFinishedSlug(status.slug) && (
+              <OrderAge
+                placedAt={data.placedAt}
+                slug={status.slug}
+                now={now}
+                icon
+              />
+            )}
+          </span>
+        </div>
+        <Tooltip content={t("orders.openPage")}>
+          <Button
+            asChild
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t("orders.openPage")}
+          >
+            <Link href={`/orders/${data.id}`}>
+              <Maximize2 />
+            </Link>
+          </Button>
+        </Tooltip>
+        {onCollapse && (
+          <Tooltip content={t("orders.collapsePanel")}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("orders.collapsePanel")}
+              onClick={onCollapse}
+            >
+              <PanelRightClose className="rtl:rotate-180" />
+            </Button>
+          </Tooltip>
+        )}
+        {!embedded && (
+          <Tooltip content={t("common.close")}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("common.close")}
+              onClick={onClose}
+            >
+              <X />
+            </Button>
+          </Tooltip>
+        )}
+      </header>
 
-          <OrderBody order={order.data} from={"panel"} />
-          <OrderActions
-            order={order.data}
-            statuses={statuses}
-            onMoved={onMoved}
-          />
-        </>
-      )}
-    </Panel>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas scrollbar-thin">
+        <OrderBody order={data} from="panel" />
+      </div>
+
+      <OrderActions order={data} statuses={statuses} onMoved={onMoved} />
+    </div>
   );
 }
-
-/** The app's `outline` pill: cream, hairline, soft ink type. */
-const CHIP =
-  "flex h-[28px] items-center gap-xs rounded-full border border-line bg-cream px-md text-[13px] font-medium text-text-soft hover:bg-neutral-fill hover:text-text";

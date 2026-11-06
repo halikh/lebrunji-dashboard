@@ -1,55 +1,81 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Crosshair, ImageUp, RefreshCw, Trash2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
-import { uploadImage, deleteImage } from "@/lib/images";
+import { t } from "@/i18n/translations";
+import { withFocus, type Focus } from "@/lib/image-focus";
 import {
   fitsShape,
   isCutout,
   measureImage,
+  PHOTO_FRAMES,
   type ImageShape,
+  type PhotoKind,
 } from "@/lib/image-shape";
-import { t } from "@/i18n/translations";
+import { deleteImage, uploadImage } from "@/lib/images";
+import { IMAGE } from "@/lib/limits";
 
-import { Button, cx } from "./index";
-import { useFieldWiring } from "./field";
+import { Button } from "./button";
+import { cx } from "./cx";
+import {
+  ImageFramer,
+  type FramedPicture,
+  type FramerSource,
+} from "./image-framer";
 import { PreviewImage } from "./image-preview";
 
 /**
- * Choosing a picture, and getting it into Storage.
+ * The largest file a photo may be *before* framing. What is uploaded is the
+ * framed copy, a fraction of this, and is held to the usual limits; this only
+ * stops a browser tab being asked to decode something absurd.
+ */
+const PHOTO_SOURCE_MAX_MB = 30;
+
+/**
+ * Choosing a picture, and getting it into storage.
  *
- * ## Three ways in, because people arrive with the file in three states
+ * ## Three ways in
  *
- * A merchant photographing a plate has it in a folder. One sent a logo over
- * WhatsApp has it on the clipboard. One tidying a folder full of them wants to
- * drag. Supporting only the file picker makes the other two save a file first
- * for no reason.
- *
- * Paste is listened for on the whole drop zone rather than the document, so a
- * screen with two of these does not put the image in whichever one happened to
- * mount first.
+ * A file picker, drag and drop, and paste (a logo sent over WhatsApp sits on
+ * the clipboard). Paste is listened for on the zone, not the document, so two
+ * uploaders on one screen do not fight over it.
  *
  * ## It uploads on choosing, not on saving
  *
- * The point is seeing the picture in place before committing to it — a photo
- * that turns out to be sideways or of the wrong dish should be discovered here
- * rather than in the app. So the file goes up immediately and the form is
- * handed a URL, which it saves along with everything else.
+ * So the picture is seen in place before it is committed. The file goes up at
+ * once (through `/api/images`, see `@/lib/images`) and the form is handed a
+ * URL it saves with everything else. The cost is orphans, so this deletes its
+ * own supersedings — a file it uploaded this session and then replaced has
+ * never been referenced by a row. It never deletes an image that arrived as
+ * `value`: that one is still live until the form saves.
  *
- * The cost is orphans: choose three images and save the third, and the first
- * two are objects nothing points at. So this deletes its own supersedings —
- * a file it uploaded during this editing session and then replaced has never
- * been referenced by any row, and is safe to remove. What it does **not**
- * touch is an image that arrived as `value` from a saved row: that one is
- * still in the database until the form saves, and deleting it early would take
- * the picture out of the app for a save that might never happen.
+ * ## Checked before a byte is sent
  *
- * ## Why the progress bar is real
+ * `shape` and `cutout` are checked in the browser first, so a wrong picture
+ * costs nothing — not five megabytes over a phone, not an orphan. A file the
+ * browser cannot measure is let through; the upload's own checks (type from
+ * the magic bytes, size, pixel limits) say what is wrong with it better.
  *
- * Five megabytes over a shop's tethered phone is slow enough that a spinner
- * saying nothing is indistinguishable from a hang — which is the state in which
- * people press the button again. See `api/images.ts` for why that means not
- * using supabase-js here.
+ * ## Shop and dish photos are framed first
+ *
+ * With `photo`, a chosen file is not uploaded as it is: it opens
+ * `ImageFramer`, which crops it to the kind's master shape and asks where the
+ * subject is, and what goes up is the crop, with the point on its address
+ * (`lib/image-shape.ts`, `lib/image-focus.ts`). A saved photo gets "Adjust
+ * framing", which moves the point and uploads nothing.
+ *
+ * ## The progress bar is real
+ *
+ * Five megabytes over a tethered phone is slow enough that a silent spinner
+ * looks like a hang — the state in which people press the button again.
  */
 export function ImageUploader({
   value,
@@ -57,7 +83,12 @@ export function ImageUploader({
   folder,
   shape,
   cutout = false,
+  photo,
+  reframe = true,
   disabled = false,
+  id,
+  "aria-describedby": describedBy,
+  "aria-invalid": ariaInvalid,
 }: {
   /** The URL currently saved on the row, or chosen in this session. */
   value: string | null;
@@ -70,37 +101,76 @@ export function ImageUploader({
     | "category-art"
     | "tag-art"
     | "menu-sections";
-  /**
-   * The shape the app draws this picture in, when it draws it in a fixed
-   * frame. A file of another shape is refused before it uploads, with its
-   * size and the shape wanted, so the fix is obvious. See `image-shape.ts`.
-   */
+  /** The frame the app draws this picture in; other shapes are refused. */
   shape?: ImageShape;
-  /**
-   * Only a picture on a transparent background — for art the app lays on its
-   * own coloured tiles, where a white square around it shows as exactly that.
-   * Refused before upload, like `shape`. See `hasClearBorder`.
-   */
+  /** Only a transparent-background picture (art laid on the app's own tiles). */
   cutout?: boolean;
+  /** A shop's or a dish's photograph: framed before it is uploaded. */
+  photo?: PhotoKind;
+  /**
+   * Whether the saved photo can be reframed here. Off where `value` is a
+   * picture this row only inherits — a branch showing its shop's photo —
+   * because a new point would have to be saved somewhere it does not belong.
+   */
+  reframe?: boolean;
   disabled?: boolean;
+  /** `Field`'s render props. */
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean | "true" | "false";
 }) {
-  const field = useFieldWiring();
-
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [over, setOver] = useState(false);
+  const [framing, setFraming] = useState<FramerSource | null>(null);
+  const frame = photo ? PHOTO_FRAMES[photo] : null;
 
   const input = useRef<HTMLInputElement>(null);
   /** Paths this component uploaded, newest last. Never anything it was given. */
   const ours = useRef<string[]>([]);
   const abort = useRef<AbortController | null>(null);
 
-  // A drag abandoned by navigating away should not go on uploading, and a
-  // component that unmounts mid-upload would otherwise set state afterwards.
+  // Leaving mid-upload stops it, and stops state being set after unmount.
   useEffect(() => {
     const controller = abort;
     return () => controller.current?.abort();
   }, []);
+
+  /** Uploads `file`; the row gets its address, with `focus` on it if given. */
+  const send = useCallback(
+    async (file: File, focus: Focus | null) => {
+      setProgress(0);
+      abort.current = new AbortController();
+
+      const superseded = ours.current.at(-1);
+
+      try {
+        const uploaded = await uploadImage(file, folder, {
+          onProgress: setProgress,
+          signal: abort.current.signal,
+        });
+
+        ours.current.push(uploaded.path);
+        onChange(withFocus(uploaded.url, focus));
+
+        // The one it replaces, only if we put it there. Nothing ever pointed
+        // at it. Failing to tidy up is not worth telling anybody about.
+        if (superseded) void deleteImage(superseded).catch(() => {});
+      } catch (cause) {
+        if (cause instanceof DOMException && cause.name === "AbortError")
+          return;
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : t("common.somethingWentWrong"),
+        );
+      } finally {
+        setProgress(null);
+        abort.current = null;
+      }
+    },
+    [folder, onChange],
+  );
 
   const accept = useCallback(
     async (file: File | null | undefined) => {
@@ -108,10 +178,17 @@ export function ImageUploader({
 
       setError(null);
 
-      // Before the upload, so a wrong picture costs nothing — not five
-      // megabytes over a phone, and not an orphan in the bucket. A file the
-      // browser cannot read is let through: the upload's own checks say
-      // what is wrong with it better than a shape check can.
+      // A photo is cropped to its shape in the framing step, so its shape
+      // and size here do not matter — only that it is not absurd.
+      if (frame) {
+        if (file.size > PHOTO_SOURCE_MAX_MB * 1024 * 1024) {
+          setError(t("validation.imageTooBig", { max: PHOTO_SOURCE_MAX_MB }));
+          return;
+        }
+        setFraming({ kind: "file", file });
+        return;
+      }
+
       if (shape) {
         const size = await measureImage(file);
         if (size && !fitsShape(size, shape)) {
@@ -132,116 +209,123 @@ export function ImageUploader({
         return;
       }
 
-      setProgress(0);
-      abort.current = new AbortController();
-
-      const superseded = ours.current.at(-1);
-
-      try {
-        const uploaded = await uploadImage(file, folder, {
-          onProgress: setProgress,
-          signal: abort.current.signal,
-        });
-
-        ours.current.push(uploaded.path);
-        onChange(uploaded.url);
-
-        // The one it replaces, if we are the ones who put it there. Nothing has
-        // ever pointed at it, so this cannot take a picture out of the app.
-        // Failing to tidy up is not worth telling anybody about.
-        if (superseded) void deleteImage(superseded).catch(() => {});
-      } catch (cause) {
-        if (cause instanceof DOMException && cause.name === "AbortError")
-          return;
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : t("common.somethingWentWrong"),
-        );
-      } finally {
-        setProgress(null);
-        abort.current = null;
-      }
+      await send(file, null);
     },
-    [cutout, disabled, folder, onChange, shape],
+    [cutout, disabled, frame, send, shape],
+  );
+
+  const framed = useCallback(
+    (picture: FramedPicture) => {
+      setFraming(null);
+      if (picture.file) void send(picture.file, picture.focus);
+      else if (value) onChange(withFocus(value, picture.focus));
+    },
+    [onChange, send, value],
+  );
+
+  const framer = frame && photo && (
+    <ImageFramer
+      source={framing}
+      kind={photo}
+      shape={frame.shape}
+      previews={frame.previews}
+      onCancel={() => setFraming(null)}
+      onDone={framed}
+    />
   );
 
   const busy = progress !== null;
+  const invalid = ariaInvalid === true || ariaInvalid === "true";
+  const rules = (
+    <p className="text-[12px] text-ink-4">
+      {frame
+        ? t("controls.imagePhotoRules", {
+            shape: `${frame.shape.width}:${frame.shape.height}`,
+          })
+        : t("controls.imageRules", {
+            mb: Math.round(IMAGE.maxBytes / (1024 * 1024)),
+          })}
+      {shape &&
+        `, ${t("controls.imageShape", { shape: `${shape.width}:${shape.height}` })}`}
+      {cutout && `, ${t("controls.imageCutout")}`}
+    </p>
+  );
 
   if (value) {
     return (
-      <div className="flex items-center gap-lg">
-        {/* Clickable, like every other picture in the dashboard. Ninety-six
-            points is enough to see that *a* photograph arrived and not enough
-            to see whether it is the right one the right way up — which is the
-            whole question this control exists to let somebody answer before
-            they save. No name to pass: the row being edited may not have one
-            yet. */}
+      <div
+        id={id}
+        aria-describedby={describedBy}
+        aria-invalid={invalid || undefined}
+        className="flex items-start gap-4"
+        onPaste={(event) => {
+          const file = Array.from(event.clipboardData.files)[0];
+          if (file) void accept(file);
+        }}
+      >
+        {/* Clickable, to judge the picture full size before saving. */}
         <PreviewImage
           src={value}
-          className="size-[96px] rounded-md border border-border"
+          className={cx(
+            "size-24",
+            cutout &&
+              "bg-[repeating-conic-gradient(var(--color-hover)_0%_25%,var(--color-surface)_0%_50%)] bg-[length:12px_12px]",
+          )}
         />
 
-        <div className="flex min-w-0 flex-col items-start gap-sm">
-          <div className="flex flex-wrap items-center gap-sm">
+        <div className="flex min-w-0 flex-col items-start gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
               size="sm"
               disabled={disabled || busy}
               onClick={() => input.current?.click()}
             >
+              <RefreshCw />
               {t("images.replace")}
             </Button>
-            {/* Danger, like every other removal in the product. It is the
-                colour that says "this takes something away", and an operator
-                should not have to learn that it means one thing on a row and
-                another inside a form. */}
+            {frame && reframe && (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={disabled || busy}
+                onClick={() => setFraming({ kind: "url", url: value })}
+              >
+                <Crosshair />
+                {t("images.adjust")}
+              </Button>
+            )}
             <Button
-              variant="danger"
+              variant="danger-soft"
               size="sm"
               disabled={disabled || busy}
               onClick={() => onChange(null)}
             >
+              <Trash2 />
               {t("images.remove")}
             </Button>
           </div>
-
-          {busy && <Progress fraction={progress} />}
+          {busy ? <Progress fraction={progress} /> : rules}
           {error && <Problem>{error}</Problem>}
         </div>
 
         <Picker input={input} onFile={accept} disabled={disabled} />
+        {framer}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-sm">
+    <div className="flex flex-col gap-1.5">
       {/*
-        The whole zone opens the picker, not just the word "browse".
-
-        It already looked that way — `cursor-pointer` has been on this box all
-        along — and clicking anywhere but the link did nothing. A pointer over a
-        surface that ignores the click is a small lie, and the target it points
-        at is one word in a sentence.
-
-        A div rather than a button, because it contains a button of its own and
-        a button inside a button is invalid and behaves unpredictably. That
-        makes it unreachable from the keyboard, which is exactly what the inner
-        `browse` button is for: it stays as the focusable, announced way in, and
-        the div is the large target for a mouse. Making the div focusable too
-        would be a second tab stop onto the same action.
-
-        The cursor is declared here because the global rule deliberately does
-        not reach `div`s — one broad enough to catch them would put a pointer on
-        half the page.
+        The whole zone opens the picker for a mouse. It is a div because it
+        holds a button; the inner "browse" button is the one keyboard stop.
       */}
       <div
-        id={field?.id}
-        aria-describedby={field?.describedBy}
-        // So a form that scrolls to its first `[aria-invalid="true"]` after a
-        // failed Save finds a required picture too, not only the text fields.
-        aria-invalid={field?.invalid || undefined}
+        id={id}
+        aria-describedby={describedBy}
+        // So a form that scrolls to its first invalid control finds this too.
+        aria-invalid={invalid || undefined}
         onPaste={(event) => {
           const file = Array.from(event.clipboardData.files)[0];
           if (file) void accept(file);
@@ -252,9 +336,7 @@ export function ImageUploader({
         }}
         onDragLeave={() => setOver(false)}
         onClick={() => {
-          // Not while it is uploading: the picker would open over a transfer
-          // already in flight, and the second file would replace the first
-          // without either finishing visibly.
+          // Not mid-upload: a second file would replace the first unseen.
           if (disabled || busy) return;
           input.current?.click();
         }}
@@ -264,60 +346,55 @@ export function ImageUploader({
           void accept(event.dataTransfer.files[0]);
         }}
         className={cx(
-          "flex cursor-pointer flex-col items-center gap-xs rounded-md border border-dashed px-lg py-xl text-center",
-          // A ground of its own, rather than whatever is behind it.
-          //
-          // It was transparent, so on a form the zone was a dashed outline
-          // drawn straight onto the page's cream — the one control on the
-          // screen with no surface under it, which read as a disabled area
-          // rather than as somewhere to drop a file. `bg-surface` is what every
-          // other input on the form stands on. The drag state keeps its own
-          // tint, because that one is feedback rather than chrome.
-          over ? "border-primary bg-primary-wash" : "border-border bg-surface",
-          disabled && "cursor-not-allowed opacity-60",
+          "flex flex-col items-center gap-1.5 rounded-lg border border-dashed px-4 py-6 text-center transition-colors",
+          over
+            ? "border-accent bg-accent-soft"
+            : invalid
+              ? "border-danger bg-surface"
+              : "border-line-strong bg-subtle hover:border-ink-4 hover:bg-hover/60",
+          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
         )}
       >
-        <p className="text-[14px] text-text-soft">
+        <span className="mb-1 flex size-9 items-center justify-center rounded-full border border-line bg-surface text-ink-3 shadow-xs">
+          <ImageUp className="size-4" />
+        </span>
+        <p className="text-[13.5px] text-ink-2">
           {t("images.drop")}{" "}
           <button
             type="button"
             disabled={disabled || busy}
             onClick={(event) => {
-              // The zone around this opens the picker too. Without stopping
-              // here the same click arrives there as well and asks twice.
+              // The zone opens the picker too; don't ask twice.
               event.stopPropagation();
               input.current?.click();
             }}
-            className="font-semibold text-primary underline"
+            className="rounded-sm font-medium text-accent hover:text-accent-hover hover:underline disabled:text-ink-4"
           >
             {t("images.browse")}
           </button>
         </p>
-        <p className="text-[12px] text-text-faint">{t("images.paste")}</p>
-
-        {busy && <Progress fraction={progress} />}
+        <p className="text-[12px] text-ink-3">{t("images.paste")}</p>
+        {busy ? <Progress fraction={progress} /> : rules}
       </div>
 
       {error && <Problem>{error}</Problem>}
 
       <Picker input={input} onFile={accept} disabled={disabled} />
+      {framer}
     </div>
   );
 }
 
 /**
- * The file input itself, kept out of the layout.
- *
- * `sr-only` rather than `display: none`, so it stays focusable and reachable —
- * a hidden input is not in the accessibility tree, and the buttons above only
- * work because this one is really there.
+ * The file input itself, out of the layout but still in the accessibility
+ * tree (`sr-only`, not `display: none`).
  */
 function Picker({
   input,
   onFile,
   disabled,
 }: {
-  input: React.RefObject<HTMLInputElement | null>;
+  input: RefObject<HTMLInputElement | null>;
   onFile: (file: File | undefined) => void;
   disabled: boolean;
 }) {
@@ -325,15 +402,14 @@ function Picker({
     <input
       ref={input}
       type="file"
-      accept="image/jpeg,image/png,image/webp"
+      accept={IMAGE.types.join(",")}
       disabled={disabled}
+      tabIndex={-1}
       aria-label={t("images.choose")}
       className="sr-only"
       onChange={(event) => {
         onFile(event.target.files?.[0]);
-        // Cleared, so choosing the same file twice in a row fires again —
-        // which happens after a failed upload, and is exactly when the retry
-        // matters.
+        // Cleared, so choosing the same file again (a retry) fires again.
         event.target.value = "";
       }}
     />
@@ -342,26 +418,32 @@ function Picker({
 
 function Progress({ fraction }: { fraction: number }) {
   const percent = Math.round(fraction * 100);
+  const percentLabel = `${percent}%`;
   return (
-    <div
-      role="progressbar"
-      aria-label={t("images.uploading")}
-      aria-valuenow={percent}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      className="h-[6px] w-[140px] overflow-hidden rounded-full bg-neutral-fill"
-    >
+    <div className="flex items-center gap-2">
       <div
-        className="h-full rounded-full bg-primary transition-[width]"
-        style={{ width: `${percent}%` }}
-      />
+        role="progressbar"
+        aria-label={t("images.uploading")}
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="h-1.5 w-36 overflow-hidden rounded-full bg-line"
+      >
+        <div
+          className="h-full rounded-full bg-accent transition-[width]"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <span className="text-[12px] text-ink-3 tabular-nums">
+        {percentLabel}
+      </span>
     </div>
   );
 }
 
-function Problem({ children }: { children: React.ReactNode }) {
+function Problem({ children }: { children: ReactNode }) {
   return (
-    <p role="alert" className="text-[13px] font-medium text-danger">
+    <p role="alert" className="text-[12.5px] leading-snug text-danger-ink">
       {children}
     </p>
   );

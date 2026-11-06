@@ -35,6 +35,109 @@ export const ARTWORK_SHAPES = {
 } as const satisfies Record<string, ImageShape>;
 
 /**
+ * ## Photographs: one master shape, cropped again by the app
+ *
+ * A shop's or a dish's photograph is not drawn in one frame but in many, so no
+ * single shape fits them all. Each is cut to a master shape on upload — the
+ * framing step, `ImageFramer` — with a point saying where the subject is
+ * (`lib/image-focus.ts`), and the app crops each frame around that point.
+ *
+ * - **Dish 1:1.** Nearly every frame a dish is in is square: the menu's
+ *   cards and rows, the basket, the order. Bundles are dishes here.
+ * - **Shop 4:3.** Shops run from 2.4:1 cards on Home to near-square posters
+ *   and square thumbnails; 4:3 sits between them, and it is the shape a phone
+ *   camera takes, so a shop's own photo loses least.
+ *
+ * `previews` are the app's frames, approximately, from its constants
+ * (`store-cards.tsx`'s `RAIL_ART_RATIO`, `RAIL_FEATURED`, `RAIL_DISH`; the
+ * shop and dish pages' covers). They are shown in the framing step so the
+ * team sees what the customer will. Not exact to the point — the app's
+ * frames scale with the phone — and they do not need to be.
+ *
+ * ## Big enough for the cover
+ *
+ * `cover` is the largest frame: the shop or dish page's own photo, the width
+ * of the phone (440 points on the widest) and about three quarters as tall.
+ * On a 3× phone that is about 1320 real pixels across, and a photo with fewer
+ * is stretched there — sharp on every card, soft as the cover (user,
+ * 2026-11-05; on dev, eight shops' photos were banners or about 590 pixels
+ * wide). The framing step says so when a crop has too few pixels for it,
+ * {@link coverPixelsNeeded}; it warns rather than refuses, because a soft
+ * photo of the right shop is better than none.
+ */
+export type PhotoKind = "dish" | "shop";
+
+export type PhotoPreview = {
+  /** `images.frame.<key>` in the strings. */
+  key:
+    | "card"
+    | "rail"
+    | "dishPage"
+    | "homeCard"
+    | "featured"
+    | "thumb"
+    | "shopPage";
+  ratio: number;
+};
+
+export const PHOTO_FRAMES = {
+  dish: {
+    shape: { width: 1, height: 1 },
+    previews: [
+      { key: "card", ratio: 1 },
+      { key: "rail", ratio: 1.9 },
+      { key: "dishPage", ratio: 1.5 },
+    ],
+    cover: { width: 440, height: 290 },
+  },
+  shop: {
+    shape: { width: 4, height: 3 },
+    previews: [
+      { key: "homeCard", ratio: 2.4 },
+      { key: "featured", ratio: 0.93 },
+      { key: "thumb", ratio: 1 },
+      { key: "shopPage", ratio: 1.33 },
+    ],
+    cover: { width: 440, height: 330 },
+  },
+} as const satisfies Record<
+  PhotoKind,
+  {
+    shape: ImageShape;
+    previews: readonly PhotoPreview[];
+    /** The page cover, in points. See "Big enough for the cover". */
+    cover: { width: number; height: number };
+  }
+>;
+
+/** The densest phone the app is fetched for — `image-url.ts` there. */
+const COVER_SCALE = 3;
+
+/**
+ * How many pixels across a picture of `aspect` (width over height) needs to
+ * be sharp as `cover`. The cover crops to fill, so a picture wider for its
+ * height than the cover is scaled to the cover's height and needs more.
+ */
+export function coverPixelsNeeded(
+  cover: { width: number; height: number },
+  aspect: number,
+): number {
+  const drawn = Math.max(cover.width, cover.height * aspect);
+  return Math.round(drawn * COVER_SCALE);
+}
+
+/**
+ * Stretched by more than this and it shows. A 1254-pixel square on a 1320
+ * cover (1.05×) is sharp; a 1024 one (1.29×) is just soft enough to say so.
+ */
+const SOFT_STRETCH = 1.25;
+
+/** Whether `pixels` across is too few for `needed`. */
+export function looksSoft(pixels: number, needed: number): boolean {
+  return pixels > 0 && needed / pixels > SOFT_STRETCH;
+}
+
+/**
  * How far off a picture may be and still count.
  *
  * One percent: enough for an export that rounded 2100 × 900 to 2100 × 901,

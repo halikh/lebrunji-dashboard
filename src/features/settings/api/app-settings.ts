@@ -275,3 +275,82 @@ export async function fetchTimezones(): Promise<TimezoneOption[]> {
     label: row.label as string,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Pausing orders (0256)
+// ---------------------------------------------------------------------------
+
+/**
+ * Orders stopped by hand, whatever the hours say — rain, no riders, a
+ * holiday. The customer app keeps browsing and says why nothing orders;
+ * `place_order` refuses with `OFFHR`. With `until` the pause lifts by itself
+ * at that instant, so one somebody forgot to switch off cannot cost the next
+ * morning's orders.
+ */
+export type OrderingPause = {
+  paused: boolean;
+  /** ISO instant, or null to hold until resumed. */
+  until: string | null;
+  /** What the app says instead of the standard words; blank for those. */
+  note: { en: string; ar: string };
+};
+
+const PAUSE_COLUMNS = "orders_paused, orders_paused_until, orders_paused_note";
+
+/** Whether a pause is in force at `now` — switched on, and not past its end. */
+export function pauseHolds(pause: OrderingPause, now = Date.now()): boolean {
+  if (!pause.paused) return false;
+  if (!pause.until) return true;
+  const end = Date.parse(pause.until);
+  return Number.isNaN(end) || end > now;
+}
+
+/**
+ * Read separately, and `null` without 0256 — as `fetchCustomerAppSettings`
+ * is, so a dashboard deployed ahead of the migration hides the control
+ * rather than breaking the tab.
+ */
+export async function fetchOrderingPause(): Promise<OrderingPause | null> {
+  const { data, error } = await getClient()
+    .from("app_settings")
+    .select(PAUSE_COLUMNS)
+    .single();
+
+  if (error) {
+    if (isMissingColumn(error)) return null;
+    throw new Error(`Could not read the settings: ${error.message}`);
+  }
+
+  const row = data as Record<string, unknown>;
+  const note = (row.orders_paused_note ?? {}) as { en?: string; ar?: string };
+  return {
+    paused: row.orders_paused === true,
+    until: (row.orders_paused_until as string | null) ?? null,
+    note: { en: note.en ?? "", ar: note.ar ?? "" },
+  };
+}
+
+/** Pause now (with an end, or none), or resume. Resuming clears the end and the note. */
+export async function updateOrderingPause(next: OrderingPause): Promise<void> {
+  const en = next.note.en.trim();
+  const ar = next.note.ar.trim();
+  const { error } = await getClient()
+    .from("app_settings")
+    .update(
+      next.paused
+        ? {
+            orders_paused: true,
+            orders_paused_until: next.until,
+            orders_paused_note: en || ar ? { en, ar } : null,
+          }
+        : {
+            orders_paused: false,
+            orders_paused_until: null,
+            orders_paused_note: null,
+          },
+    )
+    // The single row; see `updateAppSettings`.
+    .eq("id", true);
+
+  if (error) throw new Error(error.message);
+}

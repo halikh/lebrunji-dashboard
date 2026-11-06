@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToasts } from "@/components/ui/toast";
 import { currencyKeys } from "@/features/reference/use-currencies";
+import { updateAppSettings } from "@/features/settings/api/app-settings";
+import { appSettingsKey } from "@/features/settings/use-clock";
 import { t } from "@/i18n/translations";
 
 import {
@@ -64,6 +66,32 @@ export function useSetRate() {
       // the old one.
       void queryClient.invalidateQueries({ queryKey: currencyKeys.all });
       toast.success(t("pricing.rateSaved", { code: input.code }));
+    },
+    onError: (error) => {
+      toast.danger(
+        error instanceof Error ? error.message : t("common.somethingWentWrong"),
+      );
+    },
+  });
+}
+
+/**
+ * What each shop past the first adds to a delivery (`app_settings.extra_store_fee`).
+ *
+ * Its own Save, not the ladder's. It is a different row in a different table,
+ * and folding it into "Save the ladder" would make a ladder that fails half-way
+ * also leave this unsaved without saying so.
+ */
+export function useSaveExtraStoreFee() {
+  const queryClient = useQueryClient();
+  const toast = useToasts();
+
+  return useMutation({
+    mutationFn: (amount: number) =>
+      updateAppSettings({ extraStoreFee: amount }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: appSettingsKey });
+      toast.success(t("pricing.extraSaved"));
     },
     onError: (error) => {
       toast.danger(

@@ -51,6 +51,13 @@ export type Customer = {
   createdAt: string;
   /** How many orders they have placed, ever. Cancelled ones included. */
   orderCount: number;
+  /**
+   * When their newest order was placed, or null for none.
+   *
+   * One embedded row per customer (`latest`, ordered and limited inside the
+   * embed), so the list can say who has gone quiet without a second read.
+   */
+  lastOrderAt: string | null;
 };
 
 /**
@@ -70,7 +77,13 @@ export type CustomerPage = {
 };
 
 const COLUMNS = `id, name, phone, is_active, deleted_at, created_at,
-   orders ( count )`;
+   orders ( count ),
+   latest:orders ( placed_at )`;
+
+function lastOrderOf(value: unknown): string | null {
+  const first = asArray(value)[0];
+  return (first?.placed_at as string | undefined) ?? null;
+}
 
 /**
  * A page of customers, newest first.
@@ -112,6 +125,10 @@ export async function fetchCustomers(options: {
   let query = getClient()
     .from("users")
     .select(COLUMNS)
+    // The `latest` embed: each customer's newest live order, one row.
+    .is("latest.deleted_at", null)
+    .order("placed_at", { ascending: false, referencedTable: "latest" })
+    .limit(1, { referencedTable: "latest" })
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -153,6 +170,7 @@ export async function fetchCustomers(options: {
     deletedAt: (row.deleted_at as string | null) ?? null,
     createdAt: row.created_at as string,
     orderCount: countOf(row.orders),
+    lastOrderAt: lastOrderOf(row.latest),
   }));
 
   return {
@@ -284,7 +302,14 @@ export async function fetchCustomer(id: string): Promise<CustomerDetail> {
   const client = getClient();
 
   const [profile, addresses, preferences] = await Promise.all([
-    client.from("users").select(COLUMNS).eq("id", id).single(),
+    client
+      .from("users")
+      .select(COLUMNS)
+      .is("latest.deleted_at", null)
+      .order("placed_at", { ascending: false, referencedTable: "latest" })
+      .limit(1, { referencedTable: "latest" })
+      .eq("id", id)
+      .single(),
 
     client
       .from("addresses")
@@ -320,6 +345,7 @@ export async function fetchCustomer(id: string): Promise<CustomerDetail> {
     deletedAt: (profile.data.deleted_at as string | null) ?? null,
     createdAt: profile.data.created_at as string,
     orderCount: countOf(profile.data.orders),
+    lastOrderAt: lastOrderOf(profile.data.latest),
 
     addresses: (addresses.data ?? []).map((row) => ({
       id: row.id as string,

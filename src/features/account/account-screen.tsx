@@ -1,17 +1,22 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { KeyRound, Mail, UserRound } from "lucide-react";
+import { useState, type FormEvent } from "react";
 
-import { Button, Input, cx } from "@/components/ui";
-import { Field } from "@/components/ui/field";
-import { SectionTab, tabArrowHandler } from "@/components/ui/tab";
-import { useToasts } from "@/components/ui/toast";
 import {
-  useGuardedAction,
-  useUnsavedChanges,
-} from "@/components/unsaved-changes";
-import { t, type TranslationKey } from "@/i18n/translations";
+  Avatar,
+  Button,
+  Field,
+  Input,
+  Page,
+  PageHeader,
+  Skeleton,
+  useToasts,
+} from "@/components/ui";
+import { SettingRow, SettingsGroup } from "@/components/ui/setting-row";
+import { useUnsavedChanges } from "@/components/unsaved-changes";
+import { t } from "@/i18n/translations";
 import { PASSWORD } from "@/lib/limits";
 import { validatePassword } from "@/lib/validation";
 
@@ -21,186 +26,213 @@ import { validatePassword } from "@/lib/validation";
  * ## Its own page, not a tab on Settings
  *
  * Settings is **the shop's** — its hours, its sound, the words customers read.
- * An operator's own sign-in belongs to one person, and filing it beside the
- * privacy policy makes both harder to find. The traffic runs the other way too:
- * the shop's clock and hours used to be a tab here, and moved to Settings.
+ * An operator's own sign-in belongs to one person, so it lives where the
+ * account menu points, next to Sign out.
  *
- * It is not a rail section either. The rail is six items and should stay six —
- * it is glanced at all day, and every addition costs a little of the queue's
- * prominence. So it lives where account-level things already live: at the foot
- * of the rail, next to Sign out, which is the other thing there that is about
- * *you* rather than about the business.
+ * ## Both changes ask for the current password
  *
- * ## Both actions ask for the current password
- *
- * Not ceremony. A signed-in session is exactly what an unattended laptop
- * already has, so a session alone cannot be the proof for a change that
- * outlives it: setting a new password from a borrowed session is a permanent
- * takeover, and setting a new *email* hands over the recovery route too, which
- * is worse — the real operator can no longer reset their way back in.
- *
- * The current password is the one thing a stolen session does not carry. The
- * route re-authenticates with it before either change; the form asks for it
- * because a control that is going to be refused should say why beforehand.
+ * A signed-in session is exactly what an unattended laptop already has, so it
+ * cannot be the proof for a change that outlives it. `/auth/account`
+ * re-authenticates with the current password before either change; the form
+ * asks for it up front because a control that is going to be refused should
+ * say why beforehand.
  *
  * ## An email change is not done when it says it is
  *
  * Supabase mails the **new** address and the change lands only when that link
- * is followed. So a success here is "check your email", and the address on
- * screen keeps saying the old one — because it is still the old one. Reporting
- * "saved" would leave an operator believing they had moved their recovery route
- * when they had not, which is the single worst thing this screen could get
- * wrong.
+ * is followed. So success here is "check your email", and the address at the
+ * top keeps saying the old one — because it still is.
+ *
+ * ## Rows first, forms on demand
+ *
+ * Laid out like Google's and Stripe's security pages: the email and the
+ * password are rows that say what is there now, each with Change. The form
+ * opens under its own row with its own Save, so neither can submit the
+ * other's half — a form that sends whichever half was filled in can be
+ * half-sent by accident.
  */
-type TabKey = "password" | "email";
 
-const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
-  { key: "password", labelKey: "account.tabPassword" },
-  { key: "email", labelKey: "account.tabEmail" },
-];
+export const accountKey = ["account", "me"] as const;
 
 export function AccountScreen() {
-  const [tab, setTab] = useState<TabKey>("password");
-  // These tabs are local state rather than the URL, so there is no `show()` to
-  // guard the way the other screens have — the button is the whole switch.
-  const guarded = useGuardedAction();
-
-  const toast = useToasts();
-  const queryClient = useQueryClient();
-
   const account = useQuery({
-    queryKey: ["account", "me"],
+    queryKey: accountKey,
     queryFn: async () => {
       const response = await fetch("/auth/account");
       if (!response.ok) throw new Error(t("account.failed"));
       return (await response.json()) as { email: string | null };
     },
-    // The browser holds no token it could read an email out of, so this is the
-    // only way to know. It changes about never.
+    // The browser holds no token it could read an email out of, so this is
+    // the only way to know. It changes about never.
     staleTime: 10 * 60_000,
   });
 
+  const email = account.data?.email ?? null;
+  const [open, setOpen] = useState<Kind | null>(null);
+
+  const emailValue = account.isPending ? (
+    <Skeleton className="h-4 w-48" />
+  ) : account.isError ? (
+    <span role="alert" className="text-danger-ink">
+      {t("account.failed")}{" "}
+      <button
+        type="button"
+        onClick={() => void account.refetch()}
+        className="font-medium underline underline-offset-2 hover:text-danger"
+      >
+        {t("common.retry")}
+      </button>
+    </span>
+  ) : (
+    // `break-all`: an address is one unbroken word, and a long one would
+    // otherwise push the row wider than a phone.
+    <span className="font-medium break-all text-ink-2">{email}</span>
+  );
+
   return (
-    <div className="flex h-full min-w-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-sm border-b border-border bg-surface px-lg pt-lg md:px-xxl">
-        <h1 className="text-[26px] md:text-[30px]">{t("account.title")}</h1>
-        <p className="text-[13px] text-text-soft">{t("account.blurb")}</p>
+    <Page>
+      <PageHeader title={t("account.title")} description={t("account.blurb")} />
 
-        {/* Chapters of one screen, so `SectionTab` — the same underline the
-            store and the customer profile use.
-
-            Only the operator's own sign-in. The shop's clock, hours and sound
-            used to be a General tab here; they are the business's, not this
-            person's, and now live on Settings. */}
-        <div
-          role="tablist"
-          // Scrolls rather than wraps if a translation outgrows a phone —
-          // the same strip Settings draws. See the note there.
-          className="-mb-px flex gap-lg overflow-x-auto [&>*]:shrink-0 [&>*]:whitespace-nowrap"
-        >
-          {TABS.map(({ key, labelKey }) => (
-            <SectionTab
-              key={key}
-              label={t(labelKey)}
-              active={tab === key}
-              onClick={guarded(() => setTab(key))}
-              onKeyDown={tabArrowHandler(
-                TABS.map((one) => one.key),
-                tab,
-                setTab,
-              )}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
-        {/* Full width and first: which account these two forms are about is
-            the thing to establish before either of them is filled in. */}
-        <section className="flex flex-col gap-xs rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
-          <h2 className="text-[19px]">{t("account.signedInAs")}</h2>
-          {/* `break-all`: an address is one unbroken word, and a long one
-              would otherwise push the card wider than a phone. */}
-          <p className="break-all text-[17px] font-semibold">
-            {account.data?.email ?? t("common.loading")}
-          </p>
+      <div className="flex max-w-3xl flex-col gap-6">
+        <section className="flex items-center gap-4 rounded-lg border border-line bg-surface p-5 shadow-xs">
+          {email ? (
+            <Avatar name={email} size={44} />
+          ) : (
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-hover text-ink-3">
+              <UserRound className="size-5" />
+            </span>
+          )}
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-[13px] font-medium text-ink-3">
+              {t("account.signedInAs")}
+            </p>
+            {account.isPending ? (
+              <Skeleton className="h-5 w-56" />
+            ) : (
+              <p className="text-[16px] font-semibold break-all text-ink">
+                {email ?? t("account.unknownEmail")}
+              </p>
+            )}
+          </div>
         </section>
 
-        {/* One at a time, not side by side. They were a two-column grid,
-            which was right when the page was only these two forms: the same
-            current-password field, the same shape, and stacking them put the
-            second below the fold. With tabs the choice is made above, so
-            showing both would be offering it twice.
+        {/* Google's and Stripe's security pages: each way in is a row that
+            says what it is now, with Change beside it. The form opens under
+            its own row, so nothing is asked for until somebody means to
+            change it, and the two changes can never be sent as one. */}
+        <SettingsGroup
+          title={t("account.signInTitle")}
+          description={t("account.signInBlurb")}
+        >
+          <SettingRow
+            label={
+              <span className="flex items-center gap-2">
+                <Mail className="size-4 text-ink-3" aria-hidden />
+                {t("account.emailRow")}
+              </span>
+            }
+            description={emailValue}
+            footer={
+              open === "email" && (
+                <ChangeForm
+                  kind="email"
+                  blurb={t("account.emailBlurb")}
+                  submit={t("account.changeEmail")}
+                  email={email}
+                  onClose={() => setOpen(null)}
+                />
+              )
+            }
+          >
+            {open !== "email" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setOpen("email")}
+                aria-label={t("account.emailTitle")}
+              >
+                {t("account.change")}
+              </Button>
+            )}
+          </SettingRow>
 
-            Siblings rather than a swapped child, so a half-typed password
-            survives a look at the email form and back. */}
-        <div className={cx(tab !== "password" && "hidden")}>
-          <Change
-            title={t("account.passwordTitle")}
-            blurb={t("account.passwordBlurb")}
-            submit={t("account.changePassword")}
-            fields="password"
-            onDone={() => toast.success(t("account.passwordChanged"))}
-          />
-        </div>
-
-        <div className={cx(tab !== "email" && "hidden")}>
-          <Change
-            title={t("account.emailTitle")}
-            blurb={t("account.emailBlurb")}
-            submit={t("account.changeEmail")}
-            fields="email"
-            onDone={() => {
-              // Not "saved": the address does not move until the link in the new
-              // inbox is followed.
-              toast.info(t("account.emailPending"));
-              void queryClient.invalidateQueries({
-                queryKey: ["account", "me"],
-              });
-            }}
-          />
-        </div>
+          <SettingRow
+            label={
+              <span className="flex items-center gap-2">
+                <KeyRound className="size-4 text-ink-3" aria-hidden />
+                {t("account.passwordRow")}
+              </span>
+            }
+            description={
+              <span className="tracking-widest text-ink-2">
+                {t("account.passwordMasked")}
+              </span>
+            }
+            footer={
+              open === "password" && (
+                <ChangeForm
+                  kind="password"
+                  blurb={t("account.passwordBlurb")}
+                  submit={t("account.changePassword")}
+                  email={email}
+                  onClose={() => setOpen(null)}
+                />
+              )
+            }
+          >
+            {open !== "password" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setOpen("password")}
+                aria-label={t("account.passwordTitle")}
+              >
+                {t("account.change")}
+              </Button>
+            )}
+          </SettingRow>
+        </SettingsGroup>
       </div>
-    </div>
+    </Page>
   );
 }
+
+type Kind = "password" | "email";
+
+type Errors = { current?: string; next?: string; confirm?: string };
 
 /**
  * One change, with its re-authentication.
  *
- * Two instances rather than one form with both fields: an operator changing a
- * password should not have to look at an email box, and a form that submits
- * whichever half you filled in is a form that can be half-submitted by
- * accident.
+ * Errors appear when Save is pressed rather than while typing: a half-typed
+ * password is not a mistake yet, and a field going red under the cursor reads
+ * as being told off.
  */
-function Change({
-  title,
+function ChangeForm({
+  kind,
   blurb,
   submit,
-  fields,
-  onDone,
+  email,
+  onClose,
 }: {
-  title: string;
+  kind: Kind;
   blurb: string;
   submit: string;
-  fields: "password" | "email";
-  onDone: () => void;
+  email: string | null;
+  onClose: () => void;
 }) {
   const toast = useToasts();
+  const queryClient = useQueryClient();
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
-
-  // Short and quick to retype, but it is still a form somebody is part way
-  // through, and the tab strip above would empty it without a word.
-  useUnsavedChanges(current !== "" || next !== "" || confirm !== "");
+  const [errors, setErrors] = useState<Errors>({});
   const [pending, setPending] = useState(false);
-  const [errors, setErrors] = useState<{
-    current?: string;
-    next?: string;
-    confirm?: string;
-  }>({});
+
+  const dirty = current !== "" || next !== "" || confirm !== "";
+  // Short and quick to retype, but still a form somebody is part way through.
+  useUnsavedChanges(dirty);
 
   function clear() {
     setCurrent("");
@@ -209,30 +241,33 @@ function Change({
     setErrors({});
   }
 
-  async function send() {
+  function validate(): Errors {
     const strong =
-      fields === "password" ? validatePassword(next) : { ok: true as const };
-
-    const found = {
+      kind === "password"
+        ? validatePassword(next, { email: email ?? undefined })
+        : ({ ok: true } as const);
+    return {
       current: current ? undefined : t("account.currentRequired"),
       next:
-        fields === "email"
+        kind === "email"
           ? // Deliberately shallow. The address is proved by the confirmation
-            // mail reaching it — a regex here would only ever catch a typo that
-            // has no `@` in it, and every stricter pattern rejects addresses
-            // that are perfectly valid.
-            next.includes("@")
+            // mail reaching it; every stricter pattern rejects valid ones.
+            next.trim().includes("@")
             ? undefined
             : t("account.emailInvalid")
           : strong.ok
             ? undefined
             : t(strong.key, strong.params),
       confirm:
-        fields === "password" && next !== confirm
+        kind === "password" && next !== confirm
           ? t("account.confirmMismatch")
           : undefined,
     };
+  }
 
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    const found = validate();
     setErrors(found);
     if (found.current || found.next || found.confirm) return;
 
@@ -242,13 +277,14 @@ function Change({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
-          fields === "password"
+          kind === "password"
             ? { current, password: next }
-            : { current, email: next },
+            : { current, email: next.trim() },
         ),
       });
-
-      const body = (await response.json()) as { error?: string };
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
 
       if (!response.ok) {
         // A wrong current password belongs on the field it is about, not in a
@@ -262,7 +298,15 @@ function Change({
       }
 
       clear();
-      onDone();
+      onClose();
+      if (kind === "password") {
+        toast.success(t("account.passwordChanged"));
+      } else {
+        // Not "saved": the address does not move until the link in the new
+        // inbox is followed.
+        toast.info(t("account.emailPending"));
+        void queryClient.invalidateQueries({ queryKey: accountKey });
+      }
     } catch {
       toast.danger(t("common.somethingWentWrong"));
     } finally {
@@ -271,73 +315,114 @@ function Change({
   }
 
   return (
-    <section className="flex h-full flex-col gap-lg rounded-lg border-2 border-transparent bg-surface p-lg shadow-card">
-      <div className="flex flex-col gap-xs">
-        <h2 className="text-[16px] font-semibold">{title}</h2>
-        <p className="text-[13px] text-text-soft">{blurb}</p>
-      </div>
-
+    <form
+      onSubmit={(event) => void onSubmit(event)}
+      noValidate
+      className="flex flex-col gap-4 rounded-md border border-line bg-subtle p-4"
+    >
+      <p className="text-[13px] text-ink-3">{blurb}</p>
+      {/* Password managers fill the right account when the form names it. */}
+      {email && (
+        <input
+          type="email"
+          name="username"
+          autoComplete="username"
+          value={email}
+          readOnly
+          hidden
+        />
+      )}
       <Field
         label={t("account.currentPassword")}
         hint={t("account.currentHint")}
         error={errors.current}
       >
-        <Input
-          type="password"
-          autoComplete="current-password"
-          value={current}
-          onChange={(event) => setCurrent(event.target.value)}
-          placeholder={t("login.passwordPlaceholder")}
-        />
+        {(props) => (
+          <Input
+            {...props}
+            type="password"
+            autoComplete="current-password"
+            // Opened on purpose, so the cursor goes where typing starts.
+            autoFocus
+            value={current}
+            onChange={(event) => setCurrent(event.target.value)}
+            className="sm:max-w-sm"
+          />
+        )}
       </Field>
 
-      {fields === "password" ? (
-        <>
+      {kind === "password" ? (
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label={t("account.newPassword")}
             hint={t("account.newPasswordHint", { min: PASSWORD.min })}
             error={errors.next}
           >
-            <Input
-              type="password"
-              autoComplete="new-password"
-              value={next}
-              onChange={(event) => setNext(event.target.value)}
-              placeholder={t("login.passwordPlaceholder")}
-            />
+            {(props) => (
+              <Input
+                {...props}
+                type="password"
+                autoComplete="new-password"
+                maxLength={PASSWORD.max}
+                value={next}
+                onChange={(event) => setNext(event.target.value)}
+              />
+            )}
           </Field>
-
           <Field label={t("account.confirmPassword")} error={errors.confirm}>
-            <Input
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(event) => setConfirm(event.target.value)}
-              placeholder={t("login.passwordPlaceholder")}
-            />
+            {(props) => (
+              <Input
+                {...props}
+                type="password"
+                autoComplete="new-password"
+                maxLength={PASSWORD.max}
+                value={confirm}
+                onChange={(event) => setConfirm(event.target.value)}
+              />
+            )}
           </Field>
-        </>
+        </div>
       ) : (
         <Field
           label={t("account.newEmail")}
           hint={t("account.newEmailHint")}
           error={errors.next}
         >
-          <Input
-            type="email"
-            autoComplete="email"
-            value={next}
-            onChange={(event) => setNext(event.target.value)}
-            placeholder={t("login.emailPlaceholder")}
-          />
+          {(props) => (
+            <Input
+              {...props}
+              type="email"
+              autoComplete="email"
+              value={next}
+              onChange={(event) => setNext(event.target.value)}
+              placeholder={t("login.emailPlaceholder")}
+              className="sm:max-w-sm"
+            />
+          )}
         </Field>
       )}
 
-      <div className="mt-auto flex justify-end">
-        <Button onClick={() => void send()} pending={pending}>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            clear();
+            onClose();
+          }}
+          disabled={pending}
+        >
+          {t("common.cancel")}
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!dirty}
+          pending={pending}
+        >
           {submit}
         </Button>
       </div>
-    </section>
+    </form>
   );
 }

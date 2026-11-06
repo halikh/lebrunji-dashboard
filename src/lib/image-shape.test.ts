@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { ARTWORK_SHAPES, fitsShape, hasClearBorder } from "./image-shape";
+import {
+  ARTWORK_SHAPES,
+  coverPixelsNeeded,
+  fitsShape,
+  hasClearBorder,
+  looksSoft,
+  PHOTO_FRAMES,
+} from "./image-shape";
 
 describe("fitsShape", () => {
   it("accepts the example sizes the hints give", () => {
@@ -78,5 +85,27 @@ describe("hasClearBorder", () => {
         for (let x = cx; x < cx + 3; x++) pixels[(y * size + x) * 4 + 3] = 0;
     }
     expect(hasClearBorder(pixels, size, size)).toBe(true);
+  });
+});
+
+describe("sharp enough for the cover", () => {
+  const cover = PHOTO_FRAMES.shop.cover;
+
+  it("needs about 1320 pixels for a 4:3 shop photo", () => {
+    expect(coverPixelsNeeded(cover, 4 / 3)).toBe(1320);
+  });
+
+  it("needs far more for a banner, which the cover scales to its height", () => {
+    // Dar Aloud, Kshoor, Saleh Meat, Sarafand on dev: 1600 × 685.
+    const needed = coverPixelsNeeded(cover, 1600 / 685);
+    expect(needed).toBeGreaterThan(2300);
+    expect(looksSoft(1600, needed)).toBe(true);
+  });
+
+  it("says a small photo is soft and a good one is not", () => {
+    const needed = coverPixelsNeeded(cover, 4 / 3);
+    expect(looksSoft(590, needed)).toBe(true); // Croissant Bahjat
+    expect(looksSoft(1254, needed)).toBe(false);
+    expect(looksSoft(2000, needed)).toBe(false);
   });
 });

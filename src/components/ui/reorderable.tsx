@@ -13,8 +13,10 @@ import {
 
 import { t } from "@/i18n/translations";
 
-import { cx } from "./index";
-import { ROW_ABOVE } from "./row";
+import { cx } from "./cx";
+
+/** Keeps the handle above a row's stretched link, so a grab never opens the row. */
+const ROW_ABOVE = "relative z-10";
 
 /**
  * Putting a list in the order the merchant wants it in.
@@ -162,7 +164,7 @@ export function useReorder({
   ids,
   onReorder,
   labelOf,
-  lifted = "relative z-10 shadow-raised",
+  lifted = "relative z-10 bg-surface shadow-lg ring-1 ring-line",
   disabled = false,
 }: Options) {
   /**
@@ -329,7 +331,7 @@ export function useReorder({
   const place = useCallback(
     (node: HTMLElement, id: string, by: number, animate: boolean) => {
       node.style.transition = animate
-        ? "transform var(--duration-control) var(--ease-arrive)"
+        ? "transform 180ms cubic-bezier(0.32, 0.72, 0, 1)"
         : "none";
       node.style.transform = by === 0 ? "" : `translateY(${by}px)`;
       shifted.current.set(id, by);
@@ -824,7 +826,7 @@ export function useReorder({
 
       if (before === undefined || before === top || reduced) continue;
 
-      // Comfortably past `--duration-control` plus the two frames below. It
+      // Comfortably past the 180ms transition plus the two frames below. It
       // gates a re-measurement, not the animation itself, so an approximation
       // costs at most a skipped update rather than a wrong one.
       settleBy.current = performance.now() + 500;
@@ -968,21 +970,15 @@ export function useReorder({
       // `touch-none` so a drag on a phone moves the row rather than scrolling
       // the page out from under it.
       className: cx(
-        "flex size-[28px] shrink-0 touch-none items-center justify-center rounded-sm text-text-faint",
-        "hover:bg-neutral-fill hover:text-text-soft",
+        "flex size-7 shrink-0 touch-none items-center justify-center rounded-md text-ink-4 transition-colors",
+        "hover:bg-hover hover:text-ink-2 focus-visible:text-ink-2 aria-pressed:bg-accent-soft aria-pressed:text-accent",
         // A 44px target for a thumb below `md`, drawn as nothing. The pseudo
         // element is part of the handle, so a press on it starts the same drag
         // and `touch-none` covers it too; the 28px square that shows stays put,
         // and no row grows. (`ROW_ABOVE` below supplies the `relative`.)
         "before:absolute before:-inset-[8px] md:before:hidden",
-        // On a phone the grip sits on a line of its own, above the row's
-        // contents rather than before them: a margin that fills the rest of
-        // the line pushes everything after it to the next. Beside the picture
-        // it cost the name 44px it could not spare. Every list that renders a
-        // handle wraps its rows below `md` for this.
-        "max-md:me-[calc(100%-28px)]",
         moving === id ? "cursor-grabbing" : "cursor-grab",
-        // Above the row's stretched hit area — see `ROW_TARGET` in `row.ts`.
+        // Above the row's stretched hit area (a link covering the row).
         // Set here for the same reason `hidden` above is: every list renders
         // this handle, and a rule repeated per call site is one the next list
         // forgets. Without it a grab would open the editor instead of moving

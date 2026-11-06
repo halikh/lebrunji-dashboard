@@ -1,75 +1,77 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import {
+  AlertCircle,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Clock,
+  Image as ImageIcon,
+  MapPin,
+  PartyPopper,
+  Store,
+} from "lucide-react";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
-import { Button, cx } from "@/components/ui";
-import { Collapse } from "@/components/ui/collapse";
-import { ROW, ROW_TARGET } from "@/components/ui/row";
-import { SearchInput } from "@/components/ui/search-input";
+import {
+  Badge,
+  Button,
+  buttonClass,
+  Card,
+  EmptyState,
+  LinkRow,
+  Page,
+  PageHeader,
+  SearchInput,
+  Skeleton,
+  cx,
+} from "@/components/ui";
 import { pickLocalized } from "@/i18n/db-text";
 import { t, type TranslationKey } from "@/i18n/translations";
 import type { Localized } from "@/lib/validation";
 
-import {
-  fetchBranchesWithoutAddress,
-  fetchItemsWithoutImage,
-  fetchStoresWithoutHours,
-  fetchStoresWithoutImage,
-  type ItemTodo,
-  type TodoList,
+import type {
+  AddressTodo,
+  HoursTodo,
+  ItemTodo,
+  StoreTodo,
+  TodoList,
 } from "./api/todo";
-
-const todoKeys = {
-  all: ["todo"] as const,
-  storeImages: ["todo", "store-images"] as const,
-  itemImages: ["todo", "item-images"] as const,
-  hours: ["todo", "hours"] as const,
-  addresses: ["todo", "addresses"] as const,
-};
+import { todoHref, useTodoLists } from "./use-todo";
 
 /**
  * What is left to do before the catalogue looks finished.
  *
- * Four lists, each a row per thing with a link straight to where it is
- * fixed, so the page is worked *through* rather than read. Hours first: a shop
- * with no hours cannot be ordered from at all. Addresses next: required since
- * `0198`, and the branches from before it are filled here before launch. A
- * missing picture only looks unfinished.
+ * Four groups, each a row per thing with a link straight to where it is fixed,
+ * so the page is worked *through* rather than read. Hours first and marked
+ * urgent: a shop with no hours is open around the clock in the app (`0170`),
+ * so it takes orders at hours nobody is there to cook them. Addresses next:
+ * required since `0198`. A missing picture only looks unfinished.
  *
- * Refetched on every visit (`staleTime: 0`): this is the page somebody comes
- * back to after fixing three things, and a cached list still showing them
- * would say the fixes did not land.
+ * Groups start closed — the page opens on four headings and four counts, which
+ * is the summary — except the first one with work in it (the urgent one,
+ * while it has rows), and any group a search found something in.
+ *
+ * ## Shaped after Shopify's setup guide and Stripe's onboarding checklist
+ *
+ * - **Progress first**: "2 of 4 done" with a bar, so the page answers "how
+ *   far along are we" before anything is opened.
+ * - **One clear next step**: the single most useful fix, named, with one
+ *   primary button — the urgent group first, live shops before hidden ones.
+ * - **Tasks complete themselves**: a group turns green when its list is
+ *   empty, because the list *is* the data. There is no "mark as done" and no
+ *   dismiss: either would hide a gap that is still there. A "this shop
+ *   deliberately has no picture" choice would need a column to remember it
+ *   (a migration), not a browser setting.
  */
 export function TodoScreen() {
   const [search, setSearch] = useState("");
-
-  const hours = useQuery({
-    queryKey: todoKeys.hours,
-    queryFn: fetchStoresWithoutHours,
-    staleTime: 0,
-  });
-  const addresses = useQuery({
-    queryKey: todoKeys.addresses,
-    queryFn: fetchBranchesWithoutAddress,
-    staleTime: 0,
-  });
-  const storeImages = useQuery({
-    queryKey: todoKeys.storeImages,
-    queryFn: fetchStoresWithoutImage,
-    staleTime: 0,
-  });
-  const itemImages = useQuery({
-    queryKey: todoKeys.itemImages,
-    queryFn: fetchItemsWithoutImage,
-    staleTime: 0,
-  });
+  const { hours, addresses, storeImages, itemImages } = useTodoLists();
 
   // Filtered here rather than in the queries. These lists are what is *left*,
   // short by nature and already fully downloaded, so a browser-side filter
-  // searches all of it — the reason the rest of the dashboard asks the
-  // database does not apply. A capped list says so under itself regardless.
+  // searches all of it. A capped list says so under itself regardless.
   const term = normalise(search);
   const searching = term.length > 0;
 
@@ -96,154 +98,219 @@ export function TodoScreen() {
   // menus, and that is how somebody sets about fixing them.
   const itemGroups = groupByStore(itemRows);
 
+  const all = [hours, addresses, storeImages, itemImages];
+  const loaded = all.every((query) => query.isSuccess);
+  const total =
+    (hours.data?.rows.length ?? 0) +
+    (addresses.data?.rows.length ?? 0) +
+    (storeImages.data?.rows.length ?? 0) +
+    (itemImages.data?.rows.length ?? 0);
+  const truncated = all.some((query) => query.data?.truncated);
+  const allDone = loaded && total === 0;
+
+  /** Which groups have nothing left, in page order. */
+  const groupsDone = all.map(
+    (query) => query.isSuccess && query.data.rows.length === 0,
+  );
+  const doneCount = groupsDone.filter(Boolean).length;
+  /** The first group with work in it opens by itself — the guide's "current step". */
+  const firstOpen = all.findIndex(
+    (query) => query.isSuccess && query.data.rows.length > 0,
+  );
+  // From the whole lists, not the searched ones: the next step does not move
+  // because somebody typed a name.
+  const next = loaded
+    ? nextStep({
+        hours: hours.data?.rows ?? [],
+        addresses: addresses.data?.rows ?? [],
+        storeImages: storeImages.data?.rows ?? [],
+        itemImages: itemImages.data?.rows ?? [],
+      })
+    : null;
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 flex-col gap-md border-b border-border bg-surface px-lg py-lg md:px-xxl">
-        <div className="flex flex-col gap-xxs">
-          <h1 className="text-[26px] md:text-[30px]">{t("todo.title")}</h1>
-          <p className="text-[14px] text-text-soft">{t("todo.blurb")}</p>
-        </div>
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder={t("todo.search")}
-        />
-      </div>
+    <Page>
+      <PageHeader
+        title={t("todo.title")}
+        description={t("todo.blurb")}
+        meta={
+          loaded && total > 0 ? (
+            <Badge
+              tone={hoursRows.length > 0 && !searching ? "danger" : "neutral"}
+            >
+              {total === 1
+                ? t("todo.remainingOne")
+                : t("todo.remaining", {
+                    count: truncated ? `${total}+` : total,
+                  })}
+            </Badge>
+          ) : undefined
+        }
+      />
 
-      {/* No vertical padding on the scroller itself: a sticky heading sticks
-          to the scroller's edge, and padding there would leave a strip above
-          it for the rows to show through as they pass.
+      {allDone ? (
+        <Card padded={false}>
+          <EmptyState
+            icon={<PartyPopper />}
+            title={t("todo.allDoneTitle")}
+            description={t("todo.allDoneBody")}
+          />
+        </Card>
+      ) : (
+        <>
+          {loaded && <Guide done={doneCount} of={all.length} next={next} />}
 
-          And no `scroll-hint`, alone among the panes: its top-edge shadow is
-          drawn whenever the pane is scrolled, which here is always under a
-          sticky heading — a shadow beneath a heading that is not raised. */}
-      <div className="flex min-h-0 flex-grow flex-col overflow-y-auto bg-background">
-        <div className="flex flex-col gap-lg px-lg pb-lg pt-sm md:px-xxl md:pb-xxl">
-          <TodoSection
-            titleKey="todo.hoursTitle"
-            bodyKey="todo.hoursBody"
-            query={hours}
-            count={hoursRows.length}
-            doneKey="todo.hoursDone"
-            searching={searching}
-            urgent
-          >
-            {hoursRows.map((row) => (
-              <TodoRow
-                key={row.storeId}
-                href={`/catalogue/${row.storeId}?tab=hours${
-                  row.branches.length > 0 ? `&branch=${row.branches[0].id}` : ""
-                }`}
-                title={pickLocalized(row.storeName)}
-                hidden={!row.storeActive}
-                detail={
-                  // A one-branch shop is "no hours"; a chain names which of
-                  // its places are missing them.
-                  row.branchCount > 1
-                    ? t("todo.hoursBranches", {
-                        names: row.branches
-                          .map((branch) => pickLocalized(branch.name))
-                          .join(" · "),
-                        count: row.branches.length,
-                        total: row.branchCount,
-                      })
-                    : t("todo.hoursNone")
-                }
-                actionKey="todo.setHours"
-              />
-            ))}
-          </TodoSection>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={t("todo.search")}
+            className="-my-3"
+          />
 
-          <TodoSection
-            titleKey="todo.addressTitle"
-            bodyKey="todo.addressBody"
-            query={addresses}
-            count={addressRows.length}
-            doneKey="todo.addressDone"
-            searching={searching}
-          >
-            {addressRows.map((row) => (
-              <TodoRow
-                key={row.branchId}
-                // A one-branch shop's address is on its Details tab; a chain's
-                // branch has a page of its own.
-                href={
-                  row.branchCount > 1
-                    ? `/catalogue/${row.storeId}/branches/${row.branchId}`
-                    : `/catalogue/${row.storeId}?tab=details`
-                }
-                title={pickLocalized(row.storeName)}
-                hidden={!row.storeActive}
-                detail={
-                  row.branchCount > 1
-                    ? pickLocalized(row.branchName)
-                    : undefined
-                }
-                actionKey="todo.addAddress"
-              />
-            ))}
-          </TodoSection>
-
-          <TodoSection
-            titleKey="todo.storeImagesTitle"
-            bodyKey="todo.storeImagesBody"
-            query={storeImages}
-            count={storeRows.length}
-            doneKey="todo.storeImagesDone"
-            searching={searching}
-          >
-            {storeRows.map((row) => (
-              <TodoRow
-                key={row.id}
-                href={`/catalogue/${row.id}?tab=details`}
-                title={pickLocalized(row.name)}
-                hidden={!row.isActive}
-                actionKey="todo.addPicture"
-              />
-            ))}
-          </TodoSection>
-
-          <TodoSection
-            titleKey="todo.itemImagesTitle"
-            bodyKey="todo.itemImagesBody"
-            query={itemImages}
-            count={itemRows.length}
-            doneKey="todo.itemImagesDone"
-            searching={searching}
-          >
-            {itemGroups.map((group) => (
-              <div key={group.storeId} className="flex flex-col gap-sm">
-                {/* Sticky under the section's own heading, so a long run of
-                    dishes still says whose menu it is. `--todo-head` is that
-                    heading's height, measured by the section.
- */}
-                <h3 className="sticky top-[var(--todo-head)] z-10 flex items-baseline gap-sm bg-background pb-xs pt-sm text-[17px]">
-                  {pickLocalized(group.storeName)}
-                  <span className="font-sans text-[12px] font-medium text-text-faint">
-                    {group.items.length === 1
-                      ? t("todo.itemsOne")
-                      : t("todo.items", { count: group.items.length })}
-                  </span>
-                </h3>
-                {group.items.map((item) => (
-                  <TodoRow
-                    key={item.id}
-                    href={`/catalogue/${item.storeId}/items/${item.id}`}
-                    title={pickLocalized(item.name)}
-                    hidden={!item.isActive}
-                    actionKey="todo.addPicture"
-                  />
+          <div className="flex flex-col gap-4">
+            <TodoGroup
+              icon={<Clock />}
+              titleKey="todo.hoursTitle"
+              bodyKey="todo.hoursBody"
+              doneKey="todo.hoursDone"
+              query={hours}
+              count={hoursRows.length}
+              searching={searching}
+              current={firstOpen === 0}
+              urgent
+            >
+              <ul className="divide-y divide-line">
+                {hoursRows.map((row) => (
+                  <li key={row.storeId}>
+                    <TodoRow
+                      href={todoHref.hours(row.storeId, row.branches[0]?.id)}
+                      title={pickLocalized(row.storeName)}
+                      hidden={!row.storeActive}
+                      // A one-branch shop is "no hours"; a chain names which
+                      // of its places are missing them.
+                      detail={
+                        row.branchCount > 1
+                          ? t("todo.hoursBranches", {
+                              names: row.branches
+                                .map((branch) => pickLocalized(branch.name))
+                                .join(", "),
+                              count: row.branches.length,
+                              total: row.branchCount,
+                            })
+                          : t("todo.hoursNone")
+                      }
+                      actionKey="todo.setHours"
+                    />
+                  </li>
                 ))}
-              </div>
-            ))}
-          </TodoSection>
-        </div>
-      </div>
-    </div>
+              </ul>
+            </TodoGroup>
+
+            <TodoGroup
+              icon={<MapPin />}
+              titleKey="todo.addressTitle"
+              bodyKey="todo.addressBody"
+              doneKey="todo.addressDone"
+              query={addresses}
+              count={addressRows.length}
+              searching={searching}
+              current={firstOpen === 1}
+            >
+              <ul className="divide-y divide-line">
+                {addressRows.map((row) => (
+                  <li key={row.branchId}>
+                    <TodoRow
+                      href={todoHref.address(
+                        row.storeId,
+                        row.branchId,
+                        row.branchCount,
+                      )}
+                      title={pickLocalized(row.storeName)}
+                      hidden={!row.storeActive}
+                      detail={
+                        row.branchCount > 1
+                          ? pickLocalized(row.branchName)
+                          : undefined
+                      }
+                      actionKey="todo.addAddress"
+                    />
+                  </li>
+                ))}
+              </ul>
+            </TodoGroup>
+
+            <TodoGroup
+              icon={<Store />}
+              titleKey="todo.storeImagesTitle"
+              bodyKey="todo.storeImagesBody"
+              doneKey="todo.storeImagesDone"
+              query={storeImages}
+              count={storeRows.length}
+              searching={searching}
+              current={firstOpen === 2}
+            >
+              <ul className="divide-y divide-line">
+                {storeRows.map((row) => (
+                  <li key={row.id}>
+                    <TodoRow
+                      href={todoHref.storeImage(row.id)}
+                      title={pickLocalized(row.name)}
+                      hidden={!row.isActive}
+                      actionKey="todo.addPicture"
+                    />
+                  </li>
+                ))}
+              </ul>
+            </TodoGroup>
+
+            <TodoGroup
+              icon={<ImageIcon />}
+              titleKey="todo.itemImagesTitle"
+              bodyKey="todo.itemImagesBody"
+              doneKey="todo.itemImagesDone"
+              query={itemImages}
+              count={itemRows.length}
+              searching={searching}
+              current={firstOpen === 3}
+            >
+              {itemGroups.map((group) => (
+                <div key={group.storeId}>
+                  {/* Sticky, so a long run of dishes still says whose menu
+                      it is. */}
+                  <h3 className="sticky top-0 z-[1] flex items-baseline gap-2 border-y border-line bg-subtle px-5 py-2 text-[13px] font-semibold text-ink">
+                    <span className="truncate">
+                      {pickLocalized(group.storeName)}
+                    </span>
+                    <span className="shrink-0 text-[12px] font-normal text-ink-3">
+                      {group.items.length === 1
+                        ? t("todo.itemsOne")
+                        : t("todo.items", { count: group.items.length })}
+                    </span>
+                  </h3>
+                  <ul className="divide-y divide-line">
+                    {group.items.map((item) => (
+                      <li key={item.id}>
+                        <TodoRow
+                          href={todoHref.itemImage(item.storeId, item.id)}
+                          title={pickLocalized(item.name)}
+                          hidden={!item.isActive}
+                          actionKey="todo.addPicture"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </TodoGroup>
+          </div>
+        </>
+      )}
+    </Page>
   );
 }
 
-function TodoSection<T>({
+function TodoGroup<T>({
+  icon,
   titleKey,
   bodyKey,
   doneKey,
@@ -251,8 +318,12 @@ function TodoSection<T>({
   count,
   searching,
   urgent = false,
+  current = false,
   children,
 }: {
+  /** The first group with work in it: open on arrival, like a guide's current step. */
+  current?: boolean;
+  icon: ReactNode;
   titleKey: TranslationKey;
   bodyKey: TranslationKey;
   doneKey: TranslationKey;
@@ -266,163 +337,116 @@ function TodoSection<T>({
   count: number;
   searching: boolean;
   /**
-   * A gap that costs something now, not before launch: the section starts
-   * open while it has rows, and its count is drawn in the danger colour.
+   * A gap that costs something now, not before launch: the group starts open
+   * while it has rows, and wears the danger colour.
    */
   urgent?: boolean;
   children: ReactNode;
 }) {
-  // Closed by default: the page opens on three headings and three counts,
-  // which is the summary, and a section is opened to work through it. Null
-  // until the heading is pressed, so an urgent section can open itself once
+  // Null until the heading is pressed, so an urgent group can open itself once
   // its rows arrive and still be closed by hand.
   const [open, setOpen] = useState<boolean | null>(null);
-  // A search opens every section it found something in — results folded
-  // away behind a heading would read as no results.
-  const shown = (open ?? (urgent && count > 0)) || (searching && count > 0);
+  // A search opens every group it found something in — results folded away
+  // behind a heading would read as no results.
+  const shown =
+    (open ?? ((urgent || current) && count > 0)) || (searching && count > 0);
   const panelId = useId();
-
-  // The heading's height, for the shop names sticking beneath it. Measured
-  // rather than guessed: the blurb wraps on a narrow window, and a guessed
-  // offset would tuck the shop name under the heading or leave a gap.
-  const section = useRef<HTMLElement>(null);
-  const head = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const node = head.current;
-    const host = section.current;
-    if (!node || !host) return;
-    const observer = new ResizeObserver(() => {
-      host.style.setProperty("--todo-head", `${node.offsetHeight}px`);
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+  const hot = urgent && query.isSuccess && count > 0;
+  const done = query.isSuccess && count === 0 && !searching;
 
   return (
-    <section ref={section} className="flex flex-col">
-      {/* Sticky, so the section being worked through is always named at the
-          top while its rows scroll by. The page's ground behind it, so the
-          rows pass underneath rather than through. */}
-      <div ref={head} className="sticky top-0 z-20 bg-background pb-sm pt-md">
-        {/* The heading opens and closes the section, as a menu section's
-            does — the whole heading row is the target, the chevron turns with
-            it, and the count stays visible closed, since closed it is the
-            whole of what the section says. */}
+    <section
+      className={cx(
+        "rounded-lg border bg-surface shadow-xs",
+        hot ? "border-danger/30" : "border-line",
+      )}
+    >
+      <h2>
         <button
           type="button"
           onClick={() => setOpen(!shown)}
           aria-expanded={shown}
           aria-controls={panelId}
-          className="flex w-full items-start gap-md rounded-md px-xxs py-xs text-left"
+          className="flex w-full items-start gap-3.5 rounded-lg px-5 py-4 text-start transition-colors hover:bg-subtle"
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <span
             aria-hidden
             className={cx(
-              "mt-[9px] shrink-0 text-text-faint duration-[var(--duration-expand)] ease-[var(--ease-arrive)]",
-              shown && "rotate-90",
+              "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md [&_svg]:size-[18px]",
+              hot
+                ? "bg-danger-soft text-danger"
+                : done
+                  ? "bg-success-soft text-success"
+                  : "bg-hover text-ink-3",
             )}
           >
-            <path d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="flex min-w-0 flex-col gap-xxs">
-            <h2 className="flex items-center gap-sm text-[22px]">
-              {t(titleKey)}
-              {query.isSuccess && count > 0 && (
-                <span
-                  className={cx(
-                    "flex h-[24px] min-w-[24px] items-center justify-center rounded-full px-sm font-sans text-[13px] font-medium tabular-nums",
-                    urgent
-                      ? "bg-danger-wash text-danger"
-                      : "bg-active-fill text-on-active",
-                  )}
-                >
-                  {count}
-                  {query.data?.truncated && !searching && "+"}
-                </span>
-              )}
-              {query.isSuccess && count === 0 && !searching && (
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.4}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                  className="text-accent-deep"
-                >
-                  <path d="M5 12.5l4.5 4.5L19 7.5" />
-                </svg>
-              )}
-            </h2>
-            <span className="text-[13px] text-text-soft">{t(bodyKey)}</span>
+            {done ? <Check /> : icon}
           </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-ink">
+              {t(titleKey)}
+              {query.isPending && <Skeleton className="h-5 w-8 rounded-full" />}
+              {query.isSuccess && count > 0 && (
+                <Badge tone={hot ? "danger" : "neutral"}>
+                  <span className="tabular-nums">
+                    {count}
+                    {query.data?.truncated && !searching && "+"}
+                  </span>
+                </Badge>
+              )}
+              {hot && <Badge tone="danger">{t("todo.urgent")}</Badge>}
+              {done && (
+                <Badge tone="success" dot>
+                  {t("todo.done")}
+                </Badge>
+              )}
+            </span>
+            <span className="text-[13px] font-normal text-ink-3">
+              {t(bodyKey)}
+            </span>
+          </span>
+          <ChevronDown
+            aria-hidden
+            className={cx(
+              "mt-2 size-4 shrink-0 text-ink-4 transition-transform",
+              shown && "rotate-180",
+            )}
+          />
         </button>
-      </div>
+      </h2>
 
-      <Collapse open={shown}>
-        {/* Indented to where the title's text starts — past the chevron (14),
-            its gap (12) and the button's own inset (2) — so the title, the
-            shop names and the tiles all share one left edge. */}
-        <div id={panelId} className="flex flex-col gap-sm pb-sm pl-[28px]">
+      {shown && (
+        <div id={panelId} className="border-t border-line">
           {query.isPending && (
-            <div aria-hidden className="flex flex-col gap-sm">
+            <div aria-busy className="flex flex-col gap-3 px-5 py-4">
               {[0, 1, 2].map((row) => (
-                <div key={row} className="h-[60px] rounded-lg bg-line-soft" />
+                <Skeleton key={row} className="h-4 w-2/3" />
               ))}
             </div>
           )}
 
           {query.isError && (
-            <div className="flex items-center gap-md rounded-lg bg-danger-wash px-lg py-md">
-              <p role="alert" className="flex-grow text-[14px] text-danger">
+            <div className="flex flex-wrap items-center gap-3 px-5 py-4">
+              <AlertCircle className="size-4 shrink-0 text-danger" />
+              <p role="alert" className="flex-1 text-[13.5px] text-danger-ink">
                 {t("todo.failed")}
               </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void query.refetch()}
-              >
+              <Button size="sm" onClick={() => void query.refetch()}>
                 {t("common.retry")}
               </Button>
             </div>
           )}
 
           {query.isSuccess && count === 0 && (
+            // An empty group is the good news this page exists to deliver, so
+            // it is said in green. A search that found nothing is not that.
             <p
               className={cx(
-                "flex items-center gap-sm rounded-lg bg-surface px-lg py-md text-[14px] font-medium shadow-card",
-                searching ? "text-text-soft" : "text-accent-deep",
+                "flex items-center gap-2 px-5 py-4 text-[13.5px] font-medium",
+                searching ? "text-ink-3" : "text-success-ink",
               )}
             >
-              {/* Said, and in green: an empty to-do list is the good news
-                  this page exists to deliver. A search that found nothing is
-                  not that, and says so plainly. */}
-              {!searching && (
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.4}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="M5 12.5l4.5 4.5L19 7.5" />
-                </svg>
-              )}
+              {!searching && <Check className="size-4" />}
               {searching ? t("todo.noMatch") : t(doneKey)}
             </p>
           )}
@@ -430,13 +454,171 @@ function TodoSection<T>({
           {query.isSuccess && count > 0 && children}
 
           {query.data?.truncated && (
-            <p className="px-xxs text-[12px] text-text-faint">
+            <p className="border-t border-line px-5 py-3 text-[12.5px] text-ink-3">
               {t("todo.truncated")}
             </p>
           )}
         </div>
-      </Collapse>
+      )}
     </section>
+  );
+}
+
+function TodoRow({
+  href,
+  title,
+  detail,
+  hidden,
+  actionKey,
+}: {
+  href: string;
+  title: string;
+  detail?: string;
+  hidden: boolean;
+  actionKey: TranslationKey;
+}) {
+  return (
+    <LinkRow href={href} className="px-5">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center gap-2">
+          <span
+            className={cx(
+              "truncate text-[14px] font-medium",
+              hidden ? "text-ink-3" : "text-ink",
+            )}
+          >
+            {title}
+          </span>
+          {hidden && <Badge>{t("todo.hidden")}</Badge>}
+        </span>
+        {detail && (
+          <span className="truncate text-[12.5px] text-ink-3">{detail}</span>
+        )}
+      </div>
+      {/* The words go on a phone and the chevron stays: the whole row is the
+          link, and the group's heading already says what the fix is. */}
+      <span className="shrink-0 text-[13px] font-medium text-accent-ink max-sm:sr-only">
+        {t(actionKey)}
+      </span>
+    </LinkRow>
+  );
+}
+
+type NextStep = { href: string; label: string; urgentStep: boolean };
+
+/**
+ * The one fix to make next, in the page's order of cost: hours (a shop
+ * taking orders at 4 a.m.), then addresses (required), then pictures. Live
+ * shops before hidden ones within each, because a live gap is one a
+ * customer is looking at.
+ */
+function nextStep(lists: {
+  hours: HoursTodo[];
+  addresses: AddressTodo[];
+  storeImages: StoreTodo[];
+  itemImages: ItemTodo[];
+}): NextStep | null {
+  const live = <T,>(rows: T[], active: (row: T) => boolean) =>
+    rows.find(active) ?? rows[0];
+
+  const hours = live(lists.hours, (row) => row.storeActive);
+  if (hours) {
+    return {
+      href: todoHref.hours(hours.storeId, hours.branches[0]?.id),
+      label: t("todo.nextHours", { name: pickLocalized(hours.storeName) }),
+      urgentStep: true,
+    };
+  }
+  const address = live(lists.addresses, (row) => row.storeActive);
+  if (address) {
+    return {
+      href: todoHref.address(
+        address.storeId,
+        address.branchId,
+        address.branchCount,
+      ),
+      label: t("todo.nextAddress", {
+        name:
+          address.branchCount > 1
+            ? `${pickLocalized(address.storeName)}, ${pickLocalized(address.branchName)}`
+            : pickLocalized(address.storeName),
+      }),
+      urgentStep: false,
+    };
+  }
+  const store = live(lists.storeImages, (row) => row.isActive);
+  if (store) {
+    return {
+      href: todoHref.storeImage(store.id),
+      label: t("todo.nextStoreImage", { name: pickLocalized(store.name) }),
+      urgentStep: false,
+    };
+  }
+  const item = live(lists.itemImages, (row) => row.isActive);
+  if (item) {
+    return {
+      href: todoHref.itemImage(item.storeId, item.id),
+      label: t("todo.nextItemImage", {
+        name: pickLocalized(item.name),
+        shop: pickLocalized(item.storeName),
+      }),
+      urgentStep: false,
+    };
+  }
+  return null;
+}
+
+/**
+ * Progress and the next step, at the top — Shopify's setup guide. The bar
+ * counts groups, not rows: four hundred dishes without pictures is one task
+ * with a long list, and a bar crawling by quarter-percents says nothing.
+ */
+function Guide({
+  done,
+  of,
+  next,
+}: {
+  done: number;
+  of: number;
+  next: NextStep | null;
+}) {
+  return (
+    <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <p className="text-[13px] font-medium text-ink-3 tabular-nums">
+          {t("todo.progress", { done, total: of })}
+        </p>
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={of}
+          aria-valuenow={done}
+          aria-label={t("todo.progressLabel")}
+          className="h-2 w-full max-w-md overflow-hidden rounded-full bg-hover"
+        >
+          <div
+            className="h-full rounded-full bg-accent transition-[width]"
+            style={{ width: `${(done / Math.max(1, of)) * 100}%` }}
+          />
+        </div>
+        {next && (
+          <p className="flex min-w-0 items-center gap-2 text-[14px] text-ink">
+            <span className="shrink-0 font-semibold">{t("todo.nextUp")}</span>
+            <span className="truncate">{next.label}</span>
+            {next.urgentStep && <Badge tone="danger">{t("todo.urgent")}</Badge>}
+          </p>
+        )}
+      </div>
+      {next && (
+        <Link
+          href={next.href}
+          className={cx(buttonClass({ variant: "primary" }), "shrink-0")}
+        >
+          {t("todo.startNext")}
+          <ArrowRight className="rtl:rotate-180" />
+        </Link>
+      )}
+    </Card>
   );
 }
 
@@ -455,73 +637,6 @@ function matches(term: string, ...names: (Localized | null | undefined)[]) {
     Object.values(name ?? {}).some(
       (text) => typeof text === "string" && normalise(text).includes(term),
     ),
-  );
-}
-
-function TodoRow({
-  href,
-  title,
-  detail,
-  hidden,
-  actionKey,
-}: {
-  href: string;
-  title: string;
-  detail?: string;
-  hidden: boolean;
-  actionKey: TranslationKey;
-}) {
-  return (
-    <div
-      className={cx(
-        ROW,
-        "border-transparent",
-        hidden && "bg-neutral-fill/60 shadow-none",
-      )}
-    >
-      <div className="flex min-w-0 flex-grow flex-col gap-xxs">
-        <span className="flex min-w-0 items-center gap-sm">
-          {/* The whole row is the link — see `ROW_TARGET`. */}
-          <Link
-            href={href}
-            className={cx(
-              "truncate text-[15px] font-medium text-text",
-              ROW_TARGET,
-            )}
-          >
-            {title}
-          </Link>
-          {hidden && (
-            <span className="flex h-[22px] shrink-0 items-center rounded-full bg-line-soft px-[9px] text-[11px] font-medium text-text-soft">
-              {t("todo.hidden")}
-            </span>
-          )}
-        </span>
-        {detail && (
-          <span className="truncate text-[13px] text-text-soft">{detail}</span>
-        )}
-      </div>
-      <span className="flex shrink-0 items-center gap-xs text-[14px] font-medium text-text">
-        {/* The words go on a phone and the chevron stays. The whole row is
-            the link and each section's heading already says what the fix is,
-            so "Add a picture" beside every row there was only taking width
-            from the name it is about. */}
-        <span className="max-sm:sr-only">{t(actionKey)}</span>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          <path d="M9 6l6 6-6 6" />
-        </svg>
-      </span>
-    </div>
   );
 }
 

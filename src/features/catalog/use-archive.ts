@@ -13,10 +13,12 @@ import { searchTerm } from "@/lib/search";
 
 import {
   fetchArchiveCounts,
+  fetchArchivedBundles,
   fetchArchivedCategories,
   fetchArchivedPromotions,
   fetchArchivedStores,
   fetchArchivedTags,
+  restoreBundle,
   restoreCategory,
   restorePromotion,
   restoreStore,
@@ -24,6 +26,7 @@ import {
   type ArchiveCursor,
   type ArchiveKind,
   type ArchivePage,
+  type ArchivedBundle,
   type ArchivedCategory,
   type ArchivedPromotion,
   type ArchivedStore,
@@ -106,6 +109,13 @@ export function useArchivedPromotions(search: string, enabled: boolean) {
   );
 }
 
+export function useArchivedBundles(search: string, enabled: boolean) {
+  return useArchivedList<ArchivedBundle>("bundles", fetchArchivedBundles, {
+    search,
+    enabled,
+  });
+}
+
 /**
  * The numbers on the tab strip.
  *
@@ -159,6 +169,7 @@ export function useCatalogueRestore() {
       "promotions",
       "artworks",
       "menu",
+      "bundles",
     ]) {
       void queryClient.invalidateQueries({ queryKey: [key] });
     }
@@ -188,5 +199,6 @@ export function useCatalogueRestore() {
     category: useMutation(restorer(restoreCategory)),
     tag: useMutation(restorer(restoreTag)),
     promotion: useMutation(restorer(restorePromotion)),
+    bundle: useMutation(restorer(restoreBundle)),
   };
 }

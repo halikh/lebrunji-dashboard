@@ -1,40 +1,29 @@
 "use client";
 
-import type { Params, TranslationKey } from "@/i18n/translations";
+import { useState } from "react";
 
-import { ConfirmButton } from "./confirm-button";
-import { Toggle } from "./toggle";
+import { t, type Params, type TranslationKey } from "@/i18n/translations";
+
+import { cx } from "./cx";
+import { Switch } from "./form";
+import { ConfirmDialog } from "./overlay";
 
 /**
  * A switch that asks first.
  *
- * ## Why a switch, of all things, gets a dialog
+ * Most switches should not ask — flipping them *is* the action. The exception
+ * is a switch that changes what customers can see: hiding a dish takes it off
+ * the menu of a shop that is taking orders, and nothing on the operator's
+ * screen says anything went wrong. Nobody undoes a mistake they did not notice,
+ * so the moment to catch it is before it happens — and in a column of
+ * identical switches, one row off is the easiest slip on the screen.
  *
- * `ConfirmButton` argues at length that a confirmation is worth having only
- * when the question is worth reading, and that an action performed constantly
- * should get undo instead. A switch is the archetype of the thing that should
- * *not* ask: flipping it is the action, and a dialog in the way makes a
- * one-click change into three.
+ * Both directions ask, and ask different things: turning on publishes,
+ * turning off withdraws. The confirm button is `primary`, not `danger` —
+ * hiding is reversible in one click, and red belongs to Archive.
  *
- * The exception, and it is the one that matters in this product: **a switch
- * that changes what customers can see.** Hiding an item takes it off the menu
- * of a shop that is open and taking orders, and the failure is silent from the
- * operator's side — nothing is wrong on their screen, and what they find out
- * later is that a dish stopped selling. Nobody undoes a mistake they did not
- * notice, so undo is not the tool; the moment to catch it is before it happens.
- *
- * That it sits in a row of identical switches makes it worse rather than
- * better: one row off is the easiest slip on the screen.
- *
- * ## Both directions ask, and they ask different things
- *
- * Turning something on publishes it; turning it off withdraws it. They are not
- * the same event and a single "are you sure" for both would be the empty
- * question `ConfirmButton` warns about. Each direction names what it does and
- * says who sees the result.
- *
- * A switch that changes nothing a customer sees does not belong here — it stays
- * an ordinary `Toggle`.
+ * The label beside the switch carries the state in words (`labelOn` /
+ * `labelOff`, e.g. Live / Hidden) so it never depends on colour alone.
  */
 
 type Question = {
@@ -67,34 +56,43 @@ export function ConfirmToggle({
   disabled?: boolean;
   className?: string;
 }) {
-  const question = on ? whenTurningOff : whenTurningOn;
+  const [asking, setAsking] = useState(false);
+  // Fixed when the dialog opens, so the question does not flip to the other
+  // direction while it is still on screen (the value changes as it settles).
+  const [question, setQuestion] = useState<Question>(whenTurningOn);
+  const label = on ? labelOn : (labelOff ?? labelOn);
 
   return (
-    <ConfirmButton
-      onConfirm={onChange}
-      titleKey={question.titleKey}
-      bodyKey={question.bodyKey}
-      confirmKey={question.confirmKey}
-      params={params}
-      // `primary`, not `danger`. Hiding something is reversible in one click
-      // and takes nothing away permanently — a red button here would borrow
-      // the weight that belongs to Archive, and spending it twice is how it
-      // stops meaning anything.
-      variant="primary"
-      renderTrigger={({ onClick }) => (
-        <Toggle
-          on={on}
-          onChange={onClick}
-          labelOn={labelOn}
-          labelOff={labelOff}
+    <>
+      <span
+        className={cx(
+          "inline-flex shrink-0 items-center gap-2 text-[13px] font-medium",
+          on ? "text-ink" : "text-ink-3",
+          className,
+        )}
+      >
+        <Switch
+          checked={on}
           disabled={disabled}
-          className={className}
+          aria-label={label}
+          onCheckedChange={() => {
+            setQuestion(on ? whenTurningOff : whenTurningOn);
+            setAsking(true);
+          }}
         />
-      )}
-    >
-      {/* Never rendered: `renderTrigger` replaces it. The switch is the
-          trigger, and it carries its own label. */}
-      {labelOn}
-    </ConfirmButton>
+        <span aria-hidden className="whitespace-nowrap">
+          {label}
+        </span>
+      </span>
+      <ConfirmDialog
+        open={asking}
+        onOpenChange={setAsking}
+        title={t(question.titleKey, params)}
+        description={t(question.bodyKey, params)}
+        confirmLabel={t(question.confirmKey, params)}
+        tone="primary"
+        onConfirm={onChange}
+      />
+    </>
   );
 }

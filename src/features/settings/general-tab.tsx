@@ -1,11 +1,26 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertCircle,
+  Moon,
+  Music,
+  Play,
+  RotateCcw,
+  Upload,
+} from "lucide-react";
 import { useRef, useState } from "react";
 
-import { Button, Field, cx } from "@/components/ui";
-import { Select } from "@/components/ui/select";
-import { Toggle } from "@/components/ui/toggle";
+import {
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  NativeSelect,
+  Segmented,
+  Skeleton,
+} from "@/components/ui";
+import { SettingRow, SettingsGroup } from "@/components/ui/setting-row";
 import { useToasts } from "@/components/ui/toast";
 import { useUnsavedChanges } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
@@ -19,41 +34,12 @@ import {
   updateAppSettings,
   type AppSettings,
 } from "./api/app-settings";
+import { PauseOrders } from "./pause-orders";
 import { appSettingsKey, useAppSettings, useClock } from "./use-clock";
 
 /**
- * The settings that belong to the business rather than to a row: how times
- * read, when orders are taken, and what a new one sounds like.
- *
- * The first tab on Settings, because these are the ones a shop actually comes
- * back to change. The customer-app gate and the storage sweep used to sit
- * underneath them and now live on Advanced — see `advanced-tab.tsx`.
- *
- * Each was a constant in a file before migration 0093 — the trading day
- * returned a literal `8`, the chime was synthesised in JavaScript, times were
- * always 24-hour — which is fine right up until somebody wants one changed and
- * the answer is "a release".
- *
- * ## Each one saves on its own
- *
- * No Save button over the three. They are unrelated settings that happen to
- * share a screen, and a single Save would mean changing the clock format and
- * accidentally writing back an ordering window somebody was mid-way through
- * adjusting in another tab. The switch commits; the window has its own Save
- * because two selects are one decision.
- */
-/**
- * Which "saved" a save was.
- *
- * Every control on this tab wrote the same word. Three of them sit on one
- * screen and two can be pressed a second apart, so the toast said something had
- * been saved without saying which — and a stack of identical "Saved" pills is
- * the one shape that cannot answer the question it raises. Naming the thing
- * costs three strings and makes the second toast informative rather than
- * confusing.
- *
- * Keyed off what the patch actually touched, so a caller cannot pass the wrong
- * label: the patch *is* the answer.
+ * Which "saved" a save was — keyed off what the patch touched, so two saves a
+ * second apart do not stack two identical "Saved" toasts.
  */
 function savedKey(patch: Partial<AppSettings>) {
   if (patch.clock24h !== undefined) return "general.savedClock" as const;
@@ -67,12 +53,27 @@ function savedKey(patch: Partial<AppSettings>) {
   return "general.saved" as const;
 }
 
+/**
+ * The settings that belong to the business rather than to a row.
+ *
+ * ## Each one saves on its own
+ *
+ * Laid out as Linear and Stripe lay out settings: one row per setting, the
+ * consequence written beside the control.
+ *
+ * No Save over the lot. They are unrelated settings that share a screen, and
+ * one Save would mean flipping the clock format and accidentally writing back
+ * an ordering window somebody was mid-way through in another tab. The clock
+ * commits on the spot; the zone asks first (it moves every time in the app and
+ * every report day); the window has its own Save because two hours are one
+ * decision.
+ */
 export function GeneralTab() {
   const queryClient = useQueryClient();
   const toast = useToasts();
 
-  // The same query every screen that shows a time is reading, so the
-  // invalidation below is what re-formats all of them.
+  // The same query every screen that shows a time reads, so the invalidation
+  // below is what re-formats all of them.
   const settings = useAppSettings();
   const clock = useClock();
   const zones = useQuery({
@@ -95,10 +96,9 @@ export function GeneralTab() {
 
   const current = settings.data;
 
-  /** The ordering window, held locally so the two ends are saved together. */
+  /** The ordering window, held locally so both ends are saved together. */
   const [open, setOpen] = useState<string | null>(null);
   const [close, setClose] = useState<string | null>(null);
-
   const openHour = open ?? String(current?.openHour ?? 8);
   const closeHour = close ?? String(current?.closeHour ?? 2);
   const windowDirty =
@@ -106,140 +106,243 @@ export function GeneralTab() {
     (Number(openHour) !== current.openHour ||
       Number(closeHour) !== current.closeHour);
 
-  // Before the error return below: a hook cannot be conditional.
+  /** A zone picked and waiting for the operator to confirm it. */
+  const [pendingZone, setPendingZone] = useState<string | null>(null);
+
+  // Before the early returns: a hook cannot be conditional.
   useUnsavedChanges(windowDirty);
 
   if (settings.isError) {
     return (
-      <p
-        role="alert"
-        className="p-lg text-[13px] md:p-xxl font-medium text-danger"
-      >
-        {t("content.failed")}
-      </p>
+      <EmptyState
+        icon={<AlertCircle />}
+        title={t("content.failed")}
+        action={
+          <Button onClick={() => void settings.refetch()}>
+            {t("common.retry")}
+          </Button>
+        }
+      />
     );
   }
 
+  if (!current) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy>
+        {[0, 1, 2].map((one) => (
+          <Skeleton key={one} className="h-40 rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  const zoneLabel = (name: string) => {
+    const zone = zones.data?.find((one) => one.name === name);
+    return zone ? zone.label : name;
+  };
+  const hours = hourOptions(clock.hour);
+  const overnight = Number(closeHour) < Number(openHour);
+  const allDay = Number(closeHour) === Number(openHour);
+
   return (
-    <div className="flex min-h-0 flex-grow flex-col gap-xxl overflow-y-auto scroll-hint p-lg md:p-xxl">
-      {/* ---- clock ------------------------------------------------------ */}
-      <section className="flex flex-col gap-sm">
-        <h2 className="text-[17px]">{t("general.clockTitle")}</h2>
-        <Field label={t("general.clockLabel")} hint={t("general.clockHint")}>
-          <Toggle
-            on={current?.clock24h ?? true}
-            onChange={() => save.mutate({ clock24h: !current?.clock24h })}
-            disabled={!current || save.isPending}
-            labelOn={t("general.clock24")}
-            labelOff={t("general.clock12")}
-            className="w-[132px]"
-          />
-        </Field>
+    <div className="flex flex-col gap-6">
+      <SettingsGroup
+        title={t("general.clockTitle")}
+        description={t("general.clockBlurb")}
+      >
+        <SettingRow
+          id="setting-clock"
+          label={t("general.clockLabel")}
+          description={t("general.clockHint")}
+        >
+          {/* Saves on the spot, like a Linear preference: it is one click
+              to put back and changes nothing but how times are written. */}
+          <div role="group" aria-labelledby="setting-clock">
+            <Segmented
+              className="w-fit"
+              value={current.clock24h ? "24" : "12"}
+              onChange={(next) => {
+                const clock24h = next === "24";
+                if (clock24h !== current.clock24h) save.mutate({ clock24h });
+              }}
+              items={[
+                { key: "24", label: t("general.clock24") },
+                { key: "12", label: t("general.clock12") },
+              ]}
+            />
+          </div>
+        </SettingRow>
 
         {/* Hidden until 0183 is applied: no list, nothing to choose. */}
         {(zones.data?.length ?? 0) > 0 && (
-          <Field label={t("general.zoneLabel")} hint={t("general.zoneHint")}>
-            {/* Capped rather than fixed, so it gives way on a phone — a zone
-                label with its IANA name beside it is long. */}
-            <div className="w-full max-w-[260px]">
-              <Select
-                value={current?.timezone ?? businessTimezone()}
-                onChange={(timezone) => {
-                  if (timezone !== current?.timezone) save.mutate({ timezone });
-                }}
-                options={(zones.data ?? []).map((zone) => ({
-                  value: zone.name,
-                  label: `${zone.label} (${zone.name})`,
-                }))}
-                disabled={!current || save.isPending}
-              />
-            </div>
-          </Field>
-        )}
-      </section>
-
-      {/* ---- the shift --------------------------------------------------- */}
-      <section className="flex flex-col gap-sm border-t border-border pt-xxl">
-        <h2 className="text-[17px]">{t("general.shiftTitle")}</h2>
-
-        {/* The consequence, said before the control rather than discovered
-            afterwards. Moving the opening hour moves what "today" means on the
-            queue and in every report — `business_day_starts_at()` reads this
-            column — which is a much larger change than the two dropdowns look
-            like. */}
-        <p className="text-[13px] text-text-soft">{t("general.shiftBlurb")}</p>
-
-        <div className="flex flex-wrap items-end gap-lg">
-          <div className="w-[140px]">
-            <Field label={t("general.opensAt")}>
-              <Select
-                value={openHour}
-                onChange={setOpen}
-                options={hourOptions(clock.hour)}
-                disabled={!current}
-              />
-            </Field>
-          </div>
-
-          <div className="w-[140px]">
-            <Field label={t("general.closesAt")}>
-              <Select
-                value={closeHour}
-                onChange={setClose}
-                options={hourOptions(clock.hour)}
-                disabled={!current}
-              />
-            </Field>
-          </div>
-
-          <Button
-            disabled={!windowDirty}
-            pending={save.isPending}
-            onClick={() =>
-              save.mutate(
-                { openHour: Number(openHour), closeHour: Number(closeHour) },
-                {
-                  onSuccess: () => {
-                    setOpen(null);
-                    setClose(null);
-                  },
-                },
-              )
-            }
+          <SettingRow
+            id="setting-zone"
+            label={t("general.zoneLabel")}
+            description={t("general.zoneHint")}
           >
-            {t("general.saveShift")}
-          </Button>
-        </div>
-
-        {/* Closing before opening is not a mistake here — it is a shop open
-            past midnight, which is the ordinary case in this business. Said out
-            loud because it looks wrong at a glance, and the database
-            deliberately has no constraint that would "correct" it. */}
-        {Number(closeHour) <= Number(openHour) && (
-          <p className="text-[12px] font-semibold text-active-ink">
-            {t("general.overnight", {
-              open: clock.hour(Number(openHour)),
-              close: clock.hour(Number(closeHour)),
-            })}
-          </p>
+            <NativeSelect
+              aria-labelledby="setting-zone"
+              className="w-full md:w-72"
+              value={current.timezone ?? businessTimezone()}
+              disabled={save.isPending}
+              onChange={(event) => {
+                const next = event.target.value;
+                // Not saved yet: a zone moves every time and every report
+                // day, so it asks first (the dialog below).
+                if (next !== current.timezone) setPendingZone(next);
+              }}
+            >
+              {(zones.data ?? []).map((zone) => {
+                // A person's name for it, with the IANA id it stores.
+                const label = [zone.label, `(${zone.name})`].join(" ");
+                return (
+                  <option key={zone.name} value={zone.name}>
+                    {label}
+                  </option>
+                );
+              })}
+            </NativeSelect>
+          </SettingRow>
         )}
+      </SettingsGroup>
 
-        <p className="text-[11px] text-text-faint">
-          {t("promotions.inZone", { zone: businessTimezone() })}
-        </p>
-      </section>
+      <SettingsGroup
+        title={t("general.shiftTitle")}
+        // The consequence, before the control: the opening hour is also where
+        // "today" begins on the queue and in every report.
+        description={t("general.shiftBlurb")}
+      >
+        <SettingRow
+          label={t("general.hoursLabel")}
+          description={t("general.shiftZone", {
+            zone: zoneLabel(current.timezone ?? businessTimezone()),
+          })}
+          footer={
+            (overnight || allDay || windowDirty) && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Closing before opening is not a mistake: a shop open past
+                    midnight is the ordinary case, and the database
+                    deliberately has no constraint that would "correct" it.
+                    Said out loud because it looks wrong at a glance. */}
+                {overnight || allDay ? (
+                  <p className="flex items-center gap-2 text-[13px] font-medium text-info-ink">
+                    <Moon className="size-4 shrink-0" aria-hidden />
+                    {allDay
+                      ? t("general.shiftSameHour")
+                      : t("general.overnight", {
+                          open: clock.hour(Number(openHour)),
+                          close: clock.hour(Number(closeHour)),
+                        })}
+                  </p>
+                ) : (
+                  <span />
+                )}
+                {/* Two hours are one decision, so they have one Save — shown
+                    only once there is something to save, the way Stripe's
+                    inline settings do. */}
+                {windowDirty && (
+                  <div className="ms-auto flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={save.isPending}
+                      onClick={() => {
+                        setOpen(null);
+                        setClose(null);
+                      }}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      pending={save.isPending}
+                      onClick={() =>
+                        save.mutate(
+                          {
+                            openHour: Number(openHour),
+                            closeHour: Number(closeHour),
+                          },
+                          {
+                            onSuccess: () => {
+                              setOpen(null);
+                              setClose(null);
+                            },
+                          },
+                        )
+                      }
+                    >
+                      {t("general.saveShift")}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )
+          }
+        >
+          <div className="grid w-full grid-cols-2 gap-3 md:w-auto">
+            <Field label={t("general.opensAt")} className="md:w-36">
+              {(props) => (
+                <NativeSelect
+                  {...props}
+                  value={openHour}
+                  onChange={(event) => setOpen(event.target.value)}
+                >
+                  {hours.map((hour) => (
+                    <option key={hour.value} value={hour.value}>
+                      {hour.label}
+                    </option>
+                  ))}
+                </NativeSelect>
+              )}
+            </Field>
+            <Field label={t("general.closesAt")} className="md:w-36">
+              {(props) => (
+                <NativeSelect
+                  {...props}
+                  value={closeHour}
+                  onChange={(event) => setClose(event.target.value)}
+                >
+                  {hours.map((hour) => (
+                    <option key={hour.value} value={hour.value}>
+                      {hour.label}
+                    </option>
+                  ))}
+                </NativeSelect>
+              )}
+            </Field>
+          </div>
+        </SettingRow>
+      </SettingsGroup>
 
-      {/* ---- the sound --------------------------------------------------- */}
-      <section className="flex flex-col gap-sm border-t border-border pt-xxl">
-        <h2 className="text-[17px]">{t("general.soundTitle")}</h2>
-        <p className="text-[13px] text-text-soft">{t("general.soundBlurb")}</p>
+      <PauseOrders settings={current} />
 
+      <SettingsGroup title={t("general.alertsTitle")}>
         <SoundPicker
-          url={current?.notificationSoundUrl ?? null}
+          url={current.notificationSoundUrl}
           onChange={(next) => save.mutate({ notificationSoundUrl: next })}
           pending={save.isPending}
         />
-      </section>
+      </SettingsGroup>
+
+      <ConfirmDialog
+        open={pendingZone !== null}
+        onOpenChange={(next) => !next && setPendingZone(null)}
+        title={t("general.zoneConfirmTitle", {
+          zone: zoneLabel(pendingZone ?? ""),
+        })}
+        description={t("general.zoneConfirmBody", {
+          zone: zoneLabel(pendingZone ?? ""),
+        })}
+        confirmLabel={t("general.zoneConfirm")}
+        onConfirm={async () => {
+          if (!pendingZone) return;
+          // The mutation toasts its own failure; the dialog just closes.
+          await save
+            .mutateAsync({ timezone: pendingZone })
+            .catch(() => undefined);
+        }}
+      />
     </div>
   );
 }
@@ -247,19 +350,11 @@ export function GeneralTab() {
 /**
  * Choosing, hearing and clearing the new-order sound.
  *
- * ## Playing it is not optional
- *
- * A sound is the one setting you cannot check by looking. Without a preview the
- * operator uploads a file, sees a filename, and finds out whether it was the
- * right one at the moment an order arrives during service — which is the worst
- * possible time to discover it is three minutes of music.
- *
- * ## Clearing goes back to the built-in chime, not to silence
- *
- * The whole point of the sound is that it fires when nobody is looking at the
- * screen. "None" would be a setting whose effect is that orders arrive
- * unannounced, which is the failure the chime exists to prevent — so the
- * absence of a file means the synthesised one, and the button says so.
+ * Playing it is not optional: a sound is the one setting you cannot check by
+ * looking, and finding out it is three minutes of music when an order lands
+ * during service is the worst time to. Clearing goes back to the built-in
+ * chime, never to silence — orders arriving unannounced is the failure the
+ * chime exists to prevent.
  */
 function SoundPicker({
   url,
@@ -290,68 +385,74 @@ function SoundPicker({
   }
 
   const busy = progress !== null;
+  const percent = Math.round((progress ?? 0) * 100);
 
   return (
-    <div className="flex flex-col gap-sm">
-      <div className="flex flex-wrap items-center gap-sm">
-        <Button
-          variant="secondary"
-          disabled={busy || pending}
-          onClick={() => input.current?.click()}
-        >
-          {url ? t("general.soundReplace") : t("general.soundChoose")}
-        </Button>
-
-        {/* Blue, where "Choose an MP3" beside it is grey.
-            
-            In this palette blue is what can be acted on and grey is a ground
-            with no opinion — and of the two controls here this is the one that
-            *does* something on the spot. The other opens a file picker on the
-            way to a save. Same reason the back control wears it. */}
-        <Button
-          variant="primary-quiet"
-          disabled={busy}
-          onClick={() => {
-            // The real thing: the same function the queue calls, so what is
-            // heard here is what will be heard then.
-            void chime(url);
-          }}
-        >
-          {t("general.soundPlay")}
-        </Button>
-
-        {url && (
-          <Button
-            variant="danger"
-            disabled={busy || pending}
-            onClick={() => onChange(null)}
-          >
-            {t("general.soundClear")}
-          </Button>
-        )}
-      </div>
-
-      <p className="text-[12px] text-text-faint">
-        {url ? t("general.soundCustom") : t("general.soundBuiltIn")}
-        {" · "}
-        {t("general.soundLimits", {
-          size: Math.round(SOUND.maxBytes / 1024),
-          seconds: SOUND.maxSeconds,
-        })}
-      </p>
-
-      {busy && (
-        <div
-          role="progressbar"
-          aria-label={t("images.uploading")}
-          aria-valuenow={Math.round((progress ?? 0) * 100)}
-          className="h-[6px] w-[140px] overflow-hidden rounded-full bg-neutral-fill"
-        >
-          <div
-            className={cx("h-full rounded-full bg-primary transition-[width]")}
-            style={{ width: `${Math.round((progress ?? 0) * 100)}%` }}
-          />
+    <SettingRow
+      label={t("general.soundTitle")}
+      description={
+        <div className="flex flex-col gap-1.5">
+          <p>{t("general.soundBlurb")}</p>
+          <p className="flex items-center gap-2 text-ink-2">
+            <Music className="size-3.5 shrink-0 text-ink-4" aria-hidden />
+            <span className="font-medium">
+              {url ? t("general.soundCustom") : t("general.soundBuiltIn")}
+            </span>
+          </p>
+          <p className="text-[12.5px] text-ink-4">
+            {t("general.soundLimits", {
+              size: Math.round(SOUND.maxBytes / 1024),
+              seconds: SOUND.maxSeconds,
+            })}
+          </p>
         </div>
+      }
+      footer={
+        busy && (
+          <div
+            role="progressbar"
+            aria-label={t("images.uploading")}
+            aria-valuenow={percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="h-1.5 w-full overflow-hidden rounded-full bg-hover"
+          >
+            <div
+              className="h-full rounded-full bg-accent transition-[width]"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        )
+      }
+    >
+      <Button
+        variant="secondary"
+        disabled={busy}
+        // The real thing: the same function the queue calls, so what is
+        // heard here is what will be heard then.
+        onClick={() => void chime(url)}
+      >
+        <Play />
+        {t("general.soundPlay")}
+      </Button>
+      <Button
+        variant="secondary"
+        disabled={busy || pending}
+        pending={busy}
+        onClick={() => input.current?.click()}
+      >
+        <Upload />
+        {url ? t("general.soundReplace") : t("general.soundChoose")}
+      </Button>
+      {url && (
+        <Button
+          variant="ghost"
+          disabled={busy || pending}
+          onClick={() => onChange(null)}
+        >
+          <RotateCcw />
+          {t("general.soundClear")}
+        </Button>
       )}
 
       {/* `sr-only`, not hidden: a `display: none` input is out of the
@@ -370,22 +471,13 @@ function SoundPicker({
           event.target.value = "";
         }}
       />
-    </div>
+    </SettingRow>
   );
 }
 
 /**
- * `00` to `23`, in the shop's own format.
- *
- * These labels used to be 24-hour always, on the grounds that a picker whose
- * labels moved as you changed the format directly above it was a mirror looking
- * at itself. That was the wrong call. The toggle promises the dashboard reads
- * times the way this shop writes them, and a shop that reads `8:00 PM` should
- * not have to translate its own closing time back into `20` to set it — the two
- * controls sitting together is what makes the change legible, not what makes it
- * confusing.
- *
- * The *value* is the hour, and it never moves. Only the label does.
+ * `00` to `23`, labelled in the shop's own format. The *value* is the hour and
+ * never moves; only the label follows the clock setting above it.
  */
 function hourOptions(label: (hour: number) => string) {
   return Array.from({ length: 24 }, (_, hour) => ({

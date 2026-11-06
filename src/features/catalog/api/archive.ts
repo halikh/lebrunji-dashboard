@@ -95,8 +95,24 @@ export type ArchivedPromotion = {
   archivedAt: string;
 };
 
-/** Which of the four lists. Also the tab key on the screen. */
-export type ArchiveKind = "stores" | "categories" | "tags" | "promotions";
+/**
+ * A bundle (`0204`) — a `menu_items` row with `is_bundle` set and no section.
+ * Having no section is what keeps it off the shop's own archive (which lists
+ * dishes by section), so without this list an archived bundle had no way back.
+ */
+export type ArchivedBundle = {
+  id: string;
+  name: Localized;
+  imageUrl: string | null;
+  archivedAt: string;
+  storeName: Localized;
+  /** Whether the shop it belongs to is itself archived. */
+  storeArchived: boolean;
+};
+
+/** Which of the lists. Also the tab key on the screen. */
+export type ArchiveKind =
+  "stores" | "categories" | "tags" | "promotions" | "bundles";
 
 /**
  * Where the next page starts: the last row's archival instant and its id.
@@ -298,6 +314,42 @@ export async function fetchArchivedPromotions(
   return { rows, cursor: cursorOf(rows, limit) };
 }
 
+/** Archived bundles, newest first. */
+export async function fetchArchivedBundles(
+  options: PageOptions = {},
+): Promise<ArchivePage<ArchivedBundle>> {
+  const { search = null, after = null, limit = PAGE.size } = options;
+
+  let query = getClient()
+    .from("menu_items")
+    .select("id, name, image_url, deleted_at, stores ( name, deleted_at )")
+    .eq("is_bundle", true)
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+
+  if (search) query = query.or(likeAny(NAMED, search));
+  if (after) query = query.or(afterCursor(after));
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Could not read the archive: ${error.message}`);
+
+  const rows = (data ?? []).map((row) => {
+    const store = one(row.stores);
+    return {
+      id: row.id as string,
+      name: (row.name as Localized) ?? {},
+      imageUrl: (row.image_url as string | null) ?? null,
+      archivedAt: row.deleted_at as string,
+      storeName: (store?.name as Localized) ?? {},
+      storeArchived: store?.deleted_at != null,
+    };
+  });
+
+  return { rows, cursor: cursorOf(rows, limit) };
+}
+
 /**
  * The picture a promotion is recognised by: first banner, else first tile.
  *
@@ -332,23 +384,27 @@ export async function fetchArchiveCounts(
 ): Promise<ArchiveCounts> {
   const client = getClient();
 
-  function counter(table: string, columns: readonly string[]) {
+  function counter(table: string, columns: readonly string[], bundles = false) {
     let query = client
       .from(table)
       .select("id", { count: "exact", head: true })
       .not("deleted_at", "is", null);
+    // Only bundles from `menu_items`: archived dishes belong to the shop's
+    // own archive, not this one.
+    if (bundles) query = query.eq("is_bundle", true);
     if (search) query = query.or(likeAny(columns, search));
     return query;
   }
 
-  const [stores, categories, tags, promotions] = await Promise.all([
+  const [stores, categories, tags, promotions, bundles] = await Promise.all([
     counter("stores", NAMED),
     counter("categories", NAMED),
     counter("menu_item_tags", NAMED),
     counter("discounts", ["slug"]),
+    counter("menu_items", NAMED, true),
   ]);
 
-  for (const result of [stores, categories, tags, promotions]) {
+  for (const result of [stores, categories, tags, promotions, bundles]) {
     if (result.error) {
       throw new Error(`Could not read the archive: ${result.error.message}`);
     }
@@ -359,11 +415,17 @@ export async function fetchArchiveCounts(
     categories: categories.count ?? 0,
     tags: tags.count ?? 0,
     promotions: promotions.count ?? 0,
+    bundles: bundles.count ?? 0,
   };
 
   return {
     ...counts,
-    all: counts.stores + counts.categories + counts.tags + counts.promotions,
+    all:
+      counts.stores +
+      counts.categories +
+      counts.tags +
+      counts.promotions +
+      counts.bundles,
   };
 }
 
@@ -429,7 +491,40 @@ export async function restorePromotion(id: string): Promise<void> {
 }
 
 /**
- * The one write all four restores make.
+ * Puts a bundle back, as it was — switch, dates and dishes included. A dish
+ * inside it archived since is still reported by the bundles list as "Not
+ * showing", which is where that is fixed.
+ *
+ * **Refuses when its shop is archived**, for the reason {@link restoreStore}
+ * refuses an archived category: it would come back somewhere nothing draws.
+ * Read back rather than trusted from the row on screen.
+ */
+export async function restoreBundle(id: string): Promise<void> {
+  const { data, error: lookup } = await getClient()
+    .from("menu_items")
+    .select("is_bundle, stores ( name, deleted_at )")
+    .eq("id", id)
+    .single();
+
+  if (lookup) throw new Error(lookup.message);
+  // Never clears `deleted_at` on a plain dish from here: that is the shop
+  // archive's job, with its section check.
+  if (!data?.is_bundle) throw new Error(t("archive.notABundle"));
+
+  const store = one(data.stores);
+  if (store?.deleted_at != null) {
+    throw new Error(
+      t("archive.shopGoneFirst", {
+        name: pickLocalized((store.name as Localized) ?? {}),
+      }),
+    );
+  }
+
+  await clearDeletedAt("menu_items", id);
+}
+
+/**
+ * The one write all the restores make.
  *
  * A shared helper rather than four near-identical functions: they differ only
  * in a table name, and four copies is four places for the column to be spelled

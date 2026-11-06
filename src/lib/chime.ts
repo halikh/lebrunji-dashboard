@@ -157,3 +157,50 @@ function note(
   oscillator.start(start);
   oscillator.stop(start + duration + 0.02);
 }
+
+/**
+ * Whether the browser will let the chime play yet.
+ *
+ * ## Why this needs saying on screen
+ *
+ * After a reload, or a tab opened straight onto the dashboard, the browser
+ * keeps the page silent until somebody clicks or types on it. On most pages
+ * that happens within seconds. On Orders it may not happen at all: it is the
+ * page people leave open and watch, so the first order of the shift arrived
+ * in silence there and chimed everywhere else — which looked like the Orders
+ * page had no sound. Nothing in code can lift the rule, so the shell says the
+ * sound is off and offers the one click that turns it on.
+ *
+ * `navigator.userActivation.hasBeenActive` is the browser's own answer, and
+ * stays true for the life of the page once set. Where it is missing (older
+ * Safari), the audio context's state stands in.
+ */
+const lockListeners = new Set<() => void>();
+
+function notifyLock() {
+  for (const listener of lockListeners) listener();
+}
+
+export function soundLocked(): boolean {
+  if (typeof window === "undefined") return false;
+  const activation = (
+    navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }
+  ).userActivation;
+  if (activation) return !activation.hasBeenActive;
+  return context?.state !== "running";
+}
+
+export function subscribeSoundLock(listener: () => void) {
+  lockListeners.add(listener);
+  const events = ["pointerdown", "keydown"] as const;
+  // After the handlers that unlock, so the answer has changed by the time it
+  // is read again.
+  const later = () => setTimeout(notifyLock, 0);
+  for (const name of events) window.addEventListener(name, later);
+  context?.addEventListener("statechange", notifyLock);
+  return () => {
+    lockListeners.delete(listener);
+    for (const name of events) window.removeEventListener(name, later);
+    context?.removeEventListener("statechange", notifyLock);
+  };
+}
