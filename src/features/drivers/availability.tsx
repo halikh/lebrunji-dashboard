@@ -2,7 +2,7 @@
 
 import { RotateCcw } from "lucide-react";
 
-import { Badge, Button, Switch, cx } from "@/components/ui";
+import { Badge, Button, Switch, Tooltip, cx } from "@/components/ui";
 import { nextChangeAt } from "@/features/catalog/shops/next-change";
 import { useClock } from "@/features/settings/use-clock";
 import { t } from "@/i18n/translations";
@@ -116,17 +116,6 @@ export function AvailabilityControl({
     });
   }
 
-  const back = overridden && (
-    <button
-      type="button"
-      disabled={save.isPending}
-      onClick={() => override(null)}
-      className="font-medium text-accent hover:text-accent-hover hover:underline disabled:opacity-50"
-    >
-      {t("drivers.followRota")}
-    </button>
-  );
-
   if (layout === "card") {
     return (
       <div className="flex flex-col gap-3">
@@ -159,15 +148,36 @@ export function AvailabilityControl({
     );
   }
 
+  // In a row, the way back is an icon in a slot every row keeps, filled or
+  // not. As a text link stacked under the switch it made overridden rows
+  // wider and taller than the rest, so the badges, the switches and the
+  // buttons beside them stopped lining up down the list (user, 2026-11-07).
+  // The words are not lost: the line under the name says "Overruled
+  // tonight", and the button's tooltip and name say what it does.
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex items-center gap-1">
       <Switch
         checked={taking}
         disabled={save.isPending}
         onCheckedChange={(on) => override(on)}
         aria-label={t("drivers.onShift")}
       />
-      {overridden && <span className="text-[12px]">{back}</span>}
+      {overridden ? (
+        <Tooltip content={t("drivers.followRota")}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t("drivers.followRota")}
+            disabled={save.isPending}
+            onClick={() => override(null)}
+            className="text-accent hover:text-accent-hover"
+          >
+            <RotateCcw />
+          </Button>
+        </Tooltip>
+      ) : (
+        <span aria-hidden className="size-8 shrink-0" />
+      )}
     </div>
   );
 }
