@@ -645,11 +645,14 @@ export async function groupAisles(
   storeId: string,
   title: Localized,
   sectionIds: string[],
+  imageUrl: string,
 ): Promise<string> {
+  // The picture is required by the database since app migration 0261.
   const { data, error } = await getClient().rpc("menu_group_aisles", {
     p_store_id: storeId,
     p_title: titleLocalized(title),
     p_section_ids: sectionIds,
+    p_image_url: imageUrl,
   });
 
   if (error) throw new Error(friendly(error.message));
@@ -667,11 +670,14 @@ export async function groupAisles(
  */
 export async function gatherLooseProducts(
   sectionId: string,
+  imageUrl: string,
   title?: Localized,
 ): Promise<string> {
+  // The new sub-aisle's picture, required by the database since 0261.
   const { data, error } = await getClient().rpc("menu_gather_loose_products", {
     p_section_id: sectionId,
     p_title: title ? titleLocalized(title) : null,
+    p_image_url: imageUrl,
   });
 
   if (error) throw new Error(friendly(error.message));
@@ -843,6 +849,10 @@ function friendly(message: string): string {
   }
   if (message.includes("still holds") && message.includes("sub-aisle")) {
     return t("dbError.aisleHoldsSubAisles");
+  }
+  // 0261: an aisle or sub-aisle without a picture.
+  if (message.includes("needs a picture")) {
+    return t("dbError.needsPicture");
   }
 
   // Unrecognised. The raw Postgres message is ugly and *true*; a friendly

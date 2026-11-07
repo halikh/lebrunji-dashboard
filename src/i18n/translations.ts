@@ -1133,6 +1133,9 @@ const en = {
     aisleArchived: "Its aisle is archived. Restore the aisle first, then this.",
     aisleHoldsSubAisles:
       "This aisle still holds sub-aisles. Move or archive them first.",
+    // 0261: the database refuses an aisle or sub-aisle without a picture.
+    needsPicture:
+      "Aisles and sub-aisles need a picture. Add one, then save again.",
   },
 
   form: {
@@ -1481,6 +1484,9 @@ const en = {
     // The switch refused by 0196 while products sit directly on an aisle.
     menuLayoutNeedsSubAisles:
       "Some products sit directly on a section. On the aisles layout every product is in a sub-aisle — on the Menu tab, use Move to group sections under an aisle first, then switch.",
+    // 0261: the same switch, refused while a section has no picture.
+    menuLayoutNeedsPictures:
+      "Some sections have no picture. On the aisles layout every aisle and sub-aisle is a tile in the app — on the Menu tab, edit each section without one and add its picture, then switch.",
     hiddenHintNew:
       "Recommended for now — it has no menu or opening hours yet. Turn it on from the shops list when it is ready.",
 
@@ -3569,6 +3575,13 @@ const en = {
     // A sub-aisle's tile too, since its aisle's page shows them (0196).
     sectionImageHint:
       "Shown on its tile when the shop's menu layout is Aisles — an aisle on the shop's page, a sub-aisle on its aisle's page. Without one, the tile shows its first item's picture.",
+    sectionImageHintRequired:
+      "Required for aisles and sub-aisles: it is the tile customers tap in the app — an aisle on the shop's page, a sub-aisle on its aisle's page.",
+    sectionImageRequired: "Add a picture. Aisles and sub-aisles need one.",
+    // On the Menu tab, beside an aisle or sub-aisle saved before pictures
+    // were required. Rename it to add one.
+    noPicture: "No picture",
+    gatherTitle: "Gather {name}'s loose products",
     sectionAdded: "{name} added",
     // The new name, not the old one: it is what the operator is looking at
     // in the list, and it confirms the edit landed as typed.

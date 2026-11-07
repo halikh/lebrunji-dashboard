@@ -314,8 +314,11 @@ export function useAisles(storeId: string) {
   });
 
   const group = useMutation({
-    mutationFn: (input: { title: Localized; sectionIds: string[] }) =>
-      groupAisles(storeId, input.title, input.sectionIds),
+    mutationFn: (input: {
+      title: Localized;
+      sectionIds: string[];
+      imageUrl: string;
+    }) => groupAisles(storeId, input.title, input.sectionIds, input.imageUrl),
     onSuccess: (_result, input) => {
       toast.success(
         t("menu.aislesGrouped", { name: pickLocalized(input.title) }),
@@ -325,8 +328,11 @@ export function useAisles(storeId: string) {
   });
 
   const gather = useMutation({
-    mutationFn: (input: { sectionId: string; name: Localized }) =>
-      gatherLooseProducts(input.sectionId),
+    mutationFn: (input: {
+      sectionId: string;
+      name: Localized;
+      imageUrl: string;
+    }) => gatherLooseProducts(input.sectionId, input.imageUrl),
     onSuccess: (_result, input) => {
       toast.success(
         t("menu.looseGathered", { name: pickLocalized(input.name) }),

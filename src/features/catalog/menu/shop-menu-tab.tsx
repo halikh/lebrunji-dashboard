@@ -25,6 +25,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import {
+  Badge,
   Button,
   Checkbox,
   ConfirmDialog,
@@ -74,6 +75,7 @@ import {
 import { useStore } from "../use-stores";
 import { DishList, DishRow, type RowOrder } from "./dish-row";
 import {
+  GatherDialog,
   MoveSectionDialog,
   SectionDialog,
   type SectionMoves,
@@ -797,9 +799,9 @@ function SectionBlock({
             },
             { onSuccess: done },
           ),
-        group: (name, done) =>
+        group: (name, imageUrl, done) =>
           aisles.group.mutate(
-            { title: name, sectionIds: [section.id] },
+            { title: name, sectionIds: [section.id], imageUrl },
             { onSuccess: done },
           ),
       }
@@ -808,6 +810,7 @@ function SectionBlock({
   // Products placed directly on an aisle before 0196, which may not hold them
   // any more. They keep selling; this is the way out for them.
   const loose = !holdsProducts && section.items.length > 0;
+  const [gathering, setGathering] = useState(false);
 
   const addDish = guarded(() =>
     router.push(newDishHref(ctx.storeId, section.id)),
@@ -949,6 +952,11 @@ function SectionBlock({
             {title}
           </h3>
           <LevelTag level={level} />
+          {level !== "section" && !section.imageUrl && (
+            <Badge tone="warning" dot>
+              {t("menu.noPicture")}
+            </Badge>
+          )}
           <span className="shrink-0 text-[12.5px] text-ink-3 tabular-nums">
             {subs.length > 0
               ? t("menu.aisleCount", {
@@ -1010,15 +1018,22 @@ function SectionBlock({
               <Button
                 size="sm"
                 pending={aisles.gather.isPending}
-                onClick={() =>
-                  aisles.gather.mutate({
-                    sectionId: section.id,
-                    name: section.title,
-                  })
-                }
+                onClick={() => setGathering(true)}
               >
                 {t("menu.looseGather")}
               </Button>
+              <GatherDialog
+                open={gathering}
+                onOpenChange={setGathering}
+                name={title}
+                pending={aisles.gather.isPending}
+                onGather={(imageUrl) =>
+                  aisles.gather.mutate(
+                    { sectionId: section.id, name: section.title, imageUrl },
+                    { onSuccess: () => setGathering(false) },
+                  )
+                }
+              />
             </div>
           )}
 

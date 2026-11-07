@@ -36,7 +36,9 @@ export type SectionFields = { title: Localized; imageUrl: string | null };
  *
  * The picture is asked of every shop's sections, not only supermarkets': it is
  * read only when the shop's layout is Aisles, and asking regardless lets the
- * pictures be in place before the layout is switched.
+ * pictures be in place before the layout is switched. For an aisle or a
+ * sub-aisle it is required: those are tiles in the app, and a tile falling
+ * back to its first item's picture looks like a product, not an aisle.
  */
 export function SectionDialog({
   open,
@@ -112,6 +114,8 @@ function SectionForm({
     initial?.imageUrl ?? null,
   );
   const [error, setError] = useState<string | undefined>(undefined);
+  const [imageError, setImageError] = useState<string | undefined>(undefined);
+  const needsImage = level !== "section";
 
   const dirty = changed(
     { title, imageUrl },
@@ -121,11 +125,10 @@ function SectionForm({
 
   function submit() {
     const result = validateLocalizedText(title, codes, TEXT.title);
-    if (!result.ok) {
-      setError(t(result.key, result.params));
-      return;
-    }
-    setError(undefined);
+    setError(result.ok ? undefined : t(result.key, result.params));
+    const missingImage = needsImage && !imageUrl?.trim();
+    setImageError(missingImage ? t("menu.sectionImageRequired") : undefined);
+    if (!result.ok || missingImage) return;
     onSave({ title, imageUrl });
   }
 
@@ -147,10 +150,22 @@ function SectionForm({
         filter="title"
         placeholder={placeholder}
       />
-      <Field label={t("menu.sectionImage")} hint={t("menu.sectionImageHint")}>
+      <Field
+        label={t("menu.sectionImage")}
+        hint={t(
+          needsImage
+            ? "menu.sectionImageHintRequired"
+            : "menu.sectionImageHint",
+        )}
+        required={needsImage}
+        error={imageError}
+      >
         <ImageUploader
           value={imageUrl}
-          onChange={setImageUrl}
+          onChange={(next) => {
+            setImageUrl(next);
+            if (next) setImageError(undefined);
+          }}
           folder="menu-sections"
           shape={ARTWORK_SHAPES.aisle}
           cutout
@@ -188,8 +203,8 @@ export type SectionMoves = {
   pending: boolean;
   /** Under `target`, or out to an aisle of its own when null. */
   move: (target: string | null, done: () => void) => void;
-  /** Into a new aisle called `title`. */
-  group: (title: Localized, done: () => void) => void;
+  /** Into a new aisle called `title`, with its (required) picture. */
+  group: (title: Localized, imageUrl: string, done: () => void) => void;
 };
 
 /**
@@ -247,9 +262,16 @@ function MoveForm({
 
   const [target, setTarget] = useState("");
   const [title, setTitle] = useState<Localized>({});
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [imageError, setImageError] = useState<string | undefined>(undefined);
 
-  useUnsavedChanges(changed({ target, title }, { target: "", title: {} }));
+  useUnsavedChanges(
+    changed(
+      { target, title, imageUrl },
+      { target: "", title: {}, imageUrl: null },
+    ),
+  );
 
   const options = [
     ...(moves.canGroup
@@ -271,12 +293,11 @@ function MoveForm({
     }
     if (target === NEW_AISLE) {
       const result = validateLocalizedText(title, codes, TEXT.title);
-      if (!result.ok) {
-        setError(t(result.key, result.params));
-        return;
-      }
-      setError(undefined);
-      moves.group(title, onDone);
+      setError(result.ok ? undefined : t(result.key, result.params));
+      const picture = imageUrl?.trim() ?? "";
+      setImageError(picture ? undefined : t("menu.sectionImageRequired"));
+      if (!result.ok || !picture) return;
+      moves.group(title, picture, onDone);
       return;
     }
     setError(undefined);
@@ -311,6 +332,26 @@ function MoveForm({
           placeholder={{ en: "Dairy & Eggs", ar: "ألبان وبيض" }}
         />
       )}
+      {target === NEW_AISLE && (
+        <Field
+          label={t("menu.sectionImage")}
+          hint={t("menu.sectionImageHintRequired")}
+          required
+          error={imageError}
+        >
+          <ImageUploader
+            value={imageUrl}
+            onChange={(next) => {
+              setImageUrl(next);
+              if (next) setImageError(undefined);
+            }}
+            folder="menu-sections"
+            shape={ARTWORK_SHAPES.aisle}
+            cutout
+            disabled={moves.pending}
+          />
+        </Field>
+      )}
       <div className="sticky bottom-0 z-10 -mx-6 -mb-5 mt-auto flex justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
         <Button variant="secondary" onClick={onCancel} disabled={moves.pending}>
           {t("common.cancel")}
@@ -320,5 +361,85 @@ function MoveForm({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * "Gather loose products" — a new sub-aisle holding every product sitting
+ * directly on the aisle. It is a sub-aisle, so it needs its picture before it
+ * is made (0261); the title is the aisle's, as before.
+ */
+export function GatherDialog({
+  open,
+  onOpenChange,
+  name,
+  pending,
+  onGather,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  name: string;
+  pending: boolean;
+  onGather: (imageUrl: string) => void;
+}) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | undefined>(undefined);
+
+  function submit() {
+    const picture = imageUrl?.trim() ?? "";
+    if (!picture) {
+      setImageError(t("menu.sectionImageRequired"));
+      return;
+    }
+    onGather(picture);
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (pending) return;
+        if (!next) {
+          setImageUrl(null);
+          setImageError(undefined);
+        }
+        onOpenChange(next);
+      }}
+      title={t("menu.gatherTitle", { name })}
+      description={t("menu.looseBody")}
+      footer={
+        <>
+          <Button
+            variant="secondary"
+            onClick={() => onOpenChange(false)}
+            disabled={pending}
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button variant="primary" onClick={submit} pending={pending}>
+            {t("menu.looseGather")}
+          </Button>
+        </>
+      }
+    >
+      <Field
+        label={t("menu.sectionImage")}
+        hint={t("menu.sectionImageHintRequired")}
+        required
+        error={imageError}
+      >
+        <ImageUploader
+          value={imageUrl}
+          onChange={(next) => {
+            setImageUrl(next);
+            if (next) setImageError(undefined);
+          }}
+          folder="menu-sections"
+          shape={ARTWORK_SHAPES.aisle}
+          cutout
+          disabled={pending}
+        />
+      </Field>
+    </Dialog>
   );
 }

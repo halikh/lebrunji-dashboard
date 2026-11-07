@@ -1033,6 +1033,10 @@ function friendly(message: string): string {
   if (message.includes("every product is in a sub-aisle")) {
     return t("store.menuLayoutNeedsSubAisles");
   }
+  // 0261: the same switch, refused while a section has no picture.
+  if (message.includes("every aisle and sub-aisle has one")) {
+    return t("store.menuLayoutNeedsPictures");
+  }
   if (message.includes("slug")) return t("dbError.duplicateSlug");
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("_len")) return t("dbError.tooLong");
