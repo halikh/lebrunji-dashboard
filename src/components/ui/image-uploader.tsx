@@ -12,11 +12,15 @@ import {
 
 import { t } from "@/i18n/translations";
 import { withFocus, type Focus } from "@/lib/image-focus";
+import type { ImagePromptKind } from "@/lib/image-prompts";
 import {
+  coverPixelsNeeded,
+  exampleSize,
   fitsShape,
   isCutout,
   measureImage,
   PHOTO_FRAMES,
+  shapeName,
   type ImageShape,
   type PhotoKind,
 } from "@/lib/image-shape";
@@ -31,6 +35,7 @@ import {
   type FramerSource,
 } from "./image-framer";
 import { PreviewImage } from "./image-preview";
+import { ImagePrompt } from "./image-prompt";
 
 /**
  * The largest file a photo may be *before* framing. What is uploaded is the
@@ -76,6 +81,14 @@ const PHOTO_SOURCE_MAX_MB = 30;
  *
  * Five megabytes over a tethered phone is slow enough that a silent spinner
  * looks like a hang — the state in which people press the button again.
+ *
+ * ## It says what it wants before it is asked
+ *
+ * The line under the box names the shape in words and as a ratio, with a size
+ * in pixels that fits it ("Square 1:1, e.g. 1254 × 1254 px"), and the file
+ * types it takes — so the refusals above are the exception, not how the rules
+ * are learnt. With `prompt`, the house ChatGPT prompt for this kind of
+ * picture sits under it (`ImagePrompt`).
  */
 export function ImageUploader({
   value,
@@ -85,6 +98,7 @@ export function ImageUploader({
   cutout = false,
   photo,
   reframe = true,
+  prompt,
   disabled = false,
   id,
   "aria-describedby": describedBy,
@@ -113,6 +127,11 @@ export function ImageUploader({
    * because a new point would have to be saved somewhere it does not belong.
    */
   reframe?: boolean;
+  /**
+   * Offer the house ChatGPT prompt for this kind of picture, about `subject`
+   * (the row's English name as the form has it).
+   */
+  prompt?: { kind: ImagePromptKind; subject: string };
   disabled?: boolean;
   /** `Field`'s render props. */
   id?: string;
@@ -236,81 +255,105 @@ export function ImageUploader({
 
   const busy = progress !== null;
   const invalid = ariaInvalid === true || ariaInvalid === "true";
+  const mb = Math.round(IMAGE.maxBytes / (1024 * 1024));
+  const named = (one: ImageShape) =>
+    t(`images.shapeName.${shapeName(one)}`, {
+      shape: `${one.width}:${one.height}`,
+    });
+  const example = shape ? exampleSize(shape) : null;
   const rules = (
     <p className="text-[12px] text-ink-4">
       {frame
         ? t("controls.imagePhotoRules", {
-            shape: `${frame.shape.width}:${frame.shape.height}`,
+            shape: named(frame.shape),
+            pixels: coverPixelsNeeded(
+              frame.cover,
+              frame.shape.width / frame.shape.height,
+            ),
           })
-        : t("controls.imageRules", {
-            mb: Math.round(IMAGE.maxBytes / (1024 * 1024)),
-          })}
-      {shape &&
-        `, ${t("controls.imageShape", { shape: `${shape.width}:${shape.height}` })}`}
-      {cutout && `, ${t("controls.imageCutout")}`}
+        : [
+            shape &&
+              example &&
+              t("controls.imageShape", {
+                shape: named(shape),
+                width: example.width,
+                height: example.height,
+              }),
+            cutout
+              ? t("controls.imageCutoutRules", { mb })
+              : t("controls.imageRules", { mb }),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
     </p>
+  );
+  const promptPanel = prompt && (
+    <ImagePrompt kind={prompt.kind} subject={prompt.subject} />
   );
 
   if (value) {
     return (
-      <div
-        id={id}
-        aria-describedby={describedBy}
-        aria-invalid={invalid || undefined}
-        className="flex items-start gap-4"
-        onPaste={(event) => {
-          const file = Array.from(event.clipboardData.files)[0];
-          if (file) void accept(file);
-        }}
-      >
-        {/* Clickable, to judge the picture full size before saving. */}
-        <PreviewImage
-          src={value}
-          className={cx(
-            "size-24",
-            cutout &&
-              "bg-[repeating-conic-gradient(var(--color-hover)_0%_25%,var(--color-surface)_0%_50%)] bg-[length:12px_12px]",
-          )}
-        />
+      <div className="flex flex-col gap-3">
+        <div
+          id={id}
+          aria-describedby={describedBy}
+          aria-invalid={invalid || undefined}
+          className="flex items-start gap-4"
+          onPaste={(event) => {
+            const file = Array.from(event.clipboardData.files)[0];
+            if (file) void accept(file);
+          }}
+        >
+          {/* Clickable, to judge the picture full size before saving. */}
+          <PreviewImage
+            src={value}
+            className={cx(
+              "size-24",
+              cutout &&
+                "bg-[repeating-conic-gradient(var(--color-hover)_0%_25%,var(--color-surface)_0%_50%)] bg-[length:12px_12px]",
+            )}
+          />
 
-        <div className="flex min-w-0 flex-col items-start gap-2 pt-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={disabled || busy}
-              onClick={() => input.current?.click()}
-            >
-              <RefreshCw />
-              {t("images.replace")}
-            </Button>
-            {frame && reframe && (
+          <div className="flex min-w-0 flex-col items-start gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="secondary"
                 size="sm"
                 disabled={disabled || busy}
-                onClick={() => setFraming({ kind: "url", url: value })}
+                onClick={() => input.current?.click()}
               >
-                <Crosshair />
-                {t("images.adjust")}
+                <RefreshCw />
+                {t("images.replace")}
               </Button>
-            )}
-            <Button
-              variant="danger-soft"
-              size="sm"
-              disabled={disabled || busy}
-              onClick={() => onChange(null)}
-            >
-              <Trash2 />
-              {t("images.remove")}
-            </Button>
+              {frame && reframe && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={disabled || busy}
+                  onClick={() => setFraming({ kind: "url", url: value })}
+                >
+                  <Crosshair />
+                  {t("images.adjust")}
+                </Button>
+              )}
+              <Button
+                variant="danger-soft"
+                size="sm"
+                disabled={disabled || busy}
+                onClick={() => onChange(null)}
+              >
+                <Trash2 />
+                {t("images.remove")}
+              </Button>
+            </div>
+            {busy ? <Progress fraction={progress} /> : rules}
+            {error && <Problem>{error}</Problem>}
           </div>
-          {busy ? <Progress fraction={progress} /> : rules}
-          {error && <Problem>{error}</Problem>}
-        </div>
 
-        <Picker input={input} onFile={accept} disabled={disabled} />
-        {framer}
+          <Picker input={input} onFile={accept} disabled={disabled} />
+          {framer}
+        </div>
+        {promptPanel}
       </div>
     );
   }
@@ -381,6 +424,7 @@ export function ImageUploader({
 
       <Picker input={input} onFile={accept} disabled={disabled} />
       {framer}
+      {promptPanel && <div className="mt-1.5">{promptPanel}</div>}
     </div>
   );
 }

@@ -226,6 +226,7 @@ function Form({
         label={t("categories.icon")}
         hint={t("categories.iconHint")}
         error={errors.icon}
+        required
       >
         <ImageUploader
           value={iconUrl}
@@ -238,6 +239,7 @@ function Form({
           folder="category-art"
           shape={ARTWORK_SHAPES.categoryIcon}
           cutout
+          prompt={{ kind: "category", subject: name.en ?? "" }}
           disabled={pending}
         />
       </Field>

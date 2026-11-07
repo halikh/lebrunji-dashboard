@@ -535,7 +535,11 @@ function Form({
           optional
         />
 
-        <Field label={t("images.label")} hint={t("bundles.imageHint")}>
+        <Field
+          label={t("images.label")}
+          hint={t("bundles.imageHint")}
+          optional={t("form.optional")}
+        >
           <ImageUploader
             value={imageUrl}
             onChange={setImageUrl}

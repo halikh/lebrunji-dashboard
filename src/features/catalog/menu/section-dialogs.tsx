@@ -158,6 +158,7 @@ function SectionForm({
             : "menu.sectionImageHint",
         )}
         required={needsImage}
+        optional={needsImage ? undefined : t("form.optional")}
         error={imageError}
       >
         <ImageUploader
@@ -169,6 +170,12 @@ function SectionForm({
           folder="menu-sections"
           shape={ARTWORK_SHAPES.aisle}
           cutout
+          // A plain section is drawn as an aisle tile if the shop switches
+          // layout, so it is asked for in the aisle style too.
+          prompt={{
+            kind: level === "subAisle" ? "subAisle" : "aisle",
+            subject: title.en ?? "",
+          }}
           disabled={pending}
         />
       </Field>
@@ -348,6 +355,7 @@ function MoveForm({
             folder="menu-sections"
             shape={ARTWORK_SHAPES.aisle}
             cutout
+            prompt={{ kind: "aisle", subject: title.en ?? "" }}
             disabled={moves.pending}
           />
         </Field>
@@ -437,6 +445,8 @@ export function GatherDialog({
           folder="menu-sections"
           shape={ARTWORK_SHAPES.aisle}
           cutout
+          // The new sub-aisle takes the aisle's name.
+          prompt={{ kind: "subAisle", subject: name }}
           disabled={pending}
         />
       </Field>

@@ -32,7 +32,45 @@ export const ARTWORK_SHAPES = {
   tile: { width: 4, height: 5 },
   categoryIcon: { width: 1, height: 1 },
   aisle: { width: 1, height: 1 },
+  // Every live tag icon is a transparent square (500 × 500); until
+  // 2026-11-07 nothing said so, and nothing stopped a photo going in.
+  tagIcon: { width: 1, height: 1 },
 } as const satisfies Record<string, ImageShape>;
+
+/**
+ * The shape in a word — what the team calls it, for the uploader's line.
+ * Anything wider than 2:1 is "wide" (a banner), so 4:3 stays "landscape".
+ */
+export function shapeName(
+  shape: ImageShape,
+): "square" | "portrait" | "landscape" | "wide" {
+  const ratio = shape.width / shape.height;
+  if (ratio === 1) return "square";
+  if (ratio < 1) return "portrait";
+  return ratio > 2 ? "wide" : "landscape";
+}
+
+/**
+ * A size in pixels to quote for `shape`.
+ *
+ * For the shapes the art is made in, the size ChatGPT returns for that shape
+ * — which is the size of every such picture in production on 2026-11-07, and
+ * so a file generated from `lib/image-prompts.ts` passes {@link fitsShape} as
+ * it comes. Anything else is worked out at 1200 pixels across.
+ */
+export function exampleSize(shape: ImageShape): {
+  width: number;
+  height: number;
+} {
+  const key = `${shape.width}:${shape.height}`;
+  if (key === "1:1") return { width: 1254, height: 1254 };
+  if (key === "4:5") return { width: 1122, height: 1402 };
+  if (key === "21:9") return { width: 1915, height: 821 };
+  return {
+    width: 1200,
+    height: Math.round((1200 * shape.height) / shape.width),
+  };
+}
 
 /**
  * ## Photographs: one master shape, cropped again by the app

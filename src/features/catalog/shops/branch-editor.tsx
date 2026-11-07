@@ -500,6 +500,7 @@ function BranchForm({
                   ? t("branches.imageOwnHint")
                   : t("branches.imageSharedHint")
               }
+              optional={t("form.optional")}
             >
               <ImageUploader
                 value={imageUrl ?? store?.imageUrl ?? null}

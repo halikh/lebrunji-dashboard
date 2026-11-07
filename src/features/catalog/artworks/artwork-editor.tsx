@@ -14,6 +14,7 @@ import {
   cx,
 } from "@/components/ui";
 import { DateField } from "@/components/ui/date-field";
+import { ImagePrompt } from "@/components/ui/image-prompt";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { LocalizedImageField } from "@/components/ui/localized-image-field";
 import { MultiSelect, Select } from "@/components/ui/select";
@@ -570,6 +571,9 @@ function Form({
           disabled={pending}
           error={errors.image}
         />
+        {/* One prompt, not one per language: the Arabic picture is the same
+            image with its words redone, which the panel's last step asks for. */}
+        <ImagePrompt kind={format} subject={altText.en ?? ""} />
 
         <LocalizedField
           label={t("artworks.altText")}

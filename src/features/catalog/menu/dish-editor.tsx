@@ -426,7 +426,11 @@ export function DishEditor({
 
               {/* Optional (0153): without one, the app draws its placeholder. */}
               <Section title={t("menu.media")}>
-                <Field label={t("images.label")} hint={t("images.hint")}>
+                <Field
+                  label={t("images.label")}
+                  hint={t("images.hint")}
+                  optional={t("form.optional")}
+                >
                   {(field) => (
                     <ImageUploader
                       {...field}

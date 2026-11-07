@@ -21,6 +21,7 @@ import {
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { ARTWORK_SHAPES } from "@/lib/image-shape";
 import { TEXT } from "@/lib/limits";
 import { isTagName } from "@/lib/text-format";
 import {
@@ -185,6 +186,7 @@ function Form({
         label={t("tags.icon")}
         hint={t("tags.iconHint")}
         error={errors.icon}
+        required
       >
         <ImageUploader
           value={iconUrl}
@@ -195,6 +197,9 @@ function Form({
             }
           }}
           folder="tag-art"
+          shape={ARTWORK_SHAPES.tagIcon}
+          cutout
+          prompt={{ kind: "tag", subject: name.en ?? "" }}
           disabled={pending}
         />
       </Field>

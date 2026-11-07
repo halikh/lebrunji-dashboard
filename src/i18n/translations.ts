@@ -1257,7 +1257,9 @@ const en = {
    */
   images: {
     label: "Image",
-    hint: "Shown in the app beside the name. JPEG, PNG or WebP. Optional.",
+    // A dish's photo. Says what happens without one (0153), since the box
+    // being empty is allowed and the team asks.
+    hint: "Without one, the app shows a placeholder. Shown on the menu card, the Home rail and the dish page.",
     choose: "Choose an image",
     drop: "Drop an image here, or",
     browse: "browse",
@@ -1326,6 +1328,50 @@ const en = {
       thumb: "Thumbnail",
       shopPage: "Shop page",
     },
+    // The shape in words, then its ratio — "Square 1:1". Chosen by the ratio
+    // in `ImageUploader`; the team says "square" and "wide", not "21:9".
+    shapeName: {
+      square: "Square {shape}",
+      portrait: "Portrait {shape}",
+      landscape: "Landscape {shape}",
+      wide: "Wide {shape}",
+    },
+  },
+
+  /**
+   * "Make it with ChatGPT" under a required picture (`ImagePrompt`). The
+   * prompts themselves are in `lib/image-prompts.ts` — they are input to a
+   * model, not chrome, and stay English.
+   */
+  imagePrompt: {
+    title: "Make it with ChatGPT",
+    intro: {
+      category:
+        "The same prompt every category's icon was made with, so a new one matches the strip: a glossy 3D group of things from that kind of shop, on a transparent background.",
+      aisle:
+        "The same prompt every aisle's picture was made with, so a new one matches its neighbours: a glossy 3D group of products from the aisle, on a transparent background.",
+      subAisle:
+        "The same prompt every sub-aisle's picture was made with: the product itself in glossy 3D, with how it is eaten or used, on a transparent background.",
+      tag: "The same prompt every tag icon was made with: a small cartoon sticker with a dark outline, on a transparent background.",
+      tile: "The house style for cards: one bold, playful idea, shot on plain red, yellow or cream.",
+      banner:
+        "The house style for banners: one bold, playful idea on plain red, yellow or cream, with room on the left for the words.",
+    },
+    subject: "What to draw",
+    subjectPlaceholder: "Filled in from the English name",
+    idea: "The idea",
+    ideaPlaceholder: "A delivery rider racing a cheetah",
+    headline: "Words on the picture (optional)",
+    headlinePlaceholder: "20% off your first order",
+    promptLabel: "The prompt",
+    copy: "Copy prompt",
+    open: "Open ChatGPT",
+    step1: "Paste the prompt into ChatGPT and download the picture it makes.",
+    step2: "Drop the downloaded file into the box above.",
+    stepCutout:
+      "If it comes back with a background, ask ChatGPT: “Make the background transparent.”",
+    stepArabic:
+      "For the Arabic picture, ask ChatGPT for the same image with the words in Arabic, and upload it in the Arabic box.",
   },
 
   /**
@@ -1511,7 +1557,8 @@ const en = {
     detailsFailed: "Could not load the shop",
     name: "Shop name",
     nameHint: "What customers see at the top of the shop.",
-    imageHint: "The picture on the shop's card in the app.",
+    imageHint:
+      "Without one, the app shows a placeholder. The shop's photo on Home, in search and at the top of its page; every branch without its own uses it.",
     prepTitle: "Preparation time",
     whatsapp: "WhatsApp number",
     // Says what its absence costs, which is the part somebody skipping the
@@ -2840,7 +2887,8 @@ const en = {
     name: "Name",
     description: "Description",
     descriptionHint: "Optional. The app lists what's inside anyway.",
-    imageHint: "The picture on the bundle's card in the app.",
+    imageHint:
+      "Without one, the app shows a placeholder. The picture on the bundle's card and page.",
     itemsSection: "What's inside",
     pickDishes: "Dishes",
     pickDishesHint:
@@ -3050,8 +3098,8 @@ const en = {
     // 21:9 (the app's `offer-card.tsx`) and a tile is square.
     imageHint: {
       banner:
-        "Wide, 21:9 — for example 2100 × 900 pixels. The words are in the picture, so each language gets its own. English is required; without an Arabic one, the English is shown.",
-      tile: "Portrait, 4:5 — for example 800 × 1000 pixels. The words are in the picture, so each language gets its own. English is required; without an Arabic one, the English is shown.",
+        "Wide, 21:9. The words are in the picture, so each language gets its own. English is required; without an Arabic one, the English is shown.",
+      tile: "Portrait, 4:5. The words are in the picture, so each language gets its own. English is required; without an Arabic one, the English is shown.",
     },
     imageRequired: "Add the picture — without one there is nothing to show.",
     // Names the boxes, because after switching format it is usually all of
@@ -3846,7 +3894,7 @@ const en = {
     // alone means, because "empty" and "the same as the shop" look identical
     // in a form and are not the same thing at all.
     imageSharedHint:
-      "The shop's picture. Choose one here to give this branch its own.",
+      "The shop's picture, used until you choose one here to give this branch its own.",
     imageOwnHint:
       "This branch's own picture. Remove it to go back to the shop's.",
     currency: "Prices in",
@@ -4096,11 +4144,17 @@ const en = {
     // carries the country.
     phoneLabel: "Phone number, country code +{code}",
     imageRules: "JPEG, PNG or WebP, up to {mb} MB",
-    imageShape: "shape {shape}",
+    // Leads the line when the picture has one shape it must be. The example
+    // size is the one ChatGPT returns for it, so a generated file fits.
+    imageShape: "{shape}, e.g. {width} × {height} px",
+    // A cut-out: a JPEG can never be one, so it is not offered.
+    imageCutoutRules:
+      "PNG or WebP with a transparent background, up to {mb} MB",
     // A shop or dish photo: any size goes in, because it is cropped and
-    // shrunk in the browser before it is uploaded.
-    imagePhotoRules: "JPEG, PNG or WebP — you crop it to {shape} next",
-    imageCutout: "transparent background",
+    // shrunk in the browser before it is uploaded. The width is what the
+    // page's cover needs to stay sharp (`coverPixelsNeeded`).
+    imagePhotoRules:
+      "{shape} — choose any JPEG, PNG or WebP photo and you crop it to that next. {pixels} px wide or more stays sharp.",
     // Comma-separated, January first / Monday first. Split by the calendar.
     months:
       "January,February,March,April,May,June,July,August,September,October,November,December",
