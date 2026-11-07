@@ -6,8 +6,17 @@
  * Deliberately not the customer app's palette: the app is playful, this is a
  * work tool. Neutral surfaces, one accent for "do this", and colour otherwise
  * reserved for meaning — order status, success, warning, danger.
+ *
+ * `static`: every token here is emitted, used by a class or not. Tailwind 4
+ * otherwise drops the variables no utility class names, and the status
+ * colours are mostly read by name at runtime — `statusTone()` builds
+ * `var(--color-status-delivered-wash)` in an inline style, which the build
+ * cannot see. Without it every status but Ordered (which a class happens to
+ * use) rendered with no wash and no dot: black text, its invisible pill's
+ * padding pushing it out of line with the shop name under it (dashboard,
+ * 2026-11-07).
  */
-@theme {
+@theme static {
   --font-sans:
     var(--font-inter), var(--font-plex-arabic), ui-sans-serif, system-ui,
     sans-serif;
