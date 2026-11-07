@@ -81,8 +81,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const liveOrders = live.data ?? 0;
 
+  // `overflow-clip`, here and on <main>, never `overflow-hidden`. A hidden box
+  // is still a scroll container — only the user cannot scroll it — so a
+  // `scrollIntoView` that the page's own scroller cannot satisfy (a focused
+  // row near the end of a list, asked to sit in the middle) scrolls *these*
+  // instead, sliding the sidebar and the page up and leaving a blank band
+  // underneath that nothing can scroll back (dashboard, 2026-11-07, a shop's
+  // menu opened with `&focus=` on its last dish). A clipped box clips the
+  // same and is not a scroll container, so nothing can move it.
   return (
-    <div data-app-shell className="flex h-dvh flex-col overflow-hidden">
+    <div data-app-shell className="flex h-dvh flex-col overflow-clip">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:font-medium focus:shadow-md"
@@ -141,7 +149,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <SoundLock />
 
-          <main id="main" className="min-h-0 flex-1 overflow-hidden">
+          <main id="main" className="min-h-0 flex-1 overflow-clip">
             {children}
           </main>
         </div>
