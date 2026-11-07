@@ -2,7 +2,7 @@ import { t } from "@/i18n/translations";
 import { formatDateTime } from "@/lib/time";
 import { formatMoney, type Currency } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
-import { unitLabel } from "@/lib/unit-label";
+import { sizeOf } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
 import {
@@ -43,6 +43,35 @@ import {
  * harder to skim than one that uses it for two. Bold marks the two things read
  * at a glance — the address and the amount — and nothing else.
  */
+
+/**
+ * One line of the bag, as the person packing it needs to read it.
+ *
+ * Three kinds of line, and each says the thing that decides what goes in:
+ *
+ * - **Sold as itself** — "2 × Kafta sandwich". A count.
+ * - **A fixed size** (a unit, no step) — "2 × Basmati rice (500 g each)". The
+ *   size is what tells the shop *which* rice: without it, "2 × Basmati rice"
+ *   leaves them to guess between the 500 g bag and the 5 kg sack, and the one
+ *   left on the counter is the one that was not ordered. "each" because two
+ *   of them is two bags of 500 g, not one bag of a kilo.
+ * - **Sold by amount** (a step) — "1.5 kg Minced beef", "750 g Halloumi",
+ *   "3 bags Charcoal". The amount is the order; there is no count to give.
+ *   The `×` stays off it: in front of an amount it reads as a multiplication.
+ *   See `0122`.
+ */
+export function whatToPack(line: OrderLine, quantity: number): string {
+  const unit = itemUnit(line);
+  // "1 piece" is the item itself, and saying so adds nothing to read.
+  if (!unit || (unit.unit === "piece" && unit.quantity === 1 && !unit.step))
+    return `${quantity} × ${line.name}`;
+  if (unit.step !== null) return `${sizeOf(unit, quantity)} ${line.name}`;
+
+  const size = sizeOf(unit, 1);
+  return `${quantity} × ${line.name} (${
+    quantity === 1 ? size : t("dispatch.packEach", { size })
+  })`;
+}
 
 /** The chat, with the message already in it. */
 export function whatsappLink(phone: string, message: string): string {
@@ -139,12 +168,9 @@ export function dispatchMessage(
       const amount = money(
         linePrice(line.unitPrice, line.optionsPrice, itemUnit(line), quantity),
       );
-      // "2 × Kafta" for a counted dish, "1.5 kg Kafta" for one sold by weight.
-      // The `×` goes with the count: it belongs in front of a number of things
-      // and reads as a multiplication in front of an amount. See `0122`.
-      const much = unitLabel(line, quantity);
-      const size = itemUnit(line)?.step == null ? `${much} × ` : `${much} `;
-      lines.push(`• ${size}${line.name}${amount ? ` — ${amount}` : ""}`);
+      lines.push(
+        `• ${whatToPack(line, quantity)}${amount ? ` — ${amount}` : ""}`,
+      );
       // Indented under the dish, because an option on its own line at the same
       // level reads as a second thing to pack.
       for (const option of line.options) lines.push(`   ${option}`);
@@ -243,10 +269,7 @@ export function kitchenMessage(
     const quantity = line.fulfilledQuantity ?? line.quantity;
     if (quantity === 0) continue;
 
-    // The amount for a line sold by weight, the count otherwise — as above.
-    const much = unitLabel(line, quantity);
-    const size = itemUnit(line)?.step == null ? `${much} × ` : `${much} `;
-    lines.push(`• ${size}${line.name}`);
+    lines.push(`• ${whatToPack(line, quantity)}`);
     for (const option of line.options) lines.push(`   ${option}`);
     if (line.note)
       lines.push(`   ${t("dispatch.lineNote", { note: line.note })}`);

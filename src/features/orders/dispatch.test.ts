@@ -8,6 +8,7 @@ import {
   cancellationMessage,
   dispatchMessage,
   kitchenMessage,
+  whatToPack,
   whatsappLink,
 } from "./dispatch";
 
@@ -220,6 +221,50 @@ describe("dispatchMessage", () => {
   });
 });
 
+describe("whatToPack", () => {
+  it("counts a dish sold as itself", () => {
+    expect(whatToPack(line({}), 2)).toBe("2 × Kafta");
+  });
+
+  it("gives a fixed-size item its size, each", () => {
+    const rice = line({ name: "Rice", priceUnit: "g", unitQuantity: 500 });
+    expect(whatToPack(rice, 1)).toBe("1 × Rice (500 g)");
+    expect(whatToPack(rice, 2)).toBe("2 × Rice (500 g each)");
+  });
+
+  it("says a counted pack in the plural", () => {
+    const eggs = line({ name: "Eggs", priceUnit: "piece", unitQuantity: 6 });
+    expect(whatToPack(eggs, 2)).toBe("2 × Eggs (6 pieces each)");
+  });
+
+  it("leaves a single piece as the item itself", () => {
+    const one = line({ name: "Kaak", priceUnit: "piece", unitQuantity: 1 });
+    expect(whatToPack(one, 3)).toBe("3 × Kaak");
+  });
+
+  it("says the amount of a line sold by weight, in grams under a kilo", () => {
+    const beef = line({
+      name: "Minced beef",
+      priceUnit: "kg",
+      unitQuantity: 0.5,
+      unitStep: 0.25,
+    });
+    expect(whatToPack(beef, 1)).toBe("500 g Minced beef");
+    expect(whatToPack(beef, 5)).toBe("1.5 kg Minced beef");
+  });
+
+  it("says stepped bags in the plural, with no ×", () => {
+    const coal = line({
+      name: "Charcoal",
+      priceUnit: "bag",
+      unitQuantity: 1,
+      unitStep: 1,
+    });
+    expect(whatToPack(coal, 1)).toBe("1 bag Charcoal");
+    expect(whatToPack(coal, 3)).toBe("3 bags Charcoal");
+  });
+});
+
 describe("kitchenMessage", () => {
   const twoShops = order({
     stores: [store("os-1", "Grill House"), store("os-2", "Juice Bar")],
@@ -253,6 +298,19 @@ describe("kitchenMessage", () => {
   it("passes the courier note on only when the shop is the whole order", () => {
     expect(kitchenMessage(order(), "os-1", true)).toContain("Ring twice");
     expect(kitchenMessage(twoShops, "os-1", true)).not.toContain("Ring twice");
+  });
+
+  it("tells the shop the pack size, so it fetches the right one", () => {
+    const text = kitchenMessage(
+      order({
+        lines: [
+          line({ name: "Rice", quantity: 2, priceUnit: "kg", unitQuantity: 5 }),
+        ],
+      }),
+      "os-1",
+      true,
+    );
+    expect(text).toContain("• 2 × Rice (5 kg each)");
   });
 
   it("leaves out a line the shop has said it is out of", () => {

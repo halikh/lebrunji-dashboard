@@ -369,6 +369,9 @@ const en = {
     note: "Note for you: {note}",
     from: "From {store}:",
     lineNote: "note: {note}",
+    // A fixed-size item ordered more than once: "2 × Rice (500 g each)". The
+    // shop packs two 500 g bags, not one of a kilo.
+    packEach: "{size} each",
     subtotal: "Items: {amount}",
     delivery: "Delivery: {amount}",
     discount: "Discount: -{amount}",
@@ -2146,6 +2149,10 @@ const en = {
     piece: "piece",
     bag: "bag",
     pack: "pack",
+    // More than one of a counted unit: "6 pieces", "2 bags".
+    pieces: "pieces",
+    bags: "bags",
+    packs: "packs",
     // The size under an item's name: "1 kg", "500 g".
     size: "{quantity} {unit}",
     // The comparison figure beside the price: "$12.00/kg".
