@@ -6,6 +6,7 @@ import { sizeOf } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
 import {
+  placeLine,
   placeName,
   roundingOf,
   type Order,
@@ -156,7 +157,7 @@ export function dispatchMessage(
   // `order_stores` row it belongs to — the same shape the receipt draws from.
   for (const store of order.stores) {
     lines.push("");
-    lines.push(t("dispatch.from", { store: placeName(store) }));
+    lines.push(t("dispatch.from", { store: placeLine(store) }));
 
     for (const line of order.lines.filter(
       (one) => one.orderStoreId === store.id,

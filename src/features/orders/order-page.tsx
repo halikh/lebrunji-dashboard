@@ -24,7 +24,7 @@ import { isFinishedSlug } from "@/lib/order-status";
 import { formatPhone } from "@/lib/phone";
 
 import { fetchAmendments, fetchHandovers } from "./api/history";
-import { placeName, type OrderStatus } from "./api/orders";
+import { placesLine, type OrderStatus } from "./api/orders";
 import { OrderAge, useTick } from "./order-age";
 import { OrderActions, OrderBody, type OrderWithLines } from "./order-detail";
 import { OrderHistory } from "./order-history";
@@ -264,7 +264,7 @@ function Aside({
             },
             {
               label: t("orders.shops"),
-              value: one.stores.map((store) => placeName(store)).join(", "),
+              value: placesLine(one.stores),
             },
             {
               label: t("orders.total"),

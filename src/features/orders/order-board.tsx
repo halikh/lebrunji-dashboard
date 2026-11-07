@@ -20,7 +20,7 @@ import { useMoney } from "@/features/reference/use-currencies";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
 
-import { placeName, type Order, type OrderStatus } from "./api/orders";
+import { placesLine, type Order, type OrderStatus } from "./api/orders";
 import { OrderAge, urgencyOf } from "./order-age";
 import { nextStatus, orderStatus, useOrders } from "./use-orders";
 
@@ -420,7 +420,7 @@ function CardFace({
           {order.customerName || t("orders.incompleteSignup")}
         </span>
         <span className="truncate text-[12.5px] text-ink-3">
-          {order.stores.map(placeName).join(", ")}
+          {placesLine(order.stores)}
         </span>
         <span className="flex items-center justify-between gap-2 pt-0.5">
           <span className="text-[13.5px] font-semibold text-ink tabular-nums">

@@ -34,12 +34,13 @@ const store = (
   id: string,
   storeName: string,
   branchName: string | null = null,
+  branchAddress: string | null = null,
 ): OrderStore => ({
   id,
   storeId: `shop-${id}`,
   storeName,
   branchName,
-  branchAddress: null,
+  branchAddress,
   storeImageUrl: null,
   storeWhatsapp: null,
   statusSlug: "preparing",
@@ -166,7 +167,7 @@ describe("dispatchMessage", () => {
     const text = dispatchMessage(
       order({
         stores: [
-          store("os-1", "Grill House", "Hamra"),
+          store("os-1", "Grill House", "Grill House Hamra", "Bliss Street"),
           store("os-2", "Juice Bar"),
         ],
         lines: [
@@ -178,7 +179,8 @@ describe("dispatchMessage", () => {
       true,
     );
 
-    const grill = text.indexOf("From Grill House — Hamra:");
+    // A chain's branch by its own name, and where it is: the pickup's door.
+    const grill = text.indexOf("From Grill House Hamra, Bliss Street:");
     const juice = text.indexOf("From Juice Bar:");
     expect(grill).toBeGreaterThan(-1);
     expect(text.indexOf("Kafta")).toBeGreaterThan(grill);

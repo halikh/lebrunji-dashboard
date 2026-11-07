@@ -661,13 +661,38 @@ function branchAddressOf(
   return localized(branch?.address, locale) || null;
 }
 
-/** "Azzurrini — Hamra" on a chain, "Azzurrini" otherwise. */
+/**
+ * The branch's own name on a chain, the shop's otherwise.
+ *
+ * Not "shop — branch" (user, 2026-11-07): a branch is named in full already
+ * ("Khalifeh Al Men3em Chicken"), so the pair said it twice. What tells two
+ * branches apart is the address, which {@link placeLine} and `PlaceName` add.
+ */
 export function placeName(
   store: Pick<OrderStore, "storeName" | "branchName">,
 ): string {
-  return store.branchName
-    ? `${store.storeName} — ${store.branchName}`
-    : store.storeName;
+  return store.branchName ?? store.storeName;
+}
+
+/**
+ * One place on one line, for a list: the name, then the branch's address on
+ * a chain — "Khalifeh Al Men3em Chicken, Hamra, Bliss Street".
+ */
+export function placeLine(
+  store: Pick<OrderStore, "storeName" | "branchName" | "branchAddress">,
+): string {
+  const name = placeName(store);
+  return store.branchAddress ? `${name}, ${store.branchAddress}` : name;
+}
+
+/** Every place on an order, for a list — one per shop, apart by a semicolon. */
+export function placesLine(
+  stores: readonly Pick<
+    OrderStore,
+    "storeName" | "branchName" | "branchAddress"
+  >[],
+): string {
+  return stores.map(placeLine).join("; ");
 }
 
 function kitchenPhone(portion: Record<string, unknown>): string | null {

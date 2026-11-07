@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { Badge, Button, StatusBadge, cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
 
-import { placeName, type Order, type OrderStatus } from "./api/orders";
+import { placesLine, type Order, type OrderStatus } from "./api/orders";
 import { OrderAge, urgencyOf } from "./order-age";
 import { nextStatus, orderStatus } from "./use-orders";
 
@@ -94,9 +94,7 @@ export function OrderRow({
         </span>
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-[12.5px] text-ink-3">
-            {compact
-              ? order.stores.map(placeName).join(", ")
-              : order.addressLine}
+            {compact ? placesLine(order.stores) : order.addressLine}
           </span>
           {order.amendedAt && (
             <Badge tone="info" className="h-[18px] px-1.5 text-[11px]">
@@ -110,7 +108,7 @@ export function OrderRow({
         <div className="hidden min-w-0 flex-1 flex-col items-start gap-1 lg:flex">
           {status && <StatusBadge slug={status.slug} />}
           <span className="max-w-full truncate text-[12.5px] text-ink-3">
-            {order.stores.map(placeName).join(", ")}
+            {placesLine(order.stores)}
           </span>
         </div>
       )}
