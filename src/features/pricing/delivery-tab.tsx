@@ -414,7 +414,7 @@ function Ladder({
             </p>
           )}
 
-          <div className="flex flex-col gap-3 rounded-b-lg border-t border-line bg-subtle px-5 py-3.5">
+          <div className="sticky bottom-0 z-10 flex flex-col gap-3 rounded-b-lg border-t border-line bg-subtle px-5 py-3.5">
             {/* A check, not a rule: nothing in the database forbids it, and
                 a promotion-shaped ladder may mean it. But it is far more
                 often a typo, and a customer further away paying less is

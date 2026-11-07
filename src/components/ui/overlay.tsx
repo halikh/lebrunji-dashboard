@@ -50,7 +50,7 @@ export function Dialog({
           )}
           {...(description ? {} : { "aria-describedby": undefined })}
         >
-          <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4">
+          <div className="flex shrink-0 items-start justify-between gap-4 px-6 pt-5 pb-4">
             <div className="min-w-0">
               <DialogPrimitive.Title className="text-[17px] font-semibold text-ink">
                 {title}
@@ -78,7 +78,7 @@ export function Dialog({
             </div>
           )}
           {footer && (
-            <div className="flex flex-wrap items-center justify-end gap-2 rounded-b-xl border-t border-line bg-subtle px-6 py-3.5">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 rounded-b-xl border-t border-line bg-subtle px-6 py-3.5">
               {footer}
             </div>
           )}
@@ -187,7 +187,7 @@ export function Sheet({
           )}
           {...(description ? {} : { "aria-describedby": undefined })}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-6 py-4">
             <div className="min-w-0">
               <DialogPrimitive.Title className="text-[16px] font-semibold text-ink">
                 {title}
@@ -213,7 +213,7 @@ export function Sheet({
             {children}
           </div>
           {footer && (
-            <div className="flex items-center justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
               {footer}
             </div>
           )}

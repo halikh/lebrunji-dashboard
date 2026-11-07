@@ -157,7 +157,7 @@ function SectionForm({
           disabled={pending}
         />
       </Field>
-      <div className="-mx-6 -mb-5 flex justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
+      <div className="sticky bottom-0 z-10 -mx-6 -mb-5 mt-auto flex justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
         <Button variant="secondary" onClick={onCancel} disabled={pending}>
           {t("common.cancel")}
         </Button>
@@ -311,7 +311,7 @@ function MoveForm({
           placeholder={{ en: "Dairy & Eggs", ar: "ألبان وبيض" }}
         />
       )}
-      <div className="-mx-6 -mb-5 flex justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
+      <div className="sticky bottom-0 z-10 -mx-6 -mb-5 mt-auto flex justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
         <Button variant="secondary" onClick={onCancel} disabled={moves.pending}>
           {t("common.cancel")}
         </Button>

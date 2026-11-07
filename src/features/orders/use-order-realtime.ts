@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { useToasts } from "@/components/ui/toast";
@@ -59,6 +60,13 @@ export function useOrderRealtime() {
   useEffect(() => {
     toastRef.current = toast;
   }, [toast]);
+
+  // The toast opens the order it announces; held in a ref like the toast.
+  const router = useRouter();
+  const routerRef = useRef(router);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
   /**
    * The chosen sound, held in a ref for the same reason the toast is.
@@ -141,15 +149,46 @@ export function useOrderRealtime() {
     };
     document.addEventListener("visibilitychange", onVisibility);
 
+    /**
+     * "New order from Rima Haddad", and a click opens it in the queue's panel.
+     *
+     * The payload is the `orders` row alone, so the name is one small read of
+     * `users` — the chime has already played, so the wait is not felt. A failed
+     * read, or an account that never finished signup (empty name), still says
+     * "New order": the toast is never lost to the lookup.
+     */
+    const announce = async (orderId?: string, userId?: string) => {
+      let name = "";
+      if (userId) {
+        const { data } = await supabase
+          .from("users")
+          .select("name")
+          .eq("id", userId)
+          .maybeSingle();
+        name = ((data?.name as string | null) ?? "").trim();
+      }
+      const message = name
+        ? t("orders.arrivedFrom", { name })
+        : t("orders.arrived");
+      if (!orderId) {
+        toastRef.current.info(message);
+        return;
+      }
+      toastRef.current.link(message, () =>
+        routerRef.current.push(`/orders?order=${encodeURIComponent(orderId)}`),
+      );
+    };
+
     const channel = supabase
       .channel("dashboard-orders")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
-        () => {
+        (payload) => {
           refresh();
           chime(soundRef.current);
-          toastRef.current.info(t("orders.arrived"));
+          const row = payload.new as { id?: string; user_id?: string };
+          void announce(row.id, row.user_id);
         },
       )
       .on(

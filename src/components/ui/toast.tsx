@@ -23,7 +23,13 @@ import { t } from "@/i18n/translations";
 export type ToastKind = "info" | "success" | "danger";
 type Undo = () => void | Promise<void>;
 
-type Show = (toast: { message: string; kind: ToastKind; undo?: Undo }) => void;
+type Show = (toast: {
+  message: string;
+  kind: ToastKind;
+  undo?: Undo;
+  /** Makes the whole toast a link: clicking it runs this and dismisses it. */
+  open?: () => void;
+}) => void;
 
 const ToastContext = createContext<Show | null>(null);
 const UndoContext = createContext<(() => boolean) | null>(null);
@@ -33,7 +39,23 @@ const LIFETIME_MS = 7000;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const latest = useRef<{ id: string | number; undo: Undo } | null>(null);
 
-  const show = useCallback<Show>(({ message, kind, undo }) => {
+  const show = useCallback<Show>(({ message, kind, undo, open }) => {
+    // Assigned below; the click handler only runs once the toast is showing.
+    let id: string | number = "";
+    const body = open ? (
+      <button
+        type="button"
+        className="-m-1 w-full cursor-pointer rounded p-1 text-start hover:underline"
+        onClick={() => {
+          sonner.dismiss(id);
+          open();
+        }}
+      >
+        {message}
+      </button>
+    ) : (
+      message
+    );
     const options = {
       duration: kind === "danger" ? 10_000 : LIFETIME_MS,
       action: undo
@@ -52,12 +74,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         if (latest.current?.undo === undo) latest.current = null;
       },
     };
-    const id =
+    id =
       kind === "success"
-        ? sonner.success(message, options)
+        ? sonner.success(body, options)
         : kind === "danger"
-          ? sonner.error(message, options)
-          : sonner(message, options);
+          ? sonner.error(body, options)
+          : sonner(body, options);
     if (undo) latest.current = { id, undo };
   }, []);
 
@@ -115,6 +137,9 @@ export function useToasts() {
       success: (message: string, undo?: Undo) =>
         show({ message, kind: "success", undo }),
       danger: (message: string) => show({ message, kind: "danger" }),
+      /** An info toast the operator can click through. */
+      link: (message: string, open: () => void) =>
+        show({ message, kind: "info", open }),
     }),
     [show],
   );

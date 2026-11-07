@@ -375,7 +375,7 @@ function Framer({
         </p>
       )}
 
-      <div className="flex justify-end gap-2 border-t border-line pt-4">
+      <div className="sticky bottom-0 z-10 -mx-6 -mb-5 mt-auto flex justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
         <Button variant="secondary" onClick={onCancel} disabled={busy}>
           {t("common.cancel")}
         </Button>

@@ -952,6 +952,9 @@ const en = {
     // queue now claims — which is the thing the operator would undo.
     moved: "{code} moved to {status}",
     arrived: "New order",
+    // The name comes from the account; an unfinished signup has none, and the
+    // toast falls back to `arrived` rather than "New order from ".
+    arrivedFrom: "New order from {name}",
     incompleteSignup: "Signup not finished",
     live: "Live",
     keyboardMove: "move",
