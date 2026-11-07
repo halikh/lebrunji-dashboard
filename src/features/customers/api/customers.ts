@@ -68,7 +68,8 @@ export type Customer = {
  * Suspended is a door held shut by the operator; closed is an account whose
  * phone number has been released and which can never be reopened.
  */
-export type CustomerScope = "all" | "active" | "suspended" | "closed";
+export type CustomerScope =
+  "all" | "active" | "suspended" | "closed" | "incomplete";
 
 export type CustomerPage = {
   customers: Customer[];
@@ -144,6 +145,10 @@ export async function fetchCustomers(options: {
     query = query.is("deleted_at", null).eq("is_active", false);
   } else if (scope === "closed") {
     query = query.not("deleted_at", "is", null);
+  } else if (scope === "incomplete") {
+    // Signed in, never finished setup: `name = ''` (see `nameOf`). Open
+    // accounts only, as Active and Suspended are; a closed one is under Closed.
+    query = query.is("deleted_at", null).eq("name", "");
   }
 
   const term = search?.trim();
@@ -187,19 +192,19 @@ export type CustomerCounts = Record<CustomerScope, number>;
 /**
  * How many customers are in each tab.
  *
- * Four `head` requests, never a select whose rows are counted in the browser.
+ * One `head` request per tab, never a select whose rows are counted in the browser.
  * The whole point of a number on a tab is that it is the size of a set the
  * screen has *not* loaded — counting what was fetched would make every tab read
  * "50", which is worse than no number because it looks like an answer.
  *
- * `Promise.all`, so the four go out together: they are independent and the
- * strip should fill in one beat rather than four.
+ * `Promise.all`, so they go out together: they are independent and the
+ * strip should fill in one beat rather than one by one.
  */
 export async function fetchCustomerCounts(): Promise<CustomerCounts> {
   const client = getClient();
   const head = { count: "exact" as const, head: true };
 
-  const [all, active, suspended, closed] = await Promise.all([
+  const [all, active, suspended, closed, incomplete] = await Promise.all([
     client.from("users").select("id", head),
     client
       .from("users")
@@ -212,9 +217,16 @@ export async function fetchCustomerCounts(): Promise<CustomerCounts> {
       .is("deleted_at", null)
       .eq("is_active", false),
     client.from("users").select("id", head).not("deleted_at", "is", null),
+    client
+      .from("users")
+      .select("id", head)
+      .is("deleted_at", null)
+      .eq("name", ""),
   ]);
 
-  const failure = [all, active, suspended, closed].find((one) => one.error);
+  const failure = [all, active, suspended, closed, incomplete].find(
+    (one) => one.error,
+  );
   if (failure?.error) {
     throw new Error(`Could not count customers: ${failure.error.message}`);
   }
@@ -224,6 +236,7 @@ export async function fetchCustomerCounts(): Promise<CustomerCounts> {
     active: active.count ?? 0,
     suspended: suspended.count ?? 0,
     closed: closed.count ?? 0,
+    incomplete: incomplete.count ?? 0,
   };
 }
 

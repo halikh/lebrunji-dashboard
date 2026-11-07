@@ -37,6 +37,7 @@ const SCOPES: { key: CustomerScope; label: TranslationKey }[] = [
   { key: "active", label: "customers.tabActive" },
   { key: "suspended", label: "customers.tabSuspended" },
   { key: "closed", label: "customers.tabClosed" },
+  { key: "incomplete", label: "customers.tabIncomplete" },
 ];
 
 const EMPTY: Record<
@@ -52,6 +53,10 @@ const EMPTY: Record<
   closed: {
     title: "customers.emptyClosedTitle",
     body: "customers.emptyClosedBody",
+  },
+  incomplete: {
+    title: "customers.emptyIncompleteTitle",
+    body: "customers.emptyIncompleteBody",
   },
 };
 
@@ -238,7 +243,11 @@ function CustomerRow({
   onOpen: () => void;
 }) {
   const unnamed = !customer.name.trim();
-  const phone = formatPhone(customer.phone);
+  // Erased when the account was closed — said, so it does not look missing.
+  const phone =
+    formatPhone(customer.phone) ||
+    (customer.deletedAt !== null ? t("customers.phoneErased") : "");
+  const erased = !customer.phone && customer.deletedAt !== null;
 
   return (
     <Tr
@@ -274,8 +283,13 @@ function CustomerRow({
           </div>
         </div>
       </Td>
-      <Td className="hidden whitespace-nowrap text-ink-2 tabular-nums md:table-cell">
-        <span dir="ltr">{phone}</span>
+      <Td
+        className={cx(
+          "hidden whitespace-nowrap tabular-nums md:table-cell",
+          erased ? "text-ink-4 italic" : "text-ink-2",
+        )}
+      >
+        <span dir={erased ? undefined : "ltr"}>{phone}</span>
       </Td>
       <Td className="hidden sm:table-cell">
         <CustomerStatus customer={customer} />

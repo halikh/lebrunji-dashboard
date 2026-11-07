@@ -158,6 +158,7 @@ const en = {
     tabActive: "Active",
     tabSuspended: "Suspended",
     tabClosed: "Closed",
+    tabIncomplete: "Signup not finished",
 
     backToList: "All customers",
     // `{code}` is empty when the code did not survive the trip — the link still
@@ -199,6 +200,10 @@ const en = {
     // `users.name = ''` is how the schema records "signed in, never finished
     // setup". Naming it makes it a status; a blank makes the row look broken.
     incomplete: "Signup not finished",
+    // Closing an account erases its name and number; the row stays for its
+    // orders.
+    closedAccount: "Closed account",
+    phoneErased: "Erased on closing",
 
     joined: "Joined {when}",
     orderCount: "{count} order(s)",
@@ -285,6 +290,9 @@ const en = {
     emptyClosedTitle: "No closed accounts",
     emptyClosedBody:
       "Accounts closed from here, or by the customer in the app, are listed here with their orders.",
+    emptyIncompleteTitle: "Everyone has finished signing up",
+    emptyIncompleteBody:
+      "Someone who verified their number but never entered a name shows up here.",
     colCustomer: "Customer",
     colPhone: "Phone",
     colOrders: "Orders",
