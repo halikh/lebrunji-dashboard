@@ -6,10 +6,12 @@ import { SearchX, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
+  Copyable,
   EmptyState,
   ListCard,
   Page,
   PageHeader,
+  QueryState,
   SearchInput,
   TBody,
   THead,
@@ -18,7 +20,6 @@ import {
   Td,
   Th,
   Tr,
-  QueryState,
   cx,
 } from "@/components/ui";
 import { InfiniteSentinel } from "@/components/ui/infinite-sentinel";
@@ -271,11 +272,8 @@ function CustomerRow({
               {nameOf(customer)}
             </Link>
             {/* The phone moves under the name where its column is hidden. */}
-            <span
-              dir="ltr"
-              className="truncate text-start text-[12.5px] text-ink-3 tabular-nums md:hidden"
-            >
-              {phone}
+            <span className="truncate text-start text-[12.5px] text-ink-3 tabular-nums md:hidden">
+              <RowPhone phone={phone} erased={erased} />
             </span>
             <span className="sm:hidden">
               <CustomerStatus customer={customer} />
@@ -289,7 +287,7 @@ function CustomerRow({
           erased ? "text-ink-4 italic" : "text-ink-2",
         )}
       >
-        <span dir={erased ? undefined : "ltr"}>{phone}</span>
+        <RowPhone phone={phone} erased={erased} />
       </Td>
       <Td className="hidden sm:table-cell">
         <CustomerStatus customer={customer} />
@@ -320,5 +318,24 @@ function CustomerRow({
         <AccountActions customer={customer} />
       </Td>
     </Tr>
+  );
+}
+
+/**
+ * The number with a copy button. The row opens the customer on click, so the
+ * click stops here: copying a number must not also navigate away.
+ */
+function RowPhone({ phone, erased }: { phone: string; erased: boolean }) {
+  if (!phone || erased) return <span>{phone}</span>;
+  return (
+    <span
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+      className="inline-flex"
+    >
+      <Copyable value={phone} label={t("customers.copyPhone")}>
+        <span dir="ltr">{phone}</span>
+      </Copyable>
+    </span>
   );
 }
