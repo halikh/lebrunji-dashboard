@@ -4,13 +4,12 @@ import {
   Checkbox as CheckboxPrimitive,
   Switch as SwitchPrimitive,
 } from "radix-ui";
-import { Check, ChevronDown, Minus } from "lucide-react";
+import { Check, Minus } from "lucide-react";
 import {
   forwardRef,
   useId,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
 
@@ -89,27 +88,6 @@ export const Textarea = forwardRef<
  * A native select, styled. Native on purpose: it is keyboard-complete, works
  * with type-ahead, and opens as the OS picker on a phone.
  */
-export const NativeSelect = forwardRef<
-  HTMLSelectElement,
-  SelectHTMLAttributes<HTMLSelectElement>
->(function NativeSelect({ className, children, ...rest }, ref) {
-  return (
-    <div className={cx("relative", className)}>
-      <select
-        ref={ref}
-        className={cx(control, "h-9 appearance-none pe-9 ps-3 text-[14px]")}
-        {...rest}
-      >
-        {children}
-      </select>
-      <ChevronDown
-        aria-hidden
-        className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-ink-3"
-      />
-    </div>
-  );
-});
-
 /**
  * Label, control, and the line under it — hint or error, never both.
  *

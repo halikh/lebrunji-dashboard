@@ -5,11 +5,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import { Button, Page, PageHeader } from "@/components/ui";
-import { Select } from "@/components/ui/select";
-import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
-import { useStores } from "../use-stores";
+import { ShopSelect } from "../shops/shop-select";
 import { BundlesList } from "./bundles-list";
 
 /**
@@ -22,7 +20,6 @@ export function BundlesScreen() {
   const pathname = usePathname();
   const params = useSearchParams();
   const shop = params.get("shop") ?? "";
-  const stores = useStores("");
 
   const setShop = (next: string) =>
     router.replace(next ? `${pathname}?shop=${next}` : pathname, {
@@ -47,17 +44,12 @@ export function BundlesScreen() {
         key={shop}
         storeId={shop}
         toolbarEnd={
-          <Select
+          <ShopSelect
             value={shop}
             onChange={setShop}
             isClearable
             placeholder={t("bundles.allShops")}
             aria-label={t("bundles.filterShop")}
-            options={(stores.data?.stores ?? []).map((store) => ({
-              value: store.id,
-              label: pickLocalized(store.name),
-            }))}
-            disabled={!stores.isSuccess}
             className="w-full sm:w-64"
           />
         }

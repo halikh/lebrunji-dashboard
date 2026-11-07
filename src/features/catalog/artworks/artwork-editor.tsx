@@ -17,7 +17,7 @@ import { DateField } from "@/components/ui/date-field";
 import { ImagePrompt } from "@/components/ui/image-prompt";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { LocalizedImageField } from "@/components/ui/localized-image-field";
-import { MultiSelect, Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/select";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useLanguages } from "@/features/reference/use-languages";
 import { pickLocalized } from "@/i18n/db-text";
@@ -52,7 +52,7 @@ import {
 } from "../use-artworks";
 import { useBundles } from "../use-bundles";
 import { usePromotions } from "../use-promotions";
-import { useStores } from "../use-stores";
+import { ShopMultiSelect } from "../shops/shop-select";
 import { ARTWORK_TONE, artworkName } from "./artwork-status";
 
 const LIST_HREF = "/artworks";
@@ -160,7 +160,6 @@ function Form({
 }) {
   const promotions = usePromotions("");
   const bundles = useBundles("");
-  const stores = useStores("");
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
   const now = useNow();
@@ -649,16 +648,12 @@ function Form({
             hint={t("artworks.storesHint")}
           >
             {(wiring) => (
-              <MultiSelect
+              <ShopMultiSelect
                 {...wiring}
                 value={storeIds}
                 onChange={setStoreIds}
                 placeholder={t("artworks.storesPlaceholder")}
-                options={(stores.data?.stores ?? []).map((store) => ({
-                  value: store.id,
-                  label: pickLocalized(store.name),
-                }))}
-                disabled={pending || !stores.isSuccess}
+                disabled={pending}
               />
             )}
           </Field>

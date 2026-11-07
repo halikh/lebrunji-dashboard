@@ -19,11 +19,7 @@ import { DateField } from "@/components/ui/date-field";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { MoneyInput } from "@/components/ui/money-input";
-import {
-  AsyncMultiSelect,
-  Select,
-  type SelectOption,
-} from "@/components/ui/select";
+import { AsyncMultiSelect, type SelectOption } from "@/components/ui/select";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useMoney } from "@/features/reference/use-currencies";
 import { useLanguages } from "@/features/reference/use-languages";
@@ -58,6 +54,7 @@ import {
   useUpdateBundle,
 } from "../use-bundles";
 import { optionKeys } from "../use-options";
+import { ShopSelect } from "../shops/shop-select";
 import { useStores } from "../use-stores";
 import { BUNDLE_TONE, bundleState } from "./bundle-status";
 
@@ -496,7 +493,7 @@ function Form({
           className="sm:max-w-sm"
         >
           {(wiring) => (
-            <Select
+            <ShopSelect
               {...wiring}
               value={storeId}
               onChange={(next) => {
@@ -505,12 +502,8 @@ function Form({
                 setItems([]);
                 setBranchPrices({});
               }}
-              options={(stores.data?.stores ?? []).map((one) => ({
-                value: one.id,
-                label: pickLocalized(one.name),
-              }))}
               placeholder={t("bundles.storePlaceholder")}
-              disabled={pending || Boolean(initial) || !stores.isSuccess}
+              disabled={pending || Boolean(initial)}
             />
           )}
         </Field>

@@ -9,12 +9,12 @@ import {
   ConfirmDialog,
   Dialog,
   Field,
-  NativeSelect,
   Textarea,
   Thumb,
   cx,
   useToasts,
 } from "@/components/ui";
+import { Select } from "@/components/ui/select";
 import {
   useGuardedAction,
   useUnsavedChanges,
@@ -661,30 +661,28 @@ function AmendLine({
         </div>
 
         {short && (
-          <label className="flex min-w-[220px] flex-1 items-center gap-2">
+          <div className="flex min-w-[220px] flex-1 items-center gap-2">
             <span className="shrink-0 text-[13px] font-medium text-ink-2">
               {t("amend.instead")}
             </span>
-            <NativeSelect
+            {/* No swap is the empty value: the placeholder, and what the
+                clear button goes back to. */}
+            <Select
+              aria-label={t("amend.instead")}
               className="min-w-0 flex-1"
               value={swap ?? ""}
               disabled={menu.isPending}
-              onChange={(event) => {
-                const id = event.target.value;
+              isClearable
+              placeholder={
+                menu.isPending ? t("common.loading") : t("amend.nothing")
+              }
+              onChange={(id) => {
                 const dish = dishes.find((one) => one.value === id);
                 onSwap(dish ? { id: dish.value, name: dish.label } : null);
               }}
-            >
-              <option value="">
-                {menu.isPending ? t("common.loading") : t("amend.nothing")}
-              </option>
-              {dishes.map((dish) => (
-                <option key={dish.value} value={dish.value}>
-                  {dish.label}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
+              options={dishes}
+            />
+          </div>
         )}
       </div>
 

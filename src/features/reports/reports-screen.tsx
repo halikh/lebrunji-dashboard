@@ -18,7 +18,6 @@ import {
   Card,
   EmptyState,
   Menu,
-  NativeSelect,
   Page,
   PageHeader,
   Section,
@@ -33,6 +32,7 @@ import {
   Tr,
   cx,
 } from "@/components/ui";
+import { Select } from "@/components/ui/select";
 import { BarChart, HBarList, HeatGrid } from "@/components/ui/chart";
 import { DateRangeField } from "@/components/ui/date-field";
 import { useToasts } from "@/components/ui/toast";
@@ -308,20 +308,16 @@ export function ReportsScreen() {
               </Button>
             )}
           </div>
-          <NativeSelect
+          <Select
             aria-label={t("reports.compareLabel")}
             value={compare}
-            onChange={(event) =>
-              setParam("compare", event.target.value, "previous")
-            }
-            className="w-full sm:ms-auto sm:w-auto"
-          >
-            {COMPARES.map((option) => (
-              <option key={option} value={option}>
-                {t(`reports.compare.${option}` as const)}
-              </option>
-            ))}
-          </NativeSelect>
+            onChange={(next) => setParam("compare", next, "previous")}
+            options={COMPARES.map((option) => ({
+              value: option,
+              label: t(`reports.compare.${option}` as const),
+            }))}
+            className="w-full sm:ms-auto sm:w-56"
+          />
         </div>
         <p className="text-[12.5px] text-ink-3">
           {compare === "none"

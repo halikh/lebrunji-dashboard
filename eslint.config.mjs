@@ -70,6 +70,32 @@ const eslintConfig = defineConfig([
         },
       ],
 
+      /**
+       * No native `<select>` (user, 2026-11-07).
+       *
+       * Every choice is the kit's `Select` (`components/ui/select.tsx`): one
+       * look, a search box in every list, keyboard-complete, and a note or a
+       * second line on an option where one helps. A set with no ceiling —
+       * shops, dishes — is an `AsyncSelect` / `AsyncMultiSelect` that asks the
+       * server as the operator types (`ShopSelect` for shops).
+       */
+      "react/forbid-elements": [
+        "error",
+        {
+          forbid: [
+            {
+              element: "select",
+              message:
+                "Use Select from @/components/ui/select (AsyncSelect for a list from the server, e.g. ShopSelect).",
+            },
+            {
+              element: "option",
+              message: "Options are SelectOption objects passed to Select.",
+            },
+          ],
+        },
+      ],
+
       "react/jsx-no-literals": [
         "warn",
         {

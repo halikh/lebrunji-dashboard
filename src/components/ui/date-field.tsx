@@ -22,7 +22,7 @@ import {
 
 import { Button } from "./button";
 import { cx } from "./cx";
-import { NativeSelect } from "./form";
+import { Select } from "./select";
 
 /**
  * A moment in time, chosen on Beirut's clock.
@@ -433,27 +433,24 @@ export function DateField({
               >
                 {t("controls.time")}
               </label>
-              <NativeSelect
+              <Select
                 id={id ? `${id}-time` : undefined}
                 aria-label={t("controls.time")}
                 className="flex-1"
                 disabled={!pickedDay}
-                value={minutes ?? ""}
-                onChange={(event) => {
-                  if (!pickedDay) return;
-                  const total = Number(event.target.value);
+                value={minutes === null ? "" : String(minutes)}
+                onChange={(next) => {
+                  if (!pickedDay || !next) return;
+                  const total = Number(next);
                   emit(pickedDay, Math.floor(total / 60), total % 60);
                 }}
-              >
-                {minutes === null && <option value="" />}
-                {slots.map((total) => (
-                  <option key={total} value={total}>
-                    {clock.hhmm(
-                      `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`,
-                    )}
-                  </option>
-                ))}
-              </NativeSelect>
+                options={slots.map((total) => ({
+                  value: String(total),
+                  label: clock.hhmm(
+                    `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`,
+                  ),
+                }))}
+              />
               <Button
                 variant="primary"
                 size="sm"

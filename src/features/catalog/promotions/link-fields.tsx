@@ -14,6 +14,7 @@ import {
   type LinkPage,
   type TapLink,
 } from "../api/links";
+import { ShopSelect } from "../shops/shop-select";
 import { useCategories } from "../use-categories";
 import { useStores } from "../use-stores";
 
@@ -40,7 +41,6 @@ export function LinkFields({
   /** Replaces the kind field's own hint — an artwork's "follows its promotion". */
   hint?: string;
 }) {
-  const stores = useStores("");
   const categories = useCategories("");
 
   const kindOptions = [
@@ -81,16 +81,12 @@ export function LinkFields({
       {value.kind === "store" && (
         <Field label={t("links.store")} error={error}>
           {(wiring) => (
-            <Select
+            <ShopSelect
               {...wiring}
               value={value.storeId ?? ""}
               onChange={(next) => onChange({ ...value, storeId: next || null })}
               placeholder={t("links.pickStore")}
-              options={(stores.data?.stores ?? []).map((store) => ({
-                value: store.id,
-                label: pickLocalized(store.name),
-              }))}
-              disabled={disabled || !stores.isSuccess}
+              disabled={disabled}
             />
           )}
         </Field>

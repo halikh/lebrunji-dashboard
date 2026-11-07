@@ -8,13 +8,13 @@ import {
   Button,
   EmptyState,
   Field,
-  NativeSelect,
   Page,
   PageHeader,
   Section,
   Skeleton,
   Switch,
 } from "@/components/ui";
+import { Select } from "@/components/ui/select";
 import { LocalizedField } from "@/components/ui/localized-field";
 import {
   changed,
@@ -216,23 +216,17 @@ function Form({
           hint={known.length === 0 ? t("content.noGroups") : undefined}
         >
           {(props) => (
-            <NativeSelect
+            <Select
               {...props}
               value={groupSlug}
               disabled={known.length === 0}
-              onChange={(event) => setGroupSlug(event.target.value)}
-            >
-              {!groupSlug && (
-                <option value="" disabled>
-                  {t("content.pickGroup")}
-                </option>
-              )}
-              {known.map(([slug, name]) => (
-                <option key={slug} value={slug}>
-                  {pickLocalized(name) || slug}
-                </option>
-              ))}
-            </NativeSelect>
+              onChange={(next) => next && setGroupSlug(next)}
+              placeholder={t("content.pickGroup")}
+              options={known.map(([slug, name]) => ({
+                value: slug,
+                label: pickLocalized(name) || slug,
+              }))}
+            />
           )}
         </Field>
       </Section>

@@ -22,7 +22,6 @@ import { NumberInput } from "@/components/ui/number-input";
 import {
   AsyncMultiSelect,
   MultiSelect,
-  Select,
   type SelectOption,
 } from "@/components/ui/select";
 import { changed, useUnsavedChanges } from "@/components/unsaved-changes";
@@ -46,6 +45,7 @@ import {
   usePromotions,
   useUpdatePromotion,
 } from "../use-promotions";
+import { ShopMultiSelect, ShopSelect } from "../shops/shop-select";
 import { useStores } from "../use-stores";
 import { AsideCard, EditorLayout, EditorPlaceholder } from "./editor-layout";
 import { LinkFields } from "./link-fields";
@@ -648,13 +648,12 @@ function Form({
                 label: t(`promotions.scopes.${option}`),
                 children:
                   option === "store" ? (
-                    <MultiSelect
+                    <ShopMultiSelect
                       aria-label={t("promotions.pickShops")}
                       value={storeIds}
                       onChange={setStoreIds}
                       placeholder={t("promotions.pickShopsPlaceholder")}
-                      disabled={pending || !stores.isSuccess}
-                      options={storeOptions}
+                      disabled={pending}
                     />
                   ) : option === "category" ? (
                     <MultiSelect
@@ -669,18 +668,17 @@ function Form({
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
                       <Field label={t("promotions.pickDishShop")}>
                         {(wiring) => (
-                          <Select
+                          <ShopSelect
                             {...wiring}
                             value={dishStoreId}
                             onChange={(value) => {
                               setDishStoreId(value);
                               setDishes([]);
                             }}
-                            options={storeOptions}
                             placeholder={t(
                               "promotions.pickDishShopPlaceholder",
                             )}
-                            disabled={pending || !stores.isSuccess}
+                            disabled={pending}
                           />
                         )}
                       </Field>

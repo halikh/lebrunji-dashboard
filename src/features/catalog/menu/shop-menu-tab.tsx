@@ -33,7 +33,6 @@ import {
   EmptyState,
   Field,
   Menu,
-  NativeSelect,
   SearchInput,
   Segmented,
   Skeleton,
@@ -42,6 +41,7 @@ import {
   cx,
   type MenuItem as MenuAction,
 } from "@/components/ui";
+import { Select } from "@/components/ui/select";
 import { GripIcon, useReorder } from "@/components/ui/reorderable";
 import { useGuardedAction } from "@/components/unsaved-changes";
 import { pickLocalized } from "@/i18n/db-text";
@@ -1528,21 +1528,17 @@ function MergeProductsDialog({
       <div className="flex flex-col gap-4">
         <Field label={t("menu.mergeTo")} hint={t("menu.mergeHint")}>
           {(field) => (
-            <NativeSelect
+            <Select
               {...field}
               value={target}
               disabled={pending}
-              onChange={(event) => setTarget(event.target.value)}
-            >
-              <option value="" disabled>
-                {t("menu.moveChoose")}
-              </option>
-              {holders.map((one) => (
-                <option key={one.id} value={one.id}>
-                  {pickLocalized(sectionPath(one, ctx.sections))}
-                </option>
-              ))}
-            </NativeSelect>
+              onChange={setTarget}
+              placeholder={t("menu.moveChoose")}
+              options={holders.map((one) => ({
+                value: one.id,
+                label: pickLocalized(sectionPath(one, ctx.sections)),
+              }))}
+            />
           )}
         </Field>
         <Checkbox
@@ -1710,20 +1706,16 @@ function BulkBar({
       >
         <Field label={t("menu.bulkMoveLabel")} hint={t("menu.bulkMoveHint")}>
           {(field) => (
-            <NativeSelect
+            <Select
               {...field}
               value={target}
-              onChange={(event) => setTarget(event.target.value)}
-            >
-              <option value="" disabled>
-                {t("menu.moveChoose")}
-              </option>
-              {holders.map((one) => (
-                <option key={one.id} value={one.id}>
-                  {pickLocalized(sectionPath(one, ctx.sections))}
-                </option>
-              ))}
-            </NativeSelect>
+              onChange={setTarget}
+              placeholder={t("menu.moveChoose")}
+              options={holders.map((one) => ({
+                value: one.id,
+                label: pickLocalized(sectionPath(one, ctx.sections)),
+              }))}
+            />
           )}
         </Field>
       </Dialog>

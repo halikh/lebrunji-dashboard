@@ -16,10 +16,10 @@ import {
   ConfirmDialog,
   EmptyState,
   Field,
-  NativeSelect,
   Segmented,
   Skeleton,
 } from "@/components/ui";
+import { Select } from "@/components/ui/select";
 import { SettingRow, SettingsGroup } from "@/components/ui/setting-row";
 import { useToasts } from "@/components/ui/toast";
 import { useUnsavedChanges } from "@/components/unsaved-changes";
@@ -180,28 +180,24 @@ export function GeneralTab() {
             label={t("general.zoneLabel")}
             description={t("general.zoneHint")}
           >
-            <NativeSelect
-              aria-labelledby="setting-zone"
+            <Select
+              aria-label={t("general.zoneLabel")}
               className="w-full md:w-72"
               value={current.timezone ?? businessTimezone()}
               disabled={save.isPending}
-              onChange={(event) => {
-                const next = event.target.value;
+              onChange={(next) => {
                 // Not saved yet: a zone moves every time and every report
                 // day, so it asks first (the dialog below).
-                if (next !== current.timezone) setPendingZone(next);
+                if (next && next !== current.timezone) setPendingZone(next);
               }}
-            >
-              {(zones.data ?? []).map((zone) => {
-                // A person's name for it, with the IANA id it stores.
-                const label = [zone.label, `(${zone.name})`].join(" ");
-                return (
-                  <option key={zone.name} value={zone.name}>
-                    {label}
-                  </option>
-                );
-              })}
-            </NativeSelect>
+              // A person's name for it, with the IANA id it stores — both
+              // searchable, so "Beirut" and "Asia/Beirut" each find it.
+              options={(zones.data ?? []).map((zone) => ({
+                value: zone.name,
+                label: zone.label,
+                note: zone.name,
+              }))}
+            />
           </SettingRow>
         )}
       </SettingsGroup>
@@ -283,32 +279,22 @@ export function GeneralTab() {
           <div className="grid w-full grid-cols-2 gap-3 md:w-auto">
             <Field label={t("general.opensAt")} className="md:w-36">
               {(props) => (
-                <NativeSelect
+                <Select
                   {...props}
                   value={openHour}
-                  onChange={(event) => setOpen(event.target.value)}
-                >
-                  {hours.map((hour) => (
-                    <option key={hour.value} value={hour.value}>
-                      {hour.label}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  onChange={(next) => next && setOpen(next)}
+                  options={hours}
+                />
               )}
             </Field>
             <Field label={t("general.closesAt")} className="md:w-36">
               {(props) => (
-                <NativeSelect
+                <Select
                   {...props}
                   value={closeHour}
-                  onChange={(event) => setClose(event.target.value)}
-                >
-                  {hours.map((hour) => (
-                    <option key={hour.value} value={hour.value}>
-                      {hour.label}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  onChange={(next) => next && setClose(next)}
+                  options={hours}
+                />
               )}
             </Field>
           </div>

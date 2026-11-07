@@ -9,7 +9,6 @@ import {
   Button,
   Field,
   FormError,
-  NativeSelect,
   Page,
   PageHeader,
   Section,
@@ -506,20 +505,16 @@ export function ShopNew() {
                   error={errors.currency}
                 >
                   {(wiring) => (
-                    <NativeSelect
+                    <Select
                       {...wiring}
                       value={currencyCode}
-                      onChange={(event) => setCurrencyCode(event.target.value)}
-                    >
-                      <option value="" disabled>
-                        {t("store.pickCurrency")}
-                      </option>
-                      {(currencies ?? []).map((one) => (
-                        <option key={one.code} value={one.code}>
-                          {one.code}
-                        </option>
-                      ))}
-                    </NativeSelect>
+                      onChange={setCurrencyCode}
+                      placeholder={t("store.pickCurrency")}
+                      options={(currencies ?? []).map((one) => ({
+                        value: one.code,
+                        label: one.code,
+                      }))}
+                    />
                   )}
                 </Field>
                 <Field
@@ -577,20 +572,17 @@ export function ShopNew() {
                   className="sm:max-w-xs"
                 >
                   {(wiring) => (
-                    <NativeSelect
+                    <Select
                       {...wiring}
                       value={menuLayout}
-                      onChange={(event) =>
-                        setMenuLayout(
-                          event.target.value === "aisles" ? "aisles" : "list",
-                        )
+                      onChange={(next) =>
+                        setMenuLayout(next === "aisles" ? "aisles" : "list")
                       }
-                    >
-                      <option value="list">{t("store.menuLayoutList")}</option>
-                      <option value="aisles">
-                        {t("store.menuLayoutAisles")}
-                      </option>
-                    </NativeSelect>
+                      options={[
+                        { value: "list", label: t("store.menuLayoutList") },
+                        { value: "aisles", label: t("store.menuLayoutAisles") },
+                      ]}
+                    />
                   )}
                 </Field>
               </div>

@@ -542,6 +542,205 @@ export function MultiSelect({
   );
 }
 
+/* ───────────────────────── Async loading ────────────────────────── */
+
+/**
+ * Options from `loadOptions` while the list is open: the first page at once,
+ * then again 250 ms after the typing stops. Only the latest request may write
+ * — an older, slower answer to a shorter search loses.
+ */
+function useAsyncOptions(
+  open: boolean,
+  search: string,
+  loadOptions: (input: string) => Promise<SelectOption[]>,
+) {
+  const [results, setResults] = useState<SelectOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const request = useRef(0);
+  const loader = useRef(loadOptions);
+  useEffect(() => {
+    loader.current = loadOptions;
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const ticket = ++request.current;
+    const timer = setTimeout(
+      () => {
+        setLoading(true);
+        loader.current(search).then(
+          (found) => {
+            if (ticket !== request.current) return;
+            setResults(found);
+            setLoading(false);
+          },
+          () => {
+            if (ticket !== request.current) return;
+            setResults([]);
+            setLoading(false);
+          },
+        );
+      },
+      search ? 250 : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [open, search]);
+
+  return { results, loading };
+}
+
+/* ─────────────────────────── AsyncSelect ────────────────────────── */
+
+/**
+ * One answer from a set with **no ceiling** — a shop among all the shops.
+ * Options come from `loadOptions` as the operator types; nothing is loaded
+ * until the list opens.
+ *
+ * `value` is the id, as the form stores it. Its label comes from the option
+ * last picked here, or — for a saved choice the list has not shown yet, as
+ * when an editor opens — from `resolveOption`, asked once per value.
+ */
+export function AsyncSelect({
+  value,
+  onChange,
+  loadOptions,
+  resolveOption,
+  placeholder,
+  disabled = false,
+  isClearable = false,
+  noOptionsMessage,
+  className,
+  "aria-label": ariaLabel,
+  ...wiring
+}: {
+  value: string;
+  onChange: (value: string, option: SelectOption | null) => void;
+  /** Asked as the operator types, debounced here. */
+  loadOptions: (input: string) => Promise<SelectOption[]>;
+  /** The option for a saved `value` the list has not shown yet. */
+  resolveOption?: (value: string) => Promise<SelectOption | null>;
+  placeholder?: string;
+  disabled?: boolean;
+  isClearable?: boolean;
+  /** What an empty result says. Should name the term the operator typed. */
+  noOptionsMessage?: (input: string) => string;
+  className?: string;
+  "aria-label"?: string;
+} & Wiring) {
+  const [open, setOpen] = useState(false);
+  const listId = useId();
+  const [search, setSearch] = useState("");
+  const { results, loading } = useAsyncOptions(open, search, loadOptions);
+  /** Every option seen, so the closed control can name its value. */
+  const [known, setKnown] = useState<ReadonlyMap<string, SelectOption>>(
+    () => new Map(),
+  );
+
+  const resolver = useRef(resolveOption);
+  useEffect(() => {
+    resolver.current = resolveOption;
+  });
+  const asked = useRef(new Set<string>());
+  useEffect(() => {
+    if (!value || known.has(value) || asked.current.has(value)) return;
+    if (!resolver.current) return;
+    asked.current.add(value);
+    resolver.current(value).then(
+      (option) => {
+        if (!option) return;
+        setKnown((current) => new Map(current).set(option.value, option));
+      },
+      () => {},
+    );
+  }, [value, known]);
+
+  const selected =
+    (value &&
+      (results.find((one) => one.value === value) ?? known.get(value))) ||
+    null;
+  const invalid = isInvalid(wiring);
+  const clearable = isClearable && !!value && !disabled;
+
+  function openChange(next: boolean) {
+    if (disabled) return;
+    setOpen(next);
+    if (!next) setSearch("");
+  }
+
+  return (
+    <PopoverPrimitive.Root open={open} onOpenChange={openChange}>
+      <div className={cx("relative", className)}>
+        <PopoverPrimitive.Trigger asChild>
+          <button
+            type="button"
+            id={wiring.id}
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-label={ariaLabel}
+            aria-describedby={wiring["aria-describedby"]}
+            aria-invalid={invalid || undefined}
+            aria-disabled={disabled || undefined}
+            disabled={disabled}
+            className={cx(
+              frame,
+              "flex h-9 items-center gap-2 ps-3 text-start",
+              clearable ? "pe-14" : "pe-9",
+            )}
+          >
+            <span
+              className={cx(
+                "min-w-0 flex-1 truncate",
+                !selected && "text-ink-4",
+              )}
+            >
+              {selected ? (
+                <OptionContent option={selected} context="value" />
+              ) : value ? (
+                t("common.loading")
+              ) : (
+                (placeholder ?? "")
+              )}
+            </span>
+          </button>
+        </PopoverPrimitive.Trigger>
+        {clearable && (
+          <button
+            type="button"
+            onClick={() => onChange("", null)}
+            aria-label={t("common.clear")}
+            title={t("common.clear")}
+            className="absolute end-8 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded text-ink-4 hover:bg-hover hover:text-ink"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+        <ChevronDown
+          aria-hidden
+          className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-ink-3"
+        />
+      </div>
+      <PanelContent id={listId}>
+        <OptionPanel
+          options={results}
+          selected={new Set(value ? [value] : [])}
+          search={search}
+          onSearch={setSearch}
+          filter={false}
+          loading={loading}
+          empty={noOptionsMessage ? noOptionsMessage(search) : undefined}
+          onPick={(option) => {
+            setKnown((current) => new Map(current).set(option.value, option));
+            onChange(option.value, option);
+            openChange(false);
+          }}
+        />
+      </PanelContent>
+    </PopoverPrimitive.Root>
+  );
+}
+
 /* ──────────────────────── AsyncMultiSelect ──────────────────────── */
 
 /**
@@ -578,39 +777,8 @@ export function AsyncMultiSelect({
   const [open, setOpen] = useState(false);
   const listId = useId();
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<SelectOption[]>([]);
-  const [loading, setLoading] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  /** Only the latest request may write results — an older, slower one loses. */
-  const request = useRef(0);
-  const loader = useRef(loadOptions);
-  useEffect(() => {
-    loader.current = loadOptions;
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    const ticket = ++request.current;
-    const timer = setTimeout(
-      () => {
-        setLoading(true);
-        loader.current(search).then(
-          (found) => {
-            if (ticket !== request.current) return;
-            setResults(found);
-            setLoading(false);
-          },
-          () => {
-            if (ticket !== request.current) return;
-            setResults([]);
-            setLoading(false);
-          },
-        );
-      },
-      search ? 250 : 0,
-    );
-    return () => clearTimeout(timer);
-  }, [open, search]);
+  const { results, loading } = useAsyncOptions(open, search, loadOptions);
 
   const chosenIds = new Set(value.map((option) => option.value));
   const remaining = results.filter((option) => !chosenIds.has(option.value));

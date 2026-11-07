@@ -214,6 +214,58 @@ export async function fetchStores(
   };
 }
 
+/** A shop as a picker shows it — `ShopSelect`. */
+export type StoreOption = { id: string; name: Localized; isActive: boolean };
+
+/**
+ * Shops matching what was typed, for a picker: the name and whether it is
+ * live, nothing else. The same search column and order as {@link fetchStores},
+ * so a picker finds a shop by the same words the list does, in the same order.
+ */
+export async function searchStoreOptions(
+  search: string,
+  limit = 50,
+): Promise<StoreOption[]> {
+  let query = getClient()
+    .from("stores")
+    .select("id, name, is_active")
+    .is("deleted_at", null)
+    .order("admin_sort_order", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(limit);
+  if (search.trim()) {
+    query = query.ilike("search_text", `%${normalise(search)}%`);
+  }
+  const { data, error } = await query;
+  if (error) throw new Error(`Could not search stores: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name as Localized,
+    isActive: row.is_active,
+  }));
+}
+
+/**
+ * The named shops, for a picker opening on a saved choice it has not listed
+ * yet. Archived ones too: a promotion saved against a shop since archived
+ * should still say which shop, not show an empty chip.
+ */
+export async function fetchStoreOptions(
+  ids: readonly string[],
+): Promise<StoreOption[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await getClient()
+    .from("stores")
+    .select("id, name, is_active")
+    .in("id", [...ids]);
+  if (error) throw new Error(`Could not read stores: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name as Localized,
+    isActive: row.is_active,
+  }));
+}
+
 /** One store, for a screen that is about that store. */
 export async function fetchStore(id: string): Promise<Store> {
   const { data, error } = await getClient()

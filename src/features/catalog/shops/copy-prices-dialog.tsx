@@ -3,7 +3,8 @@
 import { AlertTriangle, ArrowRight, ChevronDown } from "lucide-react";
 import { useId, useMemo, useState, type ReactNode } from "react";
 
-import { Badge, Button, Dialog, NativeSelect, cx } from "@/components/ui";
+import { Badge, Button, Dialog, cx } from "@/components/ui";
+import { Select } from "@/components/ui/select";
 import { ChoiceList } from "@/components/ui/choice-list";
 import { Price } from "@/features/reference/price";
 import { pickLocalized } from "@/i18n/db-text";
@@ -195,19 +196,17 @@ export function CopyPricesDialog({
                   value: "section",
                   label: t("branchMenu.copySection"),
                   children: (
-                    <NativeSelect
+                    <Select
                       aria-label={t("branchMenu.copySectionLabel")}
                       value={sectionId}
                       disabled={busy}
-                      onChange={(event) => setSectionId(event.target.value)}
+                      onChange={setSectionId}
+                      options={sections.map((one) => ({
+                        value: one.section.id,
+                        label: one.path,
+                      }))}
                       className="w-full sm:w-72"
-                    >
-                      {sections.map((one) => (
-                        <option key={one.section.id} value={one.section.id}>
-                          {one.path}
-                        </option>
-                      ))}
-                    </NativeSelect>
+                    />
                   ),
                 },
               ]}

@@ -7,7 +7,6 @@ export {
   FormError,
   FormNotice,
   Input,
-  NativeSelect,
   Switch,
   Textarea,
 } from "./form";

@@ -8,13 +8,13 @@ import {
   Button,
   ConfirmDialog,
   Field,
-  NativeSelect,
   Page,
   PageHeader,
   Section,
   Switch,
   cx,
 } from "@/components/ui";
+import { Select } from "@/components/ui/select";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -77,6 +77,9 @@ import { hoursKeys } from "./use-hours";
  * own page (`branch-screen.tsx`), each saving its own way: the menu as each
  * switch and price is made, the week and this form with a Save.
  */
+/** The currency picker's "same as the shop" — stored as null, never sent. */
+const SAME_AS_SHOP = "__shop__";
+
 export function NewBranchScreen({ storeId }: { storeId: string }) {
   const store = useStore(storeId);
   const branches = useBranches(storeId);
@@ -471,24 +474,24 @@ function BranchForm({
               hint={t("branches.currencyHint")}
             >
               {(wiring) => (
-                <NativeSelect
+                // "Same as the shop" is a real choice to come back to, so it
+                // is an option with a value of its own, not the empty one.
+                <Select
                   {...wiring}
-                  value={currencyCode ?? ""}
-                  onChange={(event) =>
-                    setCurrencyCode(event.target.value || null)
+                  value={currencyCode ?? SAME_AS_SHOP}
+                  onChange={(next) =>
+                    setCurrencyCode(next === SAME_AS_SHOP ? null : next)
                   }
-                >
-                  <option value="">
-                    {t("branches.currencySame", { code: shopCode })}
-                  </option>
-                  {(currencies ?? [])
-                    .filter((one) => one.code !== shopCode)
-                    .map((one) => (
-                      <option key={one.code} value={one.code}>
-                        {one.code}
-                      </option>
-                    ))}
-                </NativeSelect>
+                  options={[
+                    {
+                      value: SAME_AS_SHOP,
+                      label: t("branches.currencySame", { code: shopCode }),
+                    },
+                    ...(currencies ?? [])
+                      .filter((one) => one.code !== shopCode)
+                      .map((one) => ({ value: one.code, label: one.code })),
+                  ]}
+                />
               )}
             </Field>
             {/* Handed the resolved picture, so the box is never empty while the

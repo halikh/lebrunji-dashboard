@@ -4138,6 +4138,10 @@ const en = {
   controls: {
     noMatches: "Nothing matches that search.",
     allChosen: "Everything is already chosen.",
+    // The shop pickers (`ShopSelect`), searched on the server as you type.
+    noShops: "No shop matches “{term}”.",
+    pickShop: "Choose a shop",
+    pickShops: "Choose shops",
     remove: "Remove {name}",
     loadMore: "Load more",
     // The phone field shows only the national digits, so its spoken name

@@ -20,13 +20,13 @@ import {
   EmptyState,
   Field,
   Menu,
-  NativeSelect,
   SearchInput,
   Segmented,
   Skeleton,
   Switch,
   cx,
 } from "@/components/ui";
+import { Select } from "@/components/ui/select";
 import { ConfirmToggle } from "@/components/ui/confirm-toggle";
 import { LocalizedField } from "@/components/ui/localized-field";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -171,36 +171,41 @@ export function ShopOptionsTab({ storeId }: { storeId: string }) {
           placeholder={t("options.searchPlaceholder")}
           className="w-full sm:w-72"
         />
-        <label className="flex min-w-0 items-center gap-2 text-[13px] text-ink-3 max-sm:w-full">
+        <div className="flex min-w-0 items-center gap-2 text-[13px] text-ink-3 max-sm:w-full">
           <span className="shrink-0">{t("options.filterLabel")}</span>
-          <NativeSelect
+          {/* "All" is the empty value — the placeholder, and what clearing
+              goes back to. A dish's section is its second line, which is what
+              the old list's groups said. */}
+          <Select
+            aria-label={t("options.filterLabel")}
             value={filterValue}
-            onChange={(event) => {
-              const next = event.target.value;
+            onChange={(next) => {
               // Every open form below belongs to the old filter.
               guarded(() => choose(next))();
             }}
+            isClearable
+            placeholder={t("options.filterAll")}
+            options={sections.flatMap((one) => {
+              const title = pickLocalized(one.title);
+              return [
+                {
+                  value: `s:${one.id}`,
+                  label: t("options.filterSection", { name: title }),
+                },
+                ...one.items.map((dish) => ({
+                  value: `i:${one.id}:${dish.id}`,
+                  label: pickLocalized(dish.name),
+                  detail: title,
+                  note:
+                    (counts.data?.get(dish.id) ?? 0) === 0
+                      ? t("options.noneSet")
+                      : undefined,
+                })),
+              ];
+            })}
             className="min-w-0 flex-1 sm:w-64"
-          >
-            <option value="">{t("options.filterAll")}</option>
-            {sections.map((one) => (
-              <optgroup key={one.id} label={pickLocalized(one.title)}>
-                <option value={`s:${one.id}`}>
-                  {t("options.filterSection", {
-                    name: pickLocalized(one.title),
-                  })}
-                </option>
-                {one.items.map((dish) => (
-                  <option key={dish.id} value={`i:${one.id}:${dish.id}`}>
-                    {(counts.data?.get(dish.id) ?? 0) === 0
-                      ? `${pickLocalized(dish.name)}, ${t("options.noneSet")}`
-                      : pickLocalized(dish.name)}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </NativeSelect>
-        </label>
+          />
+        </div>
         <div className="ms-auto">
           <Button variant="primary" onClick={() => setAdding(true)}>
             <Plus />
