@@ -116,25 +116,26 @@ export function optionsHref(
 }
 
 /**
- * Which sections of each shop's menu were folded.
+ * Which sections of each shop's menu were opened.
  *
  * Editing a dish is a page of its own, so coming back remounts the tab — and a
- * menu that forgot what had been folded would hand back a different screen than
+ * menu that forgot what had been opened would hand back a different screen than
  * the one left. Module state rather than storage: it is for the round trip to a
  * dish and back, and a reload starting fresh is fine. Per shop, so one shop's
- * choices do not fold another's sections.
+ * choices do not open another's sections.
  *
- * Folded rather than open is what is remembered, because sections start open:
- * the most common job — a price, a dish off — should be on screen, not a click
- * away.
+ * Open rather than folded is what is remembered, because sections start folded
+ * (user, 2026-11-07): a supermarket's menu is hundreds of products, and the
+ * page should open on its aisles — the outline — with one click into any of
+ * them. A search, and a dish returned to, still show what they found.
  */
-const folded = new Map<string, Set<string>>();
+const opened = new Map<string, Set<string>>();
 
-export function foldedSections(storeId: string): Set<string> {
-  let set = folded.get(storeId);
+export function openedSections(storeId: string): Set<string> {
+  let set = opened.get(storeId);
   if (!set) {
     set = new Set();
-    folded.set(storeId, set);
+    opened.set(storeId, set);
   }
   return set;
 }

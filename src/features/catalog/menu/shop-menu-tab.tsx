@@ -82,7 +82,7 @@ import {
 } from "./section-dialogs";
 import {
   LevelTag,
-  foldedSections,
+  openedSections,
   levelCounts,
   newDishHref,
   nextSectionSort,
@@ -207,26 +207,28 @@ function MenuBoard({ storeId }: { storeId: string }) {
       (id): id is string => typeof id === "string",
     ),
   );
-  const [folded, setFolded] = useState<Set<string>>(
-    () => new Set(foldedSections(storeId)),
+  // Everything starts folded; what was opened is remembered for the round
+  // trip to a dish (`openedSections`).
+  const [opened, setOpened] = useState<Set<string>>(
+    () => new Set(openedSections(storeId)),
   );
   const [released, setReleased] = useState<Set<string>>(() => new Set());
   const isOpen = (id: string) =>
-    !folded.has(id) || (forced.has(id) && !released.has(id));
+    opened.has(id) || (forced.has(id) && !released.has(id));
 
   function setOpen(id: string, open: boolean) {
-    const memory = foldedSections(storeId);
-    if (open) memory.delete(id);
-    else memory.add(id);
-    setFolded(new Set(memory));
+    const memory = openedSections(storeId);
+    if (open) memory.add(id);
+    else memory.delete(id);
+    setOpened(new Set(memory));
     if (!open) setReleased((current) => new Set(current).add(id));
   }
 
   function setAllOpen(open: boolean) {
-    const memory = foldedSections(storeId);
+    const memory = openedSections(storeId);
     memory.clear();
-    if (!open) for (const one of sections) memory.add(one.id);
-    setFolded(new Set(memory));
+    if (open) for (const one of sections) memory.add(one.id);
+    setOpened(new Set(memory));
     if (!open) setReleased(new Set(sections.map((one) => one.id)));
   }
 
