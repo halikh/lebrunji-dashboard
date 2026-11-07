@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { t } from "@/i18n/translations";
-import type { Currency } from "@/lib/money";
+import type { ConvertibleCurrency, Currency } from "@/lib/money";
 
 import type { Order, OrderLine, OrderStore } from "./api/orders";
 import {
@@ -30,6 +30,20 @@ const USD: Currency = {
   groupSeparator: ",",
 };
 
+/** The pair a message says figures in both of: dollars, and lira at 89,500. */
+const BOTH: { from: ConvertibleCurrency; to: ConvertibleCurrency } = {
+  from: { ...USD, rate: 1, isBase: true },
+  to: {
+    code: "LBP",
+    symbol: "ل.ل",
+    symbolPosition: "after",
+    decimalDigits: 0,
+    decimalSeparator: ".",
+    groupSeparator: ",",
+    rate: 89_500,
+  },
+};
+
 const store = (
   id: string,
   storeName: string,
@@ -45,6 +59,7 @@ const store = (
   pickupAddress: null,
   pickupLatitude: null,
   pickupLongitude: null,
+  shopRate: null,
   storeImageUrl: null,
   storeWhatsapp: null,
   statusSlug: "preparing",
@@ -136,19 +151,20 @@ describe("dispatchMessage", () => {
     expect(text).not.toContain("Discount");
   });
 
-  it("says the discount, and the other currency after the total", () => {
+  it("says the discount, and the other currency after the total, as cash", () => {
     const text = dispatchMessage(
       order({ discount: 200, total: 1100 }),
       USD,
       true,
-      (minor) => `${minor * 895} ل.ل`,
+      BOTH,
     );
     const lines = text.split("\n");
 
     expect(text).toContain("Discount: -$2.00");
     expect(lines.at(-2)).toBe("*Collect on delivery: $11.00*");
+    // $11.00 is 984,500 lira; nobody hands over a 500, so 985,000.
     expect(lines.at(-1)).toBe(
-      t("dispatch.collectOther", { amount: "984500 ل.ل" }),
+      t("dispatch.collectOther", { amount: "985,000 ل.ل" }),
     );
   });
 
@@ -177,20 +193,27 @@ describe("dispatchMessage", () => {
             pickupLatitude: 33.9,
             pickupLongitude: 35.48,
             storeWhatsapp: "96171000001",
-            subtotal: 600,
+            // This shop quotes its own rate (0120).
+            shopRate: 90_000,
           }),
           store("os-2", "Juice Bar", null, null, {
             pickupAddress: "Makdisi Street",
-            subtotal: 400,
           }),
         ],
         lines: [
           line({ id: "a", orderStoreId: "os-2", name: "Lemonade" }),
-          line({ id: "b", orderStoreId: "os-1", name: "Kafta" }),
+          line({
+            id: "b",
+            orderStoreId: "os-1",
+            name: "Kafta",
+            unitPrice: 325,
+            quantity: 2,
+          }),
         ],
       }),
       USD,
       true,
+      BOTH,
     );
 
     // A chain's branch by its own name; each stop numbered and complete.
@@ -208,21 +231,36 @@ describe("dispatchMessage", () => {
     );
     expect(first).toContain("Shop phone: +96171000001");
     expect(first).toContain("Kafta");
-    expect(first).toContain("This shop's items: $6.00");
+    // At the shop's own 90,000: $3.25 is 292,500, paid as 293,000, twice.
+    expect(first).toContain("*Pay the shop: $6.50*\nOr 586,000 ل.ل");
 
     const second = text.slice(juice, door);
     expect(second).toContain("Address: Makdisi Street");
     expect(second).not.toContain("Map:");
     expect(second).not.toContain("Shop phone:");
     expect(second).toContain("Lemonade");
-    expect(second).toContain("This shop's items: $4.00");
+    // At the platform's 89,500: $5.00 is 447,500, paid as 448,000.
+    expect(second).toContain("*Pay the shop: $5.00*\nOr 448,000 ل.ل");
   });
 
-  it("does not number or subtotal a single pickup", () => {
+  it("pays a single pickup too, without numbering it", () => {
     const text = dispatchMessage(order(), USD, true);
     expect(text).toContain("*Pick up from Grill House*");
     expect(text).not.toContain("Pickup 1 of");
-    expect(text).not.toContain("This shop's items");
+    expect(text).toContain("*Pay the shop: $10.00*");
+    // No second currency given: no second figure guessed.
+    expect(text).not.toContain("ل.ل");
+  });
+
+  it("pays a shop for what is in the bag, not what was ordered", () => {
+    const text = dispatchMessage(
+      order({
+        lines: [line({ id: "a", quantity: 3, fulfilledQuantity: 1 })],
+      }),
+      USD,
+      true,
+    );
+    expect(text).toContain("*Pay the shop: $5.00*");
   });
 
   it("sends an amended order as it now stands", () => {

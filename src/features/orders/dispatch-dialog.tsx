@@ -93,7 +93,7 @@ export function DispatchDialog({
   onClose: () => void;
 }) {
   const clock = useClock();
-  const { currencies, convertTo, secondaryCode } = useMoney();
+  const { currencies, secondaryCode } = useMoney();
   const dispatch = useDispatchOrder();
   const queryClient = useQueryClient();
 
@@ -215,19 +215,22 @@ export function DispatchDialog({
     setBlocked(refused);
   }
 
+  // The order's currency and the other one, so each shop's pay and the total
+  // can be said in both. Either missing (rates still loading, or no second
+  // currency) and the message leaves the second figures out.
+  const from = currencies?.find((one) => one.code === order.currencyCode);
+  const otherCode = secondaryCode(order.currencyCode);
+  const to = otherCode
+    ? currencies?.find((one) => one.code === otherCode)
+    : undefined;
+
   const message = dispatchMessage(
     { ...order, lines },
-    currencies?.find((one) => one.code === order.currencyCode),
+    from,
     // The driver reads this on their own phone, so it carries the business's
     // clock format — the phone has no idea what this setting says.
     clock.clock24h,
-    // The total in the other currency, at the rate the receipt reads it at.
-    (minor) => {
-      const other = secondaryCode(order.currencyCode);
-      return other
-        ? convertTo(minor, order.currencyCode, other, order.shopRate)
-        : null;
-    },
+    from && to ? { from, to } : undefined,
   );
 
   const isHolder = (driver: Courier) => holder?.courierId === driver.id;

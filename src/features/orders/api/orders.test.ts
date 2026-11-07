@@ -157,6 +157,7 @@ describe("withOrderMoved", () => {
     pickupAddress: null,
     pickupLatitude: null,
     pickupLongitude: null,
+    shopRate: null,
     storeWhatsapp: null,
     statusSlug: slug,
     statusName: statusName(slug),

@@ -1,12 +1,18 @@
 import { t } from "@/i18n/translations";
 import { formatDateTime } from "@/lib/time";
-import { formatMoney, type Currency } from "@/lib/money";
+import {
+  convertMoney,
+  formatMoney,
+  type ConvertibleCurrency,
+  type Currency,
+} from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { sizeOf } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
 import {
   placeName,
+  roundToCash,
   roundingOf,
   type Order,
   type OrderLine,
@@ -41,8 +47,9 @@ import {
  *
  * WhatsApp renders `*bold*`, and a message that uses it everywhere is harder
  * to skim than one that uses it for the stops. Bold marks where to go — each
- * pickup, then "Deliver to" — and the amount to collect, nothing else, so the
- * message reads as the trip: stop, stop, door, cash.
+ * pickup, then "Deliver to" — and the money that changes hands there: what
+ * each shop is paid, and what is collected at the door. Nothing else, so the
+ * message reads as the trip: stop and pay, stop and pay, door and collect.
  */
 
 /**
@@ -74,6 +81,36 @@ export function whatToPack(line: OrderLine, quantity: number): string {
   })`;
 }
 
+/**
+ * A line in the other currency, as the app shows it beside the price: the
+ * item and its options each converted at `shopRate` and rounded to the cash
+ * step, one unit at a time, then counted out — 400,000 LBP stays 400,000, and
+ * two of them are 800,000, not 799,000 (the app's `cashFigure`, 2026-11-06).
+ * An order already in that currency is its own figure.
+ */
+export function otherFigure(
+  line: Pick<
+    OrderLine,
+    "unitPrice" | "optionsPrice" | "priceUnit" | "unitQuantity" | "unitStep"
+  >,
+  quantity: number,
+  other: { from: ConvertibleCurrency; to: ConvertibleCurrency },
+  shopRate: number | null,
+): number {
+  const unit = itemUnit(line);
+  if (other.from.code === other.to.code) {
+    return linePrice(line.unitPrice, line.optionsPrice, unit, quantity);
+  }
+  const cash = (amount: number) =>
+    roundToCash(
+      convertMoney(amount, other.from, other.to, shopRate),
+      other.to.code,
+    );
+  const options = cash(line.optionsPrice);
+  const item = cash(line.unitPrice - line.optionsPrice);
+  return linePrice(item + options, options, unit, quantity);
+}
+
 /** A pin as a link that opens in whatever maps app the phone has. */
 function mapUrl(latitude: number, longitude: number): string {
   return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
@@ -103,24 +140,34 @@ export function whatsappLink(phone: string, message: string): string {
  * match the message, and the priced lines no longer add up to the subtotal
  * beneath them. A line at zero is left out: it is not in the bag.
  *
+ * ## What each shop is paid
+ *
+ * Every pickup ends with what the driver hands that shop (user, 2026-11-07):
+ * its lines as they now stand, added up — so the figure always matches the
+ * bag listed above it, amended or not — and the same in the other currency.
+ *
  * ## The other currency, and the rounding
  *
- * `convert` says the total in the other currency, at the same rate the
- * receipt's second line is read at (`Order.shopRate`) — so the driver and the
- * operator quote one figure at the door. Absent, the line is left out rather
- * than guessed. And when the server rounded a lira total to its cash step
- * (`0173`), the message says by how much, so the lines above the total add up
- * to it.
+ * `other` is the pair to say a figure in both. A shop's figure is read at
+ * **that shop's** rate (`OrderStore.shopRate`), the one its menu quoted; the
+ * order's total at the receipt's (`Order.shopRate`). Converted figures are
+ * cash, as the app shows them: each line one unit at a time, rounded to the
+ * 1,000 note, then counted out (`otherFigure`) — so the lira the driver hands
+ * a shop is the lira the customer saw. Absent, those lines are left out
+ * rather than guessed. And when the server rounded a lira total to its cash
+ * step (`0173`), the message says by how much, so the lines above add up.
  */
 export function dispatchMessage(
   order: Order & { lines: OrderLine[] },
   currency: Currency | undefined,
   clock24h: boolean,
-  /** The total in the other currency, or null when it cannot be said. */
-  convert?: (minor: number) => string | null,
+  /** The order's currency and the other one, to say a figure in both. */
+  other?: { from: ConvertibleCurrency; to: ConvertibleCurrency },
 ): string {
   const money = (minor: number) =>
     currency ? formatMoney(minor, currency) : null;
+  const inOther = (minor: number) =>
+    other ? formatMoney(minor, other.to) : null;
 
   const lines: string[] = [];
 
@@ -166,6 +213,8 @@ export function dispatchMessage(
       );
     }
 
+    let bag = 0;
+    let bagOther = 0;
     for (const line of order.lines.filter(
       (one) => one.orderStoreId === store.id,
     )) {
@@ -173,9 +222,17 @@ export function dispatchMessage(
       const quantity = line.fulfilledQuantity ?? line.quantity;
       if (quantity === 0) continue;
 
-      const amount = money(
-        linePrice(line.unitPrice, line.optionsPrice, itemUnit(line), quantity),
+      const price = linePrice(
+        line.unitPrice,
+        line.optionsPrice,
+        itemUnit(line),
+        quantity,
       );
+      bag += price;
+      if (other) {
+        bagOther += otherFigure(line, quantity, other, store.shopRate);
+      }
+      const amount = money(price);
       lines.push(
         `• ${whatToPack(line, quantity)}${amount ? ` — ${amount}` : ""}`,
       );
@@ -186,10 +243,15 @@ export function dispatchMessage(
         lines.push(`   ${t("dispatch.lineNote", { note: line.note })}`);
     }
 
-    // What this bag is worth, so each stop can be checked on its own. One
-    // shop's would only repeat the Items line below.
-    const bag = stops > 1 ? money(store.subtotal) : null;
-    if (bag) lines.push(t("dispatch.pickupSubtotal", { amount: bag }));
+    // What the driver hands this shop, in both currencies.
+    const pay = money(bag);
+    if (pay) {
+      lines.push(`*${t("dispatch.payShop", { amount: pay })}*`);
+      const payOther = inOther(bagOther);
+      if (payOther) {
+        lines.push(t("dispatch.collectOther", { amount: payOther }));
+      }
+    }
   });
 
   // The door.
@@ -240,8 +302,17 @@ export function dispatchMessage(
     }
     // The one number the driver acts on.
     lines.push(`*${t("dispatch.collect", { amount: total })}*`);
-    const other = convert?.(order.total) ?? null;
-    if (other) lines.push(t("dispatch.collectOther", { amount: other }));
+    const totalOther = other
+      ? inOther(
+          roundToCash(
+            convertMoney(order.total, other.from, other.to, order.shopRate),
+            other.to.code,
+          ),
+        )
+      : null;
+    if (totalOther) {
+      lines.push(t("dispatch.collectOther", { amount: totalOther }));
+    }
   } else {
     lines.push(t("dispatch.amountUnknown"));
   }

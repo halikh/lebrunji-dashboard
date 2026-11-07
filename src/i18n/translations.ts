@@ -381,7 +381,9 @@ const en = {
     pickupOf: "Pickup {n} of {count}: {store}",
     pickupAddress: "Address: {address}",
     pickupPhone: "Shop phone: {phone}",
-    pickupSubtotal: "This shop's items: {amount}",
+    // What the driver hands the shop at the pickup: its lines as they now
+    // stand. The lira line under it reuses `collectOther` ("Or …").
+    payShop: "Pay the shop: {amount}",
     deliverTo: "Deliver to",
     lineNote: "note: {note}",
     // A fixed-size item ordered more than once: "2 × Rice (500 g each)". The

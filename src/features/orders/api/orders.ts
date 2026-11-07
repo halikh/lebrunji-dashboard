@@ -55,6 +55,13 @@ export type OrderStore = {
   pickupAddress: string | null;
   pickupLatitude: number | null;
   pickupLongitude: number | null;
+  /**
+   * This shop's own rate (`stores.exchange_rate`, `0120`), or null for the
+   * platform's — what its share is read at in the other currency, as its menu
+   * quoted it. `Order.shopRate` is null on a split order; this never is for
+   * the reason that one is.
+   */
+  shopRate: number | null;
   storeImageUrl: string | null;
   /**
    * Where this kitchen is sent its half of the order, or null.
@@ -774,6 +781,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
         branchName: branchNameOf(store, locale),
         branchAddress: branchAddressOf(store, locale),
         ...pickupOf(store, locale),
+        shopRate: oneShopRate([store]),
         storeWhatsapp: kitchenPhone(store),
         storeImageUrl:
           (asRecord(store.stores)?.image_url as string | null) ?? null,
