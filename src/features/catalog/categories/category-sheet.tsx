@@ -264,7 +264,7 @@ function Form({
         />
       </div>
 
-      <div className="sticky bottom-0 -mx-6 -mb-5 mt-auto flex items-center justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
+      <div className="sticky -bottom-5 -mx-6 -mb-5 mt-auto flex items-center justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
         <Button variant="secondary" onClick={onCancel} disabled={pending}>
           {t("common.cancel")}
         </Button>
