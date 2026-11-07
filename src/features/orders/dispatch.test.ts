@@ -35,18 +35,23 @@ const store = (
   storeName: string,
   branchName: string | null = null,
   branchAddress: string | null = null,
+  over: Partial<OrderStore> = {},
 ): OrderStore => ({
   id,
   storeId: `shop-${id}`,
   storeName,
   branchName,
   branchAddress,
+  pickupAddress: null,
+  pickupLatitude: null,
+  pickupLongitude: null,
   storeImageUrl: null,
   storeWhatsapp: null,
   statusSlug: "preparing",
   statusName: "Preparing",
   progress: 2,
   subtotal: 0,
+  ...over,
 });
 
 const line = (over: Partial<OrderLine>): OrderLine => ({
@@ -95,12 +100,12 @@ const order = (
 });
 
 describe("dispatchMessage", () => {
-  it("carries the customer, the phone, the address in bold and the pin", () => {
+  it("carries the customer, the phone, the address and the pin", () => {
     const text = dispatchMessage(order(), USD, true);
 
-    expect(text).toContain("Customer: Rima Haddad");
+    expect(text).toContain("*Deliver to*\nCustomer: Rima Haddad");
     expect(text).toContain("Phone: +96170123456");
-    expect(text).toContain("*Address: Hamra, Bliss St, 3rd floor*");
+    expect(text).toContain("Address: Hamra, Bliss St, 3rd floor");
     expect(text).toContain(
       "Map: https://www.google.com/maps/search/?api=1&query=33.8959,35.4787",
     );
@@ -163,12 +168,21 @@ describe("dispatchMessage", () => {
     expect(text).toContain("• 2 × Kafta\n");
   });
 
-  it("groups lines under their shop, branch and all", () => {
+  it("gives every pickup its own block, before the door", () => {
     const text = dispatchMessage(
       order({
         stores: [
-          store("os-1", "Grill House", "Grill House Hamra", "Bliss Street"),
-          store("os-2", "Juice Bar"),
+          store("os-1", "Grill House", "Grill House Hamra", "Bliss Street", {
+            pickupAddress: "Bliss Street",
+            pickupLatitude: 33.9,
+            pickupLongitude: 35.48,
+            storeWhatsapp: "96171000001",
+            subtotal: 600,
+          }),
+          store("os-2", "Juice Bar", null, null, {
+            pickupAddress: "Makdisi Street",
+            subtotal: 400,
+          }),
         ],
         lines: [
           line({ id: "a", orderStoreId: "os-2", name: "Lemonade" }),
@@ -179,13 +193,36 @@ describe("dispatchMessage", () => {
       true,
     );
 
-    // A chain's branch by its own name, and where it is: the pickup's door.
-    const grill = text.indexOf("From Grill House Hamra, Bliss Street:");
-    const juice = text.indexOf("From Juice Bar:");
+    // A chain's branch by its own name; each stop numbered and complete.
+    const grill = text.indexOf("*Pickup 1 of 2: Grill House Hamra*");
+    const juice = text.indexOf("*Pickup 2 of 2: Juice Bar*");
+    const door = text.indexOf("*Deliver to*");
     expect(grill).toBeGreaterThan(-1);
-    expect(text.indexOf("Kafta")).toBeGreaterThan(grill);
-    expect(text.indexOf("Kafta")).toBeLessThan(juice);
-    expect(text.indexOf("Lemonade")).toBeGreaterThan(juice);
+    expect(juice).toBeGreaterThan(grill);
+    expect(door).toBeGreaterThan(juice);
+
+    const first = text.slice(grill, juice);
+    expect(first).toContain("Address: Bliss Street");
+    expect(first).toContain(
+      "Map: https://www.google.com/maps/search/?api=1&query=33.9,35.48",
+    );
+    expect(first).toContain("Shop phone: +96171000001");
+    expect(first).toContain("Kafta");
+    expect(first).toContain("This shop's items: $6.00");
+
+    const second = text.slice(juice, door);
+    expect(second).toContain("Address: Makdisi Street");
+    expect(second).not.toContain("Map:");
+    expect(second).not.toContain("Shop phone:");
+    expect(second).toContain("Lemonade");
+    expect(second).toContain("This shop's items: $4.00");
+  });
+
+  it("does not number or subtotal a single pickup", () => {
+    const text = dispatchMessage(order(), USD, true);
+    expect(text).toContain("*Pick up from Grill House*");
+    expect(text).not.toContain("Pickup 1 of");
+    expect(text).not.toContain("This shop's items");
   });
 
   it("sends an amended order as it now stands", () => {

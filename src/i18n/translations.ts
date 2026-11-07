@@ -375,7 +375,14 @@ const en = {
     address: "Address: {address}",
     map: "Map: {url}",
     note: "Note for you: {note}",
-    from: "From {store}:",
+    // Each pickup is its own block, numbered when there is more than one
+    // stop: the shop, where it is, its pin and its phone, then its bag.
+    pickup: "Pick up from {store}",
+    pickupOf: "Pickup {n} of {count}: {store}",
+    pickupAddress: "Address: {address}",
+    pickupPhone: "Shop phone: {phone}",
+    pickupSubtotal: "This shop's items: {amount}",
+    deliverTo: "Deliver to",
     lineNote: "note: {note}",
     // A fixed-size item ordered more than once: "2 × Rice (500 g each)". The
     // shop packs two 500 g bags, not one of a kilo.

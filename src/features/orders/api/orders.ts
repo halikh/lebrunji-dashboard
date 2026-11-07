@@ -46,6 +46,15 @@ export type OrderStore = {
    * `branchName`, or when the branch has none.
    */
   branchAddress: string | null;
+  /**
+   * Where the driver collects this portion: the branch's written address and
+   * pin, chain or not (`branchAddress` is only there to tell branches apart).
+   * Read on the order's detail, for the driver's message; null on the queue,
+   * which does not ask, and when the branch has none.
+   */
+  pickupAddress: string | null;
+  pickupLatitude: number | null;
+  pickupLongitude: number | null;
   storeImageUrl: string | null;
   /**
    * Where this kitchen is sent its half of the order, or null.
@@ -312,7 +321,7 @@ export async function fetchOrder(
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal, status,
-         branches ( id, name, address, branch_contacts ( whatsapp_phone ) ),
+         branches ( id, name, address, latitude, longitude, branch_contacts ( whatsapp_phone ) ),
          stores ( name, image_url, exchange_rate,
            branches ( id, sort_order, created_at, deleted_at, branch_contacts ( whatsapp_phone ) ) ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
@@ -618,6 +627,30 @@ function pinOf(
 }
 
 /**
+ * Where the driver collects a portion: its branch's address and pin, both or
+ * neither of the pin (a latitude without its longitude is a point nobody
+ * chose). Absent from the queue's query, so null there.
+ */
+function pickupOf(
+  portion: Record<string, unknown>,
+  locale: string,
+): {
+  pickupAddress: string | null;
+  pickupLatitude: number | null;
+  pickupLongitude: number | null;
+} {
+  const branch = asRecord(portion.branches);
+  const latitude = (branch?.latitude as number | null | undefined) ?? null;
+  const longitude = (branch?.longitude as number | null | undefined) ?? null;
+  const pinned = latitude !== null && longitude !== null;
+  return {
+    pickupAddress: localized(branch?.address, locale) || null,
+    pickupLatitude: pinned ? latitude : null,
+    pickupLongitude: pinned ? longitude : null,
+  };
+}
+
+/**
  * Where this portion's kitchen is sent its half of the order.
  *
  * The number lives on the branch since `0101` — in `branch_contacts` since
@@ -740,6 +773,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
         storeName: localized(asRecord(store.stores)?.name, locale),
         branchName: branchNameOf(store, locale),
         branchAddress: branchAddressOf(store, locale),
+        ...pickupOf(store, locale),
         storeWhatsapp: kitchenPhone(store),
         storeImageUrl:
           (asRecord(store.stores)?.image_url as string | null) ?? null,

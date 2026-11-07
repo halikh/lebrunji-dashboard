@@ -6,7 +6,6 @@ import { sizeOf } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
 import {
-  placeLine,
   placeName,
   roundingOf,
   type Order,
@@ -40,9 +39,10 @@ import {
  *
  * ## Plain text, and no shouting
  *
- * WhatsApp renders `*bold*`, and a message that uses it for every heading is
- * harder to skim than one that uses it for two. Bold marks the two things read
- * at a glance — the address and the amount — and nothing else.
+ * WhatsApp renders `*bold*`, and a message that uses it everywhere is harder
+ * to skim than one that uses it for the stops. Bold marks where to go — each
+ * pickup, then "Deliver to" — and the amount to collect, nothing else, so the
+ * message reads as the trip: stop, stop, door, cash.
  */
 
 /**
@@ -72,6 +72,11 @@ export function whatToPack(line: OrderLine, quantity: number): string {
   return `${quantity} × ${line.name} (${
     quantity === 1 ? size : t("dispatch.packEach", { size })
   })`;
+}
+
+/** A pin as a link that opens in whatever maps app the phone has. */
+function mapUrl(latitude: number, longitude: number): string {
+  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 }
 
 /** The chat, with the message already in it. */
@@ -123,41 +128,43 @@ export function dispatchMessage(
   lines.push(
     t("dispatch.placed", { when: formatDateTime(order.placedAt, clock24h) }),
   );
-  lines.push("");
 
-  lines.push(
-    t("dispatch.customer", {
-      name: order.customerName || t("orders.incompleteSignup"),
-    }),
-  );
-  if (order.customerPhone) {
-    lines.push(
-      t("dispatch.phone", { phone: formatPhone(order.customerPhone) }),
-    );
-  }
-  lines.push(`*${t("dispatch.address", { address: order.addressLine })}*`);
-
-  // The pin, where there is one — the order's own, snapshotted at placement
-  // (`0131`), or for an older order the saved address's. See `Order.latitude`.
-  // A help in finding the door, never a substitute for the line above.
-  if (order.latitude !== null && order.longitude !== null) {
-    lines.push(
-      t("dispatch.map", {
-        url: `https://www.google.com/maps/search/?api=1&query=${order.latitude},${order.longitude}`,
-      }),
-    );
-  }
-
-  if (order.courierNote) {
-    lines.push(t("dispatch.note", { note: order.courierNote }));
-  }
-
-  // Grouped by shop, because a two-shop order is two pickups and the driver
-  // needs to know which dish is at which door. `lines` is flat and carries the
+  // In the order of the trip: every pickup, then the door, then the money.
+  //
+  // One block per shop, each complete on its own (user, 2026-11-07): a
+  // two-shop order is two stops, and a driver standing at the first needs
+  // that shop's address, pin and phone, and to know which bag is whose —
+  // not one "From" line among the dishes. `lines` is flat and carries the
   // `order_stores` row it belongs to — the same shape the receipt draws from.
-  for (const store of order.stores) {
+  const stops = order.stores.length;
+  order.stores.forEach((store, index) => {
     lines.push("");
-    lines.push(t("dispatch.from", { store: placeLine(store) }));
+    lines.push(
+      `*${
+        stops > 1
+          ? t("dispatch.pickupOf", {
+              n: index + 1,
+              count: stops,
+              store: placeName(store),
+            })
+          : t("dispatch.pickup", { store: placeName(store) })
+      }*`,
+    );
+    if (store.pickupAddress) {
+      lines.push(t("dispatch.pickupAddress", { address: store.pickupAddress }));
+    }
+    if (store.pickupLatitude !== null && store.pickupLongitude !== null) {
+      lines.push(
+        t("dispatch.map", {
+          url: mapUrl(store.pickupLatitude, store.pickupLongitude),
+        }),
+      );
+    }
+    if (store.storeWhatsapp) {
+      lines.push(
+        t("dispatch.pickupPhone", { phone: formatPhone(store.storeWhatsapp) }),
+      );
+    }
 
     for (const line of order.lines.filter(
       (one) => one.orderStoreId === store.id,
@@ -178,6 +185,39 @@ export function dispatchMessage(
       if (line.note)
         lines.push(`   ${t("dispatch.lineNote", { note: line.note })}`);
     }
+
+    // What this bag is worth, so each stop can be checked on its own. One
+    // shop's would only repeat the Items line below.
+    const bag = stops > 1 ? money(store.subtotal) : null;
+    if (bag) lines.push(t("dispatch.pickupSubtotal", { amount: bag }));
+  });
+
+  // The door.
+  lines.push("");
+  lines.push(`*${t("dispatch.deliverTo")}*`);
+  lines.push(
+    t("dispatch.customer", {
+      name: order.customerName || t("orders.incompleteSignup"),
+    }),
+  );
+  if (order.customerPhone) {
+    lines.push(
+      t("dispatch.phone", { phone: formatPhone(order.customerPhone) }),
+    );
+  }
+  lines.push(t("dispatch.address", { address: order.addressLine }));
+
+  // The pin, where there is one — the order's own, snapshotted at placement
+  // (`0131`), or for an older order the saved address's. See `Order.latitude`.
+  // A help in finding the door, never a substitute for the line above.
+  if (order.latitude !== null && order.longitude !== null) {
+    lines.push(
+      t("dispatch.map", { url: mapUrl(order.latitude, order.longitude) }),
+    );
+  }
+
+  if (order.courierNote) {
+    lines.push(t("dispatch.note", { note: order.courierNote }));
   }
 
   lines.push("");
