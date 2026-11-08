@@ -821,7 +821,8 @@ function MessagePreview({ text }: { text: string }) {
           )}
         </button>
       </Tooltip>
-      <p className="max-h-64 overflow-y-auto rounded-md rounded-ss-none bg-surface px-3 py-2.5 pe-10 text-[13px] leading-relaxed break-words whitespace-pre-wrap text-ink shadow-xs scrollbar-thin">
+      {/* `plaintext`: each line picks its own direction, as WhatsApp's do. */}
+      <p className="max-h-64 overflow-y-auto rounded-md rounded-ss-none bg-surface px-3 py-2.5 pe-10 text-[13px] leading-relaxed break-words whitespace-pre-wrap text-ink shadow-xs scrollbar-thin [unicode-bidi:plaintext]">
         {text}
       </p>
     </div>

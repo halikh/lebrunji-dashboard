@@ -27,6 +27,9 @@ export type ItemTodo = {
   isActive: boolean;
   storeId: string;
   storeName: Localized;
+  /** Set when the gap is one branch's (a branch on markup under a shop on commission). */
+  branchId?: string;
+  branchName?: Localized;
 };
 
 export type HoursTodo = {
@@ -51,6 +54,55 @@ export type AddressTodo = {
 };
 
 export type TodoList<T> = { rows: T[]; truncated: boolean };
+
+/**
+ * Live shops on commission with no rate entered (`0262`): commission chosen
+ * and the rate left empty, or nothing chosen at all, which is commission.
+ *
+ * Either way it is commission at 0%: every order from the shop records
+ * nothing for us, and the driver hands the shop the whole of its part. A shop
+ * on markup is set — its margin is in its store prices, not a rate.
+ */
+export async function fetchStoresWithoutCommission(): Promise<
+  TodoList<StoreTodo>
+> {
+  const client = getClient();
+  const [stores, earnings] = await Promise.all([
+    client
+      .from("stores")
+      .select("id, name, is_active")
+      .is("deleted_at", null)
+      .order("admin_sort_order", { ascending: true })
+      .order("id", { ascending: true }),
+    client
+      .from("store_earnings")
+      .select("store_id, model, commission_percent")
+      .is("branch_id", null),
+  ]);
+
+  if (stores.error)
+    throw new Error(`Could not read shops: ${stores.error.message}`);
+  if (earnings.error)
+    throw new Error(`Could not read commission: ${earnings.error.message}`);
+
+  const settled = new Set(
+    (earnings.data ?? [])
+      .filter((row) => row.model === "markup" || row.commission_percent != null)
+      .map((row) => row.store_id as string),
+  );
+  const rows = (stores.data ?? []).filter(
+    (row) => !settled.has(row.id as string),
+  );
+
+  return {
+    rows: rows.slice(0, PAGE.cap).map((row) => ({
+      id: row.id as string,
+      name: (row.name as Localized) ?? {},
+      isActive: row.is_active as boolean,
+    })),
+    truncated: rows.length > PAGE.cap,
+  };
+}
 
 /** Live shops with no picture. */
 export async function fetchStoresWithoutImage(): Promise<TodoList<StoreTodo>> {
@@ -119,6 +171,129 @@ export async function fetchItemsWithoutImage(): Promise<TodoList<ItemTodo>> {
         storeName: store?.name ?? {},
       };
     }),
+    truncated: rows.length > PAGE.cap,
+  };
+}
+
+/**
+ * Dishes on markup with no markup filled in (`0262`): no price from the shop,
+ * so the shop is paid the whole price and we keep nothing on it.
+ *
+ * Two kinds of place are on markup. A shop on markup: its dishes need the
+ * shop's own price from the shop. A branch on markup under a shop on
+ * commission: its dishes need the branch's own, since the shop-wide editors
+ * do not ask for one there (`usesMarkup` reads the shop alone) — a shop row
+ * left from an earlier spell on markup still counts. Bundles are dishes and
+ * count too; dishes in an archived aisle do not, since nobody can order them.
+ */
+export async function fetchItemsWithoutMarkup(): Promise<TodoList<ItemTodo>> {
+  const client = getClient();
+  const places = await client
+    .from("store_earnings")
+    .select(
+      `store_id, branch_id, model,
+       stores!inner ( id, name, deleted_at ),
+       branches ( id, name, deleted_at )`,
+    )
+    .is("stores.deleted_at", null);
+  if (places.error)
+    throw new Error(`Could not read markup shops: ${places.error.message}`);
+
+  const names = new Map<string, Localized>();
+  const shopModel = new Map<string, string | null>();
+  for (const row of places.data ?? []) {
+    const store = one(row.stores) as { id: string; name: Localized } | null;
+    if (!store) continue;
+    names.set(store.id, store.name ?? {});
+    if (row.branch_id === null)
+      shopModel.set(store.id, row.model as string | null);
+  }
+  /** Shops on markup themselves. */
+  const markupShops = new Set(
+    [...shopModel].filter(([, model]) => model === "markup").map(([id]) => id),
+  );
+  /** Live branches on markup whose shop is not. */
+  const markupBranches = (places.data ?? []).flatMap((row) => {
+    const branch = one(row.branches) as {
+      id: string;
+      name: Localized;
+      deleted_at: string | null;
+    } | null;
+    if (!branch || branch.deleted_at !== null || row.model !== "markup")
+      return [];
+    if (markupShops.has(row.store_id as string)) return [];
+    return [
+      {
+        storeId: row.store_id as string,
+        id: branch.id,
+        name: branch.name ?? {},
+      },
+    ];
+  });
+  const storeIds = [
+    ...new Set([...markupShops, ...markupBranches.map((b) => b.storeId)]),
+  ];
+  if (storeIds.length === 0) return { rows: [], truncated: false };
+
+  const [items, priced] = await Promise.all([
+    client
+      .from("menu_items")
+      .select("id, name, is_active, store_id, menu_sections ( deleted_at )")
+      .in("store_id", storeIds)
+      .is("deleted_at", null)
+      .order("id", { ascending: true }),
+    client
+      .from("item_store_prices")
+      .select("menu_item_id, branch_id, menu_items!inner ( store_id )")
+      .in("menu_items.store_id", storeIds),
+  ]);
+  if (items.error)
+    throw new Error(`Could not read menu items: ${items.error.message}`);
+  if (priced.error)
+    throw new Error(
+      `Could not read prices from shops: ${priced.error.message}`,
+    );
+
+  /** "item" for the shop's own row, "item:branch" for a branch's. */
+  const done = new Set(
+    (priced.data ?? []).map((row) =>
+      row.branch_id === null
+        ? (row.menu_item_id as string)
+        : `${row.menu_item_id as string}:${row.branch_id as string}`,
+    ),
+  );
+  const live = (items.data ?? []).filter((row) => {
+    // No section is a bundle; an archived aisle is off every menu.
+    const section = one(row.menu_sections) as {
+      deleted_at: string | null;
+    } | null;
+    return !section || section.deleted_at === null;
+  });
+
+  const rows: ItemTodo[] = [];
+  for (const row of live) {
+    const id = row.id as string;
+    const storeId = row.store_id as string;
+    const base = {
+      id,
+      name: (row.name as Localized) ?? {},
+      isActive: row.is_active as boolean,
+      storeId,
+      storeName: names.get(storeId) ?? {},
+    };
+    if (markupShops.has(storeId)) {
+      if (!done.has(id)) rows.push(base);
+      continue;
+    }
+    for (const branch of markupBranches) {
+      if (branch.storeId !== storeId) continue;
+      if (done.has(`${id}:${branch.id}`) || done.has(id)) continue;
+      rows.push({ ...base, branchId: branch.id, branchName: branch.name });
+    }
+  }
+
+  return {
+    rows: rows.slice(0, PAGE.cap),
     truncated: rows.length > PAGE.cap,
   };
 }

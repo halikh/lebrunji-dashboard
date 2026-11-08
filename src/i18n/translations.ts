@@ -26,9 +26,15 @@
  *
  * So the number of languages here and the number of languages in the
  * `languages` table are unrelated, and neither constrains the other.
+ *
+ * ## The Arabic here is not the dashboard's
+ *
+ * `ar` holds only what a driver or a shop reads on WhatsApp (`dispatch.ts`,
+ * user, 2026-11-08). The operator's screens stay in English, so nothing but
+ * those messages asks for it. A key `ar` does not have falls back to `en`.
  */
 
-export type Locale = "en";
+export type Locale = "en" | "ar";
 
 export const DEFAULT_LOCALE: Locale = "en";
 
@@ -84,6 +90,7 @@ const en = {
     customers: "Customers",
     drivers: "Drivers",
     reports: "Reports",
+    earnings: "Earnings",
     todo: "To do",
     settings: "Settings",
     account: "Your account",
@@ -109,6 +116,18 @@ const en = {
       "Every branch needs one before launch: the app prints it under the shop's name.",
     addressDone: "Every branch has its address.",
     addAddress: "Add address",
+    // 0262, two checks (user, 2026-11-08): a shop on commission needs its
+    // rate, and every dish of a shop on markup needs our markup.
+    commissionTitle: "Shops on commission without a rate",
+    commissionBody:
+      "Commission is chosen, or nothing is, and no rate is entered. We earn nothing on their orders, and the driver pays the shop the full amount.",
+    commissionDone: "Every shop on commission has its rate.",
+    setCommission: "Set the rate",
+    markupTitle: "Dishes on markup without our markup",
+    markupBody:
+      "The shop is on markup, but these dishes have no price from the shop and markup yet, so we keep nothing on them.",
+    markupDone: "Every dish of a shop on markup has its markup.",
+    setMarkup: "Add markup",
     storeImagesTitle: "Shops without a picture",
     storeImagesBody: "The picture is the shop's card in the app.",
     storeImagesDone: "Every shop has a picture.",
@@ -129,7 +148,7 @@ const en = {
     done: "Done",
     allDoneTitle: "Nothing left to do",
     allDoneBody:
-      "Every shop has its hours, every branch its address, and everything has a picture.",
+      "Every shop has its hours, every shop on commission its rate, every dish on markup its markup, every branch its address, and everything has a picture.",
     // The line under the header: the whole job in one sentence, so the page
     // answers "how much is left" before anything is opened.
     remaining: "{count} things left to fix",
@@ -143,6 +162,8 @@ const en = {
     startNext: "Start",
     nextHours: "set the opening hours for {name}",
     nextAddress: "add the address for {name}",
+    nextCommission: "set the commission rate for {name}",
+    nextMarkup: "add our markup to {name} ({shop})",
     nextStoreImage: "add a picture for {name}",
     nextItemImage: "add a picture for {name} ({shop})",
   },
@@ -368,33 +389,44 @@ const en = {
     noDriversOnShift: "No driver is on shift right now.",
     seeDrivers: "See their hours",
 
-    heading: "New delivery — {code}",
+    // The first two lines are what the WhatsApp notification shows: the
+    // code, and the shape of the trip.
+    heading: "New delivery {code}",
+    tripOne: "1 pickup, then the customer",
+    tripMany: "{count} pickups, then the customer",
     placed: "Ordered {when}",
+    // Kept for the cancellation message.
     customer: "Customer: {name}",
     phone: "Phone: {phone}",
-    address: "Address: {address}",
     map: "Map: {url}",
-    note: "Note for you: {note}",
-    // Each pickup is its own block, numbered when there is more than one
-    // stop: the shop, where it is, its pin and its phone, then its bag.
-    pickup: "Pick up from {store}",
-    pickupOf: "Pickup {n} of {count}: {store}",
-    pickupAddress: "Address: {address}",
-    pickupPhone: "Shop phone: {phone}",
-    // What the driver hands the shop at the pickup: its lines as they now
-    // stand. The lira line under it reuses `collectOther` ("Or …").
+    note: "Customer's note: {note}",
+    // Every stop is numbered, pickups first and the door last, so the
+    // message reads as the trip.
+    stopPickup: "Stop {n} · Pick up at {store}",
+    stopDeliver: "Stop {n} · Deliver to {name}",
+    // What the driver hands the shop at the pickup.
     payShop: "Pay the shop: {amount}",
-    deliverTo: "Deliver to",
-    lineNote: "note: {note}",
+    // A commission shop's bag, added up, before the commission comes off
+    // it — only when there is more than one line to add.
+    bag: "Items: {amount}",
+    // What the platform keeps of a commission pickup, said before what the
+    // shop is paid so the shop sees why it is less than the bag (`0262`).
+    // Markup is never said: the lines are already at the shop's own prices.
+    commission: "Less {percent}% commission: −{amount}",
+    lineNote: "Note: {note}",
     // A fixed-size item ordered more than once: "2 × Rice (500 g each)". The
     // shop packs two 500 g bags, not one of a kilo.
     packEach: "{size} each",
-    subtotal: "Items: {amount}",
-    delivery: "Delivery: {amount}",
-    discount: "Discount: -{amount}",
+    // The customer's bill on one line: "Items $8.43 + delivery $2.65".
+    subtotal: "Items {amount}",
+    delivery: "delivery {amount}",
+    discount: "discount {amount}",
     // Cash on delivery is the only payment method, so the total *is* what the
     // driver collects. Saying "total" would leave them to work that out.
-    collect: "Collect on delivery: {amount}",
+    collect: "Collect from the customer: {amount}",
+    // What the driver holds once every shop is paid and the customer has
+    // paid them — the figure the operator settles with them.
+    cashLeft: "Left with you after paying the shops: {amount}",
     // The rate had not loaded, so no figure here would be trustworthy. Better
     // to say so than to send a number that might be wrong by a hundredfold.
     amountUnknown: "Amount: see the dashboard.",
@@ -405,9 +437,12 @@ const en = {
      * of an order has no reason to hold a customer record, and a total they
      * cannot collect is a number they might act on.
      */
-    kitchenHeading: "New order — {code}",
-    kitchenFor: "For: {name}",
-    kitchenFooter: "Sent to {store}. Reply here if anything is unavailable.",
+    kitchenHeading: "New order {code}",
+    kitchenFor: "Name on the bag: {name}",
+    // The driver pays the shop at the pickup (user, 2026-11-07), so the shop
+    // is told it will be paid then — without the figure, see `kitchenMessage`.
+    kitchenFooter:
+      "Our driver will collect it and pay you at pickup. If anything is out of stock, reply here before you start.",
     kitchenSend: "Send",
     kitchenTitle: "Send {code} to the kitchen",
     kitchenBlurb:
@@ -451,10 +486,9 @@ const en = {
 
     // A lira total the server rounded to its cash step (0173), so the lines
     // above the amount to collect add up to it.
-    rounding: "Rounding: {amount}",
-    // The amount to collect, in the other currency — at the rate the receipt
-    // reads it at.
-    collectOther: "Or {amount}",
+    rounding: "rounding {amount}",
+    // The same figure in the other currency, on the same line after it.
+    collectOther: "or {amount}",
 
     // Who has it already, at the top of the driver list.
     alreadyWith: "Already with {name} since {when}",
@@ -2219,6 +2253,8 @@ const en = {
     g: "g",
     l: "L",
     ml: "mL",
+    // A display-only size's unit (`0262`); never a "Sold by" unit.
+    cm: "cm",
     piece: "piece",
     bag: "bag",
     pack: "pack",
@@ -2226,6 +2262,14 @@ const en = {
     pieces: "pieces",
     bags: "bags",
     packs: "packs",
+    // Arabic has three plurals past one, and its dual carries no number, so
+    // "Two" is a whole phrase. The same words in English. See `sizeOf`.
+    piecesMany: "pieces",
+    piecesTwo: "2 pieces",
+    bagsMany: "bags",
+    bagsTwo: "2 bags",
+    packsMany: "packs",
+    packsTwo: "2 packs",
     // The size under an item's name: "1 kg", "500 g".
     size: "{quantity} {unit}",
     // The comparison figure beside the price: "$12.00/kg".
@@ -2247,8 +2291,11 @@ const en = {
     // Says what setting it *does*, since `0122`: a step turns the price into a
     // rate, and that is the decision being made here rather than a detail of
     // the buttons. The preview underneath then shows it happening.
+    // Only a step makes the price a rate; without one it is the price of one
+    // item of the amount set. The hint used to say the rate happened as soon
+    // as the unit was set, which was true only with "Steps by" filled.
     stepHint:
-      "Set this and the price becomes a rate — any amount costs it in proportion. Leave it empty and the customer counts whole items.",
+      "The price is for the amount set here. Fill in “Steps by” too and it becomes a rate — any amount costs it in proportion. Leave “Steps by” empty and the customer counts whole items.",
     stepPositive: "The step must be more than zero.",
     // What the buttons will actually do, spelled out. A shop setting this is
     // describing a range, and a range is far easier to check by reading it
@@ -2259,6 +2306,17 @@ const en = {
     // The pair is the whole point — an amount with no price beside it is the
     // half of this that was never in doubt.
     stepPreviewStop: "{size}, {price}",
+
+    // A display-only size (`0262`) — "900 g" on a bag of rice. Not "Sold by":
+    // it prices and counts nothing.
+    sizeLabel: "Size",
+    sizeHint:
+      "Shown under the name, on the order and in the messages to the driver and the shop — 900 g on a bag of rice. Information only; it does not change the price or how it is counted.",
+    sizeAmount: "Size",
+    sizeUnit: "Unit",
+    sizeNone: "No size",
+    sizeBoth: "Give both the size and its unit, or neither.",
+    sizePositive: "The size must be more than zero.",
   },
 
   options: {
@@ -2551,6 +2609,7 @@ const en = {
     description:
       "What delivery costs, and what the second currency is worth. Both apply to every basket straight away.",
     tabDelivery: "Delivery",
+    tabExtra: "Extra shops",
     tabRate: "Exchange rate",
     tryShops: "Shops on the order",
     // For several shops the distance is the route — shop to shop to door —
@@ -3271,7 +3330,125 @@ const en = {
     sectionCount: "{title} ({count})",
   },
 
+  /**
+   * What the platform earns from a shop — commission or markup (`0262`). Staff
+   * only: no rate or store price is ever shown to a customer.
+   */
+  earnings: {
+    saved: "Earnings saved",
+    model: "How we earn",
+    commission: "Commission",
+    markup: "Markup",
+    commissionHint:
+      "A percentage of the shop’s part of each order, delivery left out. The driver pays the shop the rest at pickup.",
+    markupHint:
+      "Each dish and choice has a price from the shop and our markup. Customers pay the two together; the driver pays the shop its price at pickup.",
+    // Shown while the model is being changed, before saving (user, 2026-11-08).
+    switchToMarkup:
+      "After saving, every dish starts with its current price as the price from the shop and no markup. Add our markup to each: To do lists the ones still missing it. Orders already placed keep commission.",
+    switchToCommission:
+      "Prices in the app still include our markup. Lower them if the shop should sell at its own price, or we take commission on top. Orders already placed keep their markup.",
+    percent: "Commission rate (%)",
+    percentHint:
+      "On a $10 order with $2 delivery, 10% is $0.80, and the driver pays the shop $7.20. A new rate applies to new orders only.",
+    percentPlaceholder: "e.g. 10",
+    percentRequired: "Enter the commission rate.",
+    // The new-shop checklist, and what is said if the shop was made but its
+    // terms were not saved.
+    readyLabel: "Commission or markup",
+    notSavedNew:
+      "The shop was created, but its commission or markup was not saved. Set it on its Details tab — the shop is listed in To do until then.",
+    percentRange: "The rate must be between 0 and 100.",
+    percentDecimals: "Two decimal places at most.",
+    // The branch editor.
+    branchHint:
+      "Same as the shop unless this branch is settled differently. Applies to orders placed from now on.",
+    markupBranchHint:
+      "Set this branch’s store prices on its Menu tab, in its own currency. A dish without one there uses the shop’s.",
+    sameAsShop: "Same as the shop ({model})",
+    commissionAt: "Commission {percent}%",
+    commissionNone: "Commission, no rate",
+    percentBranchHint:
+      "This branch’s own rate. To use the shop’s, choose “Same as the shop”.",
+    percentShop: "Shop’s rate: {percent}%",
+    // Markup, typed as the shop's price plus ours (user, 2026-11-08). The
+    // app price is their sum and is worked out; the markup is never stored.
+    shopPrice: "Price from the shop",
+    shopPriceHint: "What the shop charges us for one. Customers never see it.",
+    shopPricePlaceholder: "380000",
+    markupPlaceholder: "20000",
+    markupAmount: "Our markup",
+    markupAmountHint: "Added on top. This is what we keep on each one.",
+    appPrice: "Price in the app: {price}",
+    markupNegative:
+      "The markup can’t be below zero, or we would lose money on every sale.",
+    // Both are required on a shop on markup (user, 2026-11-08).
+    bothNeeded: "Fill in both the price from the shop and our markup.",
+    shopPriceFor: "Price from the shop for {name}",
+    markupFor: "Our markup for {name}",
+    // The captions beside a branch row's two boxes.
+    fromShopShort: "From shop",
+    markupShort: "Markup",
+    branchMenuMarkup:
+      "This branch is on markup: each row has the price from the branch and our markup, in {code}. Empty uses the shop’s.",
+    // The quick price on the Menu tab, for a dish with a price from the shop:
+    // changing the app price there alone would quietly change our markup.
+    quickPriceMarkup:
+      "This dish is on markup. Change the price from the shop and our markup on its page, so the two stay together.",
+    openDish: "Open the dish",
+    // The order page, under each shop's lines.
+    orderModel: "Settled by",
+    orderNoRecord: "No commission recorded",
+    orderEarned: "We earn",
+    orderPaidToShop: "Paid to the shop at pickup",
+  },
+
+  /** The earnings report — `/earnings`, `api_v1_admin_earnings` (`0262`). */
+  earningsReport: {
+    // The filters: one shop, and the way of earning (user, 2026-11-08).
+    allShops: "All shops",
+    shopFilter: "Shop",
+    filter: {
+      all: "All",
+      commission: "Commission",
+      markup: "Markup",
+    },
+    emptyFiltered: {
+      commission: "No commission in this period",
+      markup: "No markup in this period",
+    },
+    title: "Earnings",
+    description:
+      "What we earned from each shop and branch, and what drivers paid the shops at pickup.",
+    currencyTitle: "In {code}",
+    currencySummary: "{earned} earned, {paid} paid to shops, {orders} orders",
+    colShop: "Shop",
+    colBranch: "Branch",
+    colModel: "Settled by",
+    colOrders: "Orders",
+    colSales: "Sales",
+    colEarned: "Earned",
+    colPaid: "Paid to shops",
+    colSalesRaw: "Sales (minor units)",
+    colEarnedRaw: "Earned (minor units)",
+    colPaidRaw: "Paid (minor units)",
+    total: "Total",
+    sheet: "Earnings {code}",
+    failed: "Could not load the earnings.",
+    emptyTitle: "Nothing earned in this period",
+    emptyBody:
+      "Only orders placed since commission and markup were set up are counted. Set a shop’s rate on its Details tab.",
+    toShops: "Go to shops",
+    note: "Sales leave delivery out. Cancelled orders are not counted; one reopened is counted again.",
+  },
+
   reports: {
+    // What we earned (`0262`): commission and markup as one figure, per
+    // currency, with the breakdown on the Earnings page.
+    earned: "We earned",
+    earnedHint: "Commission and markup. Breakdown on Earnings.",
+    earnedColumn: "Earned",
+    earnedIn: "We earned ({code})",
     title: "Reports",
     description:
       "How the business did over a period, compared with the period before.",
@@ -3391,8 +3568,9 @@ const en = {
 
   account: {
     title: "Your account",
-    blurb:
-      "Your own sign-in. Both changes ask for your current password — a signed-in session is exactly what an unattended laptop already has, so it cannot be the proof for a change that outlives it.",
+    blurb: "Your own sign-in to this dashboard.",
+    profileTitle: "Profile",
+    profileBlurb: "Who this dashboard knows you as.",
     tabPassword: "Password",
     tabEmail: "Email",
     signedInAs: "Signed in as",
@@ -3400,6 +3578,9 @@ const en = {
 
     currentPassword: "Current password",
     currentHint: "Proves it is you, and not a session somebody walked up to.",
+    currentPlaceholder: "The password you sign in with now",
+    newPasswordPlaceholder: "{min} characters or more",
+    confirmPlaceholder: "Type it again",
     currentRequired: "Enter your current password.",
     wrongPassword: "That is not your current password.",
 
@@ -3427,7 +3608,7 @@ const en = {
     unknownEmail: "Unknown",
     signInTitle: "Signing in",
     signInBlurb:
-      "How you get into the dashboard. Both changes ask for your current password first.",
+      "How you get into the dashboard. Changing either asks for your current password first, so an unattended laptop cannot.",
     emailRow: "Email",
     passwordRow: "Password",
     passwordMasked: "••••••••••",
@@ -4299,7 +4480,87 @@ const en = {
 /** Every locale's shape, taken from the one that is complete. */
 type Strings = typeof en;
 
-const bundles: Record<Locale, Strings> = { en };
+/** A locale that covers part of `en`, in any words. */
+type Translated<T> = {
+  [K in keyof T]?: T[K] extends string ? string : Translated<T[K]>;
+};
+
+/** What drivers and shops read. See the note at the top of this file. */
+const ar: Translated<Strings> = {
+  dispatch: {
+    heading: "طلب توصيل جديد {code}",
+    tripOne: "استلام من محل واحد، ثم التسليم للزبون",
+    // A figure rather than a counted noun: Arabic's noun changes with the
+    // number, and "عدد المحلات" is right for all of them.
+    tripMany: "عدد المحلات: {count}، ثم التسليم للزبون",
+    placed: "وقت الطلب: {when}",
+    customer: "الزبون: {name}",
+    phone: "الهاتف: {phone}",
+    map: "الموقع: {url}",
+    note: "ملاحظة الزبون: {note}",
+    stopPickup: "المحطة {n}: الاستلام من {store}",
+    stopDeliver: "المحطة {n}: التسليم إلى {name}",
+    payShop: "ادفع للمحل: {amount}",
+    bag: "الأصناف: {amount}",
+    // No minus sign: "يُخصم" says it, and a sign before a figure lands on the
+    // wrong side of it in a right-to-left line.
+    commission: "يُخصم {percent}% عمولة: {amount}",
+    lineNote: "ملاحظة: {note}",
+    packEach: "{size} للواحدة",
+    subtotal: "الأصناف {amount}",
+    delivery: "التوصيل {amount}",
+    discount: "الخصم {amount}",
+    rounding: "التقريب {amount}",
+    collect: "اقبض من الزبون: {amount}",
+    collectOther: "أو {amount}",
+    cashLeft: "يبقى معك بعد الدفع للمحلات: {amount}",
+    amountUnknown: "المبلغ: راجع لوحة التحكم.",
+    kitchenHeading: "طلب جديد {code}",
+    kitchenFor: "الاسم على الكيس: {name}",
+    kitchenFooter:
+      "سيستلم سائقنا الطلب ويدفع لكم عند الاستلام. إذا كان أي صنف غير متوفر، أخبرونا هنا قبل البدء.",
+    cancelHeading: "أُلغي الطلب {code}",
+    cancelBody:
+      "تم إلغاء هذا الطلب. الرجاء عدم استلامه أو توصيله. نعتذر عن الإزعاج.",
+  },
+  orders: {
+    incompleteSignup: "لم يكتمل التسجيل",
+  },
+  // The app's words (`units` in its bundle), so a shop and a customer read
+  // one amount the same way.
+  units: {
+    kg: "كغ",
+    g: "غ",
+    l: "ل",
+    ml: "مل",
+    cm: "سم",
+    piece: "قطعة",
+    pieces: "قطع",
+    piecesMany: "قطعة",
+    piecesTwo: "قطعتان",
+    bag: "كيس",
+    bags: "أكياس",
+    bagsMany: "كيس",
+    bagsTwo: "كيسان",
+    pack: "علبة",
+    packs: "علب",
+    packsMany: "علبة",
+    packsTwo: "علبتان",
+    size: "{quantity} {unit}",
+  },
+};
+
+const bundles: Record<Locale, Translated<Strings>> = { en, ar };
+
+/** The string at a dotted path through a bundle, if there is one. */
+function lookup(bundle: unknown, parts: string[]): string | null {
+  let value = bundle;
+  for (const part of parts) {
+    if (typeof value !== "object" || value === null) return null;
+    value = (value as Record<string, unknown>)[part];
+  }
+  return typeof value === "string" ? value : null;
+}
 
 /** Dotted key into the bundle — `login.submit`. */
 type Path<T, Prefix extends string = ""> = {
@@ -4338,12 +4599,9 @@ export function t(
   locale: Locale = DEFAULT_LOCALE,
 ): string {
   const parts = key.split(".");
-  let value: unknown = bundles[locale];
-  for (const part of parts) {
-    if (typeof value !== "object" || value === null) return key;
-    value = (value as Record<string, unknown>)[part];
-  }
-  if (typeof value !== "string") return key;
+  const value =
+    lookup(bundles[locale], parts) ?? lookup(bundles[DEFAULT_LOCALE], parts);
+  if (value === null) return key;
   if (!params) return value;
 
   return value.replace(/\{(\w+)\}/g, (whole, name: string) =>

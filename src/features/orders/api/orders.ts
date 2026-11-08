@@ -9,7 +9,7 @@ import {
   statusProgress,
 } from "@/lib/order-status";
 import { startOfBusinessDay } from "@/lib/time";
-import { unitNumber } from "@/lib/units";
+import { asSizeUnit, unitNumber, type SizeUnit } from "@/lib/units";
 
 import { orderRefusal } from "./refusal";
 
@@ -77,6 +77,39 @@ export type OrderStore = {
   /** Position on the path. `null` is terminal and off it — cancelled. */
   progress: number | null;
   subtotal: number;
+  /**
+   * What the platform earned on this portion and what the driver pays the
+   * shop at pickup (`order_store_earnings`, `0262`). Read on the detail only;
+   * null on the queue, and for a portion placed before `0262` — which is "no
+   * commission recorded": the shop is paid its subtotal, as it always was.
+   */
+  earnings: OrderStoreEarnings | null;
+  /**
+   * The same place in Arabic, for the WhatsApp messages (`dispatch.ts`). English
+   * or any language the row has when it has no Arabic — see `localized`.
+   */
+  arabic: {
+    storeName: string;
+    branchName: string | null;
+    pickupAddress: string | null;
+  };
+};
+
+/**
+ * One portion's figures, fixed when it was placed and kept up by
+ * `settle_order_store` as its lines are amended. In the order's currency.
+ * Staff only — the row is behind `is_admin()`.
+ */
+export type OrderStoreEarnings = {
+  model: "commission" | "markup";
+  /** The rate at the time, on commission; null on markup or with no rate. */
+  commissionPercent: number | null;
+  /** What the customer pays for this shop's part, delivery left out. */
+  sales: number;
+  /** What the driver hands the shop at pickup: `sales − earning`. */
+  storeDue: number;
+  /** The platform's: the commission, or the markup. */
+  earning: number;
 };
 
 export type OrderLine = {
@@ -128,8 +161,25 @@ export type OrderLine = {
   priceUnit: string | null;
   unitQuantity: number | null;
   unitStep: number | null;
+  /**
+   * The dish's display-only size as sold — "900 g" — copied onto the line at
+   * placement (`0262`). Both null for a dish with none, and for older lines.
+   */
+  sizeQuantity: number | null;
+  sizeUnit: SizeUnit | null;
+  /**
+   * On a markup portion, what the shop is paid for one press — the
+   * counterpart of `unitPrice` / `optionsPrice` (`order_line_store_prices`,
+   * `0262`). Null when the line has no store price: the shop is paid the app
+   * price.
+   */
+  storeUnitPrice: number | null;
+  storeOptionsPrice: number | null;
   note: string | null;
   options: string[];
+  /** The name and options in Arabic, for the WhatsApp messages. */
+  nameAr: string;
+  optionsAr: string[];
 };
 
 export type Order = {
@@ -328,13 +378,16 @@ export async function fetchOrder(
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
        order_stores ( id, store_id, subtotal, status,
+         order_store_earnings ( model, commission_percent, sales, store_due, earning ),
          branches ( id, name, address, latitude, longitude, branch_contacts ( whatsapp_phone ) ),
          stores ( name, image_url, exchange_rate,
            branches ( id, sort_order, created_at, deleted_at, branch_contacts ( whatsapp_phone ) ) ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
            options_price, price_unit, unit_quantity, unit_step,
+           size_quantity, size_unit,
            fulfilled_quantity, replaces_line_id, amendment_reason,
            menu_items ( image_url ),
+           order_line_store_prices ( store_unit_price, store_options_price ),
            order_line_options ( name, item_options ( name ) ) ) )`,
     )
     .eq("id", id)
@@ -365,6 +418,11 @@ export async function fetchOrder(
         // which JSON has no type for. Parsed here rather than at each screen.
         unitQuantity: unitNumber(line.unit_quantity as string | number | null),
         unitStep: unitNumber(line.unit_step as string | number | null),
+        sizeQuantity: unitNumber(
+          line.size_quantity as string | number | null | undefined,
+        ),
+        sizeUnit: asSizeUnit(line.size_unit),
+        ...storePricesOf(asRecord(line.order_line_store_prices)),
         note: (line.note as string | null) ?? null,
         imageUrl:
           (asRecord(line.menu_items)?.image_url as string | null) ?? null,
@@ -372,11 +430,9 @@ export async function fetchOrder(
         // on the line, as the dish's own name always was. Today's option name
         // only for a row that somehow has no snapshot: a choice renamed since
         // would otherwise rewrite what the customer picked.
-        options: asArray(line.order_line_options).map(
-          (o) =>
-            localized(o.name, locale) ||
-            localized(asRecord(o.item_options)?.name, locale),
-        ),
+        options: optionNames(line, locale),
+        nameAr: localized(line.name, "ar"),
+        optionsAr: optionNames(line, "ar"),
       });
     }
   }
@@ -597,6 +653,15 @@ function localized(value: unknown, locale: string): string {
   return "";
 }
 
+/** A line's chosen options, each by its snapshot, in one language. */
+function optionNames(line: Record<string, unknown>, locale: string): string[] {
+  return asArray(line.order_line_options).map(
+    (o) =>
+      localized(o.name, locale) ||
+      localized(asRecord(o.item_options)?.name, locale),
+  );
+}
+
 /**
  * PostgREST returns an embedded relation as an object or an array depending on
  * its cardinality, and the difference is not always visible from the select.
@@ -789,8 +854,44 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
         statusName: statusName(slug),
         progress: statusProgress(slug),
         subtotal: store.subtotal as number,
+        earnings: earningsOf(asRecord(store.order_store_earnings)),
+        arabic: {
+          storeName: localized(asRecord(store.stores)?.name, "ar"),
+          branchName: branchNameOf(store, "ar"),
+          pickupAddress: pickupOf(store, "ar").pickupAddress,
+        },
       };
     }),
+  };
+}
+
+/** A portion's `order_store_earnings` row, or null — see `OrderStore.earnings`. */
+function earningsOf(
+  row: Record<string, unknown> | null,
+): OrderStoreEarnings | null {
+  if (!row) return null;
+  const model = row.model === "markup" ? "markup" : "commission";
+  const rate = row.commission_percent;
+  return {
+    model,
+    // `numeric(5, 2)` arrives as a string.
+    commissionPercent:
+      rate == null || !Number.isFinite(Number(rate)) ? null : Number(rate),
+    sales: Number(row.sales ?? 0),
+    storeDue: Number(row.store_due ?? 0),
+    earning: Number(row.earning ?? 0),
+  };
+}
+
+function storePricesOf(row: Record<string, unknown> | null): {
+  storeUnitPrice: number | null;
+  storeOptionsPrice: number | null;
+} {
+  return {
+    storeUnitPrice:
+      row?.store_unit_price == null ? null : Number(row.store_unit_price),
+    storeOptionsPrice:
+      row?.store_options_price == null ? null : Number(row.store_options_price),
   };
 }
 

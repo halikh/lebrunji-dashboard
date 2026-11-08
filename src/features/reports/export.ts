@@ -4,7 +4,20 @@ import { download, reportFilename, toCsv } from "@/lib/download";
 import { t } from "@/i18n/translations";
 import { formatMoney, type Currency } from "@/lib/money";
 
+import type { EarningsRow } from "@/features/earnings/api";
+import {
+  earnedByStore,
+  earnedText,
+  earnedTotals,
+} from "@/features/earnings/summary";
+
 import type { Stats } from "./api/stats";
+
+/** What we earned over the same range, and how to say each currency. */
+export type EarnedForExport = {
+  rows: readonly EarningsRow[];
+  currencyOf: (code: string) => Currency | undefined;
+};
 
 /**
  * The overview, as a file.
@@ -30,7 +43,7 @@ import type { Stats } from "./api/stats";
 
 export type ExportFormat = "csv" | "xlsx";
 
-type Sheet = { name: string; rows: (string | number)[][] };
+export type Sheet = { name: string; rows: (string | number)[][] };
 
 /**
  * The report as a set of named tables.
@@ -39,9 +52,20 @@ type Sheet = { name: string; rows: (string | number)[][] };
  * cannot disagree about what the report contains — which they would within a
  * week if each assembled its own.
  */
-function sheets(stats: Stats, currency: Currency | undefined): Sheet[] {
+function sheets(
+  stats: Stats,
+  currency: Currency | undefined,
+  earned: EarnedForExport | undefined,
+): Sheet[] {
   const money = (minor: number) =>
     currency ? formatMoney(minor, currency) : String(minor);
+  const moneyIn = (minor: number, code: string) => {
+    const of = earned?.currencyOf(code);
+    return of ? formatMoney(minor, of) : `${minor} ${code}`;
+  };
+  // One summary row per currency, never added across them (`0262`).
+  const totals = earnedTotals(earned?.rows ?? []);
+  const perStore = earnedByStore(earned?.rows ?? []);
 
   return [
     {
@@ -53,6 +77,15 @@ function sheets(stats: Stats, currency: Currency | undefined): Sheet[] {
           money(stats.totals.revenue),
           stats.totals.revenue,
         ],
+        ...(totals.length > 0
+          ? totals.map((one) => [
+              totals.length > 1
+                ? t("reports.earnedIn", { code: one.currencyCode })
+                : t("reports.earned"),
+              moneyIn(one.amount, one.currencyCode),
+              one.amount,
+            ])
+          : [[t("reports.earned"), money(0), 0]]),
         [
           t("reports.tileOrders"),
           String(stats.totals.orders),
@@ -122,12 +155,14 @@ function sheets(stats: Stats, currency: Currency | undefined): Sheet[] {
           t("reports.colOrders"),
           t("reports.colRevenue"),
           t("reports.colRaw"),
+          t("reports.earnedColumn"),
         ],
         ...stats.topStores.map((store) => [
           nameOf(store.name),
           store.orders,
           money(store.revenue),
           store.revenue,
+          earnedText(perStore.get(store.storeId), moneyIn),
         ]),
       ],
     },
@@ -159,9 +194,21 @@ export async function exportReport(
   stats: Stats,
   currency: Currency | undefined,
   range: { from: string; to: string },
+  earned?: EarnedForExport,
 ): Promise<void> {
-  const tables = sheets(stats, currency);
+  await writeSheets(format, sheets(stats, currency, earned), "report", range);
+}
 
+/**
+ * Hands over a set of named tables as one file — shared with the earnings
+ * report (`features/earnings/export.ts`), so the two files read alike.
+ */
+export async function writeSheets(
+  format: ExportFormat,
+  tables: Sheet[],
+  what: string,
+  range: { from: string; to: string },
+): Promise<void> {
   if (format === "csv") {
     // One file, with each table under its own heading and a blank line
     // between. CSV has no concept of a sheet, and five separate downloads for
@@ -170,10 +217,7 @@ export async function exportReport(
     for (const sheet of tables) {
       rows.push([sheet.name], ...sheet.rows, []);
     }
-    download(
-      reportFilename("report", range.from, range.to, "csv"),
-      toCsv(rows),
-    );
+    download(reportFilename(what, range.from, range.to, "csv"), toCsv(rows));
     return;
   }
 
@@ -196,7 +240,7 @@ export async function exportReport(
 
     const buffer = await workbook.xlsx.writeBuffer();
     download(
-      reportFilename("report", range.from, range.to, "xlsx"),
+      reportFilename(what, range.from, range.to, "xlsx"),
       new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       }),

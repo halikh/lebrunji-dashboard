@@ -37,9 +37,12 @@ import { TEXT } from "@/lib/limits";
 import {
   linePrice,
   PRICE_UNITS,
+  SIZE_UNITS,
+  sizeUnitKey,
   unitAmount,
   unitKey,
   type PriceUnit,
+  type SizeUnit,
 } from "@/lib/units";
 import {
   validateLocalizedText,
@@ -48,8 +51,11 @@ import {
   type Valid,
 } from "@/lib/validation";
 
+import { usesMarkup } from "../api/earnings";
 import type { Store } from "../api/stores";
 import { useLiveBundlesWith } from "../use-bundles";
+import { useShopEarnings, useShopStorePrices } from "../use-earnings";
+import { MarkupPriceFields, useMarkupPrice } from "./markup-price-fields";
 import { useItemOptionGroups } from "../use-options";
 import { useTagVocabulary } from "../use-tags";
 import { DishBranches } from "./dish-branches";
@@ -72,8 +78,16 @@ export type DishDraft = {
   unitQuantity: number | null;
   /** How far one press of the customer's + moves — `0119`. Null with no unit. */
   unitStep: number | null;
+  /** Display-only, "900 g" (`0262`). Both null or both set. */
+  sizeQuantity: number | null;
+  sizeUnit: SizeUnit | null;
   /** Ids into the shared tag vocabulary, edited on the Tags page. */
   tagIds: string[];
+  /**
+   * What a markup shop is paid for it (`item_store_prices`, the shop's row).
+   * Absent when it was not on screen or did not move; null removes it.
+   */
+  storePrice?: number | null;
 };
 
 /**
@@ -148,6 +162,14 @@ export function DishEditor({
   const decimals = decimalsOf(code);
   const tags = useTagVocabulary();
   const inBundles = useLiveBundlesWith(storeId, itemId ?? "");
+  // A store price matters only where something in the shop is on markup, so
+  // the field is there only then (`0262`).
+  const earnings = useShopEarnings(storeId);
+  const markup = usesMarkup(earnings.data);
+  const storePrices = useShopStorePrices(storeId, markup);
+  const savedStorePrice = itemId
+    ? (storePrices.data?.items.get(itemId) ?? null)
+    : null;
 
   const opened = {
     section: sectionId,
@@ -161,6 +183,9 @@ export function DishEditor({
     unitQuantity:
       initial?.unitQuantity == null ? "" : String(initial.unitQuantity),
     unitStep: initial?.unitStep == null ? "" : String(initial.unitStep),
+    sizeQuantity:
+      initial?.sizeQuantity == null ? "" : String(initial.sizeQuantity),
+    sizeUnit: (initial?.sizeUnit ?? "") as SizeUnit | "",
   };
 
   const [section, setSection] = useState(opened.section);
@@ -175,6 +200,17 @@ export function DishEditor({
   const [unitQuantity, setUnitQuantity] = useState(opened.unitQuantity);
   /** Empty is a real answer: the whole-item stepper. */
   const [unitStep, setUnitStep] = useState(opened.unitStep);
+  const [sizeQuantity, setSizeQuantity] = useState(opened.sizeQuantity);
+  const [sizeUnit, setSizeUnit] = useState<SizeUnit | "">(opened.sizeUnit);
+  // On markup, the price is typed as the shop's plus ours (`markup-price`).
+  const split = useMarkupPrice({
+    active: markup,
+    price,
+    savedPrice: opened.price,
+    savedStorePrice,
+  });
+  /** What customers pay — the sum on a split, the plain box otherwise. */
+  const sellPrice = split.sellPrice;
 
   // Against what the form *opened with*, so a blank new dish (live by default)
   // is not unsaved the moment it appears.
@@ -185,16 +221,19 @@ export function DishEditor({
         section,
         name,
         description,
-        price,
+        price: sellPrice,
         isActive,
         imageUrl,
         tagIds,
         priceUnit,
         unitQuantity,
         unitStep,
+        sizeQuantity,
+        sizeUnit,
       },
       opened,
-    );
+    ) ||
+    split.moved;
   useUnsavedChanges(dirty);
 
   /** One message per field, every field checked — not a queue of round trips. */
@@ -204,6 +243,7 @@ export function DishEditor({
     price?: string;
     unit?: string;
     step?: string;
+    size?: string;
   }>({});
   const [failed, setFailed] = useState(false);
 
@@ -242,6 +282,17 @@ export function DishEditor({
           ? t("units.stepPositive")
           : undefined;
 
+    // Both or neither — `menu_items_size_whole` (`0262`).
+    const size = sizeQuantity.trim() === "" ? null : Number(sizeQuantity);
+    const sizeProblem =
+      size === null && sizeUnit === ""
+        ? undefined
+        : size === null || sizeUnit === "" || !Number.isFinite(size)
+          ? t("units.sizeBoth")
+          : size <= 0
+            ? t("units.sizePositive")
+            : undefined;
+
     const found = {
       name: messageOf(validateLocalizedText(name, codes, TEXT.name)),
       description: messageOf(
@@ -249,9 +300,10 @@ export function DishEditor({
           optional: true,
         }),
       ),
-      price: messageOf(validatePrice(price ?? NaN)),
+      price: split.problem ?? messageOf(validatePrice(sellPrice ?? NaN)),
       unit: unitProblem,
       step: stepProblem,
+      size: sizeProblem,
     };
 
     setErrors(found);
@@ -265,7 +317,7 @@ export function DishEditor({
       sectionId: section,
       name,
       description,
-      price: price as number,
+      price: sellPrice as number,
       isActive,
       imageUrl,
       tagIds,
@@ -273,6 +325,9 @@ export function DishEditor({
       priceUnit: priceUnit === "" ? null : priceUnit,
       unitQuantity: priceUnit === "" ? null : (amount as number),
       unitStep: priceUnit === "" ? null : step,
+      sizeQuantity: sizeUnit === "" ? null : size,
+      sizeUnit: sizeUnit === "" ? null : sizeUnit,
+      ...(split.storePriceMoved && { storePrice: split.nextStorePrice }),
     };
   }
 
@@ -302,10 +357,10 @@ export function DishEditor({
           quantity: unitAmount(unit, press),
           unit: word,
         });
-        if (price === null || code === "") return size;
+        if (sellPrice === null || code === "") return size;
         return t("units.stepPreviewStop", {
           size,
-          price: format(linePrice(price, 0, unit, press), code),
+          price: format(linePrice(sellPrice, 0, unit, press), code),
         });
       })
       .join(" → ");
@@ -318,6 +373,28 @@ export function DishEditor({
     sections.find((one) => one.id === section)?.title ?? {},
   );
   const shopName = store ? pickLocalized(store.name) : "";
+
+  // Typed as said — `18.75`, not `1875`. `null` decimals until the shop's
+  // currency lands, which disables the box rather than guessing whether 3
+  // means 3 or 300.
+  const priceField = (
+    <Field
+      label={t("menu.price")}
+      hint={t("menu.priceHint")}
+      error={split.plain ? errors.price : undefined}
+      className="sm:max-w-xs"
+    >
+      {(field) => (
+        <MoneyInput
+          {...field}
+          value={price}
+          onChange={setPrice}
+          decimalDigits={decimals}
+          placeholder={t("menu.pricePlaceholder")}
+        />
+      )}
+    </Field>
+  );
 
   const visibilityHint = isActive
     ? t("menu.liveHint")
@@ -421,6 +498,42 @@ export function DishEditor({
                     maxLength={TEXT.description}
                     filter="name"
                   />
+                  {/* Display-only (`0262`): "900 g" under the name. "Sold by"
+                      below is what prices and counts it. */}
+                  <Field
+                    label={t("units.sizeLabel")}
+                    hint={t("units.sizeHint")}
+                    error={errors.size}
+                    optional={t("form.optional")}
+                  >
+                    <div className="grid gap-2 sm:max-w-sm sm:grid-cols-2">
+                      <NumberInput
+                        value={sizeQuantity}
+                        onChange={(event) =>
+                          setSizeQuantity(event.target.value)
+                        }
+                        min={0}
+                        step="any"
+                        placeholder={t("units.sizeAmount")}
+                        aria-label={t("units.sizeAmount")}
+                        invalid={Boolean(errors.size)}
+                      />
+                      <Select
+                        value={sizeUnit}
+                        aria-label={t("units.sizeUnit")}
+                        onChange={(value) => {
+                          setSizeUnit(value as SizeUnit | "");
+                          if (!value) setSizeQuantity("");
+                        }}
+                        placeholder={t("units.sizeNone")}
+                        isClearable
+                        options={SIZE_UNITS.map((unit) => ({
+                          value: unit,
+                          label: t(sizeUnitKey(unit)),
+                        }))}
+                      />
+                    </div>
+                  </Field>
                 </div>
               </Section>
 
@@ -449,25 +562,25 @@ export function DishEditor({
                 description={t("menu.priceSectionHint")}
               >
                 <div className="flex flex-col gap-5">
-                  <Field
-                    label={t("menu.price")}
-                    hint={t("menu.priceHint")}
-                    error={errors.price}
-                    className="sm:max-w-xs"
-                  >
-                    {(field) => (
-                      // Typed as said — `18.75`, not `1875`. `null` decimals
-                      // until the shop's currency lands, which disables the
-                      // box rather than guessing whether 3 means 3 or 300.
-                      <MoneyInput
-                        {...field}
-                        value={price}
-                        onChange={setPrice}
-                        decimalDigits={decimals}
-                        placeholder={t("menu.pricePlaceholder")}
-                      />
-                    )}
-                  </Field>
+                  {markup ? (
+                    // On markup: the shop's price and ours, and what that
+                    // makes in the app. The plain box only while both are
+                    // empty — a dish with no price from the shop yet.
+                    <MarkupPriceFields
+                      entry={split.entry}
+                      onChange={split.setEntry}
+                      decimals={decimals}
+                      disabled={itemId !== null && !storePrices.isSuccess}
+                      error={split.plain ? undefined : errors.price}
+                      appPrice={
+                        sellPrice !== null && code
+                          ? format(sellPrice, code)
+                          : null
+                      }
+                    />
+                  ) : (
+                    priceField
+                  )}
 
                   <Field
                     label={t("units.label")}
@@ -648,7 +761,7 @@ export function DishEditor({
                 name={pickLocalized(name)}
                 description={pickLocalized(description)}
                 imageUrl={imageUrl}
-                price={price}
+                price={sellPrice}
                 code={code}
                 shopRate={store?.exchangeRate ?? null}
                 unit={{
@@ -661,6 +774,16 @@ export function DishEditor({
                   tagIds.includes(tag.id),
                 )}
                 isActive={isActive}
+                size={
+                  sizeUnit !== "" &&
+                  Number.isFinite(Number(sizeQuantity)) &&
+                  Number(sizeQuantity) > 0
+                    ? t("units.size", {
+                        quantity: Number(sizeQuantity),
+                        unit: t(sizeUnitKey(sizeUnit)),
+                      })
+                    : ""
+                }
               />
             </>
           }
@@ -783,6 +906,7 @@ function Preview({
   unit,
   tags,
   isActive,
+  size: displaySize,
 }: {
   name: string;
   description: string;
@@ -797,6 +921,8 @@ function Preview({
   };
   tags: { id: string; name: Localized; iconUrl: string | null }[];
   isActive: boolean;
+  /** The display-only size, "900 g", or empty. */
+  size: string;
 }) {
   const size = unitSize(unit);
   let body: ReactNode = null;
@@ -846,6 +972,11 @@ function Preview({
           >
             {name || t("menu.previewName")}
           </p>
+          {displaySize && (
+            <p className="text-[12.5px] text-ink-3 tabular-nums">
+              {displaySize}
+            </p>
+          )}
           {description && (
             <p className="line-clamp-2 text-[13px] text-ink-3">{description}</p>
           )}

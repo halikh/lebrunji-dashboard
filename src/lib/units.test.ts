@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   asPriceUnit,
+  asSizeUnit,
   itemUnit,
   linePrice,
   pricePerUnit,
+  SIZE_UNITS,
   unitAmount,
 } from "./units";
 
@@ -203,5 +205,17 @@ describe("linePrice", () => {
     // still hold it, and an Infinity reaching the money would be worse.
     const broken = { unit: "kg", quantity: 0, step: 1 } as const;
     expect(linePrice(1200, 0, broken, 2)).toBe(2400);
+  });
+});
+
+describe("SIZE_UNITS (0262)", () => {
+  it("is what menu_items_size_unit_known allows", () => {
+    expect([...SIZE_UNITS]).toEqual(["g", "kg", "ml", "l", "cm"]);
+  });
+
+  it("reads a database value as a size unit, or as none", () => {
+    expect(asSizeUnit("cm")).toBe("cm");
+    expect(asSizeUnit("piece")).toBeNull();
+    expect(asSizeUnit(null)).toBeNull();
   });
 });

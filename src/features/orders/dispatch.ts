@@ -1,4 +1,5 @@
-import { t } from "@/i18n/translations";
+import { formatPercent } from "@/features/catalog/api/earnings";
+import { t, type Params, type TranslationKey } from "@/i18n/translations";
 import { formatDateTime } from "@/lib/time";
 import {
   convertMoney,
@@ -7,7 +8,7 @@ import {
   type Currency,
 } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
-import { sizeOf } from "@/lib/unit-label";
+import { displaySizeOf, sizeOf } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
 import {
@@ -16,6 +17,7 @@ import {
   roundingOf,
   type Order,
   type OrderLine,
+  type OrderStore,
 } from "./api/orders";
 
 /**
@@ -40,8 +42,8 @@ import {
  * address, the pin, every line with its options and notes, and what to collect.
  *
  * Cash on delivery is the only payment method in the product, so **the total is
- * the amount to collect at the door**, and it is the last thing in the message
- * where it can be found without scrolling.
+ * the amount to collect at the door**, and it sits at the bottom, followed
+ * only by what that leaves the driver holding once the shops are paid.
  *
  * ## Plain text, and no shouting
  *
@@ -50,7 +52,32 @@ import {
  * pickup, then "Deliver to" — and the money that changes hands there: what
  * each shop is paid, and what is collected at the door. Nothing else, so the
  * message reads as the trip: stop and pay, stop and pay, door and collect.
+ *
+ * ## In Arabic, whatever the screen is in
+ *
+ * Drivers and shops read Arabic (user, 2026-11-08), so every message is, and
+ * the operator's dialog around it stays English. Labels come from `ar` in the
+ * bundle; dishes, options, shops and pickup addresses from the Arabic the row
+ * carries, or its English when it has none. What a customer typed — their
+ * name, the door, a note — goes out as they typed it.
  */
+
+/** A label in the language the driver and the shop read. */
+function say(key: TranslationKey, params?: Params): string {
+  return t(key, params, "ar");
+}
+
+/**
+ * A code, phone number or date, kept whole inside a right-to-left line.
+ *
+ * Their first character is the problem: "#" and "+" have no direction of
+ * their own, so an Arabic line sends them to the far side of what follows —
+ * "DL-48213#", "96170123456+". An invisible left-to-right mark in front
+ * holds them in place. Money needs none: "$" stays with its digits.
+ */
+function ltr(text: string): string {
+  return `‎${text}`;
+}
 
 /**
  * One line of the bag, as the person packing it needs to read it.
@@ -67,18 +94,75 @@ import {
  *   "3 bags Charcoal". The amount is the order; there is no count to give.
  *   The `×` stays off it: in front of an amount it reads as a multiplication.
  *   See `0122`.
+ *
+ * A display-only size (`0262`) goes beside the name whichever kind it is —
+ * "2 × Basmati Rice (900 g)" — because it is what tells the shop which pack
+ * on the shelf was ordered.
  */
 export function whatToPack(line: OrderLine, quantity: number): string {
+  const label = displaySizeOf(line, "ar");
+  const name = label ? `${line.nameAr} (${label})` : line.nameAr;
   const unit = itemUnit(line);
   // "1 piece" is the item itself, and saying so adds nothing to read.
   if (!unit || (unit.unit === "piece" && unit.quantity === 1 && !unit.step))
-    return `${quantity} × ${line.name}`;
-  if (unit.step !== null) return `${sizeOf(unit, quantity)} ${line.name}`;
+    return `${quantity} × ${name}`;
+  if (unit.step !== null) return `${sizeOf(unit, quantity, "ar")} ${name}`;
 
-  const size = sizeOf(unit, 1);
-  return `${quantity} × ${line.name} (${
-    quantity === 1 ? size : t("dispatch.packEach", { size })
+  const size = sizeOf(unit, 1, "ar");
+  return `${quantity} × ${name} (${
+    quantity === 1 ? size : say("dispatch.packEach", { size })
   })`;
+}
+
+/**
+ * A line's options and note, under it: indented and dashed, because an
+ * option on its own line at the bullet's level reads as a second thing to
+ * pack. The same in the driver's message and the shop's.
+ */
+function lineDetails(line: Pick<OrderLine, "optionsAr" | "note">): string[] {
+  const details = line.optionsAr.map((option) => `   – ${option}`);
+  if (line.note) {
+    details.push(`   – ${say("dispatch.lineNote", { note: line.note })}`);
+  }
+  return details;
+}
+
+/**
+ * How a portion was settled, in words for the screen: "Commission 10%",
+ * "Commission, no rate", "Markup".
+ */
+export function earningModelLabel(
+  earnings: NonNullable<OrderStore["earnings"]>,
+): string {
+  if (earnings.model === "markup") return t("earnings.markup");
+  if (earnings.commissionPercent === null) return t("earnings.commissionNone");
+  return t("earnings.commissionAt", {
+    percent: formatPercent(earnings.commissionPercent),
+  });
+}
+
+/**
+ * What the platform keeps of one pickup, as the driver says it to the shop —
+ * "Less 10% commission: −$0.80" — or null when there is nothing to say: a
+ * portion placed before `0262`, or commission at no rate.
+ *
+ * Markup is never said. A markup shop's lines are listed at its own prices,
+ * so they already add up to what it is paid; a "Markup" line in a message the
+ * driver may show the shop only told it what we charge on top (user,
+ * 2026-11-08: the driver's message was confusing).
+ */
+export function earningLine(
+  earnings: OrderStore["earnings"],
+  money: (minor: number) => string | null,
+): string | null {
+  if (!earnings || earnings.model === "markup") return null;
+  const amount = money(earnings.earning);
+  if (!amount) return null;
+  if (earnings.commissionPercent === null) return null;
+  return say("dispatch.commission", {
+    percent: formatPercent(earnings.commissionPercent),
+    amount,
+  });
 }
 
 /**
@@ -146,6 +230,22 @@ export function whatsappLink(phone: string, message: string): string {
  * its lines as they now stand, added up — so the figure always matches the
  * bag listed above it, amended or not — and the same in the other currency.
  *
+ * Since `0262` a portion with earnings pays the shop `storeDue` — the
+ * server's figure, worked from the same lines. On commission the lines are at
+ * the app's prices and a line says what comes off them; on markup the lines
+ * themselves are at the shop's prices, so they add up to what it is paid and
+ * nothing more is said. The other currency follows the same arithmetic on
+ * the cash figures: each line through `otherFigure` (at the store price, on
+ * markup), and on commission the rate taken off the cash bag and rounded to
+ * the cash step. A portion with no earnings row is paid its bag, as before.
+ *
+ * ## What is left with the driver
+ *
+ * The last line is what the driver holds once the customer has paid and every
+ * shop has been: collected, less each shop's figure. It is the number the
+ * operator settles with them, and it is worked out here so nobody does it in
+ * their head at the end of a shift.
+ *
  * ## The other currency, and the rounding
  *
  * `other` is the pair to say a figure in both. A shop's figure is read at
@@ -168,153 +268,206 @@ export function dispatchMessage(
     currency ? formatMoney(minor, currency) : null;
   const inOther = (minor: number) =>
     other ? formatMoney(minor, other.to) : null;
+  /** " or 120,000 ل.ل" after a figure, or nothing with no second currency. */
+  const orOther = (minor: number | null) => {
+    const amount = minor === null ? null : inOther(minor);
+    return amount ? ` ${say("dispatch.collectOther", { amount })}` : "";
+  };
 
   const lines: string[] = [];
+  const stops = order.stores.length;
 
-  lines.push(t("dispatch.heading", { code: order.code }));
+  // The first two lines are the notification: which order, and the trip.
+  lines.push(`*${say("dispatch.heading", { code: ltr(order.code) })}*`);
   lines.push(
-    t("dispatch.placed", { when: formatDateTime(order.placedAt, clock24h) }),
+    stops === 1
+      ? say("dispatch.tripOne")
+      : say("dispatch.tripMany", { count: stops }),
   );
+  lines.push(
+    say("dispatch.placed", {
+      when: ltr(formatDateTime(order.placedAt, clock24h)),
+    }),
+  );
+
+  // What every shop is paid, added up, for what is left with the driver.
+  let paidShops = 0;
+  let paidShopsOther = 0;
 
   // In the order of the trip: every pickup, then the door, then the money.
   //
   // One block per shop, each complete on its own (user, 2026-11-07): a
   // two-shop order is two stops, and a driver standing at the first needs
-  // that shop's address, pin and phone, and to know which bag is whose —
-  // not one "From" line among the dishes. `lines` is flat and carries the
-  // `order_stores` row it belongs to — the same shape the receipt draws from.
-  const stops = order.stores.length;
+  // that shop's address, pin and phone, and to know which bag is whose.
+  // Every stop is numbered, the door included (user, 2026-11-08), so the
+  // message reads as the route. Names are trimmed: a shop saved as
+  // "Khalifeh Restaurant " closed its bold with a space, and WhatsApp then
+  // printed the asterisks instead of bolding. The written address goes in
+  // brackets beside the name (user, 2026-11-08), flattened to one line for
+  // the same reason: a bold cannot cross a line break.
   order.stores.forEach((store, index) => {
+    const name = placeName(store.arabic).trim();
+    const address = store.arabic.pickupAddress?.replace(/\s+/g, " ").trim();
     lines.push("");
     lines.push(
-      `*${
-        stops > 1
-          ? t("dispatch.pickupOf", {
-              n: index + 1,
-              count: stops,
-              store: placeName(store),
-            })
-          : t("dispatch.pickup", { store: placeName(store) })
-      }*`,
+      `*${say("dispatch.stopPickup", {
+        n: index + 1,
+        store: address ? `${name} (${address})` : name,
+      })}*`,
     );
-    if (store.pickupAddress) {
-      lines.push(t("dispatch.pickupAddress", { address: store.pickupAddress }));
-    }
     if (store.pickupLatitude !== null && store.pickupLongitude !== null) {
       lines.push(
-        t("dispatch.map", {
+        say("dispatch.map", {
           url: mapUrl(store.pickupLatitude, store.pickupLongitude),
         }),
       );
     }
     if (store.storeWhatsapp) {
       lines.push(
-        t("dispatch.pickupPhone", { phone: formatPhone(store.storeWhatsapp) }),
+        say("dispatch.phone", { phone: ltr(formatPhone(store.storeWhatsapp)) }),
       );
     }
 
+    const earnings = store.earnings;
+    // A markup shop's lines are said at its own prices — the ones it knows,
+    // and the ones that add up to what it is paid. See `earningLine`.
+    const markup = earnings?.model === "markup";
     let bag = 0;
     let bagOther = 0;
+    let count = 0;
     for (const line of order.lines.filter(
       (one) => one.orderStoreId === store.id,
     )) {
       // What is coming, not what was ordered — see above.
       const quantity = line.fulfilledQuantity ?? line.quantity;
       if (quantity === 0) continue;
+      count += 1;
 
+      const priced = markup
+        ? {
+            ...line,
+            unitPrice: line.storeUnitPrice ?? line.unitPrice,
+            optionsPrice: line.storeOptionsPrice ?? line.optionsPrice,
+          }
+        : line;
       const price = linePrice(
-        line.unitPrice,
-        line.optionsPrice,
+        priced.unitPrice,
+        priced.optionsPrice,
         itemUnit(line),
         quantity,
       );
       bag += price;
-      if (other) {
-        bagOther += otherFigure(line, quantity, other, store.shopRate);
-      }
+      if (other)
+        bagOther += otherFigure(priced, quantity, other, store.shopRate);
       const amount = money(price);
       lines.push(
         `• ${whatToPack(line, quantity)}${amount ? ` — ${amount}` : ""}`,
       );
-      // Indented under the dish, because an option on its own line at the same
-      // level reads as a second thing to pack.
-      for (const option of line.options) lines.push(`   ${option}`);
-      if (line.note)
-        lines.push(`   ${t("dispatch.lineNote", { note: line.note })}`);
+      lines.push(...lineDetails(line));
     }
 
-    // What the driver hands this shop, in both currencies.
-    const pay = money(bag);
+    // What the driver hands this shop, in both currencies — less the
+    // commission, where the portion has one (`0262`).
+    const due = earnings ? earnings.storeDue : bag;
+    let dueOther = bagOther;
+    if (earnings?.model === "commission" && other) {
+      dueOther =
+        bagOther -
+        roundToCash(
+          Math.round((bagOther * (earnings.commissionPercent ?? 0)) / 100),
+          other.to.code,
+        );
+    }
+    paidShops += due;
+    paidShopsOther += dueOther;
+
+    const pay = money(due);
     if (pay) {
-      lines.push(`*${t("dispatch.payShop", { amount: pay })}*`);
-      const payOther = inOther(bagOther);
-      if (payOther) {
-        lines.push(t("dispatch.collectOther", { amount: payOther }));
+      const kept = earningLine(earnings, money);
+      // The bag added up, so the commission has something to come off —
+      // one line is its own total already.
+      if (kept && count > 1) {
+        lines.push(say("dispatch.bag", { amount: money(bag) ?? "" }));
       }
+      if (kept) lines.push(kept);
+      lines.push(
+        `*${say("dispatch.payShop", { amount: pay })}*${orOther(
+          other ? dueOther : null,
+        )}`,
+      );
     }
   });
 
   // The door.
   lines.push("");
-  lines.push(`*${t("dispatch.deliverTo")}*`);
   lines.push(
-    t("dispatch.customer", {
-      name: order.customerName || t("orders.incompleteSignup"),
-    }),
+    `*${say("dispatch.stopDeliver", {
+      n: stops + 1,
+      name: order.customerName.trim() || say("orders.incompleteSignup"),
+    })}*`,
   );
-  if (order.customerPhone) {
-    lines.push(
-      t("dispatch.phone", { phone: formatPhone(order.customerPhone) }),
-    );
-  }
-  lines.push(t("dispatch.address", { address: order.addressLine }));
+  lines.push(order.addressLine.trim());
 
   // The pin, where there is one — the order's own, snapshotted at placement
   // (`0131`), or for an older order the saved address's. See `Order.latitude`.
   // A help in finding the door, never a substitute for the line above.
   if (order.latitude !== null && order.longitude !== null) {
     lines.push(
-      t("dispatch.map", { url: mapUrl(order.latitude, order.longitude) }),
+      say("dispatch.map", { url: mapUrl(order.latitude, order.longitude) }),
     );
   }
-
+  if (order.customerPhone) {
+    lines.push(
+      say("dispatch.phone", { phone: ltr(formatPhone(order.customerPhone)) }),
+    );
+  }
   if (order.courierNote) {
-    lines.push(t("dispatch.note", { note: order.courierNote }));
+    lines.push(say("dispatch.note", { note: order.courierNote }));
   }
 
   lines.push("");
 
   const total = money(order.total);
   if (total) {
-    const delivery = money(order.deliveryFee);
-    const discount = order.discount > 0 ? money(order.discount) : null;
-
-    lines.push(t("dispatch.subtotal", { amount: money(order.subtotal) ?? "" }));
-    if (delivery) lines.push(t("dispatch.delivery", { amount: delivery }));
-    if (discount) lines.push(t("dispatch.discount", { amount: discount }));
+    // The customer's bill on one line, so the figure under it is found
+    // without reading four.
+    let bill = say("dispatch.subtotal", {
+      amount: money(order.subtotal) ?? "",
+    });
+    bill += ` + ${say("dispatch.delivery", { amount: money(order.deliveryFee) ?? "" })}`;
+    if (order.discount > 0) {
+      bill += ` − ${say("dispatch.discount", { amount: money(order.discount) ?? "" })}`;
+    }
     const rounding = roundingOf(order);
     if (rounding !== 0) {
-      lines.push(
-        t("dispatch.rounding", {
-          amount: `${rounding > 0 ? "+" : "-"}${money(Math.abs(rounding)) ?? ""}`,
-        }),
-      );
+      bill += ` ${rounding > 0 ? "+" : "−"} ${say("dispatch.rounding", {
+        amount: money(Math.abs(rounding)) ?? "",
+      })}`;
     }
-    // The one number the driver acts on.
-    lines.push(`*${t("dispatch.collect", { amount: total })}*`);
+    lines.push(bill);
+
+    // The one number the driver acts on at the door.
     const totalOther = other
-      ? inOther(
-          roundToCash(
-            convertMoney(order.total, other.from, other.to, order.shopRate),
-            other.to.code,
-          ),
+      ? roundToCash(
+          convertMoney(order.total, other.from, other.to, order.shopRate),
+          other.to.code,
         )
       : null;
-    if (totalOther) {
-      lines.push(t("dispatch.collectOther", { amount: totalOther }));
-    }
+    lines.push(
+      `*${say("dispatch.collect", { amount: total })}*${orOther(totalOther)}`,
+    );
+
+    // And what they are holding at the end of it: collected less every shop
+    // paid — the figure the operator settles with them.
+    const left = order.total - paidShops;
+    const leftOther = totalOther === null ? null : totalOther - paidShopsOther;
+    lines.push(
+      say("dispatch.cashLeft", {
+        amount: `${money(left) ?? ""}${orOther(leftOther)}`,
+      }),
+    );
   } else {
-    lines.push(t("dispatch.amountUnknown"));
+    lines.push(say("dispatch.amountUnknown"));
   }
 
   return lines.join("\n");
@@ -363,15 +516,21 @@ export function kitchenMessage(
   const portion = order.stores.find((one) => one.id === storeId);
   const lines: string[] = [];
 
-  lines.push(t("dispatch.kitchenHeading", { code: order.code }));
+  // The heading and the branch first (user, 2026-11-08): the notification
+  // shows them, and a shop with two branches on one phone sees at once
+  // which kitchen it is for. Trimmed, so the bold always closes.
+  lines.push(`*${say("dispatch.kitchenHeading", { code: ltr(order.code) })}*`);
+  if (portion) lines.push(placeName(portion.arabic).trim());
   lines.push(
-    t("dispatch.placed", { when: formatDateTime(order.placedAt, clock24h) }),
+    say("dispatch.placed", {
+      when: ltr(formatDateTime(order.placedAt, clock24h)),
+    }),
   );
 
   // A first name, not the full one. The bag needs a label; the shop does not
   // need a customer.
   const first = order.customerName.trim().split(/\s+/)[0] ?? "";
-  if (first) lines.push(t("dispatch.kitchenFor", { name: first }));
+  if (first) lines.push(say("dispatch.kitchenFor", { name: first }));
 
   lines.push("");
 
@@ -382,9 +541,7 @@ export function kitchenMessage(
     if (quantity === 0) continue;
 
     lines.push(`• ${whatToPack(line, quantity)}`);
-    for (const option of line.options) lines.push(`   ${option}`);
-    if (line.note)
-      lines.push(`   ${t("dispatch.lineNote", { note: line.note })}`);
+    lines.push(...lineDetails(line));
   }
 
   // Only when this shop is the whole order. On a split order the note may be
@@ -392,13 +549,12 @@ export function kitchenMessage(
   // instruction that was never theirs.
   if (order.courierNote && order.stores.length === 1) {
     lines.push("");
-    lines.push(t("dispatch.note", { note: order.courierNote }));
+    lines.push(say("dispatch.note", { note: order.courierNote }));
   }
 
-  if (portion) {
-    lines.push("");
-    lines.push(t("dispatch.kitchenFooter", { store: placeName(portion) }));
-  }
+  // What happens next, and the one thing to tell us.
+  lines.push("");
+  lines.push(say("dispatch.kitchenFooter"));
 
   return lines.join("\n");
 }
@@ -415,11 +571,11 @@ export function cancellationMessage(
   order: Pick<Order, "code" | "customerName">,
 ): string {
   const lines: string[] = [];
-  lines.push(`*${t("dispatch.cancelHeading", { code: order.code })}*`);
+  lines.push(`*${say("dispatch.cancelHeading", { code: ltr(order.code) })}*`);
   if (order.customerName) {
-    lines.push(t("dispatch.customer", { name: order.customerName }));
+    lines.push(say("dispatch.customer", { name: order.customerName }));
   }
   lines.push("");
-  lines.push(t("dispatch.cancelBody"));
+  lines.push(say("dispatch.cancelBody"));
   return lines.join("\n");
 }

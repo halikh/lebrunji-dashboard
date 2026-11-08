@@ -151,9 +151,12 @@ export function PageHeader({
   actions,
   more,
   meta,
+  eyebrow,
   className,
 }: {
   title: ReactNode;
+  /** A small line above the title naming where the page sits ("Settings"). */
+  eyebrow?: ReactNode;
   description?: ReactNode;
   /** Buttons, secondary first and the one primary last (rightmost). */
   actions?: ReactNode;
@@ -169,6 +172,9 @@ export function PageHeader({
       <BackButton />
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="flex min-w-0 flex-col gap-1">
+          {eyebrow && (
+            <p className="text-[12.5px] font-medium text-ink-4">{eyebrow}</p>
+          )}
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-[22px] font-semibold tracking-tight text-ink">
               {title}

@@ -14,7 +14,7 @@ import {
   Skeleton,
   useToasts,
 } from "@/components/ui";
-import { SettingRow, SettingsGroup } from "@/components/ui/setting-row";
+import { SettingRow } from "@/components/ui/setting-row";
 import { useUnsavedChanges } from "@/components/unsaved-changes";
 import { t } from "@/i18n/translations";
 import { PASSWORD } from "@/lib/limits";
@@ -93,107 +93,138 @@ export function AccountScreen() {
     <Page>
       <PageHeader title={t("account.title")} description={t("account.blurb")} />
 
-      <div className="flex max-w-3xl flex-col gap-6">
-        <section className="flex items-center gap-4 rounded-lg border border-line bg-surface p-5 shadow-xs">
-          {email ? (
-            <Avatar name={email} size={44} />
-          ) : (
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-hover text-ink-3">
-              <UserRound className="size-5" />
-            </span>
-          )}
-          <div className="flex min-w-0 flex-col gap-1">
-            <p className="text-[13px] font-medium text-ink-3">
-              {t("account.signedInAs")}
-            </p>
-            {account.isPending ? (
-              <Skeleton className="h-5 w-56" />
+      {/* Stripe's and Vercel's account pages: each section named on the left,
+          its card on the right, so the page fills a desk-width screen in two
+          columns instead of one narrow strip beside a lot of nothing. */}
+      <div className="flex max-w-5xl flex-col divide-y divide-line">
+        <AccountSection
+          title={t("account.profileTitle")}
+          description={t("account.profileBlurb")}
+        >
+          <div className="flex items-center gap-4 rounded-lg border border-line bg-surface p-5 shadow-xs">
+            {email ? (
+              <Avatar name={email} size={52} />
             ) : (
-              <p className="text-[16px] font-semibold break-all text-ink">
-                {email ?? t("account.unknownEmail")}
-              </p>
+              <span className="flex size-13 shrink-0 items-center justify-center rounded-full bg-hover text-ink-3">
+                <UserRound className="size-6" />
+              </span>
             )}
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <p className="text-[12.5px] font-medium text-ink-4">
+                {t("account.signedInAs")}
+              </p>
+              {account.isPending ? (
+                <Skeleton className="h-5 w-56" />
+              ) : (
+                <p className="text-[16px] font-semibold break-all text-ink">
+                  {email ?? t("account.unknownEmail")}
+                </p>
+              )}
+            </div>
           </div>
-        </section>
+        </AccountSection>
 
         {/* Google's and Stripe's security pages: each way in is a row that
             says what it is now, with Change beside it. The form opens under
             its own row, so nothing is asked for until somebody means to
             change it, and the two changes can never be sent as one. */}
-        <SettingsGroup
+        <AccountSection
           title={t("account.signInTitle")}
           description={t("account.signInBlurb")}
         >
-          <SettingRow
-            label={
-              <span className="flex items-center gap-2">
-                <Mail className="size-4 text-ink-3" aria-hidden />
-                {t("account.emailRow")}
-              </span>
-            }
-            description={emailValue}
-            footer={
-              open === "email" && (
-                <ChangeForm
-                  kind="email"
-                  blurb={t("account.emailBlurb")}
-                  submit={t("account.changeEmail")}
-                  email={email}
-                  onClose={() => setOpen(null)}
-                />
-              )
-            }
-          >
-            {open !== "email" && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setOpen("email")}
-                aria-label={t("account.emailTitle")}
-              >
-                {t("account.change")}
-              </Button>
-            )}
-          </SettingRow>
+          <div className="divide-y divide-line rounded-lg border border-line bg-surface shadow-xs">
+            <SettingRow
+              label={
+                <span className="flex items-center gap-2">
+                  <Mail className="size-4 text-ink-3" aria-hidden />
+                  {t("account.emailRow")}
+                </span>
+              }
+              description={emailValue}
+              footer={
+                open === "email" && (
+                  <ChangeForm
+                    kind="email"
+                    blurb={t("account.emailBlurb")}
+                    submit={t("account.changeEmail")}
+                    email={email}
+                    onClose={() => setOpen(null)}
+                  />
+                )
+              }
+            >
+              {open !== "email" && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setOpen("email")}
+                  aria-label={t("account.emailTitle")}
+                >
+                  {t("account.change")}
+                </Button>
+              )}
+            </SettingRow>
 
-          <SettingRow
-            label={
-              <span className="flex items-center gap-2">
-                <KeyRound className="size-4 text-ink-3" aria-hidden />
-                {t("account.passwordRow")}
-              </span>
-            }
-            description={
-              <span className="tracking-widest text-ink-2">
-                {t("account.passwordMasked")}
-              </span>
-            }
-            footer={
-              open === "password" && (
-                <ChangeForm
-                  kind="password"
-                  blurb={t("account.passwordBlurb")}
-                  submit={t("account.changePassword")}
-                  email={email}
-                  onClose={() => setOpen(null)}
-                />
-              )
-            }
-          >
-            {open !== "password" && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setOpen("password")}
-                aria-label={t("account.passwordTitle")}
-              >
-                {t("account.change")}
-              </Button>
-            )}
-          </SettingRow>
-        </SettingsGroup>
+            <SettingRow
+              label={
+                <span className="flex items-center gap-2">
+                  <KeyRound className="size-4 text-ink-3" aria-hidden />
+                  {t("account.passwordRow")}
+                </span>
+              }
+              description={
+                <span className="tracking-widest text-ink-2">
+                  {t("account.passwordMasked")}
+                </span>
+              }
+              footer={
+                open === "password" && (
+                  <ChangeForm
+                    kind="password"
+                    blurb={t("account.passwordBlurb")}
+                    submit={t("account.changePassword")}
+                    email={email}
+                    onClose={() => setOpen(null)}
+                  />
+                )
+              }
+            >
+              {open !== "password" && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setOpen("password")}
+                  aria-label={t("account.passwordTitle")}
+                >
+                  {t("account.change")}
+                </Button>
+              )}
+            </SettingRow>
+          </div>
+        </AccountSection>
       </div>
     </Page>
+  );
+}
+
+/** A section's name and blurb on the left, its card on the right. */
+function AccountSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="grid gap-x-10 gap-y-4 py-8 first:pt-2 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+        <p className="text-[13px] text-ink-3">{description}</p>
+      </div>
+      <div className="min-w-0">{children}</div>
+    </section>
   );
 }
 
@@ -344,6 +375,7 @@ function ChangeForm({
             autoComplete="current-password"
             // Opened on purpose, so the cursor goes where typing starts.
             autoFocus
+            placeholder={t("account.currentPlaceholder")}
             value={current}
             onChange={(event) => setCurrent(event.target.value)}
             className="sm:max-w-sm"
@@ -364,6 +396,9 @@ function ChangeForm({
                 type="password"
                 autoComplete="new-password"
                 maxLength={PASSWORD.max}
+                placeholder={t("account.newPasswordPlaceholder", {
+                  min: PASSWORD.min,
+                })}
                 value={next}
                 onChange={(event) => setNext(event.target.value)}
               />
@@ -376,6 +411,7 @@ function ChangeForm({
                 type="password"
                 autoComplete="new-password"
                 maxLength={PASSWORD.max}
+                placeholder={t("account.confirmPlaceholder")}
                 value={confirm}
                 onChange={(event) => setConfirm(event.target.value)}
               />

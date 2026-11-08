@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { displaySizeOf } from "@/lib/unit-label";
 import { useRouter } from "next/navigation";
 import { Archive, CopyPlus, MoreHorizontal, Pencil } from "lucide-react";
 import { useState, type HTMLAttributes, type ReactNode } from "react";
@@ -79,6 +80,7 @@ export function DishRow({
   order,
   focused,
   selection,
+  storePrice = null,
 }: {
   item: MenuItem;
   storeId: string;
@@ -98,6 +100,12 @@ export function DishRow({
   focused?: boolean;
   /** Its tick for bulk edits, Square-style. */
   selection?: { checked: boolean; onChange: (checked: boolean) => void };
+  /**
+   * Its price from the shop, when the shop is on markup and has one
+   * (`0262`). Then the quick price does not edit the app price: alone, that
+   * would quietly change our markup. It sends staff to the dish's page.
+   */
+  storePrice?: number | null;
 }) {
   const router = useRouter();
   const guarded = useGuardedAction();
@@ -108,7 +116,13 @@ export function DishRow({
   const muted = !item.isActive;
   const bundleList = bundles.join(", ");
 
-  const detail = [unitSize(item), context ?? pickLocalized(item.description)]
+  // The dish's display size first ("900 g", 0262), as the app shows it under
+  // the name; then how it is sold, then the line under the name.
+  const detail = [
+    displaySizeOf(item),
+    unitSize(item),
+    context ?? pickLocalized(item.description),
+  ]
     .filter(Boolean)
     .join(", ");
 
@@ -216,6 +230,11 @@ export function DishRow({
           open={priceOpen}
           onOpenChange={setPriceOpen}
           update={update}
+          onMarkup={
+            storePrice !== null
+              ? guarded(() => router.push(dishHref(storeId, item.id)))
+              : null
+          }
         />
 
         <div className="flex items-center gap-1">
@@ -292,6 +311,7 @@ function QuickPrice({
   open,
   onOpenChange,
   update,
+  onMarkup,
 }: {
   item: MenuItem;
   name: string;
@@ -300,6 +320,8 @@ function QuickPrice({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   update: ReturnType<typeof useUpdateMenuItem>;
+  /** On markup with a price from the shop: the way to the dish's page. */
+  onMarkup: (() => void) | null;
 }) {
   return (
     <Popover
@@ -326,15 +348,41 @@ function QuickPrice({
         </button>
       }
     >
-      {open && (
-        <PriceEditor
-          item={item}
-          name={name}
-          code={code}
-          onDone={() => onOpenChange(false)}
-          update={update}
-        />
-      )}
+      {open &&
+        (onMarkup ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] text-ink-2">
+              {t("earnings.quickPriceMarkup")}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  onOpenChange(false);
+                  onMarkup();
+                }}
+              >
+                {t("earnings.openDish")}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <PriceEditor
+            item={item}
+            name={name}
+            code={code}
+            onDone={() => onOpenChange(false)}
+            update={update}
+          />
+        ))}
     </Popover>
   );
 }

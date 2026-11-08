@@ -26,6 +26,7 @@ import { useAppSettings } from "@/features/settings/use-clock";
 import { t } from "@/i18n/translations";
 
 import type { Band } from "./api/pricing";
+import { HowPriced } from "./how-priced";
 import { quoteDelivery } from "./quote";
 import { useLadder, useSaveExtraStoreFee, useSaveLadder } from "./use-pricing";
 
@@ -46,15 +47,13 @@ import { useLadder, useSaveExtraStoreFee, useSaveLadder } from "./use-pricing";
  * longest ride one multi-shop order may take. So the last row is the edge of
  * the business: the screen says so on the row, and removing it asks first.
  */
-export function DeliveryTab() {
+export function DeliveryTab({ extraDraft }: { extraDraft: number | null }) {
   const ladder = useLadder();
   const save = useSaveLadder();
   const settings = useAppSettings();
 
   const [draft, setDraft] = useState<Band[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Null means untouched, so a fee merely looked at is not unsaved work.
-  const [extraDraft, setExtraDraft] = useState<number | null>(null);
 
   const saved = ladder.data ?? [];
   const bands = draft ?? saved;
@@ -107,11 +106,7 @@ export function DeliveryTab() {
           }}
         />
 
-        <MultiShop
-          savedExtra={savedExtra}
-          extraDraft={extraDraft}
-          onExtraChange={setExtraDraft}
-        />
+        <HowPriced />
       </div>
 
       <div className="lg:sticky lg:top-0">
@@ -497,15 +492,16 @@ function cheaperFarther(bands: readonly Band[]) {
  * the first, capped at what separate orders would cost. A missing pin is
  * refused, never priced at the top band.
  */
-function MultiShop({
-  savedExtra,
+export function ExtraShopTab({
   extraDraft,
   onExtraChange,
 }: {
-  savedExtra: number | null;
+  /** Held by the pricing screen, so the Delivery tab's preview prices it. */
   extraDraft: number | null;
   onExtraChange: (amount: number | null) => void;
 }) {
+  const settings = useAppSettings();
+  const savedExtra = settings.data?.extraStoreFee ?? null;
   const save = useSaveExtraStoreFee();
   const { baseDecimals, baseCode, convertTo, secondaryCode } = useMoney();
 
@@ -516,32 +512,15 @@ function MultiShop({
   const to = baseCode ? secondaryCode(baseCode) : null;
   const converted = to && baseCode ? convertTo(amount, baseCode, to) : null;
 
-  const rules = [
-    t("pricing.howOne"),
-    t("pricing.howMany"),
-    t("pricing.howCap"),
-    t("pricing.howPin"),
-  ];
-
+  // The rules this fee is one part of are on the Delivery tab (`HowPriced`).
   return (
-    <Section title={t("pricing.howTitle")} description={t("pricing.howBody")}>
-      <ol className="flex flex-col gap-3">
-        {rules.map((rule, index) => (
-          <li key={index} className="flex items-start gap-3 text-[13.5px]">
-            <span
-              aria-hidden
-              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-hover text-[12px] font-semibold text-ink-2 tabular-nums"
-            >
-              {index + 1}
-            </span>
-            <span className="pt-0.5 text-ink-2">{rule}</span>
-          </li>
-        ))}
-      </ol>
-
-      <div className="mt-5 flex flex-col gap-4 border-t border-line pt-5 sm:flex-row sm:items-start">
+    <Section
+      title={t("pricing.extraTitle")}
+      description={t("pricing.extraBody")}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className="flex flex-col gap-1 sm:max-w-xs sm:flex-1">
-          <Field label={t("pricing.extraTitle")} hint={t("pricing.extraBody")}>
+          <Field label={t("pricing.extraLabel")}>
             {(props) => (
               <MoneyInput
                 {...props}

@@ -163,6 +163,8 @@ describe("withOrderMoved", () => {
     statusName: statusName(slug),
     progress: PATH.find((s) => s.slug === slug)?.progress ?? null,
     subtotal: 0,
+    earnings: null,
+    arabic: { storeName: id, branchName: null, pickupAddress: null },
   });
 
   it("moves every live portion, carrying the target's name and position", () => {

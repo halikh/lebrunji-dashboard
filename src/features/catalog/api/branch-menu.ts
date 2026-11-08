@@ -37,6 +37,13 @@ export type BranchMenuOverrides = {
   itemPrices: Map<string, number>;
   /** Option id → what this branch charges, where it differs. Minor units. */
   optionPrices: Map<string, number>;
+  /**
+   * Item id → what this branch is paid for it on markup, where it has its own
+   * (`item_store_prices`, `0262`). In the branch's currency. Staff only.
+   */
+  itemStorePrices: Map<string, number>;
+  /** Option id → the same, for a choice (`option_store_prices`). */
+  optionStorePrices: Map<string, number>;
 };
 
 export async function fetchBranchOverrides(
@@ -44,7 +51,7 @@ export async function fetchBranchOverrides(
 ): Promise<BranchMenuOverrides> {
   const client = getClient();
 
-  const [hidden, items, options] = await Promise.all([
+  const [hidden, items, options, itemStore, optionStore] = await Promise.all([
     // Bounded by the shop's own menu rather than by anything here, and sparse
     // in practice — a branch writes a row only where it differs. The limits are
     // for the case that stops being true: a branch that hid every item of a
@@ -67,9 +74,22 @@ export async function fetchBranchOverrides(
       .select("item_option_id, price")
       .eq("branch_id", branchId)
       .limit(PAGE.maxRows),
+    // Store prices for markup (`0262`), sparse in the same way.
+    client
+      .from("item_store_prices")
+      .select("menu_item_id, store_price")
+      .eq("branch_id", branchId)
+      .limit(PAGE.maxRows),
+    client
+      .from("option_store_prices")
+      .select("item_option_id, store_price")
+      .eq("branch_id", branchId)
+      .limit(PAGE.maxRows),
   ]);
 
-  const failure = [hidden, items, options].find((one) => one.error);
+  const failure = [hidden, items, options, itemStore, optionStore].find(
+    (one) => one.error,
+  );
   if (failure?.error) {
     throw new Error(
       `Could not read this branch's menu: ${failure.error.message}`,
@@ -109,6 +129,18 @@ export async function fetchBranchOverrides(
       (options.data ?? []).map((row) => [
         row.item_option_id as string,
         row.price as number,
+      ]),
+    ),
+    itemStorePrices: new Map(
+      (itemStore.data ?? []).map((row) => [
+        row.menu_item_id as string,
+        Number(row.store_price),
+      ]),
+    ),
+    optionStorePrices: new Map(
+      (optionStore.data ?? []).map((row) => [
+        row.item_option_id as string,
+        Number(row.store_price),
       ]),
     ),
   };

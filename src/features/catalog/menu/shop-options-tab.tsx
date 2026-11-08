@@ -48,6 +48,7 @@ import {
   type Localized,
 } from "@/lib/validation";
 
+import { usesMarkup } from "../api/earnings";
 import { applyOrder, type MenuSection } from "../api/menu";
 import type {
   ItemOption,
@@ -55,6 +56,7 @@ import type {
   StoreQuestion,
 } from "../api/options";
 import { useBundles } from "../use-bundles";
+import { useShopEarnings, useShopStorePrices } from "../use-earnings";
 import { useMenu } from "../use-menu";
 import {
   useCreateOptionGroup,
@@ -67,6 +69,7 @@ import {
 import { useStore } from "../use-stores";
 import type { RowOrder } from "./dish-row";
 import { ItemPickerSheet } from "./item-picker-sheet";
+import { MarkupPriceFields, useMarkupPrice } from "./markup-price-fields";
 
 /**
  * The Options tab: every question a shop asks, and which dishes ask it.
@@ -110,6 +113,11 @@ export function ShopOptionsTab({ storeId }: { storeId: string }) {
   const store = useStore(storeId);
   const groups = useStoreQuestions(storeId, search);
   const setItems = useSetQuestionItems();
+  // Store prices, where the shop or a branch is on markup (`0262`).
+  const earnings = useShopEarnings(storeId);
+  const markup = usesMarkup(earnings.data);
+  const storePrices = useShopStorePrices(storeId, markup);
+  const choiceStorePrices = markup ? (storePrices.data?.options ?? null) : null;
 
   const sections = menu.data ?? [];
   const sectionId = params.get("section");
@@ -308,6 +316,7 @@ export function ShopOptionsTab({ storeId }: { storeId: string }) {
               key={group.id}
               group={group}
               currencyCode={store.data?.currencyCode ?? ""}
+              storePrices={choiceStorePrices}
               itemId={item?.id ?? null}
               dishNames={dishNames}
               open={open === group.id}
@@ -364,6 +373,7 @@ const OFFERS_EVERYTHING: ReadonlySet<string> = new Set<string>();
 function QuestionCard({
   group,
   currencyCode,
+  storePrices,
   itemId,
   dishNames,
   open,
@@ -372,6 +382,11 @@ function QuestionCard({
 }: {
   group: StoreQuestion;
   currencyCode: string;
+  /**
+   * Each choice's shop-wide store price, when something in the shop is on
+   * markup and they have loaded; null otherwise, and the field is not shown.
+   */
+  storePrices: ReadonlyMap<string, number> | null;
   /** Every listed dish's name, for "Asked on". */
   dishNames: ReadonlyMap<string, string>;
   /**
@@ -671,7 +686,12 @@ function QuestionCard({
                     editingChoice === option.id ? (
                       <li key={option.id} className="bg-subtle p-4">
                         <ChoiceForm
-                          initial={{ name: option.name, price: option.price }}
+                          initial={{
+                            name: option.name,
+                            price: option.price,
+                            storePrice: storePrices?.get(option.id) ?? null,
+                          }}
+                          markup={storePrices !== null}
                           currencyCode={currencyCode}
                           pending={options.edit.isPending}
                           saveLabel={t("options.saveChoice")}
@@ -712,6 +732,7 @@ function QuestionCard({
                   <li className="bg-subtle p-4">
                     <ChoiceForm
                       key={added}
+                      markup={storePrices !== null}
                       currencyCode={currencyCode}
                       pending={options.add.isPending}
                       saveLabel={t("options.addOption")}
@@ -993,46 +1014,94 @@ function ChoiceRow({
  */
 function ChoiceForm({
   initial,
+  markup = false,
   currencyCode,
   pending,
   saveLabel,
   onSave,
   onCancel,
 }: {
-  initial?: { name: Localized; price: number };
+  initial?: { name: Localized; price: number; storePrice?: number | null };
+  /** Ask for a store price too — the shop or a branch is on markup (`0262`). */
+  markup?: boolean;
   currencyCode: string;
   pending: boolean;
   saveLabel: string;
-  onSave: (draft: { name: Localized; price: number }) => void;
+  /** `storePrice` only when it is on screen and moved; null removes it. */
+  onSave: (draft: {
+    name: Localized;
+    price: number;
+    storePrice?: number | null;
+  }) => void;
   onCancel: () => void;
 }) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
   // A choice is priced in its dish's currency, which is the shop's.
-  const { decimalsOf } = useMoney();
+  const { decimalsOf, format } = useMoney();
+  const decimals = decimalsOf(currencyCode);
 
   const [name, setName] = useState<Localized>(initial?.name ?? {});
   const [price, setPrice] = useState<number | null>(initial?.price ?? 0);
   const [nameError, setNameError] = useState<string | undefined>(undefined);
   const [priceError, setPriceError] = useState<string | undefined>(undefined);
+  // On markup, the shop's price plus ours (`markup-price`).
+  const split = useMarkupPrice({
+    active: markup,
+    price,
+    savedPrice: initial?.price ?? null,
+    savedStorePrice: initial?.storePrice ?? null,
+  });
 
   useUnsavedChanges(
     changed(
-      { name, price },
+      { name, price: split.sellPrice },
       { name: initial?.name ?? {}, price: initial?.price ?? 0 },
-    ),
+    ) || split.moved,
   );
 
   function submit() {
     const check = validateLocalizedText(name, codes, TEXT.name);
     setNameError(check.ok ? undefined : t(check.key, check.params));
-    // An empty box is a free choice — the common case, not an error.
-    const amount = price ?? 0;
+    // An empty box is a free choice — the common case, not an error. On
+    // markup that is both boxes empty: free to the customer, nothing paid to
+    // the shop, and no price from the shop kept.
+    const free =
+      markup && split.entry.shopPrice === null && split.entry.markup === null;
+    const amount = free ? 0 : (split.sellPrice ?? 0);
     const money = validatePrice(amount);
-    setPriceError(money.ok ? undefined : t(money.key, money.params));
-    if (!check.ok || !money.ok) return;
-    onSave({ name, price: amount });
+    const problem = free
+      ? undefined
+      : (split.problem ?? (money.ok ? undefined : t(money.key, money.params)));
+    setPriceError(problem);
+    if (!check.ok || problem) return;
+    onSave({
+      name,
+      price: amount,
+      ...(free
+        ? { storePrice: null }
+        : split.storePriceMoved && { storePrice: split.nextStorePrice }),
+    });
   }
+
+  const priceField = (
+    <Field
+      label={t("options.extraCost")}
+      hint={t("options.extraCostHint")}
+      error={split.plain ? priceError : undefined}
+      className="w-full sm:w-64"
+    >
+      {(field) => (
+        <MoneyInput
+          {...field}
+          value={price}
+          onChange={setPrice}
+          decimalDigits={decimals}
+          placeholder="0"
+        />
+      )}
+    </Field>
+  );
 
   return (
     <form
@@ -1050,23 +1119,19 @@ function ChoiceForm({
         error={nameError}
         placeholder={{ en: "Large", ar: "كبير" }}
       />
+      {markup && (
+        <MarkupPriceFields
+          entry={split.entry}
+          onChange={split.setEntry}
+          decimals={decimals}
+          error={split.plain ? undefined : priceError}
+          appPrice={
+            currencyCode ? format(split.sellPrice ?? 0, currencyCode) : null
+          }
+        />
+      )}
       <div className="flex flex-wrap items-end gap-3">
-        <Field
-          label={t("options.extraCost")}
-          hint={t("options.extraCostHint")}
-          error={priceError}
-          className="w-full sm:w-64"
-        >
-          {(field) => (
-            <MoneyInput
-              {...field}
-              value={price}
-              onChange={setPrice}
-              decimalDigits={decimalsOf(currencyCode)}
-              placeholder="0"
-            />
-          )}
-        </Field>
+        {!markup && priceField}
         <div className="ms-auto flex gap-2 pb-6">
           <Button variant="secondary" onClick={onCancel} disabled={pending}>
             {t("common.cancel")}
@@ -1298,6 +1363,8 @@ function useMenuWithBundles(storeId: string) {
               priceUnit: null,
               unitQuantity: null,
               unitStep: null,
+              sizeQuantity: null,
+              sizeUnit: null,
               tagIds: [],
             })),
           },

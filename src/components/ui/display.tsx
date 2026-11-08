@@ -29,6 +29,7 @@ export function Section({
   children,
   className,
   bodyClassName,
+  id,
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -36,9 +37,12 @@ export function Section({
   children: ReactNode;
   className?: string;
   bodyClassName?: string;
+  /** A jump target, e.g. for a checklist that scrolls to this card. */
+  id?: string;
 }) {
   return (
     <section
+      id={id}
       className={cx(
         "rounded-lg border border-line bg-surface shadow-xs",
         className,

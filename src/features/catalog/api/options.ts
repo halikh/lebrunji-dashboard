@@ -4,6 +4,8 @@ import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import type { Localized } from "@/lib/validation";
 
+import { setOptionStorePrice } from "./earnings";
+
 /**
  * Option groups: the choices attached to a dish.
  *
@@ -437,19 +439,35 @@ export async function createItemOption(
   name: Localized,
   price: number,
   sortOrder: number,
+  /**
+   * What a markup shop is paid for it (`option_store_prices`, the shop's row,
+   * `0262`). Null or absent writes none.
+   */
+  storePrice?: number | null,
 ): Promise<void> {
-  const { error } = await getClient().from("item_options").insert({
-    option_group_id: groupId,
-    name,
-    price,
-    sort_order: sortOrder,
-  });
+  const { data, error } = await getClient()
+    .from("item_options")
+    .insert({
+      option_group_id: groupId,
+      name,
+      price,
+      sort_order: sortOrder,
+    })
+    // The id, for the store price's row — staff-only, so a row of its own.
+    .select("id")
+    .single();
   if (error) throw new Error(friendly(error.message));
+
+  if (storePrice != null) {
+    await setOptionStorePrice(data.id as string, null, storePrice);
+  }
 }
 
 export type ItemOptionPatch = {
   name?: Localized;
   price?: number;
+  /** The shop-wide store price (`0262`). Null deletes it; absent leaves it. */
+  storePrice?: number | null;
   isActive?: boolean;
   isDefault?: boolean;
   sortOrder?: number;
@@ -466,11 +484,19 @@ export async function updateItemOption(
   if (patch.isDefault !== undefined) row.is_default = patch.isDefault;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
 
-  const { error } = await getClient()
-    .from("item_options")
-    .update(row)
-    .eq("id", id);
-  if (error) throw new Error(friendly(error.message, error.code));
+  if (Object.keys(row).length > 0) {
+    const { error } = await getClient()
+      .from("item_options")
+      .update(row)
+      .eq("id", id);
+    if (error) throw new Error(friendly(error.message, error.code));
+  }
+
+  // After the choice, as a dish's tags are: a failure here leaves the choice
+  // saved and its store price stale, which the screen shows.
+  if (patch.storePrice !== undefined) {
+    await setOptionStorePrice(id, null, patch.storePrice);
+  }
 }
 
 /**

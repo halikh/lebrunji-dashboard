@@ -49,6 +49,14 @@ import {
   fromWallClock,
 } from "@/lib/time";
 
+import { useEarningsReport } from "@/features/earnings/use-earnings-report";
+import {
+  earnedByStore,
+  earnedIn,
+  earnedText,
+  earnedTotals,
+} from "@/features/earnings/summary";
+
 import type { Stats } from "./api/stats";
 import { exportReport, type ExportFormat } from "./export";
 import {
@@ -157,6 +165,33 @@ export function ReportsScreen() {
   const priorData =
     compare !== "none" && !prior.isPlaceholderData ? prior.data : undefined;
 
+  // What we earned (`0262`), from the Earnings feature's reader, for the
+  // same range and the same comparison. Commission and markup together.
+  const earnings = useEarningsReport(current.from, current.to);
+  const priorEarnings = useEarningsReport(
+    before.from,
+    before.to,
+    compare !== "none",
+  );
+  const earnedNow = earnedTotals(earnings.data ?? []);
+  const earnedBefore =
+    compare !== "none" && !priorEarnings.isPlaceholderData && priorEarnings.data
+      ? earnedTotals(priorEarnings.data)
+      : undefined;
+  const earnedPerStore = earnedByStore(earnings.data ?? []);
+  /** The Earnings page, at this range — it reads the same `days` / `from` / `to`. */
+  const earningsHref = (() => {
+    const query = new URLSearchParams();
+    if (picked) {
+      query.set("from", from as string);
+      query.set("to", to as string);
+    } else if (days !== "30") {
+      query.set("days", days);
+    }
+    const search = query.toString();
+    return search ? `/earnings?${search}` : "/earnings";
+  })();
+
   const { format, currencies } = useMoney();
   const toast = useToasts();
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
@@ -236,6 +271,10 @@ export function ReportsScreen() {
         stats.data,
         currencies?.find((one) => one.code === code),
         { from: toDayKey(current.from), to: toDayKey(lastDay) },
+        {
+          rows: earnings.data ?? [],
+          currencyOf: (one) => currencies?.find((c) => c.code === one),
+        },
       );
     } catch (error) {
       toast.danger(
@@ -289,12 +328,13 @@ export function ReportsScreen() {
             value={picked ? ("" as Preset) : days}
             onChange={showPreset}
           />
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
             <DateRangeField
               from={from}
               to={to}
               onChange={pick}
               aria-label={t("reports.rangeLabel")}
+              className="sm:w-[280px]"
               // The line under the controls already says "Beirut time".
               hideZone
             />
@@ -373,12 +413,19 @@ export function ReportsScreen() {
           {/* No `shopRate` on any figure: these are sums across shops, and
               include the platform's own money — a total read at one shop's
               rate would be a number in no shop's currency. */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
             <Tile
               label={t("reports.tileRevenue")}
               value={<Price value={data.totals.revenue} code={code} />}
               change={change(data.totals.revenue, priorData?.totals.revenue)}
               was={priorData && format(priorData.totals.revenue, code)}
+            />
+            <EarnedTile
+              now={earnedNow}
+              before={earnedBefore}
+              fallbackCode={code}
+              href={earningsHref}
+              loading={earnings.isPending}
             />
             <Tile
               label={t("reports.tileOrders")}
@@ -454,8 +501,14 @@ export function ReportsScreen() {
                     name: pickLocalized(store.name),
                     count: store.orders,
                     revenue: store.revenue,
+                    // Matched by shop; "—" for one that earned nothing here.
+                    earned: earnedText(
+                      earnedPerStore.get(store.storeId),
+                      format,
+                    ),
                   }))}
                   money={(minor) => format(minor, code)}
+                  earnedHeader={t("reports.earnedColumn")}
                 />
               )}
             </Section>
@@ -540,14 +593,80 @@ export function ReportsScreen() {
   );
 }
 
+/**
+ * What we earned over the range — commission and markup as one figure, one
+ * line per currency and never added across them. Compared like the others,
+ * when the range is in one currency: two currencies have no single change.
+ * It opens the Earnings page at the same range, for the breakdown.
+ */
+function EarnedTile({
+  now,
+  before,
+  fallbackCode,
+  href,
+  loading,
+}: {
+  now: ReturnType<typeof earnedTotals>;
+  before: ReturnType<typeof earnedTotals> | undefined;
+  /** The report's currency, for a range that earned nothing. */
+  fallbackCode: string;
+  href: string;
+  loading: boolean;
+}) {
+  const { format } = useMoney();
+  const lines =
+    now.length > 0 ? now : [{ currencyCode: fallbackCode, amount: 0 }];
+  const only = lines.length === 1 ? lines[0] : undefined;
+  const value = loading ? (
+    <Skeleton className="h-7 w-24" />
+  ) : (
+    <span className="flex flex-col">
+      {lines.map((one) => (
+        <Price
+          key={one.currencyCode}
+          value={one.amount}
+          code={one.currencyCode}
+        />
+      ))}
+    </span>
+  );
+  return (
+    <Tile
+      label={t("reports.earned")}
+      value={value}
+      caption={
+        <Link
+          href={href}
+          className="text-[12.5px] text-ink-3 hover:text-accent-ink hover:underline"
+        >
+          {t("reports.earnedHint")}
+        </Link>
+      }
+      change={
+        only && before && !loading
+          ? change(only.amount, earnedIn(before, only.currencyCode))
+          : undefined
+      }
+      was={
+        only && before && !loading
+          ? format(earnedIn(before, only.currencyCode), only.currencyCode)
+          : undefined
+      }
+    />
+  );
+}
+
 function Tile({
   label,
   value,
   change: delta,
   was,
+  caption,
 }: {
   label: string;
   value: ReactNode;
+  /** A line under the figure — a hint, or a way to its breakdown. */
+  caption?: ReactNode;
   change?: { text: string; up: boolean | null };
   /** The comparison period's figure, already formatted. */
   was?: string;
@@ -557,6 +676,7 @@ function Tile({
   return (
     <Card className="flex min-w-0 flex-col">
       <Stat label={label} value={value} />
+      {caption && <div className="mt-1.5">{caption}</div>}
       {delta && (
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
           <span
@@ -674,9 +794,12 @@ function RankTable({
   countHeader,
   rows,
   money,
+  earnedHeader,
 }: {
   nameHeader: string;
   countHeader: string;
+  /** Adds the "Earned" column, read from each row's `earned`. */
+  earnedHeader?: string;
   rows: {
     key: string;
     /** Where the row's thing is opened, when it has a page. */
@@ -684,6 +807,8 @@ function RankTable({
     name: string;
     count: number;
     revenue: number;
+    /** What we earned on it, formatted — or "—". */
+    earned?: string;
   }[];
   money: (minor: number) => string;
 }) {
@@ -698,6 +823,7 @@ function RankTable({
           <Th>{nameHeader}</Th>
           <Th className="text-end">{countHeader}</Th>
           <Th className="text-end">{t("reports.colRevenue")}</Th>
+          {earnedHeader && <Th className="text-end">{earnedHeader}</Th>}
         </tr>
       </THead>
       <TBody>
@@ -730,6 +856,11 @@ function RankTable({
             <Td className="text-end tabular-nums font-medium whitespace-nowrap">
               {money(row.revenue)}
             </Td>
+            {earnedHeader && (
+              <Td className="text-end tabular-nums whitespace-nowrap text-ink-2">
+                {row.earned}
+              </Td>
+            )}
           </Tr>
         ))}
       </TBody>

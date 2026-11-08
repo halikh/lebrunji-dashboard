@@ -21,6 +21,7 @@ import {
   Switch,
   Tooltip,
   cx,
+  useToasts,
 } from "@/components/ui";
 import { MoneyInput } from "@/components/ui/money-input";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -30,6 +31,8 @@ import { toMajor } from "@/lib/minor-units";
 
 import type { Branch } from "../api/branches";
 import type { BranchMenuOverrides } from "../api/branch-menu";
+import { effectiveEarnings, type ShopStorePrices } from "../api/earnings";
+import { withShopPrice } from "../api/markup-price";
 import { menuTree, type MenuItem, type MenuSection } from "../api/menu";
 import type { Store } from "../api/stores";
 import {
@@ -37,10 +40,13 @@ import {
   useSetGroupHidden,
   useSetItemHidden,
   useSetItemPrice,
+  useSetItemStorePrice,
   useSetOptionHidden,
   useSetOptionPrice,
+  useSetOptionStorePrice,
   useSetSectionHidden,
 } from "../use-branch-menu";
+import { useShopEarnings, useShopStorePrices } from "../use-earnings";
 import { useMenu } from "../use-menu";
 import { useItemOptionGroups } from "../use-options";
 
@@ -102,6 +108,17 @@ export function BranchMenuEditor({
   const setSection = useSetSectionHidden(branch.id);
   const setItem = useSetItemHidden(branch.id);
   const setPrice = useSetItemPrice(branch.id);
+  const setStorePrice = useSetItemStorePrice(branch.id);
+  // On markup here, each dish and choice also takes what this branch is paid
+  // for it (`0262`). The shop's store price is the placeholder where the
+  // currency is the same, as the shop's app price is.
+  const earnings = useShopEarnings(storeId);
+  const markup =
+    effectiveEarnings(
+      earnings.data?.shop,
+      earnings.data?.branches.get(branch.id),
+    ).model === "markup";
+  const shopStorePrices = useShopStorePrices(storeId, markup);
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ServedFilter>("all");
@@ -236,6 +253,7 @@ export function BranchMenuEditor({
         {inherits
           ? t("branchMenu.intro", { name: branchName })
           : t("branchMenu.introOwnCurrency", { name: branchName, code })}
+        {markup && ` ${t("earnings.branchMenuMarkup", { code })}`}
       </Notice>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -298,6 +316,12 @@ export function BranchMenuEditor({
             decimals={decimals}
             inherits={inherits}
             shopCode={shopCode}
+            code={code}
+            markup={markup}
+            shopStorePrices={shopStorePrices.data}
+            onStorePrice={(itemId, storePrice) =>
+              setStorePrice.mutateAsync({ itemId, storePrice })
+            }
             onSectionServed={(served) =>
               setSection.mutate({ sectionId: section.id, hidden: !served })
             }
@@ -406,6 +430,10 @@ function SectionCard({
   decimals,
   inherits,
   shopCode,
+  code,
+  markup,
+  shopStorePrices,
+  onStorePrice,
   onSectionServed,
   onHidden,
   onPrice,
@@ -416,6 +444,12 @@ function SectionCard({
   decimals: number | null;
   inherits: boolean;
   shopCode: string;
+  /** The branch's currency — what its own prices are in. */
+  code: string;
+  /** This branch is on markup: show the store price boxes (`0262`). */
+  markup: boolean;
+  shopStorePrices: ShopStorePrices | undefined;
+  onStorePrice: (itemId: string, storePrice: number | null) => Promise<unknown>;
   onSectionServed: (served: boolean) => void;
   onHidden: (itemId: string, hidden: boolean) => void;
   onPrice: (itemId: string, price: number | null) => Promise<unknown>;
@@ -475,6 +509,10 @@ function SectionCard({
             decimals={decimals}
             inherits={inherits}
             shopCode={shopCode}
+            code={code}
+            markup={markup}
+            shopStorePrices={shopStorePrices}
+            onStorePrice={(storePrice) => onStorePrice(item.id, storePrice)}
             onHidden={(hidden) => onHidden(item.id, hidden)}
             onPrice={(price) => onPrice(item.id, price)}
           />
@@ -527,6 +565,10 @@ function ItemRow({
   decimals,
   inherits,
   shopCode,
+  code,
+  markup,
+  shopStorePrices,
+  onStorePrice,
   onHidden,
   onPrice,
 }: {
@@ -539,6 +581,11 @@ function ItemRow({
   decimals: number | null;
   inherits: boolean;
   shopCode: string;
+  /** The branch's currency — what its own prices are in. */
+  code: string;
+  markup: boolean;
+  shopStorePrices: ShopStorePrices | undefined;
+  onStorePrice: (storePrice: number | null) => Promise<unknown>;
   onHidden: (hidden: boolean) => void;
   onPrice: (price: number | null) => Promise<unknown>;
 }) {
@@ -548,6 +595,8 @@ function ItemRow({
   const name = pickLocalized(item.name);
   const itemHidden = state?.hiddenItems.has(item.id) ?? false;
   const override = state?.itemPrices.get(item.id) ?? null;
+  const ownStorePrice = state?.itemStorePrices.get(item.id) ?? null;
+  const shopStorePrice = shopStorePrices?.items.get(item.id) ?? null;
   const off = sectionOff || itemHidden;
 
   return (
@@ -581,16 +630,34 @@ function ItemRow({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="w-32">
-            <MoneyInput
-              value={override}
-              onCommit={(price) => onPrice(price)}
-              decimalDigits={decimals}
+          {markup ? (
+            <BranchMarkupBoxes
+              basePrice={inherits ? item.price : null}
+              ownPrice={override}
+              ownStorePrice={ownStorePrice}
+              inheritedStorePrice={inherits ? shopStorePrice : null}
+              decimals={decimals}
               disabled={sectionOff}
-              placeholder={inherits ? toMajor(item.price, decimals) : undefined}
-              aria-label={t("branchMenu.priceFor", { name })}
+              name={name}
+              priceLabel={t("branchMenu.priceFor", { name })}
+              code={code}
+              onPrice={onPrice}
+              onStorePrice={onStorePrice}
             />
-          </div>
+          ) : (
+            <div className="w-32">
+              <MoneyInput
+                value={override}
+                onCommit={(price) => onPrice(price)}
+                decimalDigits={decimals}
+                disabled={sectionOff}
+                placeholder={
+                  inherits ? toMajor(item.price, decimals) : undefined
+                }
+                aria-label={t("branchMenu.priceFor", { name })}
+              />
+            </div>
+          )}
           <ServedSwitch
             served={!itemHidden}
             onChange={(served) => onHidden(!served)}
@@ -619,6 +686,9 @@ function ItemRow({
           inherits={inherits}
           state={state}
           disabled={off}
+          markup={markup}
+          shopStorePrices={shopStorePrices}
+          code={code}
         />
       )}
     </li>
@@ -637,6 +707,9 @@ function ItemOptionsAtBranch({
   inherits,
   state,
   disabled,
+  markup,
+  shopStorePrices,
+  code,
 }: {
   branchId: string;
   itemId: string;
@@ -644,11 +717,15 @@ function ItemOptionsAtBranch({
   inherits: boolean;
   state: BranchMenuOverrides | undefined;
   disabled: boolean;
+  markup: boolean;
+  shopStorePrices: ShopStorePrices | undefined;
+  code: string;
 }) {
   const groups = useItemOptionGroups(itemId);
   const setGroup = useSetGroupHidden(branchId);
   const setOption = useSetOptionHidden(branchId);
   const setPrice = useSetOptionPrice(branchId);
+  const setStorePrice = useSetOptionStorePrice(branchId);
 
   if (groups.isPending) {
     return (
@@ -738,20 +815,50 @@ function ItemOptionsAtBranch({
                   <span className="min-w-0 flex-1 truncate text-[13px] text-ink-2">
                     {name}
                   </span>
-                  <div className="w-28">
-                    <MoneyInput
-                      value={override}
-                      onCommit={(price) =>
+                  {markup ? (
+                    <BranchMarkupBoxes
+                      basePrice={inherits ? option.price : null}
+                      ownPrice={override}
+                      ownStorePrice={
+                        state?.optionStorePrices.get(option.id) ?? null
+                      }
+                      inheritedStorePrice={
+                        inherits
+                          ? (shopStorePrices?.options.get(option.id) ?? null)
+                          : null
+                      }
+                      decimals={decimals}
+                      disabled={disabled || groupOff}
+                      name={name}
+                      priceLabel={t("branchMenu.optionPriceFor", { name })}
+                      code={code}
+                      onPrice={(price) =>
                         setPrice.mutateAsync({ optionId: option.id, price })
                       }
-                      decimalDigits={decimals}
-                      disabled={disabled || groupOff}
-                      placeholder={
-                        inherits ? toMajor(option.price, decimals) : undefined
+                      onStorePrice={(storePrice) =>
+                        setStorePrice.mutateAsync({
+                          optionId: option.id,
+                          storePrice,
+                        })
                       }
-                      aria-label={t("branchMenu.optionPriceFor", { name })}
+                      narrow
                     />
-                  </div>
+                  ) : (
+                    <div className="w-28">
+                      <MoneyInput
+                        value={override}
+                        onCommit={(price) =>
+                          setPrice.mutateAsync({ optionId: option.id, price })
+                        }
+                        decimalDigits={decimals}
+                        disabled={disabled || groupOff}
+                        placeholder={
+                          inherits ? toMajor(option.price, decimals) : undefined
+                        }
+                        aria-label={t("branchMenu.optionPriceFor", { name })}
+                      />
+                    </div>
+                  )}
                   <Tooltip
                     content={
                       lastChoice ? t("branchMenu.lastChoiceLocked") : undefined
@@ -778,5 +885,161 @@ function ItemOptionsAtBranch({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * A dish's or a choice's price at a branch on markup (`0262`, user
+ * 2026-11-08): the price from the branch and our markup, each written when
+ * its box is left, as the plain price box is.
+ *
+ * The app price is never typed here; it is the two added up, and goes to
+ * `branch_*_prices` as before, while the price from the branch goes to the
+ * store price with this branch's id. Both are in the branch's currency.
+ *
+ * - **Price from the shop**: keeps our markup and moves the app price. Given
+ *   for the first time it keeps the app price instead (`withShopPrice`), so
+ *   nothing a customer pays changes until a markup is typed. Cleared, the
+ *   branch falls back to the shop's.
+ * - **Our markup**: the app price becomes the shop's price plus it. Cleared,
+ *   the branch falls back to the shop's app price. Below zero is refused.
+ *
+ * Until there is a price from the shop anywhere, the plain price box stays
+ * beside it — a dish nobody has given a shop price is priced as before.
+ */
+function BranchMarkupBoxes({
+  basePrice,
+  ownPrice,
+  ownStorePrice,
+  inheritedStorePrice,
+  decimals,
+  disabled,
+  name,
+  priceLabel,
+  onPrice,
+  onStorePrice,
+  narrow,
+  code,
+}: {
+  /** The shop's app price where this branch can follow it; null otherwise. */
+  basePrice: number | null;
+  /** This branch's own app price, if it has one. */
+  ownPrice: number | null;
+  ownStorePrice: number | null;
+  /** The shop's price from the shop, where this branch can follow it. */
+  inheritedStorePrice: number | null;
+  decimals: number | null;
+  disabled: boolean;
+  name: string;
+  priceLabel: string;
+  onPrice: (price: number | null) => Promise<unknown>;
+  onStorePrice: (storePrice: number | null) => Promise<unknown>;
+  narrow?: boolean;
+  /** The branch's currency, for "Price in the app". */
+  code: string;
+}) {
+  const toast = useToasts();
+  const { format } = useMoney();
+  const sell = ownPrice ?? basePrice;
+  const store = ownStorePrice ?? inheritedStorePrice;
+  const markupNow = sell !== null && store !== null ? sell - store : null;
+  const width = narrow ? "w-28" : "w-32";
+
+  function refuse(): Promise<never> {
+    const message = t("earnings.markupNegative");
+    toast.danger(message);
+    // Rejected, so the box goes back to what is stored.
+    return Promise.reject(new Error(message));
+  }
+
+  async function commitShopPrice(next: number | null) {
+    if (next === null) {
+      await onStorePrice(null);
+      return;
+    }
+    if (sell === null) {
+      await onStorePrice(next);
+      return;
+    }
+    const moved = withShopPrice(next, { price: sell, storePrice: store });
+    if (!moved) return refuse();
+    await onStorePrice(next);
+    if (moved.price !== sell) await onPrice(moved.price);
+  }
+
+  async function commitMarkup(next: number | null) {
+    if (next === null) {
+      await onPrice(null);
+      return;
+    }
+    if (next < 0) return refuse();
+    if (store === null) return;
+    await onPrice(store + next);
+  }
+
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span className="flex items-center gap-1.5">
+        <span aria-hidden className="text-[11.5px] font-medium text-ink-4">
+          {t("earnings.fromShopShort")}
+        </span>
+        <span className={width}>
+          <MoneyInput
+            value={ownStorePrice}
+            onCommit={(next) => commitShopPrice(next)}
+            decimalDigits={decimals}
+            disabled={disabled}
+            placeholder={
+              inheritedStorePrice !== null
+                ? toMajor(inheritedStorePrice, decimals)
+                : undefined
+            }
+            aria-label={t("earnings.shopPriceFor", { name })}
+          />
+        </span>
+      </span>
+      {store !== null ? (
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="text-[11.5px] font-medium text-ink-4">
+            {t("earnings.markupShort")}
+          </span>
+          <span className={width}>
+            <MoneyInput
+              // Shown as this branch's own once it has either figure of its
+              // own; the shop's otherwise, as the placeholder.
+              value={
+                ownPrice !== null || ownStorePrice !== null ? markupNow : null
+              }
+              onCommit={(next) => commitMarkup(next)}
+              decimalDigits={decimals}
+              disabled={disabled}
+              min={-1_000_000_000}
+              placeholder={
+                markupNow !== null ? toMajor(markupNow, decimals) : undefined
+              }
+              aria-label={t("earnings.markupFor", { name })}
+            />
+          </span>
+        </span>
+      ) : (
+        <span className={width}>
+          <MoneyInput
+            value={ownPrice}
+            onCommit={(next) => onPrice(next)}
+            decimalDigits={decimals}
+            disabled={disabled}
+            placeholder={
+              basePrice !== null ? toMajor(basePrice, decimals) : undefined
+            }
+            aria-label={priceLabel}
+          />
+        </span>
+      )}
+      {sell !== null && code && (
+        <span className="text-[12px] text-ink-3 tabular-nums">
+          {t("earnings.appPrice", { price: format(sell, code) })}
+        </span>
+      )}
+    </span>
   );
 }

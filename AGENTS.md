@@ -88,7 +88,7 @@ writing a screen. Import from `@/components/ui`.
 `/shops/[storeId]/items/new`, `/shops/[storeId]/branches/[branchId]`,
 `/shops/[storeId]/branches/new`) · `/categories` · `/tags` · `/artworks` ·
 `/archive` · `/promotions` · `/bundles` · `/customers` (+`/[id]`) ·
-`/drivers` (+`/new`, `/[id]`) · `/pricing` · `/reports` · `/settings`
+`/drivers` (+`/new`, `/[id]`) · `/pricing` · `/reports` · `/earnings` · `/settings`
 (+`/settings/help/...`, `/settings/legal/...`) · `/account`.
 The sidebar and command palette read `src/components/shell/nav.ts`.
 

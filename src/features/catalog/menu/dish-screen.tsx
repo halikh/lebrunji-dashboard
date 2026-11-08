@@ -96,6 +96,8 @@ export function DishScreen({
           priceUnit: source.priceUnit,
           unitQuantity: source.unitQuantity,
           unitStep: source.unitStep,
+          sizeQuantity: source.sizeQuantity,
+          sizeUnit: source.sizeUnit,
           tagIds: source.tagIds,
         }
       : undefined;

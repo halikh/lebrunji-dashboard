@@ -91,6 +91,10 @@ export function useCreateMenuItem(storeId: string) {
     // to be able to say it before the list has come back.
     onSuccess: (_result, input) => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
+      // A store price rides on the save (`0262`).
+      void queryClient.invalidateQueries({
+        queryKey: ["store-prices", storeId],
+      });
       toast.success(t("menu.added", { name: pickLocalized(input.draft.name) }));
     },
   });
@@ -163,6 +167,9 @@ export function useUpdateMenuItem(storeId: string) {
       void queryClient.invalidateQueries({ queryKey: menuKeys.store(storeId) });
       // A bundle names its dishes and says when one is off sale.
       void queryClient.invalidateQueries({ queryKey: bundleKeys.all });
+      void queryClient.invalidateQueries({
+        queryKey: ["store-prices", storeId],
+      });
     },
   });
 }

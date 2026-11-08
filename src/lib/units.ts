@@ -67,6 +67,37 @@ export const PRICE_UNITS: readonly PriceUnit[] = [
 ] as const;
 
 /**
+ * The units `menu_items_size_unit_known` allows (`0262`): a dish's display-only
+ * size, "900 g" under the name of a bag of rice.
+ *
+ * Not a `PriceUnit` and never used to price or count anything — that is
+ * "Sold by" above. A size is information only, so it has no counted units and
+ * one length (`cm`) the price units do not.
+ */
+export type SizeUnit = "g" | "kg" | "ml" | "l" | "cm";
+
+export const SIZE_UNITS: readonly SizeUnit[] = [
+  "g",
+  "kg",
+  "ml",
+  "l",
+  "cm",
+] as const;
+
+/** A database value as a `SizeUnit`, or null — as `asPriceUnit`. */
+export function asSizeUnit(value: unknown): SizeUnit | null {
+  return typeof value === "string" &&
+    (SIZE_UNITS as readonly string[]).includes(value)
+    ? (value as SizeUnit)
+    : null;
+}
+
+/** Where a size unit's word lives in the translation bundle. */
+export function sizeUnitKey(unit: SizeUnit): `units.${SizeUnit}` {
+  return `units.${unit}`;
+}
+
+/**
  * The units that count things rather than measure them — `0258` added bags
  * and packs beside the piece.
  *

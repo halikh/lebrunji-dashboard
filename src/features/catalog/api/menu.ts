@@ -5,9 +5,16 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { PAGE } from "@/lib/limits";
 import { localizedOrNull, type Localized } from "@/lib/validation";
-import { asPriceUnit, type PriceUnit } from "@/lib/units";
+import {
+  asPriceUnit,
+  asSizeUnit,
+  unitNumber,
+  type PriceUnit,
+  type SizeUnit,
+} from "@/lib/units";
 
 import { fetchArchivedBranches, type ArchivedBranch } from "./branches";
+import { setItemStorePrice } from "./earnings";
 import { setItemTags } from "./tags";
 
 /**
@@ -55,6 +62,12 @@ export type MenuItem = {
    * sells from five kilos, five at a time.
    */
   unitStep: number | null;
+  /**
+   * A display-only size — "900 g" on a bag of rice (`0262`). Both null or both
+   * set (`menu_items_size_whole`). Not "Sold by": it prices and counts nothing.
+   */
+  sizeQuantity: number | null;
+  sizeUnit: SizeUnit | null;
   /**
    * The tags on this dish, as ids into the vocabulary.
    *
@@ -171,6 +184,7 @@ export async function fetchMenu(storeId: string): Promise<MenuSection[]> {
        menu_items ( id, menu_section_id, slug, name, description, price,
                     image_url, is_active, sort_order, deleted_at,
                     price_unit, unit_quantity, unit_step,
+                    size_quantity, size_unit,
                     menu_item_tag_links ( menu_item_tag_id ) )`,
     )
     .eq("store_id", storeId)
@@ -289,6 +303,7 @@ async function itemsInSections(sectionIds: string[]): Promise<MenuItem[]> {
     .select(
       `id, menu_section_id, slug, name, description, price,
        image_url, is_active, sort_order,
+       price_unit, unit_quantity, unit_step, size_quantity, size_unit,
        menu_item_tag_links ( menu_item_tag_id )`,
     )
     .in("menu_section_id", sectionIds)
@@ -345,6 +360,7 @@ async function searchMenuItems(
     .select(
       `id, menu_section_id, slug, name, description, price,
        image_url, is_active, sort_order,
+       price_unit, unit_quantity, unit_step, size_quantity, size_unit,
        menu_item_tag_links ( menu_item_tag_id )`,
     )
     .eq("store_id", storeId)
@@ -388,8 +404,18 @@ export type MenuItemDraft = {
   unitQuantity: number | null;
   /** Null unless the item is stepped — see `MenuItem`. */
   unitStep: number | null;
+  /** Display-only, null together — see `MenuItem`. */
+  sizeQuantity: number | null;
+  sizeUnit: SizeUnit | null;
   /** Ids from the tag vocabulary. Empty is a valid answer, not a missing one. */
   tagIds: string[];
+  /**
+   * What a markup shop is paid for it — the shop-wide row of
+   * `item_store_prices` (`0262`), in the shop's currency. Null deletes it;
+   * absent leaves it alone (the field is only on screen when something in
+   * the shop is on markup).
+   */
+  storePrice?: number | null;
 };
 
 /**
@@ -423,6 +449,8 @@ export async function createMenuItem(
       price_unit: draft.priceUnit,
       unit_quantity: draft.unitQuantity,
       unit_step: draft.unitStep,
+      size_quantity: draft.sizeQuantity,
+      size_unit: draft.sizeUnit,
       sort_order: sortOrder,
     })
     // The id comes back because the links need something to point at. It is
@@ -436,6 +464,11 @@ export async function createMenuItem(
   // A dish saved with no tags is the common case and costs nothing here.
   if (draft.tagIds.length > 0) {
     await setItemTags(data.id as string, draft.tagIds);
+  }
+
+  // A row of its own, staff-only (`0262`), so after the dish like the tags.
+  if (draft.storePrice != null) {
+    await setItemStorePrice(data.id as string, null, draft.storePrice);
   }
 }
 
@@ -467,6 +500,11 @@ export async function updateMenuItem(
   // And here — clearing the unit clears this too, so null is the value that
   // turns a stepped item back into a counted one.
   if (patch.unitStep !== undefined) row.unit_step = patch.unitStep;
+  // Null clears a size; the two travel together (`menu_items_size_whole`).
+  if (patch.sizeQuantity !== undefined) {
+    row.size_quantity = patch.sizeQuantity;
+  }
+  if (patch.sizeUnit !== undefined) row.size_unit = patch.sizeUnit;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
   // Moving a dish to another section of the same shop. The caller sends a
   // `sortOrder` with it — the end of the section it is joining — because the
@@ -489,6 +527,10 @@ export async function updateMenuItem(
   // leave tags pointing at a dish whose name and price were never written.
   if (patch.tagIds !== undefined) {
     await setItemTags(id, patch.tagIds);
+  }
+
+  if (patch.storePrice !== undefined) {
+    await setItemStorePrice(id, null, patch.storePrice);
   }
 }
 
@@ -879,6 +921,9 @@ function toItem(row: Record<string, unknown>): MenuItem {
     // `numeric` again — same string, same parse. A build reading a database
     // that predates `0119` sees the key missing, which is the plain stepper.
     unitStep: row.unit_step == null ? null : Number(row.unit_step),
+    // `numeric` again (`0262`). Absent before it, which is no size.
+    sizeQuantity: unitNumber(row.size_quantity as string | number | null),
+    sizeUnit: asSizeUnit(row.size_unit),
     sortOrder: row.sort_order as number,
     // An embed with nothing in it comes back as `[]`, so an untagged dish and
     // a dish whose links were not asked for look identical here. Every read

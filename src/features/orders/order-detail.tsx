@@ -26,7 +26,7 @@ import { Price } from "@/features/reference/price";
 import { t } from "@/i18n/translations";
 import { isFinishedSlug, statusTone } from "@/lib/order-status";
 import { formatPhone } from "@/lib/phone";
-import { unitLabel } from "@/lib/unit-label";
+import { displaySizeOf, unitLabel } from "@/lib/unit-label";
 import { itemUnit, linePrice } from "@/lib/units";
 
 import { fetchHandovers } from "./api/history";
@@ -38,7 +38,11 @@ import {
   type OrderStore,
 } from "./api/orders";
 import { AmendDialog } from "./amend-dialog";
-import { cancellationMessage, whatsappLink } from "./dispatch";
+import {
+  cancellationMessage,
+  earningModelLabel,
+  whatsappLink,
+} from "./dispatch";
 import { DispatchDialog } from "./dispatch-dialog";
 import { PlaceName } from "./place";
 import { ReopenDialog } from "./reopen-dialog";
@@ -299,6 +303,12 @@ function StoreLines({
                   )}
                 >
                   {line.name}
+                  {/* Display-only, as sold (`0262`). */}
+                  {displaySizeOf(line) && (
+                    <span className="ms-1.5 text-[12.5px] font-normal text-ink-3 tabular-nums">
+                      {displaySizeOf(line)}
+                    </span>
+                  )}
                 </span>
                 {(line.options.length > 0 || line.note) && (
                   <span className="text-[12.5px] text-ink-3">
@@ -341,7 +351,64 @@ function StoreLines({
           );
         })}
       </ul>
+      <StoreSettlement
+        store={store}
+        currencyCode={currencyCode}
+        shopRate={shopRate}
+      />
     </section>
+  );
+}
+
+/**
+ * What the platform keeps of this shop's part and what the driver hands the
+ * shop at pickup (`0262`). Staff only — the figures are read from a table the
+ * app cannot. A portion placed before `0262` has no row: no commission was
+ * recorded, and the shop is paid its subtotal, as it always was.
+ */
+function StoreSettlement({
+  store,
+  currencyCode,
+  shopRate,
+}: {
+  store: OrderStore;
+  currencyCode: string;
+  shopRate: number | null;
+}) {
+  const earnings = store.earnings;
+  return (
+    <dl className="flex flex-col gap-1.5 border-t border-line bg-subtle/60 px-4 py-3 text-[13px]">
+      <div className="flex items-baseline justify-between gap-4">
+        <dt className="text-ink-3">{t("earnings.orderModel")}</dt>
+        <dd className="font-medium text-ink">
+          {earnings ? earningModelLabel(earnings) : t("earnings.orderNoRecord")}
+        </dd>
+      </div>
+      {earnings && (
+        <div className="flex items-baseline justify-between gap-4">
+          <dt className="text-ink-3">{t("earnings.orderEarned")}</dt>
+          <dd className="font-medium text-ink">
+            <Price
+              value={earnings.earning}
+              code={currencyCode}
+              shopRate={shopRate}
+              align="end"
+            />
+          </dd>
+        </div>
+      )}
+      <div className="flex items-baseline justify-between gap-4">
+        <dt className="text-ink-3">{t("earnings.orderPaidToShop")}</dt>
+        <dd className="font-semibold text-ink">
+          <Price
+            value={earnings ? earnings.storeDue : store.subtotal}
+            code={currencyCode}
+            shopRate={shopRate}
+            align="end"
+          />
+        </dd>
+      </div>
+    </dl>
   );
 }
 

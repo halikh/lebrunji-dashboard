@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
 
 import { useConfirmLeave } from "@/components/unsaved-changes";
@@ -18,12 +18,14 @@ import { t } from "@/i18n/translations";
  * from an order went back to the drivers list; a dish reached from search went
  * back to the menu. History knows; a page does not.
  *
- * ## Why it hides on the first page
+ * ## The first page goes up instead (user, 2026-11-08: "it should always
+ * be shown")
  *
- * A page opened straight — a pasted link, a new tab, the first screen after
- * signing in — has nothing in this dashboard before it, and `history.back()`
- * there would leave the dashboard. So it shows only once there is a page of
- * ours to go back to.
+ * A page opened straight — a pasted link, a new tab, a reload — has nothing
+ * in this dashboard before it, and `history.back()` there would leave the
+ * dashboard. It used to hide there, which read as a page with no way out. Now
+ * it goes up to the page this one belongs to (`parentOf`): a dish to its
+ * shop's menu, a branch to the shop's branches, a record to its list.
  *
  * The browser does not say how deep its history is (`history.length` counts
  * pages of other sites too, and forward entries), so we count ourselves: every
@@ -86,11 +88,35 @@ export function useCanGoBack(): boolean {
   );
 }
 
+/** The home screen: the one page with nothing above it. */
+const HOME = "/orders";
+
+/**
+ * Where a page opened with no history goes up to: the page it belongs to.
+ *
+ * Mostly the path with its last part dropped. The exceptions are the paths
+ * whose parent has no page of its own — a shop's dishes and branches live on
+ * tabs of the shop, help and legal pages on Settings. Null on the home screen.
+ */
+export function parentOf(pathname: string): string | null {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length === 0 || pathname === HOME) return null;
+  if (parts[0] === "shops" && parts.length >= 4) {
+    const tab = parts[2] === "branches" ? "branches" : "menu";
+    return `/shops/${parts[1]}?tab=${tab}`;
+  }
+  if (parts[0] === "settings" && parts.length >= 2) return "/settings";
+  if (parts.length === 1) return HOME;
+  return `/${parts.slice(0, -1).join("/")}`;
+}
+
 export function BackButton() {
   const router = useRouter();
+  const pathname = usePathname();
   const confirmLeave = useConfirmLeave();
   const canGoBack = useCanGoBack();
-  if (!canGoBack) return null;
+  const parent = parentOf(pathname);
+  if (!canGoBack && parent === null) return null;
 
   return (
     <button
@@ -98,7 +124,9 @@ export function BackButton() {
       onClick={() => {
         // History pops cannot be cancelled once they start, so ask first.
         void confirmLeave().then((leave) => {
-          if (leave) router.back();
+          if (!leave) return;
+          if (canGoBack) router.back();
+          else if (parent) router.push(parent);
         });
       }}
       className="inline-flex w-fit items-center gap-1 rounded-md text-[13px] font-medium text-ink-3 hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"

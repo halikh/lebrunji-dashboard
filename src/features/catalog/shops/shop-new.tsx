@@ -42,6 +42,13 @@ import {
 } from "@/lib/validation";
 
 import {
+  EARNINGS_MODELS,
+  newShopEarnings,
+  percentProblem,
+  saveStoreEarnings,
+  type EarningsModel,
+} from "../api/earnings";
+import {
   fetchDefaultCountry,
   type MenuLayout,
   type StoreDraft,
@@ -76,7 +83,8 @@ type Errors = Partial<
     | "address"
     | "whatsapp"
     | "prep"
-    | "hours",
+    | "hours"
+    | "percent",
     string
   >
 >;
@@ -96,6 +104,9 @@ const BLANK = {
   isActive: false,
   isFeatured: false,
   menuLayout: "list" as MenuLayout,
+  // Commission by default, with the rate to be typed (`0262`).
+  model: "commission" as EarningsModel,
+  percent: "",
 };
 
 /**
@@ -166,6 +177,8 @@ export function ShopNew() {
   const [isFeatured, setIsFeatured] = useState(BLANK.isFeatured);
   const [menuLayout, setMenuLayout] = useState(BLANK.menuLayout);
   const [week, setWeek] = useState<WeekDraft>(() => draftWeek());
+  const [model, setModel] = useState<EarningsModel>(BLANK.model);
+  const [percent, setPercent] = useState(BLANK.percent);
   const [errors, setErrors] = useState<Errors>({});
 
   // Compared against the blank form rather than tracked with a flag, so a
@@ -187,6 +200,8 @@ export function ShopNew() {
         isActive,
         isFeatured,
         menuLayout,
+        model,
+        percent,
         hours: weekToHours(week),
       },
       { ...BLANK, hours: [] },
@@ -232,6 +247,7 @@ export function ShopNew() {
             ? undefined
             : t(phone.key, phone.params),
       hours: checkWeek(week) ?? undefined,
+      percent: model === "commission" ? percentProblem(percent) : undefined,
     };
   }
 
@@ -243,6 +259,8 @@ export function ShopNew() {
       return;
     }
     if (!country.data || !located.ok) return;
+    const earnings = newShopEarnings(model, percent);
+    if (!earnings) return;
 
     const draft: StoreDraft = {
       name,
@@ -272,7 +290,15 @@ export function ShopNew() {
         hours: weekToHours(week),
       },
       {
-        onSuccess: ({ id, hoursSaved }) => {
+        onSuccess: async ({ id, hoursSaved }) => {
+          // Its own row, after the shop exists (`0262`). A failure here must
+          // not lose the shop: it is made, it is said, and the shop waits in
+          // To do for its terms.
+          try {
+            await saveStoreEarnings(id, null, earnings);
+          } catch {
+            toast.danger(t("earnings.notSavedNew"));
+          }
           if (!hoursSaved) {
             // The shop is made; only its week did not land. Straight to the
             // Hours tab with the reason — not a form to fill in again.
@@ -319,6 +345,11 @@ export function ShopNew() {
     {
       label: t("store.currency"),
       done: currencyCode !== "",
+      target: "new-prices",
+    },
+    {
+      label: t("earnings.readyLabel"),
+      done: newShopEarnings(model, percent) !== null,
       target: "new-prices",
     },
   ];
@@ -492,13 +523,18 @@ export function ShopNew() {
         aside={
           <div className="flex flex-col gap-6">
             <ReadyList items={ready} />
-            <div id="new-prices" />
+            {/* The id on the card itself: an empty anchor between the cards
+                took a second gap of its own. */}
             <Section
+              id="new-prices"
               className="scroll-mt-4"
               title={t("store.stepPrices")}
               description={t("store.stepPricesHint")}
             >
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {/* One field under the other: the aside is too narrow for two
+                  side by side, which wrapped the rate's label and set the
+                  inputs out of line. */}
+              <div className="flex flex-col gap-5">
                 <Field
                   label={t("store.currency")}
                   hint={t("store.currencyHintNew")}
@@ -538,6 +574,54 @@ export function ShopNew() {
                     />
                   )}
                 </Field>
+                {/* What we earn from it (`0262`), staff only. */}
+                <Field
+                  label={t("earnings.model")}
+                  hint={
+                    model === "markup"
+                      ? t("earnings.markupHint")
+                      : t("earnings.commissionHint")
+                  }
+                >
+                  {(wiring) => (
+                    <Select
+                      {...wiring}
+                      value={model}
+                      onChange={(next) =>
+                        setModel(next === "markup" ? "markup" : "commission")
+                      }
+                      options={EARNINGS_MODELS.map((one) => ({
+                        value: one,
+                        label: t(`earnings.${one}`),
+                      }))}
+                    />
+                  )}
+                </Field>
+                {model === "commission" && (
+                  <Field
+                    label={t("earnings.percent")}
+                    hint={t("earnings.percentHint")}
+                    error={errors.percent}
+                  >
+                    {(wiring) => (
+                      <NumberInput
+                        {...wiring}
+                        value={percent}
+                        onChange={(event) => {
+                          setPercent(event.target.value);
+                          setErrors((current) => ({
+                            ...current,
+                            percent: undefined,
+                          }));
+                        }}
+                        min={0}
+                        max={100}
+                        step="any"
+                        placeholder={t("earnings.percentPlaceholder")}
+                      />
+                    )}
+                  </Field>
+                )}
               </div>
             </Section>
             <Section title={t("store.storefrontSection")}>

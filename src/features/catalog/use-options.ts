@@ -126,6 +126,8 @@ export function useItemOptions() {
   const settle = {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["options"] });
+      // A choice's store price rides on its add and edit (`0262`).
+      void queryClient.invalidateQueries({ queryKey: ["store-prices"] });
     },
     onError: (error: unknown) => {
       toast.danger(
@@ -140,8 +142,15 @@ export function useItemOptions() {
       name: Localized;
       price: number;
       sortOrder: number;
+      storePrice?: number | null;
     }) =>
-      createItemOption(input.groupId, input.name, input.price, input.sortOrder),
+      createItemOption(
+        input.groupId,
+        input.name,
+        input.price,
+        input.sortOrder,
+        input.storePrice,
+      ),
     ...settle,
   });
 

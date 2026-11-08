@@ -59,8 +59,10 @@ import {
   type MenuSection,
 } from "../api/menu";
 import { liveBundlesWith } from "../api/bundles";
+import { usesMarkup } from "../api/earnings";
 import { useBranches } from "../use-branches";
 import { useBundles } from "../use-bundles";
+import { useShopEarnings, useShopStorePrices } from "../use-earnings";
 import {
   useAisles,
   useArchiveMenuItem,
@@ -153,6 +155,12 @@ function MenuBoard({ storeId }: { storeId: string }) {
   const bundles = useBundles("", storeId);
   const bundlesOf = (dishId: string) =>
     liveBundlesWith(bundles.data ?? [], dishId);
+  // A dish with a price from the shop is priced on its own page (`0262`).
+  const earnings = useShopEarnings(storeId);
+  const markup = usesMarkup(earnings.data);
+  const storePrices = useShopStorePrices(storeId, markup);
+  const storePriceOf = (dishId: string) =>
+    markup ? (storePrices.data?.items.get(dishId) ?? null) : null;
 
   const [search, setSearch] = useState("");
   const searching = search.trim().length >= SEARCH.minTerm;
@@ -354,6 +362,7 @@ function MenuBoard({ storeId }: { storeId: string }) {
     setOpen,
     canDrag,
     bundlesOf,
+    storePriceOf,
     update,
     archive,
     highlight,
@@ -656,6 +665,8 @@ type BoardContext = {
   setOpen: (id: string, open: boolean) => void;
   canDrag: boolean;
   bundlesOf: (dishId: string) => string[];
+  /** Its price from the shop on markup, or null — see `DishRow`. */
+  storePriceOf: (dishId: string) => number | null;
   update: ReturnType<typeof useUpdateMenuItem>;
   archive: ReturnType<typeof useArchiveMenuItem>;
   highlight: string | null;
@@ -1052,6 +1063,7 @@ function SectionBlock({
                     code={ctx.code}
                     shopRate={ctx.shopRate}
                     bundles={ctx.bundlesOf(item.id)}
+                    storePrice={ctx.storePriceOf(item.id)}
                     update={ctx.update}
                     archive={ctx.archive}
                     focused={ctx.highlight === item.id}
@@ -1288,6 +1300,7 @@ function SearchResults({
                 shopRate={ctx.shopRate}
                 context={pathOf(item.sectionId)}
                 bundles={ctx.bundlesOf(item.id)}
+                storePrice={ctx.storePriceOf(item.id)}
                 update={ctx.update}
                 archive={ctx.archive}
                 selection={

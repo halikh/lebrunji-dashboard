@@ -16,6 +16,7 @@ import {
   setSectionHidden,
   type BranchMenuOverrides,
 } from "./api/branch-menu";
+import { setItemStorePrice, setOptionStorePrice } from "./api/earnings";
 
 export const branchMenuKeys = {
   all: ["branch-menu"] as const,
@@ -125,6 +126,28 @@ export function useSetOptionPrice(branchId: string) {
     branchId,
     (input: { optionId: string; price: number | null }) =>
       setOptionPrice(branchId, input.optionId, input.price),
+    { queued: true },
+  );
+}
+
+/**
+ * What this branch is paid on markup (`0262`) — queued with its prices, for
+ * the same reason. Null deletes the branch's row: it falls back to the shop's.
+ */
+export function useSetItemStorePrice(branchId: string) {
+  return useOverrideMutation(
+    branchId,
+    (input: { itemId: string; storePrice: number | null }) =>
+      setItemStorePrice(input.itemId, branchId, input.storePrice),
+    { queued: true },
+  );
+}
+
+export function useSetOptionStorePrice(branchId: string) {
+  return useOverrideMutation(
+    branchId,
+    (input: { optionId: string; storePrice: number | null }) =>
+      setOptionStorePrice(input.optionId, branchId, input.storePrice),
     { queued: true },
   );
 }

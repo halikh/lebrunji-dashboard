@@ -27,6 +27,7 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 import { BranchLabel } from "../shops/branch-label";
 import { TEXT } from "@/lib/limits";
+import { toMajor } from "@/lib/minor-units";
 import { validateLocalizedText, type Localized } from "@/lib/validation";
 
 import {
@@ -38,6 +39,13 @@ import {
   type BundleDraft,
   type BundleItem,
 } from "../api/bundles";
+import type { Branch } from "../api/branches";
+import {
+  effectiveEarnings,
+  fetchItemBranchStorePrices,
+  usesMarkup,
+} from "../api/earnings";
+import { resolveBranchEntry, type MarkupEntry } from "../api/markup-price";
 import { fetchStoreQuestions, type StoreQuestion } from "../api/options";
 import {
   AsideCard,
@@ -53,6 +61,8 @@ import {
   useCreateBundle,
   useUpdateBundle,
 } from "../use-bundles";
+import { useShopEarnings, useShopStorePrices } from "../use-earnings";
+import { MarkupPriceFields, useMarkupPrice } from "../menu/markup-price-fields";
 import { optionKeys } from "../use-options";
 import { ShopSelect } from "../shops/shop-select";
 import { useStores } from "../use-stores";
@@ -107,6 +117,12 @@ export function BundleEditor({
     queryFn: () => fetchBundleBranchPrices(id!),
     enabled: Boolean(id),
   });
+  // A markup branch's own price from the shop for it (`0262`).
+  const branchStorePrices = useQuery({
+    queryKey: bundleKeys.branchStorePrices(id ?? ""),
+    queryFn: () => fetchItemBranchStorePrices(id!),
+    enabled: Boolean(id),
+  });
 
   if (id && !initial) {
     return (
@@ -123,7 +139,10 @@ export function BundleEditor({
 
   // Branch prices seed the form, so it waits for them; a new one waits for
   // the list, whose length is where it goes in the order.
-  if ((id && branchPrices.isPending) || (!id && bundles.isPending)) {
+  if (
+    (id && (branchPrices.isPending || branchStorePrices.isPending)) ||
+    (!id && bundles.isPending)
+  ) {
     return (
       <EditorPlaceholder
         state="pending"
@@ -138,19 +157,32 @@ export function BundleEditor({
       key={initial?.id ?? "new"}
       initial={initial ?? undefined}
       initialBranchPrices={branchPrices.data ?? {}}
+      initialBranchStorePrices={branchStorePrices.data ?? {}}
       startStoreId={fromStoreId ?? presetStoreId}
       cancelHref={listHref(fromStoreId)}
       pending={create.isPending || update.isPending}
-      onSave={(draft, changes) => {
+      onSave={(draft, changes, storePrice, storeChanges) => {
         const done = () => router.replace(listHref(fromStoreId));
         if (initial) {
           update.mutate(
-            { id: initial.id, draft, branchPrices: changes },
+            {
+              id: initial.id,
+              draft,
+              branchPrices: changes,
+              storePrice,
+              branchStorePrices: storeChanges,
+            },
             { onSuccess: done },
           );
         } else {
           create.mutate(
-            { draft, sortOrder: rows.length, branchPrices: changes },
+            {
+              draft,
+              sortOrder: rows.length,
+              branchPrices: changes,
+              storePrice,
+              branchStorePrices: storeChanges,
+            },
             { onSuccess: done },
           );
         }
@@ -162,6 +194,7 @@ export function BundleEditor({
 function Form({
   initial,
   initialBranchPrices,
+  initialBranchStorePrices,
   startStoreId,
   cancelHref,
   pending,
@@ -169,12 +202,17 @@ function Form({
 }: {
   initial?: Bundle;
   initialBranchPrices: Record<string, number>;
+  initialBranchStorePrices: Record<string, number>;
   startStoreId: string | null;
   cancelHref: string;
   pending: boolean;
   onSave: (
     draft: BundleDraft,
     branchPrices: Record<string, number | null>,
+    /** On markup and moved; null removes it, absent leaves it (`0262`). */
+    storePrice?: number | null,
+    /** Markup branches' own prices from the shop that moved; null removes. */
+    branchStorePrices?: Record<string, number | null>,
   ) => void;
 }) {
   const { format, decimalsOf } = useMoney();
@@ -212,6 +250,63 @@ function Form({
   const currencyCode = store?.currencyCode ?? initial?.currencyCode ?? "";
   const decimals = currencyCode ? decimalsOf(currencyCode) : null;
   const branches = useBranches(storeId);
+  // A bundle is a dish from the basket on, so on markup it has a store price
+  // like one (`item_store_prices`, `0262`).
+  const earnings = useShopEarnings(storeId || null);
+  const markup = usesMarkup(earnings.data);
+  const storePrices = useShopStorePrices(storeId || null, markup);
+  const savedStorePrice =
+    initial && initial.storeId === storeId
+      ? (storePrices.data?.items.get(initial.id) ?? null)
+      : null;
+  // On markup, the shop's price plus ours (`markup-price`).
+  const split = useMarkupPrice({
+    active: markup,
+    price,
+    savedPrice: start.price,
+    savedStorePrice,
+  });
+  const sellPrice = split.sellPrice;
+
+  /**
+   * Branches on markup (their own row, else the shop's) price the bundle as
+   * the branch Menu tab does: the price from the branch and our markup, an
+   * empty box meaning the shop's (`resolveBranchEntry`). Only rows somebody
+   * typed in are held here; the rest show what is saved.
+   */
+  const [branchEntries, setBranchEntries] = useState<
+    Record<string, MarkupEntry>
+  >({});
+  const [branchErrors, setBranchErrors] = useState<Record<string, string>>({});
+  const onMarkupAt = (branch: Branch) =>
+    effectiveEarnings(
+      earnings.data?.shop,
+      earnings.data?.branches.get(branch.id),
+    ).model === "markup";
+  /** What the branch falls back to — the shop's, where the currency is. */
+  const shopFigures = (branch: Branch) => {
+    const inherits =
+      branch.currencyCode === null || branch.currencyCode === currencyCode;
+    return {
+      price: inherits ? sellPrice : null,
+      storePrice: inherits
+        ? markup
+          ? split.nextStorePrice
+          : savedStorePrice
+        : null,
+    };
+  };
+  const branchEntry = (branch: Branch): MarkupEntry => {
+    const typed = branchEntries[branch.id];
+    if (typed) return typed;
+    const ownPrice = initialBranchPrices[branch.id] ?? null;
+    const ownStore = initialBranchStorePrices[branch.id] ?? null;
+    const store = ownStore ?? shopFigures(branch).storePrice;
+    return {
+      shopPrice: ownStore,
+      markup: ownPrice !== null && store !== null ? ownPrice - store : null,
+    };
+  };
   const money = (minor: number) =>
     currencyCode ? format(minor, currencyCode) : String(minor);
 
@@ -240,25 +335,28 @@ function Form({
       )
     : [];
 
-  const dirty = changed(
-    {
-      storeId,
-      name,
-      description,
-      imageUrl,
-      price,
-      items: items.map((item) => [item.menuItemId, item.quantity]),
-      isActive,
-      startsAt,
-      endsAt,
-      branchPrices,
-    },
-    {
-      ...start,
-      items: start.items.map((item) => [item.menuItemId, item.quantity]),
-      branchPrices: initialBranchPrices,
-    },
-  );
+  const dirty =
+    changed(
+      {
+        storeId,
+        name,
+        description,
+        imageUrl,
+        price: sellPrice,
+        items: items.map((item) => [item.menuItemId, item.quantity]),
+        isActive,
+        startsAt,
+        endsAt,
+        branchPrices,
+      },
+      {
+        ...start,
+        items: start.items.map((item) => [item.menuItemId, item.quantity]),
+        branchPrices: initialBranchPrices,
+      },
+    ) ||
+    split.moved ||
+    Object.keys(branchEntries).length > 0;
   useUnsavedChanges(dirty);
 
   const [errors, setErrors] = useState<{
@@ -270,7 +368,7 @@ function Form({
   }>({});
 
   const separately = separatePrice(items);
-  const saving = price !== null ? separately - price : 0;
+  const saving = sellPrice !== null ? separately - sellPrice : 0;
   const offSale = offSaleItems({ items });
 
   function submit() {
@@ -280,28 +378,57 @@ function Form({
       name: nameCheck.ok ? undefined : t(nameCheck.key, nameCheck.params),
       items: items.length < 2 ? t("bundles.itemsRequired") : undefined,
       price:
-        price === null
+        split.problem ??
+        (sellPrice === null
           ? t("validation.priceRequired")
-          : price <= 0
+          : sellPrice <= 0
             ? t("bundles.pricePositive")
             : // A bundle is a saving or it is not one.
-              items.length > 0 && price >= separately
+              items.length > 0 && sellPrice >= separately
               ? t("bundles.priceBelowOriginal", {
                   separately: money(separately),
                 })
-              : undefined,
+              : undefined),
       window: windowBackwards(startsAt, endsAt)
         ? t("bundles.windowBackwards")
         : undefined,
     };
+    // Markup branches someone typed in: the two boxes, resolved.
+    const storeChanges: Record<string, number | null> = {};
+    const markupPrices: Record<string, number | null> = {};
+    const refused: Record<string, string> = {};
+    for (const branch of branches.data ?? []) {
+      if (!onMarkupAt(branch) || !branchEntries[branch.id]) continue;
+      const resolved = resolveBranchEntry(
+        branchEntry(branch),
+        shopFigures(branch),
+      );
+      if (resolved.kind === "invalid") {
+        refused[branch.id] = t(resolved.problem);
+        continue;
+      }
+      markupPrices[branch.id] =
+        resolved.kind === "split" ? resolved.price : null;
+      const storeAfter = resolved.kind === "split" ? resolved.storePrice : null;
+      if (storeAfter !== (initialBranchStorePrices[branch.id] ?? null)) {
+        storeChanges[branch.id] = storeAfter;
+      }
+    }
+    setBranchErrors(refused);
+
     setErrors(found);
-    if (Object.values(found).some(Boolean)) return;
+    if (Object.values(found).some(Boolean) || Object.keys(refused).length > 0) {
+      return;
+    }
 
     // Only the branches whose price moved — a blank one follows the bundle.
     const changes: Record<string, number | null> = {};
     for (const branch of branches.data ?? []) {
       const before = initialBranchPrices[branch.id] ?? null;
-      const after = branchPrices[branch.id] ?? null;
+      const after =
+        branch.id in markupPrices
+          ? (markupPrices[branch.id] ?? null)
+          : (branchPrices[branch.id] ?? null);
       if (before !== after) changes[branch.id] = after;
     }
 
@@ -311,7 +438,7 @@ function Form({
         name,
         description,
         imageUrl,
-        price: price!,
+        price: sellPrice!,
         isActive,
         startsAt,
         endsAt,
@@ -321,8 +448,26 @@ function Form({
         })),
       },
       changes,
+      split.storePriceMoved ? split.nextStorePrice : undefined,
+      storeChanges,
     );
   }
+
+  const priceField = (
+    <Field
+      label={t("bundles.price")}
+      hint={t("bundles.priceHint", { code: currencyCode || "—" })}
+      error={split.plain ? errors.price : undefined}
+    >
+      <MoneyInput
+        value={price}
+        onChange={setPrice}
+        decimalDigits={decimals}
+        aria-label={t("bundles.price")}
+        disabled={pending}
+      />
+    </Field>
+  );
 
   function setQuantity(menuItemId: string, quantity: number) {
     const next = Math.min(MAX_QUANTITY, Math.max(1, Math.round(quantity) || 1));
@@ -370,15 +515,15 @@ function Form({
               className="text-[14px] leading-relaxed font-medium text-ink"
               aria-live="polite"
             >
-              {currencyCode && price !== null && items.length > 0
+              {currencyCode && sellPrice !== null && items.length > 0
                 ? saving > 0
                   ? t("bundles.previewSaving", {
-                      price: money(price),
+                      price: money(sellPrice),
                       separately: money(separately),
                       saving: money(saving),
                     })
                   : t("bundles.previewNoSaving", {
-                      price: money(price),
+                      price: money(sellPrice),
                       separately: money(separately),
                     })
                 : t("bundles.previewEmpty")}
@@ -697,20 +842,22 @@ function Form({
         title={t("bundles.priceSection")}
         bodyClassName="flex flex-col gap-5"
       >
+        {/* On markup: the shop's price and ours, worked out into the
+            bundle's price; the plain box only while both are empty. */}
+        {markup && (
+          <MarkupPriceFields
+            entry={split.entry}
+            onChange={split.setEntry}
+            decimals={decimals}
+            disabled={pending || (initial != null && !storePrices.isSuccess)}
+            error={split.plain ? undefined : errors.price}
+            appPrice={
+              currencyCode && sellPrice !== null ? money(sellPrice) : null
+            }
+          />
+        )}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field
-            label={t("bundles.price")}
-            hint={t("bundles.priceHint", { code: currencyCode || "—" })}
-            error={errors.price}
-          >
-            <MoneyInput
-              value={price}
-              onChange={setPrice}
-              decimalDigits={decimals}
-              aria-label={t("bundles.price")}
-              disabled={pending}
-            />
-          </Field>
+          {!markup && priceField}
 
           {/* Read, not typed: the dishes above at their brand prices — the
               figure the app strikes through beside the bundle's. */}
@@ -724,7 +871,7 @@ function Form({
                   <span className="font-semibold text-ink tabular-nums">
                     {money(separately)}
                   </span>
-                  {price !== null && saving > 0 && (
+                  {sellPrice !== null && saving > 0 && (
                     <span className="text-[13px] font-medium text-success-ink">
                       {t("bundles.originalPriceSaving", {
                         saving: money(saving),
@@ -778,23 +925,45 @@ function Form({
                         )
                       }
                     />
-                    <div className="w-full sm:w-44">
-                      <MoneyInput
-                        aria-label={t("bundles.branchPriceOf", {
-                          name: branchName,
-                        })}
-                        value={branchPrices[branch.id] ?? null}
-                        onChange={(minor) =>
-                          setBranchPrices((current) => ({
+                    {onMarkupAt(branch) ? (
+                      <BranchMarkupEntry
+                        entry={branchEntry(branch)}
+                        onChange={(next) => {
+                          setBranchEntries((current) => ({
                             ...current,
-                            [branch.id]: minor,
-                          }))
-                        }
-                        decimalDigits={code ? decimalsOf(code) : null}
-                        placeholder={t("bundles.branchPriceSame")}
+                            [branch.id]: next,
+                          }));
+                          setBranchErrors(
+                            ({ [branch.id]: _, ...rest }) => rest,
+                          );
+                        }}
+                        shop={shopFigures(branch)}
+                        ownPrice={initialBranchPrices[branch.id] ?? null}
+                        decimals={code ? decimalsOf(code) : null}
+                        code={code}
+                        name={branchName}
+                        error={branchErrors[branch.id]}
                         disabled={pending}
                       />
-                    </div>
+                    ) : (
+                      <div className="w-full sm:w-44">
+                        <MoneyInput
+                          aria-label={t("bundles.branchPriceOf", {
+                            name: branchName,
+                          })}
+                          value={branchPrices[branch.id] ?? null}
+                          onChange={(minor) =>
+                            setBranchPrices((current) => ({
+                              ...current,
+                              [branch.id]: minor,
+                            }))
+                          }
+                          decimalDigits={code ? decimalsOf(code) : null}
+                          placeholder={t("bundles.branchPriceSame")}
+                          disabled={pending}
+                        />
+                      </div>
+                    )}
                   </li>
                 );
               })}
@@ -846,4 +1015,101 @@ function describeChoices(
         : pickLocalized(choice.name),
     )
     .join(", ");
+}
+
+/**
+ * One markup branch's bundle price: from the branch and our markup, an empty
+ * box meaning the shop's (placeholders), and what that makes in the app.
+ * Saved with the form, not on leaving the box as on the branch Menu tab.
+ */
+function BranchMarkupEntry({
+  entry,
+  onChange,
+  shop,
+  ownPrice,
+  decimals,
+  code,
+  name,
+  error,
+  disabled,
+}: {
+  entry: MarkupEntry;
+  onChange: (entry: MarkupEntry) => void;
+  /** The shop's figures this branch falls back to, in its currency or null. */
+  shop: { price: number | null; storePrice: number | null };
+  ownPrice: number | null;
+  decimals: number | null;
+  code: string;
+  name: string;
+  error?: string;
+  disabled: boolean;
+}) {
+  const { format } = useMoney();
+  const shopMarkup =
+    shop.price !== null && shop.storePrice !== null
+      ? shop.price - shop.storePrice
+      : null;
+  const resolved = resolveBranchEntry(entry, shop);
+  const appPrice =
+    resolved.kind === "split"
+      ? resolved.price
+      : resolved.kind === "follow"
+        ? (ownPrice ?? shop.price)
+        : null;
+
+  return (
+    <div className="flex w-full flex-col gap-1 sm:w-auto">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="text-[11.5px] font-medium text-ink-4">
+            {t("earnings.fromShopShort")}
+          </span>
+          <span className="w-32">
+            <MoneyInput
+              value={entry.shopPrice}
+              onChange={(shopPrice) => onChange({ ...entry, shopPrice })}
+              decimalDigits={decimals}
+              disabled={disabled}
+              invalid={Boolean(error)}
+              placeholder={
+                shop.storePrice !== null
+                  ? toMajor(shop.storePrice, decimals)
+                  : undefined
+              }
+              aria-label={t("earnings.shopPriceFor", { name })}
+            />
+          </span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="text-[11.5px] font-medium text-ink-4">
+            {t("earnings.markupShort")}
+          </span>
+          <span className="w-32">
+            <MoneyInput
+              value={entry.markup}
+              onChange={(markup) => onChange({ ...entry, markup })}
+              decimalDigits={decimals}
+              disabled={disabled}
+              invalid={Boolean(error)}
+              min={-1_000_000_000}
+              placeholder={
+                shopMarkup !== null ? toMajor(shopMarkup, decimals) : undefined
+              }
+              aria-label={t("earnings.markupFor", { name })}
+            />
+          </span>
+        </span>
+      </div>
+      {error ? (
+        <p className="text-[12.5px] text-danger-ink">{error}</p>
+      ) : (
+        appPrice !== null &&
+        code && (
+          <p className="text-[12px] text-ink-3 tabular-nums">
+            {t("earnings.appPrice", { price: format(appPrice, code) })}
+          </p>
+        )
+      )}
+    </div>
+  );
 }

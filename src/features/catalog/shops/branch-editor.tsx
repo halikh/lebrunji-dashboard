@@ -7,13 +7,16 @@ import { useState } from "react";
 import {
   Button,
   ConfirmDialog,
+  EmptyState,
   Field,
   Page,
   PageHeader,
   Section,
+  Skeleton,
   Switch,
   cx,
 } from "@/components/ui";
+import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import { LocalizedField } from "@/components/ui/localized-field";
@@ -39,9 +42,17 @@ import {
 } from "@/lib/validation";
 
 import type { Branch, BranchDraft, BranchPatch } from "../api/branches";
+import {
+  effectiveEarnings,
+  formatPercent,
+  percentProblem,
+  type EarningsModel,
+  type StoreEarnings,
+} from "../api/earnings";
 import { saveBranchHours } from "../api/hours";
 import type { Store } from "../api/stores";
 import { useBranches, useCreateBranch, useUpdateBranch } from "../use-branches";
+import { useSaveStoreEarnings, useShopEarnings } from "../use-earnings";
 import { useStore } from "../use-stores";
 
 import { BranchLiveToggle } from "./branch-status";
@@ -83,6 +94,7 @@ const SAME_AS_SHOP = "__shop__";
 export function NewBranchScreen({ storeId }: { storeId: string }) {
   const store = useStore(storeId);
   const branches = useBranches(storeId);
+  const earnings = useShopEarnings(storeId);
   const rows = branches.data ?? [];
 
   const shopName = store.data ? pickLocalized(store.data.name) : "";
@@ -100,6 +112,8 @@ export function NewBranchScreen({ storeId }: { storeId: string }) {
         store={store.data ?? null}
         initial={null}
         sortOrder={rows.length}
+        shopEarnings={earnings.data?.shop ?? null}
+        earnings={null}
       />
     </Page>
   );
@@ -115,23 +129,62 @@ export function BranchDetailsForm({
   store: Store | null;
   branch: Branch;
 }) {
+  // Waited on: the form starts from what it read (`0262`).
+  const earnings = useShopEarnings(storeId);
+  if (earnings.isError) {
+    // Not "same as the shop" by default: that would show a branch with its
+    // own terms as following the shop's.
+    return (
+      <EmptyState
+        title={t("common.loadFailed")}
+        description={t("common.loadFailedBody")}
+        action={
+          <Button onClick={() => void earnings.refetch()}>
+            {t("common.retry")}
+          </Button>
+        }
+      />
+    );
+  }
+  if (earnings.isPending) {
+    return (
+      <div aria-hidden className="flex flex-col gap-4">
+        <Skeleton className="h-48 w-full rounded-lg" />
+        <Skeleton className="h-32 w-full rounded-lg" />
+      </div>
+    );
+  }
+  const shopEarnings = earnings.data?.shop ?? null;
+  const own = earnings.data?.branches.get(branch.id) ?? null;
+
   // Keyed on the row as read, so a refetch that changed it rebuilds the form
   // rather than leaving edits on top of newer data. Not on `isActive`: that is
   // written by its own switch (here and in the page header), and flipping it
   // must not throw away a half-edited address.
   return (
     <BranchForm
-      key={JSON.stringify({ ...branch, isActive: null })}
+      key={JSON.stringify({ ...branch, isActive: null, shopEarnings, own })}
       storeId={storeId}
       store={store}
       initial={branch}
       sortOrder={branch.sortOrder}
+      shopEarnings={shopEarnings}
+      earnings={own}
     />
   );
 }
 
+/**
+ * The earnings picker's "same as the shop" (`0262`) — a branch row with no
+ * model, or no row at all.
+ */
+type EarningsChoice = EarningsModel | typeof SAME_AS_SHOP;
+
 type Errors = Partial<
-  Record<"name" | "address" | "pin" | "whatsapp" | "prep" | "hours", string>
+  Record<
+    "name" | "address" | "pin" | "whatsapp" | "prep" | "hours" | "percent",
+    string
+  >
 >;
 
 function pinOf(branch: Branch | null): string {
@@ -145,12 +198,18 @@ function BranchForm({
   store,
   initial,
   sortOrder,
+  shopEarnings,
+  earnings,
 }: {
   storeId: string;
   /** The shop, read for the two fields that fall back to it. Null while loading. */
   store: Store | null;
   initial: Branch | null;
   sortOrder: number;
+  /** The shop's `store_earnings` row — what "same as the shop" means. */
+  shopEarnings: StoreEarnings | null;
+  /** This branch's own row, or null when it follows the shop. */
+  earnings: StoreEarnings | null;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -161,6 +220,7 @@ function BranchForm({
   const { currencies } = useMoney();
   const create = useCreateBranch(storeId);
   const update = useUpdateBranch(storeId);
+  const saveEarnings = useSaveStoreEarnings(storeId);
   const listHref = `/shops/${storeId}?tab=branches`;
 
   const start = {
@@ -178,6 +238,16 @@ function BranchForm({
     // a branch that follows the brand into one that no longer does (`0110`).
     imageUrl: initial?.imageUrl ?? null,
     currencyCode: initial?.currencyCode ?? null,
+    // A row with a rate and no model is commission at its own rate whenever
+    // the shop is on commission — shown as Commission, which is what it is.
+    earnings: (earnings?.model ??
+      (earnings?.commissionPercent != null
+        ? "commission"
+        : SAME_AS_SHOP)) as EarningsChoice,
+    percent:
+      earnings?.commissionPercent == null
+        ? ""
+        : String(earnings.commissionPercent),
   };
 
   const [name, setName] = useState<Localized>(start.name);
@@ -191,6 +261,10 @@ function BranchForm({
   const [currencyCode, setCurrencyCode] = useState<string | null>(
     start.currencyCode,
   );
+  const [earningsChoice, setEarningsChoice] = useState<EarningsChoice>(
+    start.earnings,
+  );
+  const [percent, setPercent] = useState(start.percent);
   const [week, setWeek] = useState<WeekDraft>(() => draftWeek());
   const [errors, setErrors] = useState<Errors>({});
   const [confirmingCurrency, setConfirmingCurrency] = useState(false);
@@ -205,14 +279,21 @@ function BranchForm({
     pin,
     imageUrl,
     currencyCode,
+    earnings: earningsChoice,
+    percent: earningsChoice === "commission" ? percent : "",
+  };
+  const startValues = {
+    ...start,
+    percent: start.earnings === "commission" ? start.percent : "",
   };
   const dirty =
-    changed(values, start) || (!initial && weekToHours(week).length > 0);
+    changed(values, startValues) || (!initial && weekToHours(week).length > 0);
   useUnsavedChanges(dirty);
 
   const located = parseLocation(pin);
   const currencyMoved = initial !== null && currencyCode !== start.currencyCode;
-  const pending = create.isPending || update.isPending;
+  const pending =
+    create.isPending || update.isPending || saveEarnings.isPending;
 
   function check(): boolean {
     const nameCheck = validateLocalizedText(name, codes, TEXT.name);
@@ -240,6 +321,8 @@ function BranchForm({
       // A new branch is asked for its week, because no week at all is open
       // around the clock — the same rule as a new shop.
       hours: initial ? undefined : (checkWeek(week) ?? undefined),
+      percent:
+        earningsChoice === "commission" ? percentProblem(percent) : undefined,
     };
     setErrors(found);
     const ok = !Object.values(found).some(Boolean);
@@ -270,6 +353,20 @@ function BranchForm({
     };
   }
 
+  /** This branch's `store_earnings` row as the form says (`0262`). */
+  function nextEarnings(): StoreEarnings {
+    return {
+      model: earningsChoice === SAME_AS_SHOP ? null : earningsChoice,
+      commissionPercent:
+        earningsChoice === "commission" && percent.trim() !== ""
+          ? Number(percent)
+          : null,
+    };
+  }
+  const earningsMoved =
+    values.earnings !== startValues.earnings ||
+    values.percent.trim() !== startValues.percent;
+
   function save() {
     const next = draft();
 
@@ -278,6 +375,15 @@ function BranchForm({
         { draft: next, sortOrder },
         {
           onSuccess: async (id) => {
+            // A branch that differs in what the platform earns gets its row
+            // once it exists; its own toast says if that failed.
+            if (earningsMoved) {
+              saveEarnings.mutate({
+                branchId: id,
+                earnings: nextEarnings(),
+                quiet: true,
+              });
+            }
             // The branch exists; its week is a second write. A failure there
             // sends the operator to the Hours tab rather than inviting a
             // second branch.
@@ -320,7 +426,15 @@ function BranchForm({
       patch.latitude = next.latitude;
       patch.longitude = next.longitude;
     }
-    if (Object.keys(patch).length === 0) return;
+    const rowMoved = Object.keys(patch).length > 0;
+    if (earningsMoved) {
+      saveEarnings.mutate({
+        branchId: initial.id,
+        earnings: nextEarnings(),
+        quiet: rowMoved,
+      });
+    }
+    if (!rowMoved) return;
 
     update.mutate({ id: initial.id, patch, name: pickLocalized(next.name) });
   }
@@ -335,11 +449,22 @@ function BranchForm({
     setPin(start.pin);
     setImageUrl(start.imageUrl);
     setCurrencyCode(start.currencyCode);
+    setEarningsChoice(start.earnings);
+    setPercent(start.percent);
     setErrors({});
   }
 
   const shopCode = store?.currencyCode ?? "";
   const nextCode = currencyCode ?? shopCode;
+  const shopApplies = effectiveEarnings(shopEarnings);
+  const shopEarningsLabel =
+    shopApplies.model === "markup"
+      ? t("earnings.markup")
+      : shopApplies.commissionPercent !== null
+        ? t("earnings.commissionAt", {
+            percent: formatPercent(shopApplies.commissionPercent),
+          })
+        : t("earnings.commissionNone");
 
   return (
     <div className="flex flex-col gap-5">
@@ -517,6 +642,59 @@ function BranchForm({
                 disabled={pending}
               />
             </Field>
+            {/* What the platform earns here (`0262`). "Same as the shop" is a
+                row with nothing in it, or no row. Staff only. */}
+            <Field
+              label={t("earnings.model")}
+              hint={
+                earningsChoice === "markup"
+                  ? t("earnings.markupBranchHint")
+                  : t("earnings.branchHint")
+              }
+            >
+              {(wiring) => (
+                <Select
+                  {...wiring}
+                  value={earningsChoice}
+                  onChange={(next) =>
+                    setEarningsChoice(
+                      next === "commission" || next === "markup"
+                        ? next
+                        : SAME_AS_SHOP,
+                    )
+                  }
+                  options={[
+                    {
+                      value: SAME_AS_SHOP,
+                      label: t("earnings.sameAsShop", {
+                        model: shopEarningsLabel,
+                      }),
+                    },
+                    { value: "commission", label: t("earnings.commission") },
+                    { value: "markup", label: t("earnings.markup") },
+                  ]}
+                />
+              )}
+            </Field>
+            {earningsChoice === "commission" && (
+              <Field
+                label={t("earnings.percent")}
+                hint={t("earnings.percentBranchHint")}
+                error={errors.percent}
+              >
+                {(wiring) => (
+                  <NumberInput
+                    {...wiring}
+                    value={percent}
+                    onChange={(event) => setPercent(event.target.value)}
+                    min={0}
+                    max={100}
+                    step="any"
+                    placeholder={t("earnings.percentPlaceholder")}
+                  />
+                )}
+              </Field>
+            )}
           </div>
         </Section>
 

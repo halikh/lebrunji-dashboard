@@ -11,6 +11,7 @@ import { t } from "@/i18n/translations";
 
 import { AccountMenu } from "./account-menu";
 import { NAV, SETTINGS_ITEM, activeItem, type NavItem } from "./nav";
+import { SettingsMenu } from "./settings-menu";
 
 /**
  * The navigation. Full (icons and labels) or collapsed (icons only, names in
@@ -132,10 +133,10 @@ export function Sidebar({
       </div>
 
       <div className="flex shrink-0 flex-col gap-0.5 border-t border-line p-3">
-        <SidebarLink
-          item={SETTINGS_ITEM}
+        <SettingsMenu
           active={active?.href === SETTINGS_ITEM.href}
           collapsed={collapsed}
+          mobile={mobile}
           onNavigate={onNavigate}
         />
         <AccountMenu collapsed={collapsed} />

@@ -36,9 +36,16 @@ import {
 } from "@/lib/validation";
 
 import type { Branch } from "../api/branches";
+import {
+  EARNINGS_MODELS,
+  percentProblem,
+  type EarningsModel,
+  type StoreEarnings,
+} from "../api/earnings";
 import type { CurrencyChangeMode, MenuLayout, Store } from "../api/stores";
 import { useBranches, useUpdateBranch } from "../use-branches";
 import { useCategories } from "../use-categories";
+import { useSaveStoreEarnings, useShopEarnings } from "../use-earnings";
 import { useMenu } from "../use-menu";
 import { useSetStoreCurrency, useStore, useUpdateStore } from "../use-stores";
 
@@ -74,8 +81,9 @@ export function ShopDetailsTab({ storeId }: { storeId: string }) {
   // Waited on, not raced: the form is keyed on what it read, so it reads the
   // branch before it builds its fields or the pin would arrive after them.
   const branches = useBranches(storeId);
+  const earnings = useShopEarnings(storeId);
 
-  if (store.isPending || branches.isPending) {
+  if (store.isPending || branches.isPending || earnings.isPending) {
     return (
       <div aria-hidden className="flex flex-col gap-4">
         <Skeleton className="h-48 w-full rounded-lg" />
@@ -84,13 +92,18 @@ export function ShopDetailsTab({ storeId }: { storeId: string }) {
     );
   }
 
-  if (store.isError || !store.data) {
+  if (store.isError || !store.data || earnings.isError) {
     return (
       <EmptyState
         icon={<AlertTriangle />}
         title={t("store.detailsFailed")}
         action={
-          <Button onClick={() => void store.refetch()}>
+          <Button
+            onClick={() => {
+              void store.refetch();
+              void earnings.refetch();
+            }}
+          >
             {t("common.retry")}
           </Button>
         }
@@ -106,15 +119,21 @@ export function ShopDetailsTab({ storeId }: { storeId: string }) {
       // Keyed on the rows as read: a refetch that changed the shop rebuilds
       // the form rather than leaving edits on top of newer data. After a save
       // the two agree, so nothing typed is lost to the save's own refetch.
-      key={signature(store.data, sole)}
+      key={signature(store.data, sole, earnings.data.shop)}
       store={store.data}
       sole={sole}
+      earnings={earnings.data.shop}
     />
   );
 }
 
-function signature(store: Store, sole: Branch | null): string {
+function signature(
+  store: Store,
+  sole: Branch | null,
+  earnings: StoreEarnings | null,
+): string {
   return JSON.stringify([
+    earnings,
     store.id,
     store.name,
     store.imageUrl,
@@ -142,10 +161,22 @@ function pinText(branch: Branch | null): string {
 }
 
 type Errors = Partial<
-  Record<"name" | "rate" | "pin" | "address" | "prep" | "whatsapp", string>
+  Record<
+    "name" | "rate" | "pin" | "address" | "prep" | "whatsapp" | "percent",
+    string
+  >
 >;
 
-function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
+function DetailsForm({
+  store,
+  sole,
+  earnings,
+}: {
+  store: Store;
+  sole: Branch | null;
+  /** The shop's `store_earnings` row, or null — commission at no rate. */
+  earnings: StoreEarnings | null;
+}) {
   const languages = useLanguages();
   const codes = languages.data?.map((language) => language.code) ?? [];
   const { format, currencies } = useMoney();
@@ -157,6 +188,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
   const update = useUpdateStore();
   const updateBranch = useUpdateBranch(store.id);
   const setCurrency = useSetStoreCurrency();
+  const saveEarnings = useSaveStoreEarnings(store.id);
 
   const initialOthers = store.categoryIds.filter(
     (id) => id !== store.categoryId,
@@ -176,6 +208,11 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     prepMax: String(sole?.prepMaxMinutes ?? 20),
     whatsapp: sole?.whatsappPhone ?? "",
     trading: sole?.isActive ?? true,
+    model: (earnings?.model ?? "commission") as EarningsModel,
+    percent:
+      earnings?.commissionPercent == null
+        ? ""
+        : String(earnings.commissionPercent),
   };
 
   const [name, setName] = useState<Localized>(initial.name);
@@ -202,6 +239,9 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
   const [whatsapp, setWhatsapp] = useState(initial.whatsapp);
   /** Whether the one branch trades — its page is never reached on a one-place shop. */
   const [trading, setTrading] = useState(initial.trading);
+  /** How the platform earns from this shop (`0262`). */
+  const [model, setModel] = useState<EarningsModel>(initial.model);
+  const [percent, setPercent] = useState(initial.percent);
 
   const [errors, setErrors] = useState<Errors>({});
   const [confirmingCurrency, setConfirmingCurrency] = useState(false);
@@ -221,6 +261,8 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     prepMax,
     whatsapp,
     trading,
+    model,
+    percent,
   };
   // `mode` is left out: it is a question *about* a currency change and cannot
   // be reached without moving the currency, which is compared.
@@ -299,6 +341,8 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
           : undefined,
       // Required, as when the shop is added: clearing it would leave a shop
       // that takes orders and has nowhere to send them.
+      // Only on commission, and required there: markup has no rate.
+      percent: model === "commission" ? percentProblem(percent) : undefined,
       whatsapp:
         sole && whatsapp.trim() === ""
           ? t("branches.whatsappRequired")
@@ -372,6 +416,25 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
       layoutMoved ||
       rateMoved;
 
+    // Its own row, staff-only. On markup the rate is cleared, so a branch
+    // that overrides back to commission is not handed a rate nobody sees.
+    const nextEarnings: StoreEarnings = {
+      model,
+      commissionPercent:
+        model === "commission" && percent.trim() !== ""
+          ? Number(percent)
+          : null,
+    };
+    const earningsMoved =
+      model !== initial.model || percent.trim() !== initial.percent;
+    if (earningsMoved) {
+      saveEarnings.mutate({
+        branchId: null,
+        earnings: nextEarnings,
+        quiet: storeMoved,
+      });
+    }
+
     if (storeMoved) {
       update.mutate({
         id: store.id,
@@ -434,7 +497,7 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
         name: pickLocalized(sole.name),
         // One Save, one notice: quiet when the store write has already said
         // it, spoken when this is the only write there is.
-        quiet: storeMoved,
+        quiet: storeMoved || earningsMoved,
       });
     }
   }
@@ -455,11 +518,16 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
     setPrepMax(initial.prepMax);
     setWhatsapp(initial.whatsapp);
     setTrading(initial.trading);
+    setModel(initial.model);
+    setPercent(initial.percent);
     setErrors({});
   }
 
   const pending =
-    update.isPending || setCurrency.isPending || updateBranch.isPending;
+    update.isPending ||
+    setCurrency.isPending ||
+    updateBranch.isPending ||
+    saveEarnings.isPending;
   const categoryOptions = (categories.data ?? []).map((category) => ({
     value: category.id,
     label: pickLocalized(category.name),
@@ -588,6 +656,58 @@ function DetailsForm({ store, sole }: { store: Store; sole: Branch | null }) {
                   code={currencyCode}
                 />
               )}
+
+              {/* What the platform keeps (`0262`). Staff only — customers
+                  never see a rate or a store price. */}
+              <div className="grid grid-cols-1 gap-5 border-t border-line pt-5 sm:grid-cols-2">
+                <Field
+                  label={t("earnings.model")}
+                  hint={
+                    // Switching says what it leaves behind: the menu's prices
+                    // do not change by themselves either way.
+                    model !== initial.model
+                      ? model === "markup"
+                        ? t("earnings.switchToMarkup")
+                        : t("earnings.switchToCommission")
+                      : model === "markup"
+                        ? t("earnings.markupHint")
+                        : t("earnings.commissionHint")
+                  }
+                >
+                  {(wiring) => (
+                    <Select
+                      {...wiring}
+                      value={model}
+                      onChange={(next) =>
+                        setModel(next === "markup" ? "markup" : "commission")
+                      }
+                      options={EARNINGS_MODELS.map((one) => ({
+                        value: one,
+                        label: t(`earnings.${one}`),
+                      }))}
+                    />
+                  )}
+                </Field>
+                {model === "commission" && (
+                  <Field
+                    label={t("earnings.percent")}
+                    hint={t("earnings.percentHint")}
+                    error={errors.percent}
+                  >
+                    {(wiring) => (
+                      <NumberInput
+                        {...wiring}
+                        value={percent}
+                        onChange={(event) => setPercent(event.target.value)}
+                        min={0}
+                        max={100}
+                        step="any"
+                        placeholder={t("earnings.percentPlaceholder")}
+                      />
+                    )}
+                  </Field>
+                )}
+              </div>
             </div>
           </Section>
 

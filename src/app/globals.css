@@ -158,8 +158,11 @@
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
+  /* The ink as well as the ground: white text on a filled badge or button
+     would otherwise stay white on this pale blue, and vanish when selected. */
   ::selection {
     background: var(--color-accent-soft);
+    color: var(--color-ink);
   }
   [dir="rtl"],
   :lang(ar) {

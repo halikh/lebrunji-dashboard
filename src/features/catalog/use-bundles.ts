@@ -7,6 +7,7 @@ import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
 
 import { setItemPrice } from "./api/branch-menu";
+import { setItemStorePrice } from "./api/earnings";
 import {
   archiveBundle,
   createBundle,
@@ -25,6 +26,9 @@ export const bundleKeys = {
   list: (search: string, storeId = "") =>
     ["bundles", "list", search, storeId] as const,
   branchPrices: (id: string) => ["bundles", "branch-prices", id] as const,
+  /** Each branch's own price from the shop for it, on markup (`0262`). */
+  branchStorePrices: (id: string) =>
+    ["bundles", "branch-store-prices", id] as const,
 };
 
 export function useBundles(search = "", storeId = "") {
@@ -53,6 +57,16 @@ export function useLiveBundlesWith(storeId: string, dishId: string): string[] {
  */
 type BranchPriceChanges = Record<string, number | null>;
 
+/** Each branch's price from the shop that moved; null removes the branch's row. */
+async function writeBranchStorePrices(
+  id: string,
+  changes: BranchPriceChanges | undefined,
+) {
+  for (const [branchId, storePrice] of Object.entries(changes ?? {})) {
+    await setItemStorePrice(id, branchId, storePrice);
+  }
+}
+
 async function writeBranchPrices(id: string, changes: BranchPriceChanges) {
   for (const [branchId, price] of Object.entries(changes)) {
     await setItemPrice(branchId, id, price);
@@ -68,13 +82,22 @@ export function useCreateBundle() {
       draft: BundleDraft;
       sortOrder: number;
       branchPrices: BranchPriceChanges;
+      /** The shop's store price for it, on markup (`0262`); absent: none. */
+      storePrice?: number | null;
+      /** Markup branches' own prices from the shop that moved. */
+      branchStorePrices?: BranchPriceChanges;
     }) => {
       const id = await createBundle(input.draft, input.sortOrder);
       await writeBranchPrices(id, input.branchPrices);
+      if (input.storePrice != null) {
+        await setItemStorePrice(id, null, input.storePrice);
+      }
+      await writeBranchStorePrices(id, input.branchStorePrices);
       return id;
     },
     onSuccess: (_id, input) => {
       void queryClient.invalidateQueries({ queryKey: bundleKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ["store-prices"] });
       void queryClient.invalidateQueries({ queryKey: ["options"] });
       toast.success(
         t("bundles.added", { name: pickLocalized(input.draft.name) }),
@@ -97,9 +120,17 @@ export function useUpdateBundle() {
       id: string;
       draft: BundleDraft;
       branchPrices: BranchPriceChanges;
+      /** Null removes it; absent leaves it alone. */
+      storePrice?: number | null;
+      /** Markup branches' own prices from the shop that moved. */
+      branchStorePrices?: BranchPriceChanges;
     }) => {
       await updateBundle(input.id, input.draft);
       await writeBranchPrices(input.id, input.branchPrices);
+      if (input.storePrice !== undefined) {
+        await setItemStorePrice(input.id, null, input.storePrice);
+      }
+      await writeBranchStorePrices(input.id, input.branchStorePrices);
     },
     onSuccess: (_result, input) => {
       toast.success(
@@ -114,6 +145,7 @@ export function useUpdateBundle() {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: bundleKeys.all });
       void queryClient.invalidateQueries({ queryKey: ["options"] });
+      void queryClient.invalidateQueries({ queryKey: ["store-prices"] });
     },
   });
 }

@@ -9,6 +9,8 @@ import {
   Image as ImageIcon,
   MapPin,
   PartyPopper,
+  Tag,
+  Percent,
   Store,
 } from "lucide-react";
 import Link from "next/link";
@@ -67,7 +69,8 @@ import { todoHref, useTodoLists } from "./use-todo";
  */
 export function TodoScreen() {
   const [search, setSearch] = useState("");
-  const { hours, addresses, storeImages, itemImages } = useTodoLists();
+  const { hours, addresses, commission, markup, storeImages, itemImages } =
+    useTodoLists();
 
   // Filtered here rather than in the queries. These lists are what is *left*,
   // short by nature and already fully downloaded, so a browser-side filter
@@ -87,6 +90,18 @@ export function TodoScreen() {
   const addressRows = (addresses.data?.rows ?? [])
     .filter((row) => !searching || matches(term, row.storeName, row.branchName))
     .sort((a, b) => Number(b.storeActive) - Number(a.storeActive));
+  const commissionRows = (commission.data?.rows ?? [])
+    .filter((row) => !searching || matches(term, row.name))
+    .sort((a, b) => Number(b.isActive) - Number(a.isActive));
+  const markupGroups = groupByPlace(
+    (markup.data?.rows ?? []).filter(
+      (row) => !searching || matches(term, row.name, row.storeName),
+    ),
+  );
+  const markupCount = markupGroups.reduce(
+    (sum, group) => sum + group.items.length,
+    0,
+  );
   const storeRows = (storeImages.data?.rows ?? [])
     .filter((row) => !searching || matches(term, row.name))
     .sort((a, b) => Number(b.isActive) - Number(a.isActive));
@@ -98,11 +113,13 @@ export function TodoScreen() {
   // menus, and that is how somebody sets about fixing them.
   const itemGroups = groupByStore(itemRows);
 
-  const all = [hours, addresses, storeImages, itemImages];
+  const all = [hours, addresses, commission, markup, storeImages, itemImages];
   const loaded = all.every((query) => query.isSuccess);
   const total =
     (hours.data?.rows.length ?? 0) +
     (addresses.data?.rows.length ?? 0) +
+    (commission.data?.rows.length ?? 0) +
+    (markup.data?.rows.length ?? 0) +
     (storeImages.data?.rows.length ?? 0) +
     (itemImages.data?.rows.length ?? 0);
   const truncated = all.some((query) => query.data?.truncated);
@@ -123,6 +140,8 @@ export function TodoScreen() {
     ? nextStep({
         hours: hours.data?.rows ?? [],
         addresses: addresses.data?.rows ?? [],
+        commission: commission.data?.rows ?? [],
+        markup: markup.data?.rows ?? [],
         storeImages: storeImages.data?.rows ?? [],
         itemImages: itemImages.data?.rows ?? [],
       })
@@ -240,6 +259,72 @@ export function TodoScreen() {
             </TodoGroup>
 
             <TodoGroup
+              icon={<Percent />}
+              titleKey="todo.commissionTitle"
+              bodyKey="todo.commissionBody"
+              doneKey="todo.commissionDone"
+              query={commission}
+              count={commissionRows.length}
+              searching={searching}
+              current={firstOpen === 2}
+            >
+              <ul className="divide-y divide-line">
+                {commissionRows.map((row) => (
+                  <li key={row.id}>
+                    <TodoRow
+                      href={todoHref.commission(row.id)}
+                      title={pickLocalized(row.name)}
+                      hidden={!row.isActive}
+                      actionKey="todo.setCommission"
+                    />
+                  </li>
+                ))}
+              </ul>
+            </TodoGroup>
+
+            <TodoGroup
+              icon={<Tag />}
+              titleKey="todo.markupTitle"
+              bodyKey="todo.markupBody"
+              doneKey="todo.markupDone"
+              query={markup}
+              count={markupCount}
+              searching={searching}
+              current={firstOpen === 3}
+            >
+              {markupGroups.map((group) => (
+                <div key={group.storeId}>
+                  <h3 className="sticky top-0 z-[1] flex items-baseline gap-2 border-y border-line bg-subtle px-5 py-2 text-[13px] font-semibold text-ink">
+                    <span className="truncate">
+                      {pickLocalized(group.storeName)}
+                    </span>
+                    <span className="shrink-0 text-[12px] font-normal text-ink-3">
+                      {group.items.length === 1
+                        ? t("todo.itemsOne")
+                        : t("todo.items", { count: group.items.length })}
+                    </span>
+                  </h3>
+                  <ul className="divide-y divide-line">
+                    {group.items.map((item) => (
+                      <li key={item.id}>
+                        <TodoRow
+                          href={todoHref.markup(
+                            item.storeId,
+                            item.id,
+                            item.branchId,
+                          )}
+                          title={pickLocalized(item.name)}
+                          hidden={!item.isActive}
+                          actionKey="todo.setMarkup"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </TodoGroup>
+
+            <TodoGroup
               icon={<Store />}
               titleKey="todo.storeImagesTitle"
               bodyKey="todo.storeImagesBody"
@@ -247,7 +332,7 @@ export function TodoScreen() {
               query={storeImages}
               count={storeRows.length}
               searching={searching}
-              current={firstOpen === 2}
+              current={firstOpen === 4}
             >
               <ul className="divide-y divide-line">
                 {storeRows.map((row) => (
@@ -271,7 +356,7 @@ export function TodoScreen() {
               query={itemImages}
               count={itemRows.length}
               searching={searching}
-              current={firstOpen === 3}
+              current={firstOpen === 5}
             >
               {itemGroups.map((group) => (
                 <div key={group.storeId}>
@@ -515,6 +600,8 @@ type NextStep = { href: string; label: string; urgentStep: boolean };
 function nextStep(lists: {
   hours: HoursTodo[];
   addresses: AddressTodo[];
+  commission: StoreTodo[];
+  markup: ItemTodo[];
   storeImages: StoreTodo[];
   itemImages: ItemTodo[];
 }): NextStep | null {
@@ -542,6 +629,25 @@ function nextStep(lists: {
           address.branchCount > 1
             ? `${pickLocalized(address.storeName)}, ${pickLocalized(address.branchName)}`
             : pickLocalized(address.storeName),
+      }),
+      urgentStep: false,
+    };
+  }
+  const rate = live(lists.commission, (row) => row.isActive);
+  if (rate) {
+    return {
+      href: todoHref.commission(rate.id),
+      label: t("todo.nextCommission", { name: pickLocalized(rate.name) }),
+      urgentStep: false,
+    };
+  }
+  const priced = live(lists.markup, (row) => row.isActive);
+  if (priced) {
+    return {
+      href: todoHref.markup(priced.storeId, priced.id, priced.branchId),
+      label: t("todo.nextMarkup", {
+        name: pickLocalized(priced.name),
+        shop: pickLocalized(priced.storeName),
       }),
       urgentStep: false,
     };
@@ -645,6 +751,40 @@ type ItemGroup = {
   storeName: ItemTodo["storeName"];
   items: ItemTodo[];
 };
+
+/**
+ * As `groupByStore`, with a branch's gaps under their own heading — "Shop,
+ * Branch" — since two branches of one shop are two jobs on two pages.
+ */
+function groupByPlace(items: ItemTodo[]): ItemGroup[] {
+  const groups = new Map<string, ItemGroup>();
+  for (const item of items) {
+    const key = item.branchId
+      ? `${item.storeId}:${item.branchId}`
+      : item.storeId;
+    const group: ItemGroup = groups.get(key) ?? {
+      storeId: key,
+      storeName: item.branchName
+        ? joinNames(item.storeName, item.branchName)
+        : item.storeName,
+      items: [],
+    };
+    group.items.push(item);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+/** "Shop, Branch" in each language either has. */
+function joinNames(shop: Localized, branch: Localized): Localized {
+  const out: Record<string, string> = {};
+  for (const code of new Set([...Object.keys(shop), ...Object.keys(branch)])) {
+    const a = (shop as Record<string, string | undefined>)[code];
+    const b = (branch as Record<string, string | undefined>)[code];
+    out[code] = [a, b].filter(Boolean).join(", ");
+  }
+  return out as Localized;
+}
 
 function groupByStore(items: ItemTodo[]): ItemGroup[] {
   const groups = new Map<string, ItemGroup>();
