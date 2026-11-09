@@ -8,9 +8,9 @@ import type { EarningsModel } from "@/features/catalog/api/earnings";
  * `api_v1_admin_earnings` (`0262`).
  *
  * One row per shop, branch, model and currency, for orders placed in
- * `[from, to)`. Cancelled portions are left out by the function. Only orders
- * placed from `0262` on have figures at all — the ones before were never
- * charged a commission, and nothing here invents one for them.
+ * `[from, to)`. Cancelled portions are left out by the function. Orders from
+ * before `0262` were never charged a commission, and are here at no rate
+ * (`0273`).
  *
  * Figures are minor units of `currencyCode`, the order's currency, so a shop
  * whose orders came in two currencies is two rows, and nothing here adds them.
@@ -21,6 +21,8 @@ export type EarningsRow = {
   /** Null for a portion written before a branch was recorded. */
   branchId: string | null;
   branchName: Localized | null;
+  /** Tells apart two rows with the same name. Null when it could not be read. */
+  branchAddress: Localized | null;
   model: EarningsModel;
   currencyCode: string;
   orders: number;
@@ -43,11 +45,17 @@ export async function fetchEarnings(
 
   if (error) throw new Error(`Could not read the earnings: ${error.message}`);
 
-  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const addresses = await fetchBranchAddresses(
+    rows.flatMap((row) => (row.branch_id as string | null) ?? []),
+  );
+
+  return rows.map((row) => ({
     storeId: row.store_id as string,
     storeName: (row.store_name as Localized | null) ?? {},
     branchId: (row.branch_id as string | null) ?? null,
     branchName: (row.branch_name as Localized | null) ?? null,
+    branchAddress: addresses.get(row.branch_id as string) ?? null,
     model: row.model === "markup" ? "markup" : "commission",
     currencyCode: row.currency_code as string,
     // `bigint` arrives as a number from PostgREST for values this size.
@@ -56,6 +64,30 @@ export async function fetchEarnings(
     earning: Number(row.earning ?? 0),
     storeDue: Number(row.store_due ?? 0),
   }));
+}
+
+/**
+ * Each branch's address. Empty on a failed read rather than an error: the
+ * address only tells rows apart, and the figures are right without it.
+ */
+async function fetchBranchAddresses(
+  branchIds: readonly string[],
+): Promise<Map<string, Localized>> {
+  if (branchIds.length === 0) return new Map();
+
+  const { data, error } = await getClient()
+    .from("branches")
+    .select("id, address")
+    .in("id", [...new Set(branchIds)]);
+
+  if (error) return new Map();
+
+  return new Map(
+    (data ?? []).map((row) => [
+      row.id,
+      (row.address as Localized | null) ?? {},
+    ]),
+  );
 }
 
 export type CurrencyGroup = {
