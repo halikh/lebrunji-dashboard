@@ -39,7 +39,7 @@ export function ReopenDialog({
   const reopen = useReopenOrder();
   const others = statuses.filter((status) => status.slug !== from.slug);
   const [to, setTo] = useState<OrderStatusSlug>(
-    from.slug === "cancelled" ? "confirmed" : "toCustomer",
+    from.slug === "cancelled" ? "confirmed" : "driverSent",
   );
   const target = others.find((status) => status.slug === to);
 

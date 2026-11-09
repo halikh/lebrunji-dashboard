@@ -289,9 +289,6 @@ export function dispatchMessage(
       when: ltr(formatDateTime(order.placedAt, clock24h)),
     }),
   );
-  // Their reply is what moves the order to At the store and then on the way:
-  // the customer sees nothing else of the trip.
-  lines.push(say("dispatch.tellUs"));
 
   // What every shop is paid, added up, for what is left with the driver.
   let paidShops = 0;

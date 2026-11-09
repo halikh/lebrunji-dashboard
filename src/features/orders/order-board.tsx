@@ -20,25 +20,18 @@ import { useMoney } from "@/features/reference/use-currencies";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
 
-import {
-  isWaitingOnDriver,
-  placesLine,
-  type Order,
-  type OrderStatus,
-} from "./api/orders";
+import { placesLine, type Order, type OrderStatus } from "./api/orders";
 import { OrderAge, urgencyOf } from "./order-age";
 import { nextStatus, orderStatus, useOrders } from "./use-orders";
 
 const EMPTY: Record<string, TranslationKey> = {
   ordered: "orders.boardEmptyOrdered",
   confirmed: "orders.boardEmptyConfirmed",
-  atStore: "orders.boardEmptyAtStore",
-  toCustomer: "orders.boardEmptyToCustomer",
+  driverSent: "orders.boardEmptyDriverSent",
 };
 
 /**
- * Every live step side by side — Placed, Confirmed, At the store, Heading to
- * the customer — the way
+ * Every live step side by side — Placed, Confirmed, On the way — the way
  * Deliveroo's Restaurant Hub and DoorDash's order manager lay out the day.
  *
  * Tabs hide work: an operator sitting on Placed does not see the confirmed
@@ -79,14 +72,20 @@ export function OrderBoard({
   const targets = useMemo(() => {
     if (!dragging) return new Set<string>();
     const at = columns.findIndex((one) => one.slug === dragging.from.slug);
-    // A driver has it: back to Placed would lift the lock (`0271`).
+    // A driver has it: going back would lift the lock, and `0271` refuses.
     const withDriver = dragging.order.stores.some(
-      (portion) => portion.rawStatus === "driverSent",
+      (portion) => portion.statusSlug === "driverSent",
     );
     return new Set(
       [columns[at - 1], columns[at + 1]]
         .filter((one): one is OrderStatus => one !== undefined)
-        .filter((one) => !(withDriver && one.slug === "ordered"))
+        .filter(
+          (one) =>
+            !(
+              withDriver &&
+              (one.slug === "ordered" || one.slug === "confirmed")
+            ),
+        )
         .map((one) => one.slug),
     );
   }, [columns, dragging]);
@@ -444,13 +443,6 @@ function CardFace({
             </Badge>
           )}
         </span>
-        {isWaitingOnDriver(order) && (
-          <span className="truncate text-[12.5px] font-medium text-status-to-customer-ink">
-            {order.driverName
-              ? t("orders.withDriver", { name: order.driverName })
-              : t("orders.withADriver")}
-          </span>
-        )}
       </button>
       {next && (
         <div className="px-3 pb-3">

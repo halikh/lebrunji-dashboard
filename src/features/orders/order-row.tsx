@@ -5,12 +5,7 @@ import { useEffect, useRef } from "react";
 import { Badge, Button, StatusBadge, cx } from "@/components/ui";
 import { t } from "@/i18n/translations";
 
-import {
-  isWaitingOnDriver,
-  placesLine,
-  type Order,
-  type OrderStatus,
-} from "./api/orders";
+import { placesLine, type Order, type OrderStatus } from "./api/orders";
 import { OrderAge, urgencyOf } from "./order-age";
 import { nextStatus, orderStatus } from "./use-orders";
 
@@ -104,13 +99,6 @@ export function OrderRow({
           {order.amendedAt && (
             <Badge tone="info" className="h-[18px] px-1.5 text-[11px]">
               {t("orders.amendedBadge")}
-            </Badge>
-          )}
-          {isWaitingOnDriver(order) && (
-            <Badge tone="info" className="h-[18px] px-1.5 text-[11px]">
-              {order.driverName
-                ? t("orders.withDriver", { name: order.driverName })
-                : t("orders.withADriver")}
             </Badge>
           )}
         </span>

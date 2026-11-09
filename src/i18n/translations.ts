@@ -395,8 +395,6 @@ const en = {
     tripOne: "1 pickup, then the customer",
     tripMany: "{count} pickups, then the customer",
     placed: "Ordered {when}",
-    tellUs:
-      "Message us when you reach the store, and again when you have the order.",
     // Kept for the cancellation message.
     customer: "Customer: {name}",
     phone: "Phone: {phone}",
@@ -953,10 +951,7 @@ const en = {
   orderStatus: {
     ordered: "Placed",
     confirmed: "Confirmed",
-    atStore: "At the store",
-    toCustomer: "Heading to the customer",
-    // The Reports funnel only: it counts by status, where this is the whole trip.
-    driverSent: "With a driver",
+    driverSent: "On the way",
     delivered: "Delivered",
     cancelled: "Cancelled",
   },
@@ -972,8 +967,7 @@ const en = {
     means: {
       ordered: "Back to the start. The shop has to confirm it again.",
       confirmed: "Accepted and being prepared.",
-      atStore: "The courier is at the store, collecting it.",
-      toCustomer: "The courier has it and is heading to the customer.",
+      driverSent: "With a driver, on the way to the customer.",
       delivered: "It reached the customer after all.",
       cancelled:
         "It never arrived. Any promotion it used goes back to the customer.",
@@ -1108,10 +1102,7 @@ const en = {
     boardEmptyOrdered:
       "No new orders. New ones land here and the dashboard chimes.",
     boardEmptyConfirmed: "Nothing confirmed is waiting for a driver.",
-    boardEmptyAtStore: "No courier is at a store.",
-    boardEmptyToCustomer: "No order is on the road.",
-    withDriver: "With {name}",
-    withADriver: "With a driver",
+    boardEmptyDriverSent: "No order is on the road.",
     boardFailed: "Could not load this column.",
     amendedBadge: "Changed",
     // Live orders are worked oldest first, like a ticket rail.
@@ -4517,7 +4508,6 @@ const ar: Translated<Strings> = {
     // number, and "عدد المحلات" is right for all of them.
     tripMany: "عدد المحلات: {count}، ثم التسليم للزبون",
     placed: "وقت الطلب: {when}",
-    tellUs: "راسلنا عند وصولك إلى المحل، ثم عند استلام الطلب.",
     customer: "الزبون: {name}",
     phone: "الهاتف: {phone}",
     map: "الموقع: {url}",

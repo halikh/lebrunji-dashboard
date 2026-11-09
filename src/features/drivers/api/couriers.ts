@@ -193,7 +193,7 @@ export async function fetchDispatches(
     .select(
       `id, dispatched_at,
        orders ( id, code, delivery_fee, total, currency_code,
-         order_stores ( store_id, step, stores ( exchange_rate ) ),
+         order_stores ( store_id, status, stores ( exchange_rate ) ),
          order_dispatches ( id, courier_id, dispatched_at, couriers ( name ) ) )`,
     )
     .eq("courier_id", courierId)
@@ -235,7 +235,7 @@ export async function fetchDispatches(
     // delivered is not delivered.
     const slug =
       asArray(order.order_stores)
-        .map((portion) => portion.step as string | null)
+        .map((portion) => portion.status as string | null)
         .find(Boolean) ?? "";
 
     return [
