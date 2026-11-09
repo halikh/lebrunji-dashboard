@@ -187,9 +187,10 @@ export function DishScreen({
       pending={pending}
       error={error}
       onCancel={() => leave()}
-      onSave={(draft) => {
+      onSave={(draft, patch) => {
         if (itemId) {
-          const { sectionId: target, ...fields } = draft;
+          const target = draft.sectionId;
+          const { sectionId: _section, ...fields } = patch;
           update.mutate(
             {
               id: itemId,

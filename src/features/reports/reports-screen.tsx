@@ -154,8 +154,22 @@ export function ReportsScreen() {
         ? previousOf(current.from, current.to)
         : previousRange(Number(days));
 
-  const stats = useStats(current.from, current.to);
-  const prior = useStats(before.from, before.to, compare !== "none");
+  const { format, currencies } = useMoney();
+  const wantedCurrency = params.get("currency");
+  const stats = useStats(current.from, current.to, true, wantedCurrency);
+  /**
+   * The currency every money figure here is in. One at a time (`0270`): minor
+   * units of two currencies do not add up to anything. Asked for in the URL,
+   * or the function's own choice, which is the window's busiest.
+   */
+  const code =
+    stats.data?.currency ?? wantedCurrency ?? currencies?.[0]?.code ?? "";
+  const prior = useStats(
+    before.from,
+    before.to,
+    compare !== "none" && code !== "",
+    code || null,
+  );
   /**
    * The comparison, only when it is the one asked for. A placeholder holds
    * the *previous* key's figures — last year's while switching to "previous
@@ -192,19 +206,16 @@ export function ReportsScreen() {
     return search ? `/earnings?${search}` : "/earnings";
   })();
 
-  const { format, currencies } = useMoney();
   const toast = useToasts();
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
 
-  /**
-   * The currency every figure here is denominated in.
-   *
-   * `place_order` refuses a basket that mixes currencies, but two *shops* may
-   * price differently and `api_v1_admin_stats` sums regardless. A real
-   * limitation, stated rather than hidden: until a merchant runs two
-   * currencies, the first active one is the honest label.
-   */
-  const code = currencies?.[0]?.code ?? "";
+  /** The window's currencies, and the one on screen even if it holds nothing. */
+  const currencyChoices = [
+    ...new Set([
+      ...(stats.data?.currencies ?? []).map((one) => one.code),
+      ...(code ? [code] : []),
+    ]),
+  ];
 
   /** The last day *in* the half-open range, which is the day before `to`. */
   const lastDay = new Date(current.to.getTime() - 1);
@@ -248,7 +259,7 @@ export function ReportsScreen() {
 
   /** One view parameter, deleted at its default so a plain link stays plain. */
   function setParam(
-    key: "compare" | "metric",
+    key: "compare" | "metric" | "currency",
     value: string,
     fallback: string,
   ) {
@@ -358,6 +369,13 @@ export function ReportsScreen() {
             }))}
             className="w-full sm:ms-auto sm:w-56"
           />
+          {currencyChoices.length > 1 && (
+            <Segmented
+              items={currencyChoices.map((one) => ({ key: one, label: one }))}
+              value={code}
+              onChange={(next) => setParam("currency", next, "")}
+            />
+          )}
         </div>
         <p className="text-[12.5px] text-ink-3">
           {compare === "none"

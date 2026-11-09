@@ -37,6 +37,7 @@ import {
   separatePrice,
   type Bundle,
   type BundleDraft,
+  type BundlePatch,
   type BundleItem,
 } from "../api/bundles";
 import type { Branch } from "../api/branches";
@@ -161,13 +162,14 @@ export function BundleEditor({
       startStoreId={fromStoreId ?? presetStoreId}
       cancelHref={listHref(fromStoreId)}
       pending={create.isPending || update.isPending}
-      onSave={(draft, changes, storePrice, storeChanges) => {
+      onSave={(draft, patch, changes, storePrice, storeChanges) => {
         const done = () => router.replace(listHref(fromStoreId));
         if (initial) {
           update.mutate(
             {
               id: initial.id,
               draft,
+              patch,
               branchPrices: changes,
               storePrice,
               branchStorePrices: storeChanges,
@@ -208,6 +210,8 @@ function Form({
   pending: boolean;
   onSave: (
     draft: BundleDraft,
+    /** Only what this form changed, for a bundle that exists. */
+    patch: BundlePatch,
     branchPrices: Record<string, number | null>,
     /** On markup and moved; null removes it, absent leaves it (`0262`). */
     storePrice?: number | null,
@@ -221,7 +225,10 @@ function Form({
   const stores = useStores("");
   const now = useNow();
 
-  const start = {
+  // What the form opened with, held for as long as it is open: the list is
+  // re-read in the background, and a baseline that followed it would read a
+  // colleague's change as this form's own.
+  const [start] = useState(() => ({
     storeId: initial?.storeId ?? startStoreId ?? "",
     name: initial?.name ?? ({} as Localized),
     description: initial?.description ?? ({} as Localized),
@@ -231,7 +238,7 @@ function Form({
     isActive: initial?.isActive ?? true,
     startsAt: initial?.startsAt ?? null,
     endsAt: initial?.endsAt ?? null,
-  };
+  }));
 
   const [storeId, setStoreId] = useState(start.storeId);
   const [name, setName] = useState<Localized>(start.name);
@@ -255,10 +262,22 @@ function Form({
   const earnings = useShopEarnings(storeId || null);
   const markup = usesMarkup(earnings.data);
   const storePrices = useShopStorePrices(storeId || null, markup);
-  const savedStorePrice =
+  const loadedStorePrice =
     initial && initial.storeId === storeId
       ? (storePrices.data?.items.get(initial.id) ?? null)
       : null;
+  // The first answer and no later one. Until it has come Save stays off: with
+  // nothing read, the boxes would say "no markup" and saving would write the
+  // app price over the shop's.
+  const [storePriceAtOpen, setStorePriceAtOpen] = useState<{
+    value: number | null;
+  } | null>(null);
+  if (storePriceAtOpen === null && storePrices.isSuccess) {
+    setStorePriceAtOpen({ value: loadedStorePrice });
+  }
+  const savedStorePrice = storePriceAtOpen?.value ?? null;
+  const storePriceUnknown =
+    markup && initial != null && storePriceAtOpen === null;
   // On markup, the shop's price plus ours (`markup-price`).
   const split = useMarkupPrice({
     active: markup,
@@ -432,6 +451,29 @@ function Form({
       if (before !== after) changes[branch.id] = after;
     }
 
+    const pairs = items.map((item) => ({
+      menuItemId: item.menuItemId,
+      quantity: item.quantity,
+    }));
+    // Only what this form changed, so saving a typo cannot put back a price
+    // or a switch somebody else has set. The two dates are one check.
+    const startPairs = start.items.map((item) => ({
+      menuItemId: item.menuItemId,
+      quantity: item.quantity,
+    }));
+    const patch = {
+      ...(changed(name, start.name) && { name }),
+      ...(changed(description, start.description) && { description }),
+      ...(changed(imageUrl, start.imageUrl) && { imageUrl }),
+      ...(changed(sellPrice, start.price) && { price: sellPrice! }),
+      ...(changed(isActive, start.isActive) && { isActive }),
+      ...(changed([startsAt, endsAt], [start.startsAt, start.endsAt]) && {
+        startsAt,
+        endsAt,
+      }),
+      ...(changed(pairs, startPairs) && { items: pairs }),
+    };
+
     onSave(
       {
         storeId,
@@ -442,11 +484,9 @@ function Form({
         isActive,
         startsAt,
         endsAt,
-        items: items.map((item) => ({
-          menuItemId: item.menuItemId,
-          quantity: item.quantity,
-        })),
+        items: pairs,
       },
+      patch,
       changes,
       split.storePriceMoved ? split.nextStorePrice : undefined,
       storeChanges,
@@ -502,7 +542,7 @@ function Form({
             variant="primary"
             onClick={submit}
             pending={pending}
-            disabled={!dirty}
+            disabled={!dirty || storePriceUnknown}
           >
             {initial ? t("bundles.save") : t("bundles.create")}
           </Button>

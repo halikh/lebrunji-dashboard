@@ -10,6 +10,7 @@ import {
   authCookieAttributes,
   clearedCookieAttributes,
   isExpiring,
+  refreshEndsSession,
 } from "./cookies";
 import { payloadOf } from "./jwt";
 
@@ -98,10 +99,14 @@ export function readRemember(cookies: CookieWriter): boolean {
  * ## On rotation, and why a failed refresh signs you out
  *
  * Supabase rotates refresh tokens: using one invalidates it and issues another.
- * So a refresh that fails means the token was already spent or revoked, and
+ * So a refresh Auth refuses means the token was already spent or revoked, and
  * there is no recovering from it — holding on to the cookie would produce a
  * dashboard that fails every request while insisting it is signed in. Clearing
  * it and going to `/login` is the honest outcome.
+ *
+ * A refresh that merely did not happen — a rate limit, a timeout, Auth down —
+ * says nothing about the token, so the cookies stay and the next request tries
+ * again. Meanwhile an access token that has not actually expired still works.
  *
  * `write` is optional because a **server component cannot set cookies**. Called
  * from one, this still returns a working token; it simply cannot persist the
@@ -129,8 +134,13 @@ export async function currentAccessToken(
   });
 
   if (error || !data.session) {
-    if (options.write) clearSession(cookies, options.isSecure);
-    return { accessToken: null, expiresAt: null };
+    if (refreshEndsSession(error)) {
+      if (options.write) clearSession(cookies, options.isSecure);
+      return { accessToken: null, expiresAt: null };
+    }
+    return access && expiresAt !== null && expiresAt * 1000 > Date.now()
+      ? { accessToken: access, expiresAt }
+      : { accessToken: null, expiresAt: null };
   }
 
   const pair = toPair(data.session);

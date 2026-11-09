@@ -79,9 +79,14 @@ export function OrderBoard({
   const targets = useMemo(() => {
     if (!dragging) return new Set<string>();
     const at = columns.findIndex((one) => one.slug === dragging.from.slug);
+    // A driver has it: back to Placed would lift the lock (`0271`).
+    const withDriver = dragging.order.stores.some(
+      (portion) => portion.rawStatus === "driverSent",
+    );
     return new Set(
       [columns[at - 1], columns[at + 1]]
         .filter((one): one is OrderStatus => one !== undefined)
+        .filter((one) => !(withDriver && one.slug === "ordered"))
         .map((one) => one.slug),
     );
   }, [columns, dragging]);

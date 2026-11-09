@@ -326,6 +326,9 @@ export function OrdersScreen() {
           searchRef.current?.focus();
           break;
         case "Enter": {
+          // A focused control's Enter is that control's: without this the
+          // button never fired and the row under the cursor moved instead.
+          if (target?.closest("button, a, [role=button]")) break;
           const order = rows[active];
           if (order) {
             event.preventDefault();

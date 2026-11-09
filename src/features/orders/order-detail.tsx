@@ -333,12 +333,17 @@ function StoreLines({
                 )}
               </div>
               <Price
-                value={linePrice(
-                  line.unitPrice,
-                  line.optionsPrice,
-                  itemUnit(line),
-                  coming,
-                )}
+                // `linePrice` counts at least one; none coming costs nothing (`0269`).
+                value={
+                  gone
+                    ? 0
+                    : linePrice(
+                        line.unitPrice,
+                        line.optionsPrice,
+                        itemUnit(line),
+                        coming,
+                      )
+                }
                 code={currencyCode}
                 shopRate={shopRate}
                 align="end"

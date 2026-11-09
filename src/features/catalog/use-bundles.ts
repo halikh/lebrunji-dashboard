@@ -16,6 +16,7 @@ import {
   setBundleActive,
   setBundleOrder,
   updateBundle,
+  type BundlePatch,
   type Bundle,
   type BundleDraft,
 } from "./api/bundles";
@@ -119,13 +120,15 @@ export function useUpdateBundle() {
     mutationFn: async (input: {
       id: string;
       draft: BundleDraft;
+      /** Only what the form changed; the rest stays as it is on the row. */
+      patch: BundlePatch;
       branchPrices: BranchPriceChanges;
       /** Null removes it; absent leaves it alone. */
       storePrice?: number | null;
       /** Markup branches' own prices from the shop that moved. */
       branchStorePrices?: BranchPriceChanges;
     }) => {
-      await updateBundle(input.id, input.draft);
+      await updateBundle(input.id, input.patch);
       await writeBranchPrices(input.id, input.branchPrices);
       if (input.storePrice !== undefined) {
         await setItemStorePrice(input.id, null, input.storePrice);

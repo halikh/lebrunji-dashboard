@@ -174,26 +174,58 @@ export type ShopStorePrices = {
   options: Map<string, number>;
 };
 
+/** The server's own cap on one response (`max_rows`): read this much at a time. */
+const ROWS_AT_A_TIME = 1000;
+
+/** Reads page after page until one comes back short. */
+async function everyRow<Row>(
+  page: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+): Promise<{ data: Row[]; error: { message: string } | null }> {
+  const rows: Row[] = [];
+  for (;;) {
+    const { data, error } = await page(
+      rows.length,
+      rows.length + ROWS_AT_A_TIME - 1,
+    );
+    if (error) return { data: rows, error };
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < ROWS_AT_A_TIME) {
+      return { data: rows, error: null };
+    }
+  }
+}
+
 export async function fetchShopStorePrices(
   storeId: string,
 ): Promise<ShopStorePrices> {
   const client = getClient();
 
+  // Every row. A dish missing from this map reads as "no store price", and
+  // saving it would then write the app price over the shop's.
   const [items, options] = await Promise.all([
-    client
-      .from("item_store_prices")
-      .select("menu_item_id, store_price, menu_items!inner ( store_id )")
-      .is("branch_id", null)
-      .eq("menu_items.store_id", storeId)
-      .limit(PAGE.maxRows),
-    client
-      .from("option_store_prices")
-      .select(
-        "item_option_id, store_price, item_options!inner ( option_groups!inner ( store_id ) )",
-      )
-      .is("branch_id", null)
-      .eq("item_options.option_groups.store_id", storeId)
-      .limit(PAGE.maxRows),
+    everyRow((from, to) =>
+      client
+        .from("item_store_prices")
+        .select("menu_item_id, store_price, menu_items!inner ( store_id )")
+        .is("branch_id", null)
+        .eq("menu_items.store_id", storeId)
+        .order("menu_item_id")
+        .range(from, to),
+    ),
+    everyRow((from, to) =>
+      client
+        .from("option_store_prices")
+        .select(
+          "item_option_id, store_price, item_options!inner ( option_groups!inner ( store_id ) )",
+        )
+        .is("branch_id", null)
+        .eq("item_options.option_groups.store_id", storeId)
+        .order("item_option_id")
+        .range(from, to),
+    ),
   ]);
 
   const failure = [items, options].find((one) => one.error);

@@ -235,17 +235,35 @@ export async function createBundle(
   return id;
 }
 
+/** What an edit changed. A field left out is left as it is on the row. */
+export type BundlePatch = Partial<Omit<BundleDraft, "storeId">>;
+
 export async function updateBundle(
   id: string,
-  draft: BundleDraft,
+  patch: BundlePatch,
 ): Promise<void> {
-  const { error } = await getClient()
-    .from("menu_items")
-    .update({ ...toColumns(draft), is_active: draft.isActive })
-    .eq("id", id);
-  if (error) throw new Error(friendly(error.message));
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = titleLocalized(patch.name);
+  if (patch.description !== undefined) {
+    row.description = cleanLocalized(localizedOrNull(patch.description ?? {}));
+  }
+  if (patch.imageUrl !== undefined) {
+    row.image_url = patch.imageUrl?.trim() || null;
+  }
+  if (patch.price !== undefined) row.price = patch.price;
+  if (patch.isActive !== undefined) row.is_active = patch.isActive;
+  if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
+  if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;
 
-  await setBundleItems(id, draft.items);
+  if (Object.keys(row).length > 0) {
+    const { error } = await getClient()
+      .from("menu_items")
+      .update(row)
+      .eq("id", id);
+    if (error) throw new Error(friendly(error.message));
+  }
+
+  if (patch.items !== undefined) await setBundleItems(id, patch.items);
 }
 
 /** The switch in the row, on its own. */

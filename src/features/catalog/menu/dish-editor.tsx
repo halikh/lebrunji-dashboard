@@ -138,7 +138,8 @@ export function DishEditor({
   pending: boolean;
   /** A refusal from the server — what belongs to no field. */
   error: string | null;
-  onSave: (draft: DishDraft) => void;
+  /** `patch` is only what this form changed, for editing a dish that exists. */
+  onSave: (draft: DishDraft, patch: Partial<DishDraft>) => void;
   /** Absent when editing: "add another" only means something while adding. */
   onSaveAndAnother?: (draft: DishDraft) => void;
   onCancel: () => void;
@@ -167,11 +168,26 @@ export function DishEditor({
   const earnings = useShopEarnings(storeId);
   const markup = usesMarkup(earnings.data);
   const storePrices = useShopStorePrices(storeId, markup);
-  const savedStorePrice = itemId
+  const loadedStorePrice = itemId
     ? (storePrices.data?.items.get(itemId) ?? null)
     : null;
+  // The first answer and no later one, like `opened` below. Until it has come
+  // Save stays off: with nothing read, the boxes would say "no markup" and
+  // saving would write the app price over the shop's.
+  const [storePriceAtOpen, setStorePriceAtOpen] = useState<{
+    value: number | null;
+  } | null>(null);
+  if (storePriceAtOpen === null && storePrices.isSuccess) {
+    setStorePriceAtOpen({ value: loadedStorePrice });
+  }
+  const savedStorePrice = storePriceAtOpen?.value ?? null;
+  const storePriceUnknown =
+    markup && itemId !== null && storePriceAtOpen === null;
 
-  const opened = {
+  // What the form opened with, held for as long as it is open. The dish is
+  // re-read in the background, and a baseline that followed it would read a
+  // colleague's change as this form's own.
+  const [opened] = useState(() => ({
     section: sectionId,
     name: initial?.name ?? {},
     description: initial?.description ?? {},
@@ -186,7 +202,7 @@ export function DishEditor({
     sizeQuantity:
       initial?.sizeQuantity == null ? "" : String(initial.sizeQuantity),
     sizeUnit: (initial?.sizeUnit ?? "") as SizeUnit | "",
-  };
+  }));
 
   const [section, setSection] = useState(opened.section);
   const [name, setName] = useState<Localized>(opened.name);
@@ -328,6 +344,43 @@ export function DishEditor({
       sizeQuantity: sizeUnit === "" ? null : size,
       sizeUnit: sizeUnit === "" ? null : sizeUnit,
       ...(split.storePriceMoved && { storePrice: split.nextStorePrice }),
+    };
+  }
+
+  /**
+   * Only what this form changed since it opened, so saving a typo cannot put
+   * back a price or a switch somebody else has set in the meantime. A unit's
+   * three fields and a size's two are checked and written together, as the
+   * database requires (`0095`, `menu_items_size_whole`).
+   */
+  function patchOf(draft: DishDraft): Partial<DishDraft> {
+    const unit = changed(
+      [priceUnit, unitQuantity, unitStep],
+      [opened.priceUnit, opened.unitQuantity, opened.unitStep],
+    );
+    const size = changed(
+      [sizeQuantity, sizeUnit],
+      [opened.sizeQuantity, opened.sizeUnit],
+    );
+    return {
+      ...(changed(name, opened.name) && { name: draft.name }),
+      ...(changed(description, opened.description) && {
+        description: draft.description,
+      }),
+      ...(changed(sellPrice, opened.price) && { price: draft.price }),
+      ...(changed(isActive, opened.isActive) && { isActive: draft.isActive }),
+      ...(changed(imageUrl, opened.imageUrl) && { imageUrl: draft.imageUrl }),
+      ...(changed(tagIds, opened.tagIds) && { tagIds: draft.tagIds }),
+      ...(unit && {
+        priceUnit: draft.priceUnit,
+        unitQuantity: draft.unitQuantity,
+        unitStep: draft.unitStep,
+      }),
+      ...(size && {
+        sizeQuantity: draft.sizeQuantity,
+        sizeUnit: draft.sizeUnit,
+      }),
+      ...(draft.storePrice !== undefined && { storePrice: draft.storePrice }),
     };
   }
 
@@ -810,10 +863,10 @@ export function DishEditor({
         <Button
           variant="primary"
           pending={pending}
-          disabled={!dirty}
+          disabled={!dirty || storePriceUnknown}
           onClick={() => {
             const draft = build();
-            if (draft) onSave(draft);
+            if (draft) onSave(draft, patchOf(draft));
           }}
         >
           {t("menu.save")}

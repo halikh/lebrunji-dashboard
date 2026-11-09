@@ -107,6 +107,23 @@ export function clearedCookieAttributes(isSecure: boolean): CookieAttributes {
  * A missing one counts as expired: a token whose lifetime is unknown cannot be
  * assumed good.
  */
+/**
+ * Whether a failed refresh means the session is over.
+ *
+ * Only Auth saying this token is no good does: a 4xx, or an answer with no
+ * session. A rate limit (429), a timeout (408), a 5xx or no answer at all says
+ * nothing about the token, and clearing the cookies over one signs out somebody
+ * whose session is fine.
+ */
+export function refreshEndsSession(
+  error: { status?: number } | null | undefined,
+): boolean {
+  if (!error) return true;
+  const status = error.status;
+  if (typeof status !== "number") return false;
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
 export function isExpiring(
   expiresAt: number | null | undefined,
   now = Date.now(),

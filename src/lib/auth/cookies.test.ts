@@ -6,6 +6,7 @@ import {
   authCookieAttributes,
   clearedCookieAttributes,
   isExpiring,
+  refreshEndsSession,
 } from "./cookies";
 
 /**
@@ -102,5 +103,20 @@ describe("isExpiring", () => {
     // mistake is a failed query the operator sees.
     expect(isExpiring(null, now)).toBe(true);
     expect(isExpiring(undefined, now)).toBe(true);
+  });
+});
+
+describe("refreshEndsSession", () => {
+  it("ends the session when Auth refuses the token", () => {
+    expect(refreshEndsSession({ status: 400 })).toBe(true);
+    expect(refreshEndsSession({ status: 403 })).toBe(true);
+    expect(refreshEndsSession(null)).toBe(true);
+  });
+
+  it("keeps it when the refresh simply did not happen", () => {
+    expect(refreshEndsSession({ status: 429 })).toBe(false);
+    expect(refreshEndsSession({ status: 408 })).toBe(false);
+    expect(refreshEndsSession({ status: 503 })).toBe(false);
+    expect(refreshEndsSession({})).toBe(false);
   });
 });

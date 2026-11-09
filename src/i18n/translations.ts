@@ -1076,6 +1076,8 @@ const en = {
     movedElsewhere:
       "This order was moved by someone else. The screen now shows where it is.",
     wasCancelled: "This order was cancelled. Nothing was moved.",
+    driverHoldsOrder:
+      "A driver has this order, so it can't go back. Reassign it or cancel it instead.",
 
     // The order's own page.
     changedAt: "Changed {when}",

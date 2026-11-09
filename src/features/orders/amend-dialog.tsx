@@ -606,12 +606,17 @@ function AmendLine({
           )}
         </div>
         <Price
-          value={linePrice(
-            line.unitPrice,
-            line.optionsPrice,
-            itemUnit(line),
-            count,
-          )}
+          // `linePrice` counts at least one; none coming costs nothing (`0269`).
+          value={
+            count > 0
+              ? linePrice(
+                  line.unitPrice,
+                  line.optionsPrice,
+                  itemUnit(line),
+                  count,
+                )
+              : 0
+          }
           code={currencyCode}
           shopRate={shopRate}
           align="end"

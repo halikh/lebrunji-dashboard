@@ -68,6 +68,9 @@ function messageFor(
         : t("orders.movedElsewhere");
     case "CANCL":
       return t("orders.wasCancelled");
+    // `0271`: going back would lift the lock while a driver still has it.
+    case "DRIVR":
+      return t("orders.driverHoldsOrder");
     // `api_v1_reopen_order` (0259): the order is back on the path already —
     // somebody reopened it first, or it was never finished.
     case "UNFIN":
