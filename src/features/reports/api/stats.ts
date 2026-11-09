@@ -39,6 +39,11 @@ export type Stats = {
   /** The zone the day and hour buckets were cut in. */
   timezone: string;
 
+  /** The currency every money figure here is in (`0270`). Null with no orders. */
+  currency: string | null;
+  /** Every currency the window holds orders in, the busiest first. */
+  currencies: { code: string; orders: number; revenue: number }[];
+
   totals: {
     revenue: number;
     orders: number;
@@ -96,10 +101,16 @@ export type Stats = {
  * double-count it in the comparison against the previous period, which is the
  * one place a single order can visibly change a percentage.
  */
-export async function fetchStats(from: Date, to: Date): Promise<Stats> {
+export async function fetchStats(
+  from: Date,
+  to: Date,
+  /** Null: whichever currency most of the window's orders are in. */
+  currency: string | null = null,
+): Promise<Stats> {
   const { data, error } = await getClient().rpc("api_v1_admin_stats", {
     p_from: from.toISOString(),
     p_to: to.toISOString(),
+    p_currency_code: currency ?? undefined,
   });
 
   if (error) throw new Error(`Could not read the figures: ${error.message}`);

@@ -14,7 +14,8 @@ import { fetchStats } from "./api/stats";
 
 export const statsKeys = {
   all: ["stats"] as const,
-  range: (from: string, to: string) => ["stats", from, to] as const,
+  range: (from: string, to: string, currency: string | null) =>
+    ["stats", from, to, currency] as const,
 };
 
 /**
@@ -152,11 +153,16 @@ export function yearBefore(from: Date, to: Date) {
  * `enabled: false` when there is nothing to compare with — "No comparison"
  * should not cost a second aggregate over the database.
  */
-export function useStats(from: Date, to: Date, enabled = true) {
+export function useStats(
+  from: Date,
+  to: Date,
+  enabled = true,
+  currency: string | null = null,
+) {
   return useQuery({
     enabled,
-    queryKey: statsKeys.range(from.toISOString(), to.toISOString()),
-    queryFn: () => fetchStats(from, to),
+    queryKey: statsKeys.range(from.toISOString(), to.toISOString(), currency),
+    queryFn: () => fetchStats(from, to, currency),
     // Aggregates over a window that mostly does not move. A minute of staleness
     // on a revenue figure is not the same kind of wrong as a minute of
     // staleness on the live queue.
