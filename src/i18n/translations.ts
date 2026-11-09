@@ -395,6 +395,8 @@ const en = {
     tripOne: "1 pickup, then the customer",
     tripMany: "{count} pickups, then the customer",
     placed: "Ordered {when}",
+    tellUs:
+      "Message us when you reach the store, and again when you have the order.",
     // Kept for the cancellation message.
     customer: "Customer: {name}",
     phone: "Phone: {phone}",
@@ -887,6 +889,12 @@ const en = {
       "Opening and closing at the same hour means orders are taken around the clock.",
     customerAppMissing:
       "This database does not have the customer-app settings yet (migration 0178), so there is nothing to set here.",
+    latestTitle: "Newest version in the stores",
+    latestBlurb:
+      "Customers on an older version are invited to update, once for each release, and can choose Not now. Enter a version only after it is live in that store.",
+    latestVersionIos: "Newest iPhone version",
+    latestVersionAndroid: "Newest Android version",
+    latestVersionHint: "Like 1.4.0. Empty means no invitation.",
     versionsTitle: "Oldest version still allowed",
     versionsBlurb:
       "Customers on an older version are stopped at an “Update the app” screen and cannot order until they update.",
@@ -945,7 +953,10 @@ const en = {
   orderStatus: {
     ordered: "Placed",
     confirmed: "Confirmed",
-    driverSent: "On the way",
+    atStore: "At the store",
+    toCustomer: "Heading to the customer",
+    // The Reports funnel only: it counts by status, where this is the whole trip.
+    driverSent: "With a driver",
     delivered: "Delivered",
     cancelled: "Cancelled",
   },
@@ -961,7 +972,8 @@ const en = {
     means: {
       ordered: "Back to the start. The shop has to confirm it again.",
       confirmed: "Accepted and being prepared.",
-      driverSent: "With a driver, on the way to the customer.",
+      atStore: "The courier is at the store, collecting it.",
+      toCustomer: "The courier has it and is heading to the customer.",
       delivered: "It reached the customer after all.",
       cancelled:
         "It never arrived. Any promotion it used goes back to the customer.",
@@ -1094,7 +1106,10 @@ const en = {
     boardEmptyOrdered:
       "No new orders. New ones land here and the dashboard chimes.",
     boardEmptyConfirmed: "Nothing confirmed is waiting for a driver.",
-    boardEmptyDriverSent: "No order is on the road.",
+    boardEmptyAtStore: "No courier is at a store.",
+    boardEmptyToCustomer: "No order is on the road.",
+    withDriver: "With {name}",
+    withADriver: "With a driver",
     boardFailed: "Could not load this column.",
     amendedBadge: "Changed",
     // Live orders are worked oldest first, like a ticket rail.
@@ -1852,7 +1867,8 @@ const en = {
     live: "Live",
     hidden: "Hidden",
     liveHint: "Customers see this tile on the home screen.",
-    hiddenHint: "The tile is gone from the app. Its shops are unaffected.",
+    hiddenHint:
+      "The tile is gone from the app, and so is any shop listed only under it. Shops also listed under a live category stay up.",
     featured: "Featured",
     featuredLabel: "Promotion",
     featuredHint: "Featured categories lead the home screen.",
@@ -1877,11 +1893,15 @@ const en = {
     stillHasShops:
       "{count} shop(s) are still in this category. Move them first, or they would have nowhere to belong.",
     showTitle: "Show {name} to customers?",
-    showBody: "The tile appears on the home screen straight away.",
+    showBody:
+      "The tile appears on the home screen straight away, and any shop it was hiding comes back.",
     showConfirm: "Show it",
     hideTitle: "Hide {name} from customers?",
     hideBody:
-      "The tile disappears from the home screen straight away. Its shops keep trading and can still be reached by search.",
+      "The tile disappears from the home screen straight away. No shop depends on it: every shop in it is also listed under a live category and stays up.",
+    // `hidesShops` (0266): the shops listed under this and no other live one.
+    hideBodyShops:
+      "{count} shop(s) are listed only here. They disappear from the app, stop taking orders and leave customers' baskets straight away. Showing the category brings the shops back, but not what was in those baskets.",
     hideConfirm: "Hide it",
     featureTitle: "Feature {name}?",
     featureBody:
@@ -4494,6 +4514,7 @@ const ar: Translated<Strings> = {
     // number, and "عدد المحلات" is right for all of them.
     tripMany: "عدد المحلات: {count}، ثم التسليم للزبون",
     placed: "وقت الطلب: {when}",
+    tellUs: "راسلنا عند وصولك إلى المحل، ثم عند استلام الطلب.",
     customer: "الزبون: {name}",
     phone: "الهاتف: {phone}",
     map: "الموقع: {url}",

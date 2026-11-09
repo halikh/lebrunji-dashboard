@@ -33,14 +33,19 @@ import { appSettingsKey } from "./use-clock";
  */
 const customerAppKey = [...appSettingsKey, "customer-app"] as const;
 
-type Draft = Record<keyof CustomerAppSettings, string>;
+type Draft = Record<
+  Exclude<keyof CustomerAppSettings, "supportsLatest">,
+  string
+>;
 
 const FIELDS = [
   "minVersionIos",
   "minVersionAndroid",
   "iosStoreUrl",
   "androidStoreUrl",
-] as const satisfies readonly (keyof CustomerAppSettings)[];
+  "latestVersionIos",
+  "latestVersionAndroid",
+] as const satisfies readonly (keyof Draft)[];
 
 function toDraft(saved: CustomerAppSettings): Draft {
   return {
@@ -48,17 +53,22 @@ function toDraft(saved: CustomerAppSettings): Draft {
     minVersionAndroid: saved.minVersionAndroid ?? "",
     iosStoreUrl: saved.iosStoreUrl ?? "",
     androidStoreUrl: saved.androidStoreUrl ?? "",
+    latestVersionIos: saved.latestVersionIos ?? "",
+    latestVersionAndroid: saved.latestVersionAndroid ?? "",
   };
 }
 
 /** Trimmed, and empty back to null — which is what "no minimum" is stored as. */
-function fromDraft(draft: Draft): CustomerAppSettings {
+function fromDraft(draft: Draft, supportsLatest: boolean): CustomerAppSettings {
   const value = (s: string) => (s.trim() === "" ? null : s.trim());
   return {
     minVersionIos: value(draft.minVersionIos),
     minVersionAndroid: value(draft.minVersionAndroid),
     iosStoreUrl: value(draft.iosStoreUrl),
     androidStoreUrl: value(draft.androidStoreUrl),
+    latestVersionIos: value(draft.latestVersionIos),
+    latestVersionAndroid: value(draft.latestVersionAndroid),
+    supportsLatest,
   };
 }
 
@@ -146,8 +156,16 @@ export function CustomerAppTab() {
   const androidVersionBad = !isValidAppVersion(draft.minVersionAndroid);
   const iosUrlBad = !isValidStoreUrl(draft.iosStoreUrl);
   const androidUrlBad = !isValidStoreUrl(draft.androidStoreUrl);
+  const iosLatestBad = !isValidAppVersion(draft.latestVersionIos);
+  const androidLatestBad = !isValidAppVersion(draft.latestVersionAndroid);
+  const supportsLatest = settings.data?.supportsLatest === true;
   const anyBad =
-    iosVersionBad || androidVersionBad || iosUrlBad || androidUrlBad;
+    iosVersionBad ||
+    androidVersionBad ||
+    iosUrlBad ||
+    androidUrlBad ||
+    iosLatestBad ||
+    androidLatestBad;
 
   /** The minimums this save would set or change (not clear). */
   const newMinimums = (["minVersionIos", "minVersionAndroid"] as const)
@@ -163,11 +181,17 @@ export function CustomerAppTab() {
   function submit() {
     if (!draft || anyBad) return;
     if (newMinimums.length > 0) setConfirming(true);
-    else save.mutate(fromDraft(draft));
+    else save.mutate(fromDraft(draft, supportsLatest));
   }
 
   /** The props a version `Input` shares, whichever store it is for. */
-  const versionProps = (key: "minVersionIos" | "minVersionAndroid") => ({
+  const versionProps = (
+    key:
+      | "minVersionIos"
+      | "minVersionAndroid"
+      | "latestVersionIos"
+      | "latestVersionAndroid",
+  ) => ({
     value: draft[key],
     onChange: (event: { target: { value: string } }) =>
       edit(key)(event.target.value),
@@ -215,6 +239,36 @@ export function CustomerAppTab() {
           </p>
         </div>
       </Section>
+
+      {supportsLatest ? (
+        <Section
+          title={t("general.latestTitle")}
+          description={t("general.latestBlurb")}
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label={t("general.latestVersionIos")}
+              hint={t("general.latestVersionHint")}
+              error={iosLatestBad ? t("general.minVersionInvalid") : undefined}
+            >
+              {(props) => (
+                <Input {...props} {...versionProps("latestVersionIos")} />
+              )}
+            </Field>
+            <Field
+              label={t("general.latestVersionAndroid")}
+              hint={t("general.latestVersionHint")}
+              error={
+                androidLatestBad ? t("general.minVersionInvalid") : undefined
+              }
+            >
+              {(props) => (
+                <Input {...props} {...versionProps("latestVersionAndroid")} />
+              )}
+            </Field>
+          </div>
+        </Section>
+      ) : null}
 
       <Section
         title={t("general.storeLinksTitle")}
@@ -278,7 +332,9 @@ export function CustomerAppTab() {
         confirmLabel={t("general.minVersionConfirm")}
         onConfirm={async () => {
           // The mutation toasts its own failure; the dialog just closes.
-          await save.mutateAsync(fromDraft(draft)).catch(() => undefined);
+          await save
+            .mutateAsync(fromDraft(draft, supportsLatest))
+            .catch(() => undefined);
         }}
       />
     </div>

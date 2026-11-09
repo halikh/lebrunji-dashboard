@@ -272,7 +272,7 @@ export function CategoriesScreen() {
                           }
                           labelOn={t("categories.live")}
                           labelOff={t("categories.hidden")}
-                          params={{ name }}
+                          params={{ name, count: row.hidesShops }}
                           whenTurningOn={{
                             titleKey: "categories.showTitle",
                             bodyKey: "categories.showBody",
@@ -280,7 +280,10 @@ export function CategoriesScreen() {
                           }}
                           whenTurningOff={{
                             titleKey: "categories.hideTitle",
-                            bodyKey: "categories.hideBody",
+                            bodyKey:
+                              row.hidesShops > 0
+                                ? "categories.hideBodyShops"
+                                : "categories.hideBody",
                             confirmKey: "categories.hideConfirm",
                           }}
                         />

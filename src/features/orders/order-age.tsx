@@ -32,7 +32,8 @@ import { formatRelative } from "@/lib/time";
 const THRESHOLDS: Record<string, { warn: number; late: number }> = {
   ordered: { warn: 3, late: 6 },
   confirmed: { warn: 20, late: 35 },
-  driverSent: { warn: 45, late: 60 },
+  atStore: { warn: 35, late: 50 },
+  toCustomer: { warn: 45, late: 60 },
 };
 
 export type Urgency = "calm" | "warn" | "late";

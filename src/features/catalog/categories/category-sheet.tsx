@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import {
   Button,
+  ConfirmDialog,
   EmptyState,
   Field,
   Sheet,
@@ -139,6 +140,7 @@ function Form({
   // legacy row from before the constraint, which cannot be saved until it has
   // one.
   const [iconUrl, setIconUrl] = useState<string | null>(start.iconUrl);
+  const [confirmingHide, setConfirmingHide] = useState(false);
 
   const dirty = changed({ name, kindId, isActive, hasMenuNav, iconUrl }, start);
   useUnsavedChanges(dirty);
@@ -167,6 +169,16 @@ function Form({
     setErrors(found);
     if (found.name || found.kind || found.icon) return;
 
+    // Hiding takes shops with it and empties baskets (`0266`), so Save asks
+    // first, as the switch on the list does.
+    if (initial?.isActive && !isActive && initial.hidesShops > 0) {
+      setConfirmingHide(true);
+      return;
+    }
+    save();
+  }
+
+  function save() {
     const draft: CategoryDraft = {
       name,
       kindId,
@@ -263,6 +275,22 @@ function Form({
           disabled={pending}
         />
       </div>
+
+      {initial ? (
+        <ConfirmDialog
+          open={confirmingHide}
+          onOpenChange={setConfirmingHide}
+          title={t("categories.hideTitle", {
+            name: pickLocalized(initial.name),
+          })}
+          description={t("categories.hideBodyShops", {
+            count: initial.hidesShops,
+          })}
+          confirmLabel={t("categories.hideConfirm")}
+          tone="primary"
+          onConfirm={save}
+        />
+      ) : null}
 
       <div className="sticky -bottom-5 -mx-6 -mb-5 mt-auto flex items-center justify-end gap-2 border-t border-line bg-subtle px-6 py-3.5">
         <Button variant="secondary" onClick={onCancel} disabled={pending}>

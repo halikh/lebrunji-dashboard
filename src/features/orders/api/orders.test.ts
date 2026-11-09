@@ -18,8 +18,9 @@ import { OrderRefusal, orderRefusal } from "./refusal";
 const PATH: OrderStatus[] = [
   { slug: "ordered", name: "Placed", progress: 1 },
   { slug: "confirmed", name: "Confirmed", progress: 2 },
-  { slug: "driverSent", name: "On the way", progress: 3 },
-  { slug: "delivered", name: "Delivered", progress: 4 },
+  { slug: "atStore", name: "At the store", progress: 3 },
+  { slug: "toCustomer", name: "Heading to the customer", progress: 4 },
+  { slug: "delivered", name: "Delivered", progress: 5 },
   { slug: "cancelled", name: "Cancelled", progress: null },
 ];
 
@@ -31,7 +32,12 @@ describe("orderStatuses", () => {
 
 describe("liveStatusSlugs", () => {
   it("is everything that still needs somebody", () => {
-    expect(liveStatusSlugs()).toEqual(["ordered", "confirmed", "driverSent"]);
+    expect(liveStatusSlugs()).toEqual([
+      "ordered",
+      "confirmed",
+      "atStore",
+      "toCustomer",
+    ]);
   });
 
   it("excludes the end of the path and everything off it", () => {
@@ -61,7 +67,8 @@ describe("searchTerm", () => {
 describe("isUndoableMove", () => {
   it("offers undo on a move along the path", () => {
     expect(isUndoableMove("confirmed")).toBe(true);
-    expect(isUndoableMove("driverSent")).toBe(true);
+    expect(isUndoableMove("atStore")).toBe(true);
+    expect(isUndoableMove("toCustomer")).toBe(true);
   });
 
   it("never offers it onto delivered or cancelled", () => {
@@ -147,7 +154,7 @@ describe("roundToCash", () => {
 
 describe("withOrderMoved", () => {
   /** A portion at `slug`, carrying what `toOrder` would have read for it. */
-  const portion = (id: string, slug: string): OrderStore => ({
+  const portion = (id: string, slug: string, rawStatus = slug): OrderStore => ({
     id,
     storeId: `store-${id}`,
     storeName: id,
@@ -161,6 +168,7 @@ describe("withOrderMoved", () => {
     storeWhatsapp: null,
     statusSlug: slug,
     statusName: statusName(slug),
+    rawStatus,
     progress: PATH.find((s) => s.slug === slug)?.progress ?? null,
     subtotal: 0,
     earnings: null,
@@ -170,12 +178,33 @@ describe("withOrderMoved", () => {
   it("moves every live portion, carrying the target's name and position", () => {
     const moved = withOrderMoved(
       { stores: [portion("a", "ordered"), portion("b", "confirmed")] },
+      "atStore",
+    );
+    expect(moved.stores).toEqual([
+      portion("a", "atStore", "driverSent"),
+      portion("b", "atStore", "driverSent"),
+    ]);
+  });
+
+  it("locks an order handed to a driver without moving the customer on", () => {
+    const atStore = portion("c", "atStore", "driverSent");
+    const moved = withOrderMoved(
+      { stores: [portion("a", "ordered"), portion("b", "confirmed"), atStore] },
       "driverSent",
     );
     expect(moved.stores).toEqual([
-      portion("a", "driverSent"),
-      portion("b", "driverSent"),
+      portion("a", "confirmed", "driverSent"),
+      portion("b", "confirmed", "driverSent"),
+      atStore,
     ]);
+  });
+
+  it("keeps the lock when a courier's step is undone", () => {
+    const moved = withOrderMoved(
+      { stores: [portion("a", "atStore", "driverSent")] },
+      "confirmed",
+    );
+    expect(moved.stores).toEqual([portion("a", "confirmed", "driverSent")]);
   });
 
   it("leaves delivered and cancelled portions where they are, as the function does", () => {

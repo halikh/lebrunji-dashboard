@@ -3,16 +3,24 @@
  *
  * ## Hardcoded, on purpose
  *
- * The path is fixed: `order_stores.status` is a `text` column constrained to
- * exactly the five slugs below, and there is no `order_statuses` table any
- * more for a step to be added to. So the list, its order and each step's
- * position on the path live here, once, and every screen reads them from this
- * module rather than from the database. The names are chrome, not content —
- * they go through `t()` like every other string the dashboard ships.
+ * The path is fixed, and there is no `order_statuses` table any more for a step
+ * to be added to. So the list, its order and each step's position on the path
+ * live here, once, and every screen reads them from this module rather than
+ * from the database. The names are chrome, not content — they go through `t()`
+ * like every other string the dashboard ships.
  *
  * Changing the path is therefore a migration in the app repo *and* an edit
  * here, in the same change. A slug the database accepts and this list does not
  * know would render colourless and fall outside every tab.
+ *
+ * ## Steps, not statuses
+ *
+ * The slugs below are `order_stores.step` (`0267`), generated from `status` and
+ * `courier_stage`. `status` stays `driverSent` for a courier's whole trip,
+ * because that is what older installed apps can read. So an order handed to a
+ * driver is `driverSent` underneath and still the step `confirmed` here, until
+ * somebody hears the courier has reached the store. `rawStatus` on a portion is
+ * what says it is locked.
  *
  * ## Why the colours are custom properties and not Tailwind classes
  *
@@ -37,7 +45,7 @@
  *
  * It is not: the advance button is still the only filled, full-weight control in
  * the row. What the status colour adds is *which* step you are about to take —
- * so "Confirm" is blue, "Send driver" is grape, "Delivered" is mint, and an
+ * so "Confirm" is blue, "Heading to the customer" is grape, "Delivered" is mint, and an
  * operator working quickly learns the colour of the action rather than reading
  * every button. Blue stays what it always was on every other screen.
  */
@@ -48,12 +56,18 @@ import { t } from "@/i18n/translations";
 export const ORDER_STATUS_SLUGS = [
   "ordered",
   "confirmed",
-  "driverSent",
+  "atStore",
+  "toCustomer",
   "delivered",
   "cancelled",
 ] as const;
 
 export type OrderStatusSlug = (typeof ORDER_STATUS_SLUGS)[number];
+
+/** The two steps a courier reports, which live in `courier_stage` (`0267`). */
+export function isCourierLeg(slug: string | null): boolean {
+  return slug === "atStore" || slug === "toCustomer";
+}
 
 export type OrderStatus = {
   slug: OrderStatusSlug;
@@ -64,15 +78,15 @@ export type OrderStatus = {
 };
 
 /**
- * Position on the delivery path. Mirrors the database's own map, which
- * `api_v1_advance_order` and `api_v1_admin_stats` read. The end of the path is
- * as final as being off it — see `isUndoableMove`.
+ * Position on the delivery path. The end of the path is as final as being off
+ * it — see `isUndoableMove`.
  */
 const PROGRESS: Record<OrderStatusSlug, number | null> = {
   ordered: 1,
   confirmed: 2,
-  driverSent: 3,
-  delivered: 4,
+  atStore: 3,
+  toCustomer: 4,
+  delivered: 5,
   cancelled: null,
 };
 
@@ -85,8 +99,14 @@ export function statusProgress(slug: string): number | null {
   return isOrderStatusSlug(slug) ? PROGRESS[slug] : null;
 }
 
-/** A status's display name. An unknown slug shows as itself, not as nothing. */
+/**
+ * A status's display name. An unknown slug shows as itself, not as nothing.
+ *
+ * `driverSent` is off the list and still named: the Reports funnel counts by
+ * `status`, where it means anything with a driver.
+ */
 export function statusName(slug: string): string {
+  if (slug === "driverSent") return t("orderStatus.driverSent");
   return isOrderStatusSlug(slug) ? t(`orderStatus.${slug}`) : slug;
 }
 
@@ -117,7 +137,7 @@ export type StatusTone = {
   wash: string;
 };
 
-/** `driverSent` in the database, `driver-sent` in CSS. */
+/** `toCustomer` in the database, `to-customer` in CSS. */
 function tokenName(slug: string): string {
   return slug.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 }
@@ -126,7 +146,10 @@ export function statusTone(slug: string): StatusTone {
   // A slug outside the list falls back to `unknown` rather than rendering
   // colourless — the database constraint should make that impossible, but a
   // blank dot would hide it if it ever were not.
-  const name = isOrderStatusSlug(slug) ? tokenName(slug) : "unknown";
+  const name =
+    isOrderStatusSlug(slug) || slug === "driverSent"
+      ? tokenName(slug)
+      : "unknown";
 
   return {
     dot: `var(--color-status-${name})`,
@@ -143,7 +166,7 @@ export function statusTone(slug: string): StatusTone {
  * Not "is it off the path". `api_v1_advance_order` never moves a portion off
  * `delivered` or `cancelled` — it skips them and reports nothing moved — so an
  * undo offered after either would do nothing, and an undo that does not undo
- * is worse than none. Delivered is on the path (`progress` 4) and is exactly
+ * is worse than none. Delivered is on the path and is exactly
  * as final as cancelled, which is why this reads the slug rather than
  * `progress`: testing `progress !== null` offered Undo on Delivered.
  */

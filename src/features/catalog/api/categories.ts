@@ -78,6 +78,12 @@ export type Category = {
    * number, or the label is worse than nothing.
    */
   usedBy: number;
+  /**
+   * How many switched-on shops are listed under this category and no other
+   * live one: what hiding it takes off the app (`0266`). Not `usedBy`, which
+   * counts main categories for the archive refusal.
+   */
+  hidesShops: number;
 };
 
 // `stores ( count )` is an aggregate embed — one row per category carrying how
@@ -143,6 +149,18 @@ export async function fetchCategories(
 
   if (error) throw new Error(`Could not read the categories: ${error.message}`);
 
+  // An error here is a database without `0266` yet: every count reads as zero
+  // and the confirmation falls back to its general sentence.
+  const { data: reach } = await getClient().rpc(
+    "api_v1_shops_only_in_category",
+  );
+  const hides = new Map(
+    ((reach ?? []) as { category_id: string; shops: number }[]).map((row) => [
+      row.category_id,
+      row.shops,
+    ]),
+  );
+
   return (data ?? []).map((row) => ({
     id: row.id as string,
     slug: row.slug as string,
@@ -153,6 +171,7 @@ export async function fetchCategories(
     sortOrder: row.sort_order as number,
     iconUrl: (row.icon_url as string | null) ?? null,
     usedBy: countOf(row.stores),
+    hidesShops: hides.get(row.id as string) ?? 0,
   }));
 }
 

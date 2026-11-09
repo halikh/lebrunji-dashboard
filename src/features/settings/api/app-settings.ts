@@ -149,10 +149,17 @@ export type CustomerAppSettings = {
   minVersionAndroid: string | null;
   iosStoreUrl: string | null;
   androidStoreUrl: string | null;
+  /** The newest release live in each store (0268): older apps are invited to update. */
+  latestVersionIos: string | null;
+  latestVersionAndroid: string | null;
+  /** False before migration 0268, which hides those two fields. */
+  supportsLatest: boolean;
 };
 
 const CUSTOMER_APP_COLUMNS =
   "min_app_version_ios, min_app_version_android, ios_store_url, android_store_url";
+const LATEST_VERSION_COLUMNS =
+  "latest_app_version_ios, latest_app_version_android";
 
 /** The database's own check on both version columns (0178). */
 export const APP_VERSION_PATTERN = /^[0-9]+(\.[0-9]+){0,2}$/;
@@ -202,26 +209,40 @@ export function isMissingColumn(error: {
  * breaking the dashboard.
  */
 export async function fetchCustomerAppSettings(): Promise<CustomerAppSettings | null> {
-  const { data, error } = await getClient()
+  // With 0268's columns, then without: a dashboard ahead of that migration
+  // loses the two new fields and keeps the rest of the tab.
+  let supportsLatest = true;
+  let { data, error } = await getClient()
     .from("app_settings")
-    .select(CUSTOMER_APP_COLUMNS)
+    .select(`${CUSTOMER_APP_COLUMNS}, ${LATEST_VERSION_COLUMNS}`)
     .single();
+  if (error && isMissingColumn(error)) {
+    supportsLatest = false;
+    ({ data, error } = await getClient()
+      .from("app_settings")
+      .select(CUSTOMER_APP_COLUMNS)
+      .single());
+  }
 
   if (error) {
     if (isMissingColumn(error)) return null;
     throw new Error(`Could not read the settings: ${error.message}`);
   }
 
-  const row = data as Record<string, unknown>;
+  const row = data as unknown as Record<string, unknown>;
   return {
     minVersionIos: (row.min_app_version_ios as string | null) ?? null,
     minVersionAndroid: (row.min_app_version_android as string | null) ?? null,
     iosStoreUrl: (row.ios_store_url as string | null) ?? null,
     androidStoreUrl: (row.android_store_url as string | null) ?? null,
+    latestVersionIos: (row.latest_app_version_ios as string | null) ?? null,
+    latestVersionAndroid:
+      (row.latest_app_version_android as string | null) ?? null,
+    supportsLatest,
   };
 }
 
-/** Saves all four together — they are one form with one Save. */
+/** Saves them all together — they are one form with one Save. */
 export async function updateCustomerAppSettings(
   next: CustomerAppSettings,
 ): Promise<void> {
@@ -232,6 +253,12 @@ export async function updateCustomerAppSettings(
       min_app_version_android: next.minVersionAndroid,
       ios_store_url: next.iosStoreUrl,
       android_store_url: next.androidStoreUrl,
+      ...(next.supportsLatest
+        ? {
+            latest_app_version_ios: next.latestVersionIos,
+            latest_app_version_android: next.latestVersionAndroid,
+          }
+        : {}),
     })
     // The single row; see `updateAppSettings`.
     .eq("id", true);

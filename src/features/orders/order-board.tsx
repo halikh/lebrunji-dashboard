@@ -20,18 +20,25 @@ import { useMoney } from "@/features/reference/use-currencies";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { statusTone } from "@/lib/order-status";
 
-import { placesLine, type Order, type OrderStatus } from "./api/orders";
+import {
+  isWaitingOnDriver,
+  placesLine,
+  type Order,
+  type OrderStatus,
+} from "./api/orders";
 import { OrderAge, urgencyOf } from "./order-age";
 import { nextStatus, orderStatus, useOrders } from "./use-orders";
 
 const EMPTY: Record<string, TranslationKey> = {
   ordered: "orders.boardEmptyOrdered",
   confirmed: "orders.boardEmptyConfirmed",
-  driverSent: "orders.boardEmptyDriverSent",
+  atStore: "orders.boardEmptyAtStore",
+  toCustomer: "orders.boardEmptyToCustomer",
 };
 
 /**
- * Every live step side by side — Placed, Confirmed, On the way — the way
+ * Every live step side by side — Placed, Confirmed, At the store, Heading to
+ * the customer — the way
  * Deliveroo's Restaurant Hub and DoorDash's order manager lay out the day.
  *
  * Tabs hide work: an operator sitting on Placed does not see the confirmed
@@ -432,6 +439,13 @@ function CardFace({
             </Badge>
           )}
         </span>
+        {isWaitingOnDriver(order) && (
+          <span className="truncate text-[12.5px] font-medium text-status-to-customer-ink">
+            {order.driverName
+              ? t("orders.withDriver", { name: order.driverName })
+              : t("orders.withADriver")}
+          </span>
+        )}
       </button>
       {next && (
         <div className="px-3 pb-3">

@@ -117,14 +117,13 @@ export function DispatchDialog({
   /**
    * Already with a driver: every portion still in play is `driverSent`. Read
    * from the order, not the hand-overs — an Undo moves the order back without
-   * taking the hand-over away, and it is "on the way" that blocks an amend or
-   * a cancel.
+   * taking the hand-over away, and it is `driverSent` that blocks an amend.
    */
   const onTheWay =
-    order.stores.some((portion) => portion.statusSlug === "driverSent") &&
+    order.stores.some((portion) => portion.rawStatus === "driverSent") &&
     order.stores.every(
       (portion) =>
-        portion.statusSlug === "driverSent" ||
+        portion.rawStatus === "driverSent" ||
         isFinishedSlug(portion.statusSlug),
     );
 
@@ -288,10 +287,9 @@ export function DispatchDialog({
   function send() {
     if (!chosen) return;
     if (isHolder(chosen)) {
-      // The same person, but an Undo has moved the order back from "On the
-      // way". Recorded again as a reassignment, so it moves back to
-      // driverSent — left confirmed, it could be amended or cancelled
-      // behind the driver's back.
+      // The same person, but an Undo has taken the order back off them.
+      // Recorded again as a reassignment, so it moves back to driverSent —
+      // left confirmed, it could be amended behind the driver's back.
       if (!onTheWay) {
         record(chosen, true);
         return;
