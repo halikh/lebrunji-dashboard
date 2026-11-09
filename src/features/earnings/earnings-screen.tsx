@@ -370,6 +370,11 @@ function CurrencyTable({
                         {pickLocalized(row.branchName)}
                       </span>
                     )}
+                  {row.branchAddress && pickLocalized(row.branchAddress) && (
+                    <span className="truncate text-[12.5px] text-ink-3">
+                      {pickLocalized(row.branchAddress)}
+                    </span>
+                  )}
                 </span>
               </Td>
               <Td className="whitespace-nowrap text-ink-2">

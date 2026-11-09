@@ -8,6 +8,7 @@ const row = (over: Partial<EarningsRow>): EarningsRow => ({
   storeName: { en: "Grill House" },
   branchId: null,
   branchName: null,
+  branchAddress: null,
   model: "commission",
   currencyCode: "USD",
   orders: 1,
