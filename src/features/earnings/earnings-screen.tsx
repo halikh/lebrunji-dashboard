@@ -44,8 +44,9 @@ import { useEarningsReport } from "./use-earnings-report";
  * The range works as the Reports screen's does — a preset or two picked
  * dates, in the URL — so a link to "last month's earnings" stays one. One
  * table per currency, never one total across them: dollars and lira do not
- * add. Only orders placed since commission and markup existed have figures;
- * the page says so rather than showing older orders as earning nothing.
+ * add. A row is one shop's part of an order, so an order from two shops is
+ * counted once for each, and the column says "Shop orders". Orders from before
+ * commission and markup existed are here too (`0273`), at no rate.
  */
 
 const PRESETS = ["7", "30", "90", "365"] as const;

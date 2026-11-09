@@ -3421,11 +3421,12 @@ const en = {
     description:
       "What we earned from each shop and branch, and what drivers paid the shops at pickup.",
     currencyTitle: "In {code}",
-    currencySummary: "{earned} earned, {paid} paid to shops, {orders} orders",
+    currencySummary:
+      "{earned} earned, {paid} paid to shops, {orders} shop orders",
     colShop: "Shop",
     colBranch: "Branch",
     colModel: "Settled by",
-    colOrders: "Orders",
+    colOrders: "Shop orders",
     colSales: "Sales",
     colEarned: "Earned",
     colPaid: "Paid to shops",
@@ -3437,9 +3438,9 @@ const en = {
     failed: "Could not load the earnings.",
     emptyTitle: "Nothing earned in this period",
     emptyBody:
-      "Only orders placed since commission and markup were set up are counted. Set a shop’s rate on its Details tab.",
+      "No orders were placed in this period. Set a shop’s rate on its Details tab.",
     toShops: "Go to shops",
-    note: "Sales leave delivery out. Cancelled orders are not counted; one reopened is counted again.",
+    note: "Sales leave delivery out. An order from two shops counts once for each. Cancelled orders are not counted; one reopened is counted again.",
   },
 
   reports: {
