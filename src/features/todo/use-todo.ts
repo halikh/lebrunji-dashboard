@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import {
   fetchBranchesWithoutAddress,
+  fetchDriversToFix,
   fetchStoresWithoutCommission,
   fetchItemsWithoutImage,
   fetchItemsWithoutMarkup,
@@ -19,10 +20,11 @@ export const todoKeys = {
   addresses: ["todo", "addresses"] as const,
   commission: ["todo", "commission"] as const,
   markup: ["todo", "markup"] as const,
+  drivers: ["todo", "drivers"] as const,
 };
 
 /**
- * The six catalogue checklists, read together.
+ * The six catalogue checklists and the drivers' hours, read together.
  *
  * One cache entry per list. Refetched on every visit (`staleTime: 0`): this is the page
  * somebody comes back to after fixing three things, and a cached list still
@@ -59,7 +61,20 @@ export function useTodoLists() {
     queryFn: fetchItemsWithoutImage,
     staleTime: 0,
   });
-  return { hours, addresses, commission, markup, storeImages, itemImages };
+  const drivers = useQuery({
+    queryKey: todoKeys.drivers,
+    queryFn: fetchDriversToFix,
+    staleTime: 0,
+  });
+  return {
+    hours,
+    addresses,
+    commission,
+    markup,
+    storeImages,
+    itemImages,
+    drivers,
+  };
 }
 
 /** Where each kind of gap is fixed. */
@@ -86,4 +101,6 @@ export const todoHref = {
       : `/shops/${storeId}/items/${itemId}`,
   itemImage: (storeId: string, itemId: string) =>
     `/shops/${storeId}/items/${itemId}`,
+  /** The driver's page, where "Edit hours" is. */
+  driver: (id: string) => `/drivers/${id}`,
 };

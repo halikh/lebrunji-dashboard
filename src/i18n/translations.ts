@@ -101,7 +101,7 @@ const en = {
   todo: {
     title: "To do",
     blurb:
-      "What the catalogue is still missing. Each row opens the place where it is fixed.",
+      "What the catalogue and the drivers are still missing. Each row opens the place where it is fixed.",
     hoursTitle: "Shops without opening hours",
     // Urgent, and said so: no hours reads as open around the clock (`0170`),
     // so these shops take orders at hours nobody is there to cook them.
@@ -111,6 +111,17 @@ const en = {
     hoursBranches: "{count} of {total} branches have no hours: {names}",
     hoursDone: "Every shop has its opening hours.",
     setHours: "Set hours",
+    // 0280: a driver is offered only inside our ordering hours, so a week
+    // that runs past them says something that will not happen.
+    driversTitle: "Drivers whose hours don't fit ours",
+    driversBody:
+      "Drivers take orders only while we are open. Hours outside ours never count, so set their week inside our hours. A driver with no hours is never offered.",
+    driversDone: "Every driver's hours sit inside ours.",
+    driverNoHours: "No hours set",
+    driverNever: "All their hours are outside ours, so they are never offered",
+    driverDays: "Runs past our hours on {days}",
+    fixDriverHours: "Fix hours",
+    nextDriver: "fix the hours for {name}",
     addressTitle: "Branches without an address",
     addressBody:
       "Every branch needs one before launch: the app prints it under the shop's name.",
@@ -148,7 +159,7 @@ const en = {
     done: "Done",
     allDoneTitle: "Nothing left to do",
     allDoneBody:
-      "Every shop has its hours, every shop on commission its rate, every dish on markup its markup, every branch its address, and everything has a picture.",
+      "Every shop has its hours, every driver works inside ours, every shop on commission its rate, every dish on markup its markup, every branch its address, and everything has a picture.",
     // The line under the header: the whole job in one sentence, so the page
     // answers "how much is left" before anything is opened.
     remaining: "{count} things left to fix",
@@ -542,6 +553,11 @@ const en = {
     followRota: "Back to their hours",
     overrideOn: "Taking orders tonight, outside their hours.",
     overrideOff: "Not taking orders tonight, inside their hours.",
+    // The switch ends when our hours next turn (0280), and says when.
+    overrideOnUntil:
+      "Taking orders until {time}, whatever their hours say. Then back to their hours.",
+    overrideOffUntil:
+      "Not taking orders until {time}, whatever their hours say. Then back to their hours.",
     noWeek:
       "No working days set, so this driver is never offered for an order.",
     hoursTitle: "When they work",
@@ -671,6 +687,11 @@ const en = {
     nextShiftToday: "Starts today {time}",
     noHours: "No hours set",
     overruled: "Overruled tonight",
+    overruledUntil: "Overruled until {time}",
+    // A week with no minute inside our ordering hours: never offered (0280).
+    outsideOurHours: "Hours are outside ours",
+    // On a day in the hours grid that runs past our ordering hours (0280).
+    pastOurHours: "Past our hours ({open}–{close})",
     whatsapp: "Message on WhatsApp",
     shownCount: "{count} driver(s)",
     groupOn: "Taking orders ({count})",

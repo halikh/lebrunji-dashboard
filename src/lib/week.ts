@@ -117,6 +117,119 @@ function minutes(time: string): number | null {
   return hours * 60 + value;
 }
 
+/**
+ * Our own ordering hours (`app_settings`, `0256`): whole hours on the
+ * business clock. Closing at or before opening runs past midnight; equal is
+ * all day. The same reading as `ordering_open_at` and the Settings screen.
+ */
+export type OurHours = { openHour: number; closeHour: number };
+
+/** Whether the business clock at `now` is inside our hours. Pauses are not counted. */
+export function withinOurHours(
+  ours: OurHours,
+  now: Date = new Date(),
+): boolean {
+  const { openHour: open, closeHour: close } = ours;
+  if (open === close) return true;
+  const hour = toWallClock(now).hour;
+  if (open < close) return hour >= open && hour < close;
+  return hour >= open || hour < close;
+}
+
+const WEEK_MINUTES = 7 * 1440;
+
+/** A window laid on the week's minute line, `[start, end)`; end may pass the week. */
+function laidOut(day: DayWindow): { start: number; end: number } | null {
+  const opens = minutes(day.opensAt);
+  const closes = minutes(day.closesAt);
+  if (opens === null || closes === null) return null;
+  const start = day.dayOfWeek * 1440 + opens;
+  return {
+    start,
+    end: start + (closes > opens ? closes - opens : closes + 1440 - opens),
+  };
+}
+
+/** The parts of a laid-out window that fall inside our hours. */
+function overlapsOf(
+  window: { start: number; end: number },
+  ours: OurHours,
+): { start: number; end: number }[] {
+  const open = ours.openHour * 60;
+  const close = ours.closeHour * 60;
+  const length = close > open ? close - open : close + 1440 - open;
+  const pieces: { start: number; end: number }[] = [];
+  // Days -1 to 7: a window early on Sunday meets Saturday night's run, and a
+  // Saturday-night window meets the run past the week's end.
+  for (let d = -1; d <= 7; d++) {
+    const start = Math.max(window.start, d * 1440 + open);
+    const end = Math.min(window.end, d * 1440 + open + length);
+    if (end > start) pieces.push({ start, end });
+  }
+  return pieces;
+}
+
+function clockOf(minuteOfDay: number): string {
+  return `${String(Math.floor(minuteOfDay / 60)).padStart(2, "0")}:${String(
+    minuteOfDay % 60,
+  ).padStart(2, "0")}`;
+}
+
+/**
+ * A driver's week cut down to the part inside our hours — the hours they can
+ * actually take orders in. Nobody delivers for us while we are closed, so a
+ * shift of 16:00–02:00 against our 08:00–00:00 works 16:00–00:00.
+ *
+ * Read the result with `isOpenAt` / `nextChangeAt` like any week: a piece
+ * ending at midnight is written `…–00:00`, which those read as running to the
+ * end of the day. Open all day leaves the week as it is.
+ */
+export function clipToOurHours(week: DayWindow[], ours: OurHours): DayWindow[] {
+  if (ours.openHour === ours.closeHour) return week;
+  const out: DayWindow[] = [];
+  for (const day of week) {
+    const window = laidOut(day);
+    if (!window) continue;
+    for (const piece of overlapsOf(window, ours)) {
+      const start =
+        ((piece.start % WEEK_MINUTES) + WEEK_MINUTES) % WEEK_MINUTES;
+      out.push({
+        dayOfWeek: Math.floor(start / 1440),
+        opensAt: clockOf(start % 1440),
+        closesAt: clockOf((start + (piece.end - piece.start)) % 1440),
+      });
+    }
+  }
+  return out.sort(
+    (a, b) =>
+      a.dayOfWeek - b.dayOfWeek ||
+      (minutes(a.opensAt) ?? 0) - (minutes(b.opensAt) ?? 0),
+  );
+}
+
+/**
+ * The days (stored index, Sunday first) whose window runs outside our hours,
+ * in whole or in part — time a driver is down for and cannot work. Empty when
+ * every shift sits inside them, or when we are open all day.
+ */
+export function daysOutsideOurHours(
+  week: DayWindow[],
+  ours: OurHours,
+): number[] {
+  if (ours.openHour === ours.closeHour) return [];
+  const days = new Set<number>();
+  for (const day of week) {
+    const window = laidOut(day);
+    if (!window) continue;
+    const inside = overlapsOf(window, ours).reduce(
+      (sum, piece) => sum + piece.end - piece.start,
+      0,
+    );
+    if (inside < window.end - window.start) days.add(day.dayOfWeek);
+  }
+  return [...days].sort((a, b) => a - b);
+}
+
 /** One window of a day, without the day. */
 export type Shift = { opensAt: string; closesAt: string };
 

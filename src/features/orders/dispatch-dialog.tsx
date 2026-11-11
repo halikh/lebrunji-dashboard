@@ -25,7 +25,11 @@ import {
   cx,
 } from "@/components/ui";
 import { isTakingOrders, type Courier } from "@/features/drivers/api/couriers";
-import { useCouriers, useDispatchOrder } from "@/features/drivers/use-couriers";
+import {
+  useCouriers,
+  useDispatchOrder,
+  useOurHours,
+} from "@/features/drivers/use-couriers";
 import { useMoney } from "@/features/reference/use-currencies";
 import { useClock } from "@/features/settings/use-clock";
 import { t } from "@/i18n/translations";
@@ -152,15 +156,16 @@ export function DispatchDialog({
    * filtered list instead would hide the box the moment a search matched
    * nothing.
    */
+  const ours = useOurHours();
   const all = useCouriers();
   const couriers = useCouriers(search);
 
   // On shift *now*: the rota, unless tonight's override says otherwise.
   const liveCount = (all.data ?? []).filter((one) =>
-    isTakingOrders(one),
+    isTakingOrders(one, ours),
   ).length;
   const filtering = liveCount > BROWSABLE;
-  const live = (couriers.data ?? []).filter((one) => isTakingOrders(one));
+  const live = (couriers.data ?? []).filter((one) => isTakingOrders(one, ours));
   const searching = search.trim().length >= SEARCH.minTerm;
   const anyOnBooks = (all.data?.length ?? 0) > 0;
 
