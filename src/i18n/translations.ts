@@ -1204,6 +1204,11 @@ const en = {
     duplicateSlug: "Another item in this shop already uses that name.",
     missingLanguage: "Every language needs a value before this can be saved.",
     priceNegative: "A price cannot be negative.",
+    // 0286: a lira price is entered as a step of 250 (PSTEP).
+    priceOffStep:
+      "{currency} prices go in steps of {step}. Use {low} or {high}.",
+    priceOffStepPlain:
+      "That price is not a step this currency is priced in. Lira prices go in steps of 250.",
     tooLong: "That is longer than the field allows.",
     // The refusals 0196 raises — aisles and sub-aisles.
     needsSubAisle:

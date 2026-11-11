@@ -254,9 +254,12 @@ describe("dispatchMessage", () => {
     const lines = text.split("\n");
 
     expect(text).toContain("*ادفع للمحل: $4.92* أو 437,500 ل.ل");
-    expect(lines.at(-2)).toBe("*اقبض من الزبون: $6.92* أو 617,500 ل.ل");
+    // 437,500 + 180,000 = 617,500, collected as 618,000: a total is said to
+    // the nearest 1,000 (`secondToCollect`, app 0286). What is left in hand
+    // after paying the shop is what is left: 180,500.
+    expect(lines.at(-2)).toBe("*اقبض من الزبون: $6.92* أو 618,000 ل.ل");
     expect(lines.at(-1)).toBe(
-      say("dispatch.cashLeft", { amount: "$2.00 أو 180,000 ل.ل" }),
+      say("dispatch.cashLeft", { amount: "$2.00 أو 180,500 ل.ل" }),
     );
   });
 

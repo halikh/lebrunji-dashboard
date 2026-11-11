@@ -1,4 +1,5 @@
 import { t } from "@/i18n/translations";
+import { priceStepRefusal } from "@/lib/price-step";
 import { PAGE } from "@/lib/limits";
 import { getClient } from "@/lib/supabase/client";
 
@@ -293,7 +294,7 @@ export async function setItemPrice(
           { onConflict: "branch_id,menu_item_id" },
         );
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(priceStepRefusal(error) ?? error.message);
 }
 
 export async function setOptionPrice(
@@ -320,7 +321,7 @@ export async function setOptionPrice(
           { onConflict: "branch_id,item_option_id" },
         );
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(priceStepRefusal(error) ?? error.message);
 }
 
 /**

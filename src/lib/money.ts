@@ -166,6 +166,34 @@ export function convertMoney(
 }
 
 /**
+ * What a total in a currency rounds to so it can be paid in cash, in minor
+ * units: 1,000 for the lira, nothing for the dollar — `currencies.cash_step`
+ * (`0173`). Held here rather than read from the row because the dashboard's
+ * currency query does not carry the column, and it is one figure that has not
+ * moved since the lira lost its coins.
+ */
+export const CASH_STEP: Readonly<Record<string, number>> = { LBP: 1000 };
+
+/**
+ * A price moved into another currency, by the one rule the app and the
+ * server use (`convert_price`, app `0286`): into lira to the nearest 1,000,
+ * into dollars to the nearest cent. Half away from zero, sign kept. The same
+ * currency is the price as set and is not touched.
+ */
+export function convertPrice(
+  minorUnits: number,
+  from: ConvertibleCurrency,
+  to: ConvertibleCurrency,
+  shopRate?: number | null,
+): number {
+  if (from.code === to.code) return minorUnits;
+  const converted = convertMoney(minorUnits, from, to, shopRate);
+  const step = CASH_STEP[to.code];
+  if (!step || step <= 1) return converted;
+  return Math.sign(converted) * Math.round(Math.abs(converted) / step) * step;
+}
+
+/**
  * How a shop's stored price changes when the shop changes currency.
  *
  * Two intents, and they differ by the exchange rate — which on this catalogue
@@ -176,7 +204,10 @@ export function convertMoney(
  *   fix for a currency picked wrongly at creation, where the operator typed
  *   `12` meaning twelve lira.
  * - **`convert`** — the dish must go on being worth what it was worth, so the
- *   rate applies too. `1200` becomes `1076400` (`ل.ل1,076,400`).
+ *   rate applies too, and the result is a price in the new currency by the
+ *   one rule (`convertPrice`, app `0286`/`0287`): `1200` becomes `1076000`
+ *   (1,076,400 to the nearest 1,000). `keep` is never rounded — its digits
+ *   are the ones the merchant said were right.
  *
  * Neither is safe as a default for the other, which is why the caller says.
  *
@@ -209,7 +240,7 @@ export function restatePrice(
   mode: "keep" | "convert",
 ): number {
   if (from.code === to.code) return minorUnits;
-  if (mode === "convert") return convertMoney(minorUnits, from, to);
+  if (mode === "convert") return convertPrice(minorUnits, from, to);
 
   return Math.round(minorUnits * 10 ** (to.decimalDigits - from.decimalDigits));
 }

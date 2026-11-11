@@ -3,6 +3,7 @@ import { getClient } from "@/lib/supabase/client";
 import { cleanLocalized, titleLocalized } from "@/lib/text-format";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { priceStepRefusal } from "@/lib/price-step";
 import { PAGE } from "@/lib/limits";
 import { localizedOrNull, type Localized } from "@/lib/validation";
 import {
@@ -459,7 +460,7 @@ export async function createMenuItem(
     .select("id")
     .single();
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 
   // A dish saved with no tags is the common case and costs nothing here.
   if (draft.tagIds.length > 0) {
@@ -519,7 +520,7 @@ export async function updateMenuItem(
       .from("menu_items")
       .update(row)
       .eq("id", id);
-    if (error) throw new Error(friendly(error.message));
+    if (error) throw new Error(friendly(error.message, error));
   }
 
   // After the row, deliberately. If the links fail, the dish is saved and its
@@ -578,7 +579,7 @@ export async function createMenuSection(
       sort_order: sortOrder,
     });
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 export async function updateMenuSection(
@@ -598,7 +599,7 @@ export async function updateMenuSection(
     })
     .eq("id", id);
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 /**
@@ -646,7 +647,7 @@ export async function archiveMenuSection(id: string): Promise<void> {
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 // ---------------------------------------------------------------------------
@@ -672,7 +673,7 @@ export async function moveMenuSection(
     .update({ parent_id: parentId, sort_order: sortOrder })
     .eq("id", id);
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 /**
@@ -697,7 +698,7 @@ export async function groupAisles(
     p_image_url: imageUrl,
   });
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
   return data as string;
 }
 
@@ -722,7 +723,7 @@ export async function gatherLooseProducts(
     p_image_url: imageUrl,
   });
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
   return data as string;
 }
 
@@ -863,7 +864,12 @@ export async function setSortOrder(
  * loosely on purpose: a renamed constraint should degrade to the raw message,
  * not to a wrong explanation.
  */
-function friendly(message: string): string {
+function friendly(
+  message: string,
+  error?: { code?: string | null; details?: string | null } | null,
+): string {
+  const step = priceStepRefusal(error);
+  if (step) return step;
   if (message.includes("slug_live_idx") || message.includes("store_id_slug")) {
     return t("dbError.duplicateSlug");
   }
@@ -1207,7 +1213,7 @@ export async function restoreMenuItem(id: string): Promise<void> {
     .update({ deleted_at: null })
     .eq("id", id);
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 /**
@@ -1224,7 +1230,7 @@ export async function restoreMenuSection(id: string): Promise<void> {
     .update({ deleted_at: null })
     .eq("id", id);
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 /**
