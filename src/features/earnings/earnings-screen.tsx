@@ -352,6 +352,7 @@ function CurrencyTable({
             <Th align="end">{t("earningsReport.colEarned")}</Th>
             <Th align="end">{t("earningsReport.colPaid")}</Th>
             <Th align="end">{t("earningsReport.colDelivery")}</Th>
+            <Th align="end">{t("earningsReport.colTotalEarned")}</Th>
           </Tr>
         </THead>
         <TBody>
@@ -387,15 +388,18 @@ function CurrencyTable({
                 {money(row.sales)}
               </Td>
               <Td className="text-end whitespace-nowrap tabular-nums">
-                <span className="inline-flex rounded-md bg-success-soft px-2 py-0.5 font-semibold text-success-ink ring-1 ring-success/25 ring-inset">
-                  {money(row.earning)}
-                </span>
+                {money(row.earning)}
               </Td>
               <Td className="text-end whitespace-nowrap tabular-nums">
                 {money(row.storeDue)}
               </Td>
               <Td className="text-end whitespace-nowrap tabular-nums">
                 {money(row.delivery)}
+              </Td>
+              <Td className="text-end whitespace-nowrap tabular-nums">
+                <span className="inline-flex rounded-md bg-success-soft px-2 py-0.5 font-semibold text-success-ink ring-1 ring-success/25 ring-inset">
+                  {money(row.earning + row.delivery)}
+                </span>
               </Td>
             </Tr>
           ))}
@@ -407,15 +411,18 @@ function CurrencyTable({
               {money(group.totals.sales)}
             </Td>
             <Td className="text-end whitespace-nowrap tabular-nums">
-              <span className="inline-flex rounded-md bg-success-ink px-2 py-0.5 font-bold text-white shadow-xs">
-                {money(group.totals.earning)}
-              </span>
+              {money(group.totals.earning)}
             </Td>
             <Td className="text-end whitespace-nowrap tabular-nums">
               {money(group.totals.storeDue)}
             </Td>
             <Td className="text-end whitespace-nowrap tabular-nums">
               {money(group.totals.delivery)}
+            </Td>
+            <Td className="text-end whitespace-nowrap tabular-nums">
+              <span className="inline-flex rounded-md bg-success-ink px-2 py-0.5 font-bold text-white shadow-xs">
+                {money(group.totals.earning + group.totals.delivery)}
+              </span>
             </Td>
           </Tr>
         </TBody>
