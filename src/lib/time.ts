@@ -227,12 +227,17 @@ export function fromWallClock(
  * every late night split across two bars.
  *
  * One number, in one place, because it is the sort of thing that would
- * otherwise be an `8` in five files. It is `app_settings.orders_open_hour`,
- * the same column `business_day_starts_at()` reads, so the shift this cuts
- * and the one the server's reports cut cannot drift apart; 8 until the
- * settings row arrives.
+ * otherwise be a `2` in five files. It is `app_settings.orders_close_hour`,
+ * the same column `business_day_starts_at()` reads (0275), so the shift this
+ * cuts and the one the server's reports cut cannot drift apart; 2, the
+ * column's default, until the settings row arrives.
+ *
+ * The **closing** hour, not the opening one: once we have closed, the day is
+ * over, and "Today" is the next one — empty until we open. No order is placed
+ * between closing and opening, so no order changes day by the choice; only
+ * what "now" belongs to does.
  */
-export const DEFAULT_BUSINESS_DAY_STARTS_AT = 8;
+export const DEFAULT_BUSINESS_DAY_STARTS_AT = 2;
 
 let dayStartsAt = DEFAULT_BUSINESS_DAY_STARTS_AT;
 
