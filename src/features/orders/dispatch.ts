@@ -264,6 +264,23 @@ export function secondOfTotal(
   return dishes + rest;
 }
 
+/**
+ * The total's second figure as something to collect: `secondOfTotal` rounded
+ * to the nearest cash step (1,000 for the lira), as the total itself is
+ * (`0173`, app `0286`). The lines it adds up can end in 250 or 500 — a shop's
+ * own lira price is a step of 250 — and nobody hands a driver 500 lira. The
+ * app rounds the figure under a total the same way, so the customer and the
+ * driver read one number.
+ */
+export function secondToCollect(
+  order: Order & { lines: OrderLine[] },
+  other: OtherPair | undefined,
+): number | null {
+  const total = secondOfTotal(order, other);
+  if (total === null || !other) return total;
+  return roundToCash(total, other.to.code);
+}
+
 /** Every line that is coming, by `secondOfLine`, added up: the subtotal's. */
 export function secondOfDishes(
   order: Order & { lines: OrderLine[] },
@@ -545,8 +562,9 @@ export function dispatchMessage(
     lines.push(bill);
 
     // The one number the driver acts on at the door, with the second figure
-    // the customer was shown under it — see `secondOfTotal`.
-    const totalOther = secondOfTotal(order, other);
+    // the customer was shown under it, to the nearest 1,000 — see
+    // `secondToCollect`.
+    const totalOther = secondToCollect(order, other);
     lines.push(
       `*${say("dispatch.collect", { amount: total })}*${orOther(totalOther)}`,
     );

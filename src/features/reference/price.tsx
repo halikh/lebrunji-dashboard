@@ -84,6 +84,10 @@ export function Price({
         ? convertTo(value, code, other, shopRate)
         : null;
 
+  // "≈": only the first figure is what was set or charged; the second is
+  // the other currency as a guide, as the app marks it (0286).
+  const approx = converted ? `≈ ${converted}` : null;
+
   return (
     <span
       className={cx(
@@ -94,9 +98,9 @@ export function Price({
       <span className={cx("tabular-nums", className)}>
         {format(value, code)}
       </span>
-      {converted && (
+      {approx && (
         <span className="text-[12px] font-normal text-ink-4 tabular-nums">
-          {converted}
+          {approx}
         </span>
       )}
     </span>

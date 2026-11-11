@@ -9,6 +9,7 @@ import {
   statusName,
   statusProgress,
 } from "@/lib/order-status";
+import { CASH_STEP } from "@/lib/money";
 import { startOfBusinessDay } from "@/lib/time";
 import { asSizeUnit, unitNumber, type SizeUnit } from "@/lib/units";
 
@@ -673,16 +674,8 @@ function lastDriverName(row: Record<string, unknown>): string | null {
   return (asRecord(latest?.couriers)?.name as string | undefined) ?? null;
 }
 
-/**
- * The smallest amount a currency is paid in, in minor units — `currencies.cash_step`.
- *
- * Only lira has one: nobody hands over a 500 note, so a lira total is rounded
- * to the nearest 1,000 (`0173`). Held here rather than read from the row
- * because the dashboard's currency query does not carry the column, and it is
- * one figure that has not moved since the lira lost its coins. A currency not
- * listed pays to the minor unit.
- */
-export const CASH_STEP: Readonly<Record<string, number>> = { LBP: 1000 };
+/** The cash step, from `@/lib/money` where `convertPrice` uses it too. */
+export { CASH_STEP };
 
 /**
  * A total as `round_to_cash` leaves it: to the currency's cash step, never

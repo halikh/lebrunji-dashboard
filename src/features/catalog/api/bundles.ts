@@ -4,6 +4,7 @@ import { getClient } from "@/lib/supabase/client";
 import { cleanLocalized, titleLocalized } from "@/lib/text-format";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { priceStepRefusal } from "@/lib/price-step";
 import { localizedOrNull, type Localized } from "@/lib/validation";
 
 /**
@@ -211,7 +212,7 @@ export async function createBundle(
     })
     .select("id")
     .single();
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 
   const id = data.id as string;
   try {
@@ -229,7 +230,7 @@ export async function createBundle(
       .from("menu_items")
       .update({ is_active: true })
       .eq("id", id);
-    if (liveError) throw new Error(friendly(liveError.message));
+    if (liveError) throw new Error(friendly(liveError.message, liveError));
   }
 
   return id;
@@ -260,7 +261,7 @@ export async function updateBundle(
       .from("menu_items")
       .update(row)
       .eq("id", id);
-    if (error) throw new Error(friendly(error.message));
+    if (error) throw new Error(friendly(error.message, error));
   }
 
   if (patch.items !== undefined) await setBundleItems(id, patch.items);
@@ -275,7 +276,7 @@ export async function setBundleActive(
     .from("menu_items")
     .update({ is_active: isActive })
     .eq("id", id);
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 /** The whole list in one call — `api_v1_set_bundle_items`, atomic. */
@@ -290,7 +291,7 @@ async function setBundleItems(
       quantity: item.quantity,
     })),
   });
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 /** Soft, like a dish: order lines reference it. */
@@ -376,7 +377,12 @@ function firstOf(value: unknown): Record<string, unknown> | null {
 }
 
 /** A constraint name, to a sentence. */
-export function friendly(message: string): string {
+export function friendly(
+  message: string,
+  error?: { code?: string | null; details?: string | null } | null,
+): string {
+  const step = priceStepRefusal(error);
+  if (step) return step;
   if (message.includes("menu_items_window_ordered")) {
     return t("bundles.windowBackwards");
   }

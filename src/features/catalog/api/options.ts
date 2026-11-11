@@ -1,4 +1,5 @@
 import { t } from "@/i18n/translations";
+import { priceStepRefusal } from "@/lib/price-step";
 import { PAGE } from "@/lib/limits";
 import { likeAny, searchTerm } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
@@ -337,7 +338,7 @@ export async function createOptionGroup(
     .select("id")
     .single();
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 
   const id = data.id as string;
   if (draft.itemIds.length > 0)
@@ -373,7 +374,7 @@ export async function offerGroupOn(
       { onConflict: "menu_item_id,option_group_id", ignoreDuplicates: true },
     );
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 /**
@@ -400,7 +401,7 @@ export async function stopOfferingGroupOn(
     .eq("option_group_id", groupId)
     .in("menu_item_id", itemIds);
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 export type OptionGroupPatch = Partial<Omit<OptionGroupDraft, "storeId">> & {
@@ -431,7 +432,7 @@ export async function updateOptionGroup(
     .from("option_groups")
     .update(row)
     .eq("id", id);
-  if (error) throw new Error(friendly(error.message, error.code));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 export async function createItemOption(
@@ -456,7 +457,7 @@ export async function createItemOption(
     // The id, for the store price's row — staff-only, so a row of its own.
     .select("id")
     .single();
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 
   if (storePrice != null) {
     await setOptionStorePrice(data.id as string, null, storePrice);
@@ -489,7 +490,7 @@ export async function updateItemOption(
       .from("item_options")
       .update(row)
       .eq("id", id);
-    if (error) throw new Error(friendly(error.message, error.code));
+    if (error) throw new Error(friendly(error.message, error));
   }
 
   // After the choice, as a dish's tags are: a failure here leaves the choice
@@ -547,8 +548,13 @@ export async function setDefaultOption(
  * screen (make the question optional, or add a choice), which the database's
  * sentence cannot name.
  */
-function friendly(message: string, code?: string | null): string {
-  if (code === "NOCHO") return t("options.lastRequiredChoice");
+function friendly(
+  message: string,
+  error?: { code?: string | null; details?: string | null } | null,
+): string {
+  const step = priceStepRefusal(error);
+  if (step) return step;
+  if (error?.code === "NOCHO") return t("options.lastRequiredChoice");
   if (message.includes("selection_range")) return t("options.rangeImpossible");
   if (message.includes("_locales")) return t("dbError.missingLanguage");
   if (message.includes("slug")) return t("dbError.duplicateSlug");
@@ -873,7 +879,7 @@ export async function setChoiceOfferedOn(
       .delete()
       .eq("menu_item_id", itemId)
       .eq("item_option_id", optionId);
-    if (error) throw new Error(friendly(error.message));
+    if (error) throw new Error(friendly(error.message, error));
     return;
   }
 
@@ -884,7 +890,7 @@ export async function setChoiceOfferedOn(
     // second.
     { onConflict: "menu_item_id,item_option_id", ignoreDuplicates: true },
   );
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 /**
@@ -908,7 +914,7 @@ export async function setItemDefaultOption(
     .eq("menu_item_id", itemId)
     .eq("option_group_id", groupId);
 
-  if (error) throw new Error(friendly(error.message));
+  if (error) throw new Error(friendly(error.message, error));
 }
 
 /**

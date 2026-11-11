@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import {
-  convertMoney,
+  convertPrice,
   formatMoney,
   type ConvertibleCurrency,
 } from "@/lib/money";
@@ -74,7 +74,9 @@ export function useMoney() {
       const to = find(toCode);
       if (!from || !to || from.code === to.code) return null;
       if (!(from.rate > 0) || !(to.rate > 0)) return null;
-      return formatMoney(convertMoney(minorUnits, from, to, shopRate), to);
+      // By the one rule the app and the server charge by (0286): a $4.49
+      // dish reads 400,000 ل.ل, never 399,610.
+      return formatMoney(convertPrice(minorUnits, from, to, shopRate), to);
     },
     [find],
   );

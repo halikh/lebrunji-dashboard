@@ -1,5 +1,6 @@
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
+import { priceStepRefusal } from "@/lib/price-step";
 import { PAGE } from "@/lib/limits";
 import { likeAny } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
@@ -536,7 +537,9 @@ async function clearDeletedAt(table: string, id: string): Promise<void> {
     .update({ deleted_at: null })
     .eq("id", id);
 
-  if (error) throw new Error(restoreRefusal(error.message));
+  if (error) {
+    throw new Error(priceStepRefusal(error) ?? restoreRefusal(error.message));
+  }
 }
 
 /**

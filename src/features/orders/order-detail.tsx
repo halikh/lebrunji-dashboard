@@ -42,7 +42,7 @@ import { AmendDialog } from "./amend-dialog";
 import {
   secondOfDishes,
   secondOfLine,
-  secondOfTotal,
+  secondToCollect,
   type OtherPair,
 } from "./dispatch";
 import {
@@ -240,7 +240,7 @@ export function OrderBody({
             value={order.total}
             code={order.currencyCode}
             shopRate={order.shopRate}
-            second={shown(secondOfTotal(order, pair))}
+            second={shown(secondToCollect(order, pair))}
             align="end"
             className="text-[18px] font-semibold text-ink"
           />

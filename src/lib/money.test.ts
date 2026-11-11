@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { convertMoney, restatePrice, type ConvertibleCurrency } from "./money";
+import {
+  convertMoney,
+  convertPrice,
+  restatePrice,
+  type ConvertibleCurrency,
+} from "./money";
 
 /**
  * Restating a shop's prices when its currency changes — migration 0097.
@@ -78,8 +83,10 @@ describe("restatePrice — keep", () => {
 });
 
 describe("restatePrice — convert", () => {
-  it("keeps what the dish is worth", () => {
-    expect(restatePrice(1200, USD, LBP, "convert")).toBe(1_076_400);
+  it("keeps what the dish is worth, as a price in the new currency", () => {
+    // 1,076,400 to the nearest 1,000, as api_v1_set_store_currency writes it
+    // since 0287 — a converted price follows the one rule.
+    expect(restatePrice(1200, USD, LBP, "convert")).toBe(1_076_000);
   });
 
   it("comes back to the same money", () => {
@@ -92,7 +99,13 @@ describe("restatePrice — convert", () => {
     // given a default: these two answers are ~89,700 apart.
     const kept = restatePrice(1200, USD, LBP, "keep");
     const converted = restatePrice(1200, USD, LBP, "convert");
-    expect(converted / kept).toBe(89_700);
+    expect(Math.round(converted / kept / 1000)).toBe(90);
+  });
+
+  it("never rounds a kept price", () => {
+    // keep is the digits the merchant said were right (0287).
+    expect(restatePrice(4505, LBP, LBP, "keep")).toBe(4505);
+    expect(restatePrice(45_050_000, USD, LBP, "keep")).toBe(450_500);
   });
 
   it("leaves a free choice free", () => {
@@ -130,6 +143,26 @@ describe("convertMoney — a shop's own rate", () => {
   it("leaves restatePrice alone, which previews a write at the platform's", () => {
     // `api_v1_set_store_currency` converts with `currencies.rate`; a preview at
     // the shop's would show digits the write is not going to produce.
-    expect(restatePrice(1200, USD, LBP, "convert")).toBe(1_076_400);
+    // 1,076,400 at 89,700, to the nearest 1,000 (0287).
+    expect(restatePrice(1200, USD, LBP, "convert")).toBe(1_076_000);
+  });
+});
+
+/**
+ * The one rule every converted price follows — the app's `convert_price`
+ * (0286): into lira to the nearest 1,000, into dollars to the nearest cent.
+ */
+describe("convertPrice", () => {
+  it("takes dollars to the nearest 1,000 lira", () => {
+    expect(convertPrice(449, USD, LBP)).toBe(403_000); // 402,753 at 89,700
+    expect(convertPrice(449, USD, LBP, 89_000)).toBe(400_000); // 399,610
+  });
+
+  it("takes lira to the nearest cent", () => {
+    expect(convertPrice(437_500, LBP, USD, 89_000)).toBe(492);
+  });
+
+  it("leaves a price in its own currency alone", () => {
+    expect(convertPrice(437_500, LBP, LBP)).toBe(437_500);
   });
 });
