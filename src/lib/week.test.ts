@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clipToOurHours,
+  daysOutsideOurHours,
   isOpenAt,
   isOpenNow,
   overlappingDay,
@@ -217,5 +219,57 @@ describe("overlappingDay", () => {
     expect(
       overlappingDay([day(6, "22:00", "03:00"), day(0, "02:00", "10:00")]),
     ).toBe(0);
+  });
+});
+
+describe("our hours", () => {
+  const ours = { openHour: 8, closeHour: 0 };
+
+  it("cuts a shift past our closing at midnight", () => {
+    expect(clipToOurHours([day(1, "16:00", "02:00")], ours)).toEqual([
+      day(1, "16:00", "00:00"),
+    ]);
+    expect(daysOutsideOurHours([day(1, "16:00", "02:00")], ours)).toEqual([1]);
+  });
+
+  it("leaves a shift inside our hours alone", () => {
+    const week = [day(1, "16:00", "23:00"), day(5, "08:00", "00:00")];
+    expect(clipToOurHours(week, ours)).toEqual(week);
+    expect(daysOutsideOurHours(week, ours)).toEqual([]);
+  });
+
+  it("drops a shift wholly outside our hours", () => {
+    expect(clipToOurHours([day(2, "01:00", "06:00")], ours)).toEqual([]);
+    expect(daysOutsideOurHours([day(2, "01:00", "06:00")], ours)).toEqual([2]);
+  });
+
+  it("starts a shift that opens before we do at our opening", () => {
+    expect(clipToOurHours([day(3, "06:00", "12:00")], ours)).toEqual([
+      day(3, "08:00", "12:00"),
+    ]);
+  });
+
+  it("keeps the part past midnight when we close past it", () => {
+    const late = { openHour: 8, closeHour: 2 };
+    expect(clipToOurHours([day(6, "20:00", "04:00")], late)).toEqual([
+      day(6, "20:00", "02:00"),
+    ]);
+    // A Saturday-night tail into Sunday counts against Saturday's run.
+    expect(clipToOurHours([day(0, "00:00", "03:00")], late)).toEqual([
+      day(0, "00:00", "02:00"),
+    ]);
+  });
+
+  it("changes nothing when we are open all day", () => {
+    const all = { openHour: 5, closeHour: 5 };
+    const week = [day(1, "01:00", "06:00")];
+    expect(clipToOurHours(week, all)).toEqual(week);
+    expect(daysOutsideOurHours(week, all)).toEqual([]);
+  });
+
+  it("reads a clipped week the same way isOpenAt reads any", () => {
+    const clipped = clipToOurHours([day(1, "16:00", "02:00")], ours);
+    expect(isOpenAt(clipped, 1, "23:59")).toBe(true);
+    expect(isOpenAt(clipped, 2, "00:30")).toBe(false);
   });
 });

@@ -33,7 +33,7 @@ import { formatPhone } from "@/lib/phone";
 
 import { isTakingOrders, type Courier } from "./api/couriers";
 import { AvailabilityControl, ShiftBadge, ShiftLine } from "./availability";
-import { useCouriers, useSetCourierActive } from "./use-couriers";
+import { useCouriers, useOurHours, useSetCourierActive } from "./use-couriers";
 
 type Scope = "all" | "active" | "off" | "inactive";
 
@@ -69,6 +69,7 @@ export function DriversScreen() {
 
   const [search, setSearch] = useState("");
   const couriers = useCouriers(search);
+  const ours = useOurHours();
 
   const requested = params.get("scope");
   const scope: Scope = SCOPES.some((one) => one.key === requested)
@@ -99,8 +100,8 @@ export function DriversScreen() {
   const onBooks = matching.filter((one) => one.isActive);
   const counts: Record<Scope, number> = {
     all: onBooks.length,
-    active: onBooks.filter((one) => isTakingOrders(one)).length,
-    off: onBooks.filter((one) => !isTakingOrders(one)).length,
+    active: onBooks.filter((one) => isTakingOrders(one, ours)).length,
+    off: onBooks.filter((one) => !isTakingOrders(one, ours)).length,
     inactive: matching.filter((one) => !one.isActive).length,
   };
   const rows =
@@ -109,7 +110,9 @@ export function DriversScreen() {
       : scope === "all"
         ? onBooks
         : onBooks.filter((one) =>
-            scope === "active" ? isTakingOrders(one) : !isTakingOrders(one),
+            scope === "active"
+              ? isTakingOrders(one, ours)
+              : !isTakingOrders(one, ours),
           );
 
   const empty = EMPTY[scope];
@@ -125,12 +128,12 @@ export function DriversScreen() {
           {
             key: "on",
             label: t("drivers.groupOn", { count: counts.active }),
-            rows: rows.filter((one) => isTakingOrders(one)),
+            rows: rows.filter((one) => isTakingOrders(one, ours)),
           },
           {
             key: "off",
             label: t("drivers.groupOff", { count: counts.off }),
-            rows: rows.filter((one) => !isTakingOrders(one)),
+            rows: rows.filter((one) => !isTakingOrders(one, ours)),
           },
         ].filter((group) => group.rows.length > 0)
       : [{ key: scope, label: null, rows }];

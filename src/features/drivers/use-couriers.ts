@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToasts } from "@/components/ui/toast";
 import { orderKeys } from "@/features/orders/use-orders";
+import { useAppSettings } from "@/features/settings/use-clock";
 import { t } from "@/i18n/translations";
+import type { OurHours } from "@/lib/week";
 
 import {
   setCourierActive,
@@ -16,6 +18,17 @@ import {
   updateCourier,
   type CourierDraft,
 } from "./api/couriers";
+
+/**
+ * Our ordering hours, which bound every driver's week: nobody is taking
+ * orders while we are closed (0280). Null until the settings have loaded.
+ */
+export function useOurHours(): OurHours | null {
+  const settings = useAppSettings();
+  return settings.data
+    ? { openHour: settings.data.openHour, closeHour: settings.data.closeHour }
+    : null;
+}
 
 export const courierKeys = {
   all: ["couriers"] as const,

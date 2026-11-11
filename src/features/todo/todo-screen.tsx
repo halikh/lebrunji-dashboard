@@ -9,6 +9,7 @@ import {
   Image as ImageIcon,
   MapPin,
   PartyPopper,
+  Truck,
   Tag,
   Percent,
   Store,
@@ -35,11 +36,14 @@ import type { Localized } from "@/lib/validation";
 
 import type {
   AddressTodo,
+  DriverTodo,
   HoursTodo,
   ItemTodo,
   StoreTodo,
   TodoList,
 } from "./api/todo";
+import { DAY_LABELS } from "@/features/drivers/hours-grid";
+
 import { todoHref, useTodoLists } from "./use-todo";
 
 /**
@@ -69,8 +73,15 @@ import { todoHref, useTodoLists } from "./use-todo";
  */
 export function TodoScreen() {
   const [search, setSearch] = useState("");
-  const { hours, addresses, commission, markup, storeImages, itemImages } =
-    useTodoLists();
+  const {
+    hours,
+    addresses,
+    commission,
+    markup,
+    storeImages,
+    itemImages,
+    drivers,
+  } = useTodoLists();
 
   // Filtered here rather than in the queries. These lists are what is *left*,
   // short by nature and already fully downloaded, so a browser-side filter
@@ -87,6 +98,10 @@ export function TodoScreen() {
         matches(term, row.storeName, ...row.branches.map((b) => b.name)),
     )
     .sort((a, b) => Number(b.storeActive) - Number(a.storeActive));
+  // Never offered first: they cannot be handed a single order.
+  const driverRows = (drivers.data?.rows ?? [])
+    .filter((row) => !searching || normalise(row.name).includes(term))
+    .sort((a, b) => Number(b.never) - Number(a.never));
   const addressRows = (addresses.data?.rows ?? [])
     .filter((row) => !searching || matches(term, row.storeName, row.branchName))
     .sort((a, b) => Number(b.storeActive) - Number(a.storeActive));
@@ -113,10 +128,20 @@ export function TodoScreen() {
   // menus, and that is how somebody sets about fixing them.
   const itemGroups = groupByStore(itemRows);
 
-  const all = [hours, addresses, commission, markup, storeImages, itemImages];
+  // Page order: `firstOpen` and the `current` flags below index into it.
+  const all = [
+    hours,
+    drivers,
+    addresses,
+    commission,
+    markup,
+    storeImages,
+    itemImages,
+  ];
   const loaded = all.every((query) => query.isSuccess);
   const total =
     (hours.data?.rows.length ?? 0) +
+    (drivers.data?.rows.length ?? 0) +
     (addresses.data?.rows.length ?? 0) +
     (commission.data?.rows.length ?? 0) +
     (markup.data?.rows.length ?? 0) +
@@ -139,6 +164,7 @@ export function TodoScreen() {
   const next = loaded
     ? nextStep({
         hours: hours.data?.rows ?? [],
+        drivers: drivers.data?.rows ?? [],
         addresses: addresses.data?.rows ?? [],
         commission: commission.data?.rows ?? [],
         markup: markup.data?.rows ?? [],
@@ -226,6 +252,31 @@ export function TodoScreen() {
             </TodoGroup>
 
             <TodoGroup
+              icon={<Truck />}
+              titleKey="todo.driversTitle"
+              bodyKey="todo.driversBody"
+              doneKey="todo.driversDone"
+              query={drivers}
+              count={driverRows.length}
+              searching={searching}
+              current={firstOpen === 1}
+            >
+              <ul className="divide-y divide-line">
+                {driverRows.map((row) => (
+                  <li key={row.id}>
+                    <TodoRow
+                      href={todoHref.driver(row.id)}
+                      title={row.name}
+                      hidden={false}
+                      detail={driverDetail(row)}
+                      actionKey="todo.fixDriverHours"
+                    />
+                  </li>
+                ))}
+              </ul>
+            </TodoGroup>
+
+            <TodoGroup
               icon={<MapPin />}
               titleKey="todo.addressTitle"
               bodyKey="todo.addressBody"
@@ -233,7 +284,7 @@ export function TodoScreen() {
               query={addresses}
               count={addressRows.length}
               searching={searching}
-              current={firstOpen === 1}
+              current={firstOpen === 2}
             >
               <ul className="divide-y divide-line">
                 {addressRows.map((row) => (
@@ -266,7 +317,7 @@ export function TodoScreen() {
               query={commission}
               count={commissionRows.length}
               searching={searching}
-              current={firstOpen === 2}
+              current={firstOpen === 3}
             >
               <ul className="divide-y divide-line">
                 {commissionRows.map((row) => (
@@ -290,7 +341,7 @@ export function TodoScreen() {
               query={markup}
               count={markupCount}
               searching={searching}
-              current={firstOpen === 3}
+              current={firstOpen === 4}
             >
               {markupGroups.map((group) => (
                 <div key={group.storeId}>
@@ -332,7 +383,7 @@ export function TodoScreen() {
               query={storeImages}
               count={storeRows.length}
               searching={searching}
-              current={firstOpen === 4}
+              current={firstOpen === 5}
             >
               <ul className="divide-y divide-line">
                 {storeRows.map((row) => (
@@ -356,7 +407,7 @@ export function TodoScreen() {
               query={itemImages}
               count={itemRows.length}
               searching={searching}
-              current={firstOpen === 5}
+              current={firstOpen === 6}
             >
               {itemGroups.map((group) => (
                 <div key={group.storeId}>
@@ -599,6 +650,7 @@ type NextStep = { href: string; label: string; urgentStep: boolean };
  */
 function nextStep(lists: {
   hours: HoursTodo[];
+  drivers: DriverTodo[];
   addresses: AddressTodo[];
   commission: StoreTodo[];
   markup: ItemTodo[];
@@ -614,6 +666,14 @@ function nextStep(lists: {
       href: todoHref.hours(hours.storeId, hours.branches[0]?.id),
       label: t("todo.nextHours", { name: pickLocalized(hours.storeName) }),
       urgentStep: true,
+    };
+  }
+  const driver = lists.drivers.find((row) => row.never) ?? lists.drivers[0];
+  if (driver) {
+    return {
+      href: todoHref.driver(driver.id),
+      label: t("todo.nextDriver", { name: driver.name }),
+      urgentStep: false,
     };
   }
   const address = live(lists.addresses, (row) => row.storeActive);
@@ -726,6 +786,15 @@ function Guide({
       )}
     </Card>
   );
+}
+
+/** Why a driver is on the list, and which days. */
+function driverDetail(row: DriverTodo): string {
+  if (row.reason === "none") return t("todo.driverNoHours");
+  if (row.never) return t("todo.driverNever");
+  return t("todo.driverDays", {
+    days: row.days.map((day) => t(DAY_LABELS[day])).join(", "),
+  });
 }
 
 /** Lower-case, accents and Arabic diacritics off, so a search forgives both. */

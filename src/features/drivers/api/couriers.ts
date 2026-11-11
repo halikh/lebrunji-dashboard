@@ -2,11 +2,17 @@ import type { DayHours } from "@/features/catalog/api/hours";
 import { SEARCH } from "@/lib/limits";
 import { statusName } from "@/lib/order-status";
 import { digitsOf } from "@/lib/phone";
-import { isOpenNow } from "@/lib/week";
+import {
+  clipToOurHours,
+  isOpenNow,
+  withinOurHours,
+  type OurHours,
+} from "@/lib/week";
 import { matchesLike } from "@/lib/search";
 import { getClient } from "@/lib/supabase/client";
 import { oneShopRate } from "@/features/reference/shop-rate";
 import { orderRefusal } from "@/features/orders/api/refusal";
+import { isMissingColumn } from "@/features/settings/api/app-settings";
 
 /**
  * The drivers an order can be handed to.
@@ -49,15 +55,40 @@ export type Courier = {
    * first time anybody flipped a switch the rota stopped applying to that
    * person for ever — silently, until they were dispatched at four in the
    * morning. See migration 0085.
+   *
+   * It lasts until `availableOverrideUntil` (0280) — read it through
+   * `liveOverride`, never directly, or a switch from last night still counts.
    */
   availableOverride: boolean | null;
+  /**
+   * When the switch stops counting: the next time our hours turn after it was
+   * set — closing if we were open, opening if we were closed. The database
+   * stamps it (0280); null when there is no switch, or on a database without
+   * the column yet, where the switch keeps counting as it always did.
+   */
+  availableOverrideUntil: string | null;
 };
 
 // One literal, not a concatenation: supabase-js parses this string at the type
 // level to work out the row shape, and a `+` between two halves defeats that —
 // every read then comes back as an error union and the mappers stop compiling.
 const COLUMNS =
+  "id, name, phone, sort_order, available_override, available_override_until, deleted_at, courier_hours ( day_of_week, opens_at, closes_at )";
+// Without 0280's column, so the drivers screen and the dispatch dialog keep
+// working on a database that has not had it yet.
+const COLUMNS_BEFORE_0280 =
   "id, name, phone, sort_order, available_override, deleted_at, courier_hours ( day_of_week, opens_at, closes_at )";
+
+/** Runs a couriers read, once more without 0280's column if it is missing. */
+async function withColumns<
+  R extends { error: { code?: string; message: string } | null },
+>(read: (columns: string) => PromiseLike<R>): Promise<R> {
+  const first = await read(COLUMNS);
+  if (first.error && isMissingColumn(first.error)) {
+    return read(COLUMNS_BEFORE_0280);
+  }
+  return first;
+}
 
 function toCourier(row: Record<string, unknown>): Courier {
   const hours = Array.isArray(row.courier_hours)
@@ -70,6 +101,8 @@ function toCourier(row: Record<string, unknown>): Courier {
     phone: row.phone as string,
     sortOrder: row.sort_order as number,
     availableOverride: (row.available_override as boolean | null) ?? null,
+    availableOverrideUntil:
+      (row.available_override_until as string | null | undefined) ?? null,
     isActive: row.deleted_at === null,
     hours: hours
       .map((day) => ({
@@ -107,40 +140,41 @@ export async function fetchCouriers(search = ""): Promise<Courier[]> {
   // Inactive drivers are included and filtered on screen. They are not deleted
   // rows to be hidden — they are people who have left, and the list has a tab
   // for finding them again.
-  let query = getClient()
-    .from("couriers")
-    .select(COLUMNS)
-    .order("sort_order", { ascending: true })
-    .order("name", { ascending: true });
+  const { data, error } = await withColumns((columns) => {
+    let query = getClient()
+      .from("couriers")
+      .select(columns)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
 
-  if (term.length >= SEARCH.minTerm) {
-    const digits = digitsOf(term);
-    query = query.or(
-      [
-        matchesLike("name", term),
-        // Only when the term contains digits at all: a bare `%%` matches every
-        // row, so a name search would quietly return the whole table and look
-        // like the filter had failed.
-        ...(digits ? [matchesLike("phone", digits)] : []),
-      ].join(","),
-    );
-  }
-
-  const { data, error } = await query;
+    if (term.length >= SEARCH.minTerm) {
+      const digits = digitsOf(term);
+      query = query.or(
+        [
+          matchesLike("name", term),
+          // Only when the term contains digits at all: a bare `%%` matches
+          // every row, so a name search would quietly return the whole table
+          // and look like the filter had failed.
+          ...(digits ? [matchesLike("phone", digits)] : []),
+        ].join(","),
+      );
+    }
+    return query;
+  });
   if (error) throw new Error(`Could not read drivers: ${error.message}`);
-  return (data ?? []).map(toCourier);
+  // A column list chosen at run time is a plain string to supabase-js, so the
+  // row type is said here rather than parsed from it.
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map(toCourier);
 }
 
 /** One driver, for their own page. Null when the id is not a live driver. */
 export async function fetchCourier(id: string): Promise<Courier | null> {
-  const { data, error } = await getClient()
-    .from("couriers")
-    .select(COLUMNS)
-    .eq("id", id)
-    .maybeSingle();
+  const { data, error } = await withColumns((columns) =>
+    getClient().from("couriers").select(columns).eq("id", id).maybeSingle(),
+  );
 
   if (error) throw new Error(`Could not read the driver: ${error.message}`);
-  return data ? toCourier(data) : null;
+  return data ? toCourier(data as unknown as Record<string, unknown>) : null;
 }
 
 /**
@@ -344,15 +378,25 @@ export type CourierDraft = {
 };
 
 export async function createCourier(draft: CourierDraft): Promise<Courier> {
-  const { data, error } = await getClient()
+  // Inserted once, read back with whichever columns the database has: a
+  // retried insert would be a second driver.
+  const { data: inserted, error: insertError } = await getClient()
     .from("couriers")
     .insert({ name: draft.name.trim(), phone: digitsOf(draft.phone) })
-    .select(COLUMNS)
+    .select("id")
     .single();
+  if (insertError) throw new Error(insertError.message);
+  const { data, error } = await withColumns((columns) =>
+    getClient()
+      .from("couriers")
+      .select(columns)
+      .eq("id", (inserted as { id: string }).id)
+      .single(),
+  );
 
   if (error) throw new Error(error.message);
 
-  const created = toCourier(data);
+  const created = toCourier(data as unknown as Record<string, unknown>);
   if (draft.hours) await saveCourierHours(created.id, draft.hours);
   return created;
 }
@@ -470,15 +514,48 @@ export async function setCourierActive(
  * The override wins where it is set, and `null` falls through to the rota. That
  * order is the whole design: the rota is the standing answer and the override
  * is tonight's exception, not the other way round.
+ *
+ * The rota counts only inside **our** hours (`ours`, from `app_settings`): a
+ * driver down for 16:00–02:00 while we close at midnight is off at 00:30. The
+ * switch still reaches past them on purpose — an order taken at 23:58 has to
+ * go out after we close — and it lasts only until our hours next turn (0280),
+ * so it cannot become a standing exception.
  */
-export function isTakingOrders(courier: Courier, now?: Date): boolean {
+export function isTakingOrders(
+  courier: Courier,
+  ours?: OurHours | null,
+  now: Date = new Date(),
+): boolean {
   // Someone who has left is never taking orders, whatever their old rota or a
   // stale override says. The employment state wins over both.
   if (!courier.isActive) return false;
-  return courier.availableOverride ?? isOpenNow(courier.hours, now);
+  const override = liveOverride(courier, now);
+  if (override !== null) return override;
+  // Without the switch, only inside our hours: nobody delivers for us while
+  // we are closed, whatever their week says. Before the settings have loaded,
+  // the week alone.
+  if (!ours) return isOpenNow(courier.hours, now);
+  return (
+    withinOurHours(ours, now) &&
+    isOpenNow(clipToOurHours(courier.hours, ours), now)
+  );
+}
+
+/**
+ * The switch as it stands at `now`: null once its end has passed (0280), the
+ * same reading `courier_override_now` gives dispatch.
+ */
+export function liveOverride(
+  courier: Courier,
+  now = new Date(),
+): boolean | null {
+  if (courier.availableOverride === null) return null;
+  const until = courier.availableOverrideUntil;
+  if (until !== null && new Date(until).getTime() <= now.getTime()) return null;
+  return courier.availableOverride;
 }
 
 /** Is the rota currently being overruled? The screens have to say so. */
-export function isOverridden(courier: Courier): boolean {
-  return courier.availableOverride !== null;
+export function isOverridden(courier: Courier, now = new Date()): boolean {
+  return liveOverride(courier, now) !== null;
 }

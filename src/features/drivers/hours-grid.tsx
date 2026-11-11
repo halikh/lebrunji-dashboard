@@ -8,7 +8,15 @@ import type { DayHours } from "@/features/catalog/api/hours";
 import { useClock } from "@/features/settings/use-clock";
 import { t, type TranslationKey } from "@/i18n/translations";
 import { businessTimezone } from "@/lib/time";
-import { isOpenNow, summarise } from "@/lib/week";
+import {
+  clipToOurHours,
+  daysOutsideOurHours,
+  isOpenNow,
+  summarise,
+  withinOurHours,
+} from "@/lib/week";
+
+import { useOurHours } from "./use-couriers";
 
 /**
  * A driver's week.
@@ -61,6 +69,12 @@ export function HoursGrid({
   onChange: (next: DayHours[]) => void;
   disabled?: boolean;
 }) {
+  const clock = useClock();
+  const ours = useOurHours();
+  // Time down on a day that we are closed for is time they cannot work: they
+  // are offered only inside our hours (0280). Said on the day, not refused,
+  // so a week can still be saved while our hours are being changed.
+  const outside = new Set(ours ? daysOutsideOurHours(week, ours) : []);
   const dayOf = (index: number) =>
     week.find((one) => one.dayOfWeek === index) ?? null;
 
@@ -163,6 +177,15 @@ export function HoursGrid({
                     {t("hours.overnight")}
                   </Badge>
                 )}
+                {ours && outside.has(index) && (
+                  <Badge tone="warning">
+                    <AlertTriangle className="size-3" />
+                    {t("drivers.pastOurHours", {
+                      open: clock.hour(ours.openHour),
+                      close: clock.hour(ours.closeHour),
+                    })}
+                  </Badge>
+                )}
               </div>
             )}
           </li>
@@ -194,10 +217,15 @@ export function WeekSummary({
   showNow?: boolean;
 }) {
   const clock = useClock();
+  const ours = useOurHours();
   const sorted = week.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek);
   const first = sorted[0];
   const spans = summarise(week, DISPLAY_ORDER);
-  const onShift = isOpenNow(week);
+  // Their hours as far as they reach inside ours (0280) — the switch on the
+  // profile can still overrule this for tonight.
+  const onShift = ours
+    ? withinOurHours(ours) && isOpenNow(clipToOurHours(week, ours))
+    : isOpenNow(week);
   const uniform =
     !!first &&
     week.every(

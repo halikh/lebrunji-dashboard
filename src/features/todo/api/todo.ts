@@ -1,6 +1,9 @@
+import { fetchCouriers } from "@/features/drivers/api/couriers";
+import { fetchAppSettings } from "@/features/settings/api/app-settings";
 import { getClient } from "@/lib/supabase/client";
 import { PAGE } from "@/lib/limits";
 import type { Localized } from "@/lib/validation";
+import { clipToOurHours, daysOutsideOurHours } from "@/lib/week";
 
 /**
  * What the catalogue is still missing before it looks finished to a customer.
@@ -417,4 +420,56 @@ export async function fetchBranchesWithoutAddress(): Promise<
 /** PostgREST hands back a to-one embed as an object, or as a one-row array. */
 function one(value: unknown): unknown {
   return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+}
+
+/**
+ * An active driver whose week does not fit our ordering hours (0280).
+ *
+ * - `none`: no working days at all, so they are never offered;
+ * - `outside`: some days run past our hours. That time does not count — they
+ *   are offered only while we are open — so the week says something that
+ *   will not happen, and whoever reads it plans around it.
+ *
+ * `days` are the stored indexes (Sunday first) of the days that run past.
+ */
+export type DriverTodo = {
+  id: string;
+  name: string;
+  reason: "none" | "outside";
+  days: number[];
+  /** Every working minute is outside our hours: never offered at all. */
+  never: boolean;
+};
+
+export async function fetchDriversToFix(): Promise<TodoList<DriverTodo>> {
+  const [couriers, settings] = await Promise.all([
+    fetchCouriers(),
+    fetchAppSettings(),
+  ]);
+  const ours = { openHour: settings.openHour, closeHour: settings.closeHour };
+  const rows: DriverTodo[] = [];
+  for (const courier of couriers) {
+    if (!courier.isActive) continue;
+    if (courier.hours.length === 0) {
+      rows.push({
+        id: courier.id,
+        name: courier.name,
+        reason: "none",
+        days: [],
+        never: true,
+      });
+      continue;
+    }
+    const days = daysOutsideOurHours(courier.hours, ours);
+    if (days.length === 0) continue;
+    rows.push({
+      id: courier.id,
+      name: courier.name,
+      reason: "outside",
+      days,
+      never: clipToOurHours(courier.hours, ours).length === 0,
+    });
+  }
+  // A handful of people, read whole: never truncated.
+  return { rows, truncated: false };
 }
