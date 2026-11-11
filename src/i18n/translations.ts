@@ -669,14 +669,14 @@ const en = {
     colCommission: "Our commission",
     // What the driver hands in to us: our commission plus the delivery fee the
     // customer paid — none on a free delivery.
-    colToCollect: "Total to collect",
+    colToCollect: "Total",
     totalsRow: "Totals",
     totalsSkipped: "Cancelled orders not counted",
     // Free delivery from a promotion (0203): the customer paid no fee, so the
     // driver collected none and hands none in. The fee stays on screen, struck
     // through, because it is what the promotion cost us.
     freeDeliveryHint:
-      "A promotion made delivery free. The customer paid none of the {fee} fee, so it is not in Total to collect.",
+      "A promotion made delivery free. The customer paid none of the {fee} fee, so it is not in Total.",
     // A row kept on the first driver's page after the order was reassigned.
     movedTo: "Handed on to {name}",
     rangeToday: "Today ({count})",
