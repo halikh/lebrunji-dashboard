@@ -159,6 +159,13 @@ export type Dispatch = {
   /** What delivery cost on that order, inside `orderTotal`. */
   deliveryFee: number;
   orderTotal: number;
+  /**
+   * The platform's part of `orderTotal` — the commission, or the markup on a
+   * markup shop (`order_store_earnings.earning`, `0262`), summed over the
+   * order's shops that are not cancelled. 0 for a portion placed before `0262`,
+   * which carried no commission.
+   */
+  commission: number;
   currencyCode: string;
   /** The rate this order's total is read at — see `oneShopRate`. */
   shopRate: number | null;
@@ -193,7 +200,8 @@ export async function fetchDispatches(
     .select(
       `id, dispatched_at,
        orders ( id, code, delivery_fee, total, currency_code,
-         order_stores ( store_id, status, stores ( exchange_rate ) ),
+         order_stores ( store_id, status, stores ( exchange_rate ),
+           order_store_earnings ( earning ) ),
          order_dispatches ( id, courier_id, dispatched_at, couriers ( name ) ) )`,
     )
     .eq("courier_id", courierId)
@@ -246,6 +254,16 @@ export async function fetchDispatches(
         orderCode: order.code as string,
         deliveryFee: Number(order.delivery_fee),
         orderTotal: Number(order.total),
+        // A cancelled portion keeps its figures (0262) but was not sold, so
+        // its commission is not ours.
+        commission: asArray(order.order_stores)
+          .filter((portion) => portion.status !== "cancelled")
+          .reduce(
+            (sum, portion) =>
+              sum +
+              Number(asRecord(portion.order_store_earnings)?.earning ?? 0),
+            0,
+          ),
         currencyCode: order.currency_code as string,
         shopRate: oneShopRate(asArray(order.order_stores)),
         statusSlug: slug,

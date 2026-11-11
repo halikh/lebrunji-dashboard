@@ -337,6 +337,7 @@ function CurrencyTable({
       description={t("earningsReport.currencySummary", {
         earned: money(group.totals.earning),
         paid: money(group.totals.storeDue),
+        delivery: money(group.totals.delivery),
         orders: group.totals.orders,
       })}
       bodyClassName="p-0"
@@ -350,6 +351,7 @@ function CurrencyTable({
             <Th align="end">{t("earningsReport.colSales")}</Th>
             <Th align="end">{t("earningsReport.colEarned")}</Th>
             <Th align="end">{t("earningsReport.colPaid")}</Th>
+            <Th align="end">{t("earningsReport.colDelivery")}</Th>
           </Tr>
         </THead>
         <TBody>
@@ -392,6 +394,9 @@ function CurrencyTable({
               <Td className="text-end whitespace-nowrap tabular-nums">
                 {money(row.storeDue)}
               </Td>
+              <Td className="text-end whitespace-nowrap tabular-nums">
+                {money(row.delivery)}
+              </Td>
             </Tr>
           ))}
           <Tr className="bg-subtle font-semibold">
@@ -408,6 +413,9 @@ function CurrencyTable({
             </Td>
             <Td className="text-end whitespace-nowrap tabular-nums">
               {money(group.totals.storeDue)}
+            </Td>
+            <Td className="text-end whitespace-nowrap tabular-nums">
+              {money(group.totals.delivery)}
             </Td>
           </Tr>
         </TBody>

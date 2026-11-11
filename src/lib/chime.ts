@@ -171,9 +171,19 @@ function note(
  * page had no sound. Nothing in code can lift the rule, so the shell says the
  * sound is off and offers the one click that turns it on.
  *
- * `navigator.userActivation.hasBeenActive` is the browser's own answer, and
- * stays true for the life of the page once set. Where it is missing (older
- * Safari), the audio context's state stands in.
+ * ## Asking whether sound is actually blocked, not whether anyone has clicked
+ *
+ * This used to read `navigator.userActivation.hasBeenActive`, which is false
+ * on every fresh load — so the bar showed on every open, even where the
+ * browser would have played the chime anyway (Chrome lets a site it knows
+ * well, or one whose Sound permission is set to Allow, play without a click).
+ * The bar then vanished on the first click, having said something untrue.
+ *
+ * The real answer is the chime's own context: one created without a gesture
+ * starts `running` when the browser allows sound and `suspended` when it does
+ * not. `navigator.getAutoplayPolicy` (Firefox) answers the same question
+ * directly and is preferred where it exists. A browser with no Web Audio gets
+ * no bar — there is nothing the click would turn on.
  */
 const lockListeners = new Set<() => void>();
 
@@ -181,26 +191,43 @@ function notifyLock() {
   for (const listener of lockListeners) listener();
 }
 
+type AutoplayNavigator = Navigator & {
+  getAutoplayPolicy?: (type: "audiocontext") => string;
+};
+
 export function soundLocked(): boolean {
   if (typeof window === "undefined") return false;
-  const activation = (
-    navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }
-  ).userActivation;
-  if (activation) return !activation.hasBeenActive;
-  return context?.state !== "running";
+  if (context?.state === "running") return false;
+  const policy = (navigator as AutoplayNavigator).getAutoplayPolicy;
+  if (policy) {
+    try {
+      return policy.call(navigator, "audiocontext") !== "allowed";
+    } catch {
+      // Fall through to the context's own state.
+    }
+  }
+  // No context yet (before the first subscribe) reads as unlocked, so the bar
+  // does not flash before the context has had a chance to say it is running.
+  return context !== null;
 }
 
 export function subscribeSoundLock(listener: () => void) {
   lockListeners.add(listener);
+  // Created here rather than at the first chime, so its state can answer the
+  // question above from the moment the shell is on screen.
+  const ctx = audioContext();
   const events = ["pointerdown", "keydown"] as const;
   // After the handlers that unlock, so the answer has changed by the time it
   // is read again.
   const later = () => setTimeout(notifyLock, 0);
   for (const name of events) window.addEventListener(name, later);
-  context?.addEventListener("statechange", notifyLock);
+  ctx?.addEventListener("statechange", notifyLock);
+  // The context may already be settled; React re-reads the snapshot after
+  // subscribing, but say so anyway in case it changed in between.
+  setTimeout(notifyLock, 0);
   return () => {
     lockListeners.delete(listener);
     for (const name of events) window.removeEventListener(name, later);
-    context?.removeEventListener("statechange", notifyLock);
+    ctx?.removeEventListener("statechange", notifyLock);
   };
 }

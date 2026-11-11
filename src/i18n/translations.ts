@@ -647,7 +647,10 @@ const en = {
     colHanded: "Handed over",
     colStatus: "Status",
     colDelivery: "Delivery fee",
-    colTotal: "Total",
+    // The order's total less our commission, then the commission: the two
+    // add up to what the customer paid.
+    colWithoutCommission: "Order (without commission)",
+    colCommission: "Our commission",
     totalsRow: "Totals",
     totalsSkipped: "Cancelled orders not counted",
     // A row kept on the first driver's page after the order was reassigned.
@@ -3435,7 +3438,7 @@ const en = {
       "What we earned from each shop and branch, and what drivers paid the shops at pickup.",
     currencyTitle: "In {code}",
     currencySummary:
-      "{earned} earned, {paid} paid to shops, {orders} shop orders",
+      "{earned} earned, {paid} paid to shops, {delivery} delivery, {orders} shop orders",
     colShop: "Shop",
     colBranch: "Branch",
     colModel: "Settled by",
@@ -3443,9 +3446,11 @@ const en = {
     colSales: "Sales",
     colEarned: "Earned",
     colPaid: "Paid to shops",
+    colDelivery: "Delivery",
     colSalesRaw: "Sales (minor units)",
     colEarnedRaw: "Earned (minor units)",
     colPaidRaw: "Paid (minor units)",
+    colDeliveryRaw: "Delivery (minor units)",
     total: "Total",
     sheet: "Earnings {code}",
     failed: "Could not load the earnings.",
@@ -3453,7 +3458,7 @@ const en = {
     emptyBody:
       "No orders were placed in this period. Set a shop’s rate on its Details tab.",
     toShops: "Go to shops",
-    note: "Sales leave delivery out. An order from two shops counts once for each. Cancelled orders are not counted; one reopened is counted again.",
+    note: "Sales leave delivery out; delivery has its own column. An order from two shops counts once for each, and its delivery fee is split evenly between them. Cancelled orders are not counted; one reopened is counted again.",
   },
 
   reports: {

@@ -14,6 +14,7 @@ const row = (over: Partial<EarningsRow>): EarningsRow => ({
   sales: 1000,
   earning: 100,
   storeDue: 900,
+  delivery: 200,
   ...over,
 });
 
@@ -21,7 +22,7 @@ describe("groupByCurrency", () => {
   it("never adds one currency to another", () => {
     const groups = groupByCurrency([
       row({ currencyCode: "USD", orders: 3, earning: 300 }),
-      row({ currencyCode: "LBP", orders: 1, earning: 90_000 }),
+      row({ currencyCode: "LBP", orders: 1, earning: 90_000, delivery: 0 }),
       row({ storeId: "s2", currencyCode: "USD", orders: 2, earning: 50 }),
     ]);
 
@@ -31,6 +32,7 @@ describe("groupByCurrency", () => {
       sales: 2000,
       earning: 350,
       storeDue: 1800,
+      delivery: 400,
     });
     expect(groups[1]?.totals.earning).toBe(90_000);
   });
