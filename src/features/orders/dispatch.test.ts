@@ -227,6 +227,69 @@ describe("dispatchMessage", () => {
     );
   });
 
+  it("says the second figures the order kept, never converting them (0277)", () => {
+    // A 437,500 ل.ل dish ordered in dollars is $4.92; converted back at any
+    // rate it is 438,000. The order kept what checkout showed: 437,500. And
+    // the rest of the bill as the customer saw it, 180,000 — not $2.00 at
+    // today's 89,500.
+    const text = dispatchMessage(
+      order({
+        subtotal: 492,
+        deliveryFee: 200,
+        total: 692,
+        secondCurrency: "LBP",
+        secondBill: 180_000,
+        lines: [
+          line({
+            id: "a",
+            name: "Mixed grill",
+            unitPrice: 492,
+            secondUnitPrice: 437_500,
+            secondOptionsPrice: 0,
+          }),
+        ],
+      }),
+      USD,
+      true,
+      BOTH,
+    );
+    const lines = text.split("\n");
+
+    expect(text).toContain("*ادفع للمحل: $4.92* أو 437,500 ل.ل");
+    expect(lines.at(-2)).toBe("*اقبض من الزبون: $6.92* أو 617,500 ل.ل");
+    expect(lines.at(-1)).toBe(
+      say("dispatch.cashLeft", { amount: "$2.00 أو 180,000 ل.ل" }),
+    );
+  });
+
+  it("reads a kept figure for what is coming, not what was ordered", () => {
+    const text = dispatchMessage(
+      order({
+        subtotal: 984,
+        deliveryFee: 0,
+        total: 984,
+        secondCurrency: "LBP",
+        secondBill: 0,
+        lines: [
+          line({
+            id: "a",
+            unitPrice: 492,
+            quantity: 3,
+            fulfilledQuantity: 2,
+            secondUnitPrice: 437_500,
+            secondOptionsPrice: 0,
+          }),
+        ],
+      }),
+      USD,
+      true,
+      BOTH,
+    );
+    expect(text.split("\n").at(-2)).toBe(
+      "*اقبض من الزبون: $9.84* أو 875,000 ل.ل",
+    );
+  });
+
   it("says by how much a cash total was rounded, so the lines add up", () => {
     // 1000 + 300 = 1300, rounded to 1325: +$0.25.
     const text = dispatchMessage(order({ total: 1325 }), USD, true);

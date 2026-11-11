@@ -195,6 +195,93 @@ export function otherFigure(
   return linePrice(item + options, options, unit, quantity);
 }
 
+/** The pair a figure is said in: the order's currency, and the other one. */
+export type OtherPair = { from: ConvertibleCurrency; to: ConvertibleCurrency };
+
+/**
+ * The second figure under a line — **what the customer was shown**.
+ *
+ * Since the app's `0277` the order keeps it: one unit in the second currency
+ * as checkout showed it, saved when the order was placed. It is read, not
+ * worked out, so the order page, this message and the customer's own receipt
+ * say one number, and a rate changed since moves none of them. An order from
+ * before `0277` has none, and the line is converted as the app converts it
+ * (`otherFigure`). Null when there is no second currency to say it in.
+ */
+export function secondOfLine(
+  line: Pick<
+    OrderLine,
+    | "unitPrice"
+    | "optionsPrice"
+    | "priceUnit"
+    | "unitQuantity"
+    | "unitStep"
+    | "secondUnitPrice"
+    | "secondOptionsPrice"
+  >,
+  quantity: number,
+  order: Pick<Order, "secondCurrency">,
+  other: OtherPair | undefined,
+  shopRate: number | null,
+): number | null {
+  if (!other) return null;
+  if (line.secondUnitPrice != null && order.secondCurrency === other.to.code) {
+    return linePrice(
+      line.secondUnitPrice,
+      line.secondOptionsPrice ?? 0,
+      itemUnit(line),
+      quantity,
+    );
+  }
+  return otherFigure(line, quantity, other, shopRate);
+}
+
+/**
+ * The second figure under the total, added up as the customer's receipt adds
+ * it: every line that is coming (`secondOfLine`), then the rest of the bill —
+ * the figure the order kept (`second_bill`), or for an older order delivery,
+ * discount and rounding converted at the platform's rate. Never the total
+ * converted in one go: that read $5.05 as 449,000 where the lines said
+ * 450,000 (DL-261110-00238).
+ */
+export function secondOfTotal(
+  order: Order & { lines: OrderLine[] },
+  other: OtherPair | undefined,
+): number | null {
+  const dishes = secondOfDishes(order, other);
+  if (dishes === null || !other) return null;
+  const rest =
+    order.secondBill != null && order.secondCurrency === other.to.code
+      ? order.secondBill
+      : roundToCash(
+          convertMoney(
+            order.deliveryFee - order.discount + roundingOf(order),
+            other.from,
+            other.to,
+          ),
+          other.to.code,
+        );
+  return dishes + rest;
+}
+
+/** Every line that is coming, by `secondOfLine`, added up: the subtotal's. */
+export function secondOfDishes(
+  order: Order & { lines: OrderLine[] },
+  other: OtherPair | undefined,
+): number | null {
+  if (!other) return null;
+  let dishes = 0;
+  for (const line of order.lines) {
+    const quantity = line.fulfilledQuantity ?? line.quantity;
+    if (quantity === 0) continue;
+    const rate =
+      order.stores.find((store) => store.id === line.orderStoreId)?.shopRate ??
+      null;
+    dishes += secondOfLine(line, quantity, order, other, rate) ?? 0;
+  }
+  return dishes;
+}
+
 /** A pin as a link that opens in whatever maps app the phone has. */
 function mapUrl(latitude: number, longitude: number): string {
   return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
@@ -251,8 +338,10 @@ export function whatsappLink(phone: string, message: string): string {
  * `other` is the pair to say a figure in both. A shop's figure is read at
  * **that shop's** rate (`OrderStore.shopRate`), the one its menu quoted; the
  * total as the app adds it: its dish lines, then the bill's own lines at the
- * platform's rate. Converted figures are cash, as the app shows them: each
- * line one unit at a time, rounded to the
+ * platform's rate. Since the app's `0277` those are the figures the order
+ * kept — what the customer was shown — and nothing is converted
+ * (`secondOfLine`, `secondOfTotal`). For an older order, converted figures
+ * are cash, as the app shows them: each line one unit at a time, rounded to the
  * 1,000 note, then counted out (`otherFigure`) — so the lira the driver hands
  * a shop is the lira the customer saw. Absent, those lines are left out
  * rather than guessed. And when the server rounded a lira total to its cash
@@ -297,9 +386,6 @@ export function dispatchMessage(
   // What every shop is paid, added up, for what is left with the driver.
   let paidShops = 0;
   let paidShopsOther = 0;
-  // Every dish's cash figure at the app's prices, for the total's — see the
-  // door below.
-  let dishesOther = 0;
 
   // In the order of the trip: every pickup, then the door, then the money.
   //
@@ -365,8 +451,11 @@ export function dispatchMessage(
       );
       bag += price;
       if (other) {
-        bagOther += otherFigure(priced, quantity, other, store.shopRate);
-        dishesOther += otherFigure(line, quantity, other, store.shopRate);
+        // A markup shop is paid its own prices, which the customer never
+        // saw; everything else is what was shown (`secondOfLine`).
+        bagOther += markup
+          ? otherFigure(priced, quantity, other, store.shopRate)
+          : (secondOfLine(line, quantity, order, other, store.shopRate) ?? 0);
       }
       const amount = money(price);
       lines.push(
@@ -455,23 +544,9 @@ export function dispatchMessage(
     }
     lines.push(bill);
 
-    // The one number the driver acts on at the door. Its second figure is
-    // the customer's, added up as the app adds it (`totalParts`): every dish
-    // line's cash figure, then delivery, discount and rounding as one part at
-    // the platform's rate. Converting the total in one go read $5.05 as
-    // 449,000 when the lines above it came to 450,000 — and the customer
-    // was shown 450,000 (DL-261110-00238).
-    const totalOther = other
-      ? dishesOther +
-        roundToCash(
-          convertMoney(
-            order.deliveryFee - order.discount + rounding,
-            other.from,
-            other.to,
-          ),
-          other.to.code,
-        )
-      : null;
+    // The one number the driver acts on at the door, with the second figure
+    // the customer was shown under it — see `secondOfTotal`.
+    const totalOther = secondOfTotal(order, other);
     lines.push(
       `*${say("dispatch.collect", { amount: total })}*${orOther(totalOther)}`,
     );

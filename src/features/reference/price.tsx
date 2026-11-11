@@ -48,6 +48,7 @@ export function Price({
   value,
   code,
   shopRate,
+  second,
   align = "start",
   className,
 }: {
@@ -61,6 +62,13 @@ export function Price({
    * discount, or any figure totalled across more than one shop.
    */
   shopRate?: number | null;
+  /**
+   * The second figure as it was **shown to the customer**, already in that
+   * currency — an order's saved figure (app `0277`), or one worked out the
+   * way the app works it out. Written as given, never converted. Omit and
+   * the amount is converted here, as before; null says nothing beneath.
+   */
+  second?: { value: number; code: string } | null;
   /** `end` in a column of figures, where the units digits should line up. */
   align?: "start" | "end";
   /** Type for the primary line. The secondary keeps its own, deliberately. */
@@ -69,7 +77,12 @@ export function Price({
   const { format, convertTo, secondaryCode } = useMoney();
 
   const other = secondaryCode(code);
-  const converted = other ? convertTo(value, code, other, shopRate) : null;
+  const converted =
+    second !== undefined
+      ? second && format(second.value, second.code)
+      : other
+        ? convertTo(value, code, other, shopRate)
+        : null;
 
   return (
     <span

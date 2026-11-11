@@ -23,6 +23,7 @@ import {
   cx,
 } from "@/components/ui";
 import { Price } from "@/features/reference/price";
+import { useMoney } from "@/features/reference/use-currencies";
 import { t } from "@/i18n/translations";
 import { isFinishedSlug, statusTone } from "@/lib/order-status";
 import { formatPhone } from "@/lib/phone";
@@ -38,6 +39,12 @@ import {
   type OrderStore,
 } from "./api/orders";
 import { AmendDialog } from "./amend-dialog";
+import {
+  secondOfDishes,
+  secondOfLine,
+  secondOfTotal,
+  type OtherPair,
+} from "./dispatch";
 import {
   cancellationMessage,
   earningModelLabel,
@@ -96,6 +103,24 @@ export function OrderBody({
 }) {
   const itemCount = order.lines.length;
   const rounding = roundingOf(order);
+  // The second figures the customer was shown — the order's own since the
+  // app's `0277`, worked out as the app works them out before it. The same
+  // helpers as the driver's message, so the two never disagree.
+  const { currencies, secondaryCode } = useMoney();
+  const orderCurrency = currencies?.find(
+    (one) => one.code === order.currencyCode,
+  );
+  const otherCode = secondaryCode(order.currencyCode);
+  const otherCurrency = otherCode
+    ? currencies?.find((one) => one.code === otherCode)
+    : undefined;
+  const pair: OtherPair | undefined =
+    orderCurrency && otherCurrency
+      ? { from: orderCurrency, to: otherCurrency }
+      : undefined;
+  /** A figure in the other currency for `Price`, or its own conversion while rates load. */
+  const shown = (value: number | null) =>
+    pair ? (value === null ? null : { value, code: pair.to.code }) : undefined;
   const phone = order.customerPhone ? formatPhone(order.customerPhone) : null;
 
   return (
@@ -170,6 +195,8 @@ export function OrderBody({
           lines={order.lines.filter((line) => line.orderStoreId === store.id)}
           currencyCode={order.currencyCode}
           shopRate={order.shopRate}
+          order={order}
+          pair={pair}
         />
       ))}
 
@@ -182,6 +209,7 @@ export function OrderBody({
             label={t("orders.subtotal")}
             value={order.subtotal}
             order={order}
+            second={shown(secondOfDishes(order, pair))}
           />
           <MoneyLine
             label={t("orders.delivery")}
@@ -212,6 +240,7 @@ export function OrderBody({
             value={order.total}
             code={order.currencyCode}
             shopRate={order.shopRate}
+            second={shown(secondOfTotal(order, pair))}
             align="end"
             className="text-[18px] font-semibold text-ink"
           />
@@ -226,11 +255,14 @@ function MoneyLine({
   value,
   order,
   good,
+  second,
 }: {
   label: string;
   value: number;
   order: Order;
   good?: boolean;
+  /** See `Price.second`. */
+  second?: { value: number; code: string } | null;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
@@ -240,6 +272,7 @@ function MoneyLine({
           value={value}
           code={order.currencyCode}
           shopRate={order.shopRate}
+          second={second}
           align="end"
         />
       </dd>
@@ -252,11 +285,16 @@ function StoreLines({
   lines,
   currencyCode,
   shopRate,
+  order,
+  pair,
 }: {
   store: OrderStore;
   lines: OrderLine[];
   currencyCode: string;
   shopRate: number | null;
+  order: Order;
+  /** The order's currency and the other one; absent while rates load. */
+  pair: OtherPair | undefined;
 }) {
   const tone = statusTone(store.statusSlug);
   return (
@@ -346,6 +384,24 @@ function StoreLines({
                 }
                 code={currencyCode}
                 shopRate={shopRate}
+                // What the customer was shown under it — see `secondOfLine`.
+                second={
+                  pair
+                    ? {
+                        // None coming costs nothing, as the figure above.
+                        value: gone
+                          ? 0
+                          : (secondOfLine(
+                              line,
+                              coming,
+                              order,
+                              pair,
+                              store.shopRate,
+                            ) ?? 0),
+                        code: pair.to.code,
+                      }
+                    : undefined
+                }
                 align="end"
                 className={cx(
                   "text-[13.5px] font-medium text-ink",
