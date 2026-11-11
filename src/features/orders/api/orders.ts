@@ -180,6 +180,15 @@ export type OrderLine = {
   /** The name and options in Arabic, for the WhatsApp messages. */
   nameAr: string;
   optionsAr: string[];
+  /**
+   * One unit in the order's second currency **as the customer was shown it**
+   * (app migration `0277`), and the options' share — the split of `unitPrice`
+   * / `optionsPrice`. Saved when the order was placed: a 437,500 ل.ل dish
+   * ordered in dollars keeps 437,500, where converting its $4.92 back gives
+   * 438,000. Read, never converted (`secondOfLine`). Absent before 0277.
+   */
+  secondUnitPrice?: number | null;
+  secondOptionsPrice?: number | null;
 };
 
 export type Order = {
@@ -234,6 +243,15 @@ export type Order = {
   deliveryFee: number;
   discount: number;
   total: number;
+  /**
+   * The currency the customer was shown every second figure in, and the rest
+   * of the bill there — total − subtotal: delivery, less the discount, plus
+   * any rounding — saved when the order was placed (app `0277`, re-read on
+   * an amendment by `0279`). The total's second figure is its lines' plus
+   * this. Absent before 0277; readers then convert, as they always did.
+   */
+  secondCurrency?: string | null;
+  secondBill?: number | null;
   stores: OrderStore[];
 };
 
@@ -319,6 +337,7 @@ export async function fetchOrders(options: {
     .select(
       `id, code, placed_at, address_line, courier_note, currency_code,
        subtotal, delivery_fee, discount, total, amended_at,
+       second_currency, second_bill,
        user_id,
        contact_phone,
        users:user_id ( name, phone ),
@@ -372,6 +391,7 @@ export async function fetchOrder(
     .select(
       `id, code, placed_at, address_line, courier_note, currency_code,
        subtotal, delivery_fee, discount, total, amended_at,
+       second_currency, second_bill,
        user_id,
        contact_phone,
        latitude, longitude,
@@ -384,6 +404,7 @@ export async function fetchOrder(
            branches ( id, sort_order, created_at, deleted_at, branch_contacts ( whatsapp_phone ) ) ),
          order_lines ( id, menu_item_id, name, quantity, unit_price, note,
            options_price, price_unit, unit_quantity, unit_step,
+           second_unit_price, second_options_price,
            size_quantity, size_unit,
            fulfilled_quantity, replaces_line_id, amendment_reason,
            menu_items ( image_url ),
@@ -422,6 +443,9 @@ export async function fetchOrder(
           line.size_quantity as string | number | null | undefined,
         ),
         sizeUnit: asSizeUnit(line.size_unit),
+        secondUnitPrice: (line.second_unit_price as number | null) ?? null,
+        secondOptionsPrice:
+          (line.second_options_price as number | null) ?? null,
         ...storePricesOf(asRecord(line.order_line_store_prices)),
         note: (line.note as string | null) ?? null,
         imageUrl:
@@ -837,6 +861,8 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     deliveryFee: row.delivery_fee as number,
     discount: row.discount as number,
     total: row.total as number,
+    secondCurrency: (row.second_currency as string | null) ?? null,
+    secondBill: (row.second_bill as number | null) ?? null,
     stores: asArray(row.order_stores).map((store) => {
       const slug = (store.status as string | null) ?? "";
       return {
