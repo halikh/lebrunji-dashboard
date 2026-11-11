@@ -56,7 +56,11 @@ export type Stats = {
   /** One entry per Beirut day in the range, including days with nothing. */
   daily: { day: string; revenue: number; orders: number }[];
 
-  /** Only the buckets with something in them; the screen draws the empty grid. */
+  /**
+   * Only the buckets with something in them; the screen draws the empty grid.
+   * Like the funnel, only `currency`'s orders (`0276`): nothing on the page
+   * counts the other currency's.
+   */
   hourly: { dayOfWeek: number; hour: number; orders: number }[];
 
   funnel: { slug: string; progress: number | null; count: number }[];
