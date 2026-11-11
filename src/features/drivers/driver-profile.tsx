@@ -138,7 +138,7 @@ function Loaded({
   const [editingHours, setEditingHours] = useState(false);
   // Today is the trading day, cut where the stat tiles cut it, so the
   // "Today" tile and the "Today" list always say the same number.
-  const [range, setRange] = useState<"today" | "all">("all");
+  const [range, setRange] = useState<"today" | "all">("today");
 
   /**
    * Counts answer "what has happened"; averages answer "is this normal", which
@@ -346,6 +346,7 @@ function Loaded({
                       {t("drivers.colWithoutCommission")}
                     </Th>
                     <Th className="text-end">{t("drivers.colCommission")}</Th>
+                    <Th className="text-end">{t("drivers.colToCollect")}</Th>
                   </Tr>
                 </THead>
                 <TBody>
@@ -368,6 +369,7 @@ function Loaded({
                           <Td className="text-ink-3">
                             {t("drivers.movedTo", { name: row.movedTo })}
                           </Td>
+                          <Td className="text-end text-ink-4">—</Td>
                           <Td className="text-end text-ink-4">—</Td>
                           <Td className="text-end text-ink-4">—</Td>
                           <Td className="text-end text-ink-4">—</Td>
@@ -396,6 +398,16 @@ function Loaded({
                           <Td className="text-end tabular-nums">
                             <Price
                               value={row.commission}
+                              code={row.currencyCode}
+                              shopRate={row.shopRate}
+                              align="end"
+                            />
+                          </Td>
+                          {/* What the driver hands in to us: our commission
+                              plus the delivery fee. */}
+                          <Td className="text-end font-semibold tabular-nums">
+                            <Price
+                              value={row.commission + row.deliveryFee}
                               code={row.currencyCode}
                               shopRate={row.shopRate}
                               align="end"
@@ -540,7 +552,7 @@ function StatTile({
 }
 
 /**
- * The sums of the three money columns, under the rows they add up.
+ * The sums of the four money columns, under the rows they add up.
  *
  * - **Cancelled orders are left out.** Nothing was collected on them, and a
  *   total that counted them would be a figure the driver could never hand in.
@@ -628,6 +640,17 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
               : sums.map(([code, sum]) => (
                   <span key={code}>
                     {amount(sum.commission, code, sum.rates)}
+                  </span>
+                ))}
+          </span>
+        </Td>
+        <Td className="py-2 text-end">
+          <span className="flex flex-col items-end gap-1">
+            {sums.length === 0
+              ? "—"
+              : sums.map(([code, sum]) => (
+                  <span key={code}>
+                    {amount(sum.commission + sum.fee, code, sum.rates)}
                   </span>
                 ))}
           </span>

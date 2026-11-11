@@ -653,6 +653,8 @@ const en = {
     // add up to what the customer paid.
     colWithoutCommission: "Order (without commission)",
     colCommission: "Our commission",
+    // What the driver hands in to us: our commission plus the delivery fee.
+    colToCollect: "Total to collect",
     totalsRow: "Totals",
     totalsSkipped: "Cancelled orders not counted",
     // A row kept on the first driver's page after the order was reassigned.
@@ -3453,13 +3455,16 @@ const en = {
     colModel: "Settled by",
     colOrders: "Shop orders",
     colSales: "Sales",
-    colEarned: "Earned",
+    colEarned: "Earned from store",
     colPaid: "Paid to shops",
     colDelivery: "Delivery",
+    // Earned from the store plus the delivery fee.
+    colTotalEarned: "Total earned",
     colSalesRaw: "Sales (minor units)",
-    colEarnedRaw: "Earned (minor units)",
+    colEarnedRaw: "Earned from store (minor units)",
     colPaidRaw: "Paid (minor units)",
     colDeliveryRaw: "Delivery (minor units)",
+    colTotalEarnedRaw: "Total earned (minor units)",
     total: "Total",
     sheet: "Earnings {code}",
     failed: "Could not load the earnings.",
