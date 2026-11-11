@@ -33,11 +33,23 @@ export type EarningsRow = {
   /** What drivers paid the shop at pickup. */
   storeDue: number;
   /**
-   * What customers paid for delivery (`0274`). One fee per order, split
-   * evenly across its shops' portions, so a currency's rows add up to the
-   * fees charged and a two-shop order is not counted twice.
+   * What customers paid for delivery (`0274`, `0285`): the fee less what a
+   * promotion took off it. One fee per order, split evenly across its shops'
+   * portions, so a currency's rows add up to the fees paid and a two-shop
+   * order is not counted twice.
    */
   delivery: number;
+  /**
+   * Free delivery given (`0285`): what promotions took off the fee, split the
+   * same way. A cost to us, not money in, so it is never in Total earned.
+   * `delivery + deliveryWaived` is the fee quoted.
+   */
+  deliveryWaived: number;
+  /**
+   * How many orders were given free delivery. Counted on one portion of each
+   * order, so a currency's rows add up to orders, not shop orders.
+   */
+  freeDeliveries: number;
 };
 
 export async function fetchEarnings(
@@ -70,6 +82,8 @@ export async function fetchEarnings(
     earning: Number(row.earning ?? 0),
     storeDue: Number(row.store_due ?? 0),
     delivery: Number(row.delivery ?? 0),
+    deliveryWaived: Number(row.delivery_waived ?? 0),
+    freeDeliveries: Number(row.free_deliveries ?? 0),
   }));
 }
 
@@ -106,6 +120,8 @@ export type CurrencyGroup = {
     earning: number;
     storeDue: number;
     delivery: number;
+    deliveryWaived: number;
+    freeDeliveries: number;
   };
 };
 
@@ -123,7 +139,15 @@ export function groupByCurrency(rows: readonly EarningsRow[]): CurrencyGroup[] {
       group = {
         currencyCode: row.currencyCode,
         rows: [],
-        totals: { orders: 0, sales: 0, earning: 0, storeDue: 0, delivery: 0 },
+        totals: {
+          orders: 0,
+          sales: 0,
+          earning: 0,
+          storeDue: 0,
+          delivery: 0,
+          deliveryWaived: 0,
+          freeDeliveries: 0,
+        },
       };
       groups.set(row.currencyCode, group);
     }
@@ -133,6 +157,8 @@ export function groupByCurrency(rows: readonly EarningsRow[]): CurrencyGroup[] {
     group.totals.earning += row.earning;
     group.totals.storeDue += row.storeDue;
     group.totals.delivery += row.delivery;
+    group.totals.deliveryWaived += row.deliveryWaived;
+    group.totals.freeDeliveries += row.freeDeliveries;
   }
   return [...groups.values()].sort((a, b) => b.totals.orders - a.totals.orders);
 }

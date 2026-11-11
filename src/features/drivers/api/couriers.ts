@@ -196,8 +196,19 @@ export type Dispatch = {
   placedAt: string;
   orderId: string;
   orderCode: string;
-  /** What delivery cost on that order, inside `orderTotal`. */
+  /**
+   * The delivery fee quoted on that order. Not what the customer paid when a
+   * promotion made delivery free — that is `deliveryFee - deliveryWaived`,
+   * and it is the part inside `orderTotal`.
+   */
   deliveryFee: number;
+  /**
+   * What a promotion took off the fee (`orders.discount`, capped at the fee,
+   * as `0285` reads it). Since `0203` a promotion is free delivery and takes
+   * the whole fee, so this is 0 or `deliveryFee`. Nobody paid it, so the
+   * driver collected none of it.
+   */
+  deliveryWaived: number;
   orderTotal: number;
   /**
    * The platform's part of `orderTotal` — the commission, or the markup on a
@@ -239,7 +250,7 @@ export async function fetchDispatches(
     .from("order_dispatches")
     .select(
       `id, dispatched_at,
-       orders ( id, code, placed_at, delivery_fee, total, currency_code,
+       orders ( id, code, placed_at, delivery_fee, discount, total, currency_code,
          order_stores ( store_id, step, stores ( exchange_rate ),
            order_store_earnings ( earning ) ),
          order_dispatches ( id, courier_id, dispatched_at, couriers ( name ) ) )`,
@@ -294,6 +305,10 @@ export async function fetchDispatches(
         orderId: order.id as string,
         orderCode: order.code as string,
         deliveryFee: Number(order.delivery_fee),
+        deliveryWaived: Math.min(
+          Math.max(Number(order.discount ?? 0), 0),
+          Number(order.delivery_fee),
+        ),
         orderTotal: Number(order.total),
         // A cancelled portion keeps its figures (0262) but was not sold, so
         // its commission is not ours.

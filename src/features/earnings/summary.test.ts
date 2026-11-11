@@ -16,6 +16,8 @@ const row = (over: Partial<EarningsRow>): EarningsRow => ({
   earning: 100,
   storeDue: 900,
   delivery: 200,
+  deliveryWaived: 0,
+  freeDeliveries: 0,
   ...over,
 });
 

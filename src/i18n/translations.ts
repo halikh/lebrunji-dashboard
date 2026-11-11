@@ -669,10 +669,19 @@ const en = {
     // add up to what the customer paid.
     colWithoutCommission: "Order (without commission)",
     colCommission: "Our commission",
-    // What the driver hands in to us: our commission plus the delivery fee.
+    // What the driver hands in to us: our commission plus the delivery fee the
+    // customer paid — none on a free delivery.
     colToCollect: "Total to collect",
     totalsRow: "Totals",
     totalsSkipped: "Cancelled orders not counted",
+    // Free delivery from a promotion (0203): the customer paid no fee, so the
+    // driver collected none and hands none in. The fee stays on screen, struck
+    // through, because it is what the promotion cost us.
+    freeDelivery: "Free",
+    freeDeliveryHint:
+      "A promotion made delivery free. The customer paid none of the {fee} fee, so it is not in Total to collect.",
+    totalsFree: "Free delivery on: {count}",
+    totalsWaived: "{amount} free",
     // A row kept on the first driver's page after the order was reassigned.
     movedTo: "Handed on to {name}",
     rangeToday: "Today ({count})",
@@ -3470,7 +3479,10 @@ const en = {
       "What we earned from each shop and branch, and what drivers paid the shops at pickup.",
     currencyTitle: "In {code}",
     currencySummary:
-      "{earned} earned, {paid} paid to shops, {delivery} delivery, {orders} shop orders",
+      "{earned} earned, {paid} paid to shops, {delivery} delivery paid, {orders} shop orders",
+    // Only when a promotion gave free delivery in the period (0285).
+    currencyFree:
+      "Free delivery given on {count} orders: {waived}, not in Total earned.",
     colShop: "Shop",
     colBranch: "Branch",
     colModel: "Settled by",
@@ -3478,13 +3490,20 @@ const en = {
     colSales: "Sales",
     colEarned: "Earned from store",
     colPaid: "Paid to shops",
-    colDelivery: "Delivery",
-    // Earned from the store plus the delivery fee.
+    // What customers paid for delivery — a free delivery adds nothing (0285).
+    colDelivery: "Delivery paid",
+    // What promotions took off the fee: free delivery given. A cost to us,
+    // not money in, so it is not in Total earned.
+    colFreeDelivery: "Free delivery",
+    colFreeCount: "Free deliveries",
+    freeOrders: "{count} orders",
+    // Earned from the store plus the delivery customers paid.
     colTotalEarned: "Total earned",
     colSalesRaw: "Sales (minor units)",
     colEarnedRaw: "Earned from store (minor units)",
     colPaidRaw: "Paid (minor units)",
-    colDeliveryRaw: "Delivery (minor units)",
+    colDeliveryRaw: "Delivery paid (minor units)",
+    colFreeDeliveryRaw: "Free delivery (minor units)",
     colTotalEarnedRaw: "Total earned (minor units)",
     total: "Total",
     sheet: "Earnings {code}",
@@ -3493,7 +3512,7 @@ const en = {
     emptyBody:
       "No orders were placed in this period. Set a shop’s rate on its Details tab.",
     toShops: "Go to shops",
-    note: "Sales leave delivery out; delivery has its own column. An order from two shops counts once for each, and its delivery fee is split evenly between them. Cancelled orders are not counted; one reopened is counted again.",
+    note: "Sales leave delivery out; delivery has its own column. Delivery paid is what customers paid; a fee a promotion took off is under Free delivery and not in Total earned. An order from two shops counts once for each, and its delivery fee is split evenly between them. Cancelled orders are not counted; one reopened is counted again.",
   },
 
   reports: {

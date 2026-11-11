@@ -334,12 +334,25 @@ function CurrencyTable({
   return (
     <Section
       title={t("earningsReport.currencyTitle", { code: group.currencyCode })}
-      description={t("earningsReport.currencySummary", {
-        earned: money(group.totals.earning),
-        paid: money(group.totals.storeDue),
-        delivery: money(group.totals.delivery),
-        orders: group.totals.orders,
-      })}
+      description={
+        <>
+          {t("earningsReport.currencySummary", {
+            earned: money(group.totals.earning),
+            paid: money(group.totals.storeDue),
+            delivery: money(group.totals.delivery),
+            orders: group.totals.orders,
+          })}
+          {group.totals.deliveryWaived > 0 && (
+            <>
+              {" "}
+              {t("earningsReport.currencyFree", {
+                count: group.totals.freeDeliveries,
+                waived: money(group.totals.deliveryWaived),
+              })}
+            </>
+          )}
+        </>
+      }
       bodyClassName="p-0"
     >
       <Table>
@@ -352,6 +365,7 @@ function CurrencyTable({
             <Th align="end">{t("earningsReport.colEarned")}</Th>
             <Th align="end">{t("earningsReport.colPaid")}</Th>
             <Th align="end">{t("earningsReport.colDelivery")}</Th>
+            <Th align="end">{t("earningsReport.colFreeDelivery")}</Th>
             <Th align="end">{t("earningsReport.colTotalEarned")}</Th>
           </Tr>
         </THead>
@@ -397,6 +411,13 @@ function CurrencyTable({
                 {money(row.delivery)}
               </Td>
               <Td className="text-end whitespace-nowrap tabular-nums">
+                <FreeCell
+                  waived={row.deliveryWaived}
+                  count={row.freeDeliveries}
+                  money={money}
+                />
+              </Td>
+              <Td className="text-end whitespace-nowrap tabular-nums">
                 <span className="inline-flex rounded-md bg-success-soft px-2 py-0.5 font-semibold text-success-ink ring-1 ring-success/25 ring-inset">
                   {money(row.earning + row.delivery)}
                 </span>
@@ -420,6 +441,13 @@ function CurrencyTable({
               {money(group.totals.delivery)}
             </Td>
             <Td className="text-end whitespace-nowrap tabular-nums">
+              <FreeCell
+                waived={group.totals.deliveryWaived}
+                count={group.totals.freeDeliveries}
+                money={money}
+              />
+            </Td>
+            <Td className="text-end whitespace-nowrap tabular-nums">
               <span className="inline-flex rounded-md bg-success-ink px-2 py-0.5 font-bold text-white shadow-xs">
                 {money(group.totals.earning + group.totals.delivery)}
               </span>
@@ -428,6 +456,30 @@ function CurrencyTable({
         </TBody>
       </Table>
     </Section>
+  );
+}
+
+/**
+ * Free delivery given: what it cost, and on how many orders. Muted, because it
+ * is money we did not take rather than money in, and "—" when there was none.
+ */
+function FreeCell({
+  waived,
+  count,
+  money,
+}: {
+  waived: number;
+  count: number;
+  money: (minor: number) => string;
+}) {
+  if (waived <= 0) return <span className="text-ink-4">—</span>;
+  return (
+    <span className="inline-flex flex-col items-end text-ink-3">
+      <span>{money(waived)}</span>
+      <span className="text-[12px] font-normal text-ink-4">
+        {t("earningsReport.freeOrders", { count })}
+      </span>
+    </span>
   );
 }
 
