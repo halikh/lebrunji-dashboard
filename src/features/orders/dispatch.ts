@@ -250,8 +250,9 @@ export function whatsappLink(phone: string, message: string): string {
  *
  * `other` is the pair to say a figure in both. A shop's figure is read at
  * **that shop's** rate (`OrderStore.shopRate`), the one its menu quoted; the
- * order's total at the receipt's (`Order.shopRate`). Converted figures are
- * cash, as the app shows them: each line one unit at a time, rounded to the
+ * total as the app adds it: its dish lines, then the bill's own lines at the
+ * platform's rate. Converted figures are cash, as the app shows them: each
+ * line one unit at a time, rounded to the
  * 1,000 note, then counted out (`otherFigure`) — so the lira the driver hands
  * a shop is the lira the customer saw. Absent, those lines are left out
  * rather than guessed. And when the server rounded a lira total to its cash
@@ -296,6 +297,9 @@ export function dispatchMessage(
   // What every shop is paid, added up, for what is left with the driver.
   let paidShops = 0;
   let paidShopsOther = 0;
+  // Every dish's cash figure at the app's prices, for the total's — see the
+  // door below.
+  let dishesOther = 0;
 
   // In the order of the trip: every pickup, then the door, then the money.
   //
@@ -360,8 +364,10 @@ export function dispatchMessage(
         quantity,
       );
       bag += price;
-      if (other)
+      if (other) {
         bagOther += otherFigure(priced, quantity, other, store.shopRate);
+        dishesOther += otherFigure(line, quantity, other, store.shopRate);
+      }
       const amount = money(price);
       lines.push(
         `• ${whatToPack(line, quantity)}${amount ? ` — ${amount}` : ""}`,
@@ -449,10 +455,20 @@ export function dispatchMessage(
     }
     lines.push(bill);
 
-    // The one number the driver acts on at the door.
+    // The one number the driver acts on at the door. Its second figure is
+    // the customer's, added up as the app adds it (`totalParts`): every dish
+    // line's cash figure, then delivery, discount and rounding as one part at
+    // the platform's rate. Converting the total in one go read $5.05 as
+    // 449,000 when the lines above it came to 450,000 — and the customer
+    // was shown 450,000 (DL-261110-00238).
     const totalOther = other
-      ? roundToCash(
-          convertMoney(order.total, other.from, other.to, order.shopRate),
+      ? dishesOther +
+        roundToCash(
+          convertMoney(
+            order.deliveryFee - order.discount + rounding,
+            other.from,
+            other.to,
+          ),
           other.to.code,
         )
       : null;

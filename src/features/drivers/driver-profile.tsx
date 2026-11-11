@@ -342,7 +342,10 @@ function Loaded({
                     <Th>{t("drivers.colHanded")}</Th>
                     <Th>{t("drivers.colStatus")}</Th>
                     <Th className="text-end">{t("drivers.colDelivery")}</Th>
-                    <Th className="text-end">{t("drivers.colTotal")}</Th>
+                    <Th className="text-end">
+                      {t("drivers.colWithoutCommission")}
+                    </Th>
+                    <Th className="text-end">{t("drivers.colCommission")}</Th>
                   </Tr>
                 </THead>
                 <TBody>
@@ -367,6 +370,7 @@ function Loaded({
                           </Td>
                           <Td className="text-end text-ink-4">—</Td>
                           <Td className="text-end text-ink-4">—</Td>
+                          <Td className="text-end text-ink-4">—</Td>
                         </>
                       ) : (
                         <>
@@ -383,7 +387,15 @@ function Loaded({
                           </Td>
                           <Td className="text-end tabular-nums">
                             <Price
-                              value={row.orderTotal}
+                              value={row.orderTotal - row.commission}
+                              code={row.currencyCode}
+                              shopRate={row.shopRate}
+                              align="end"
+                            />
+                          </Td>
+                          <Td className="text-end tabular-nums">
+                            <Price
+                              value={row.commission}
                               code={row.currencyCode}
                               shopRate={row.shopRate}
                               align="end"
@@ -528,7 +540,7 @@ function StatTile({
 }
 
 /**
- * The sums of the two money columns, under the rows they add up.
+ * The sums of the three money columns, under the rows they add up.
  *
  * - **Cancelled orders are left out.** Nothing was collected on them, and a
  *   total that counted them would be a figure the driver could never hand in.
@@ -549,16 +561,23 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
 
   const byCurrency = new Map<
     string,
-    { fee: number; total: number; rates: Set<number | null> }
+    {
+      fee: number;
+      net: number;
+      commission: number;
+      rates: Set<number | null>;
+    }
   >();
   for (const row of counted) {
     const sum = byCurrency.get(row.currencyCode) ?? {
       fee: 0,
-      total: 0,
+      net: 0,
+      commission: 0,
       rates: new Set<number | null>(),
     };
     sum.fee += row.deliveryFee;
-    sum.total += row.orderTotal;
+    sum.net += row.orderTotal - row.commission;
+    sum.commission += row.commission;
     sum.rates.add(row.shopRate);
     byCurrency.set(row.currencyCode, sum);
   }
@@ -598,7 +617,18 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
             {sums.length === 0
               ? "—"
               : sums.map(([code, sum]) => (
-                  <span key={code}>{amount(sum.total, code, sum.rates)}</span>
+                  <span key={code}>{amount(sum.net, code, sum.rates)}</span>
+                ))}
+          </span>
+        </Td>
+        <Td className="py-2 text-end">
+          <span className="flex flex-col items-end gap-1">
+            {sums.length === 0
+              ? "—"
+              : sums.map(([code, sum]) => (
+                  <span key={code}>
+                    {amount(sum.commission, code, sum.rates)}
+                  </span>
                 ))}
           </span>
         </Td>

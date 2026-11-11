@@ -32,6 +32,12 @@ export type EarningsRow = {
   earning: number;
   /** What drivers paid the shop at pickup. */
   storeDue: number;
+  /**
+   * What customers paid for delivery (`0274`). One fee per order, split
+   * evenly across its shops' portions, so a currency's rows add up to the
+   * fees charged and a two-shop order is not counted twice.
+   */
+  delivery: number;
 };
 
 export async function fetchEarnings(
@@ -63,6 +69,7 @@ export async function fetchEarnings(
     sales: Number(row.sales ?? 0),
     earning: Number(row.earning ?? 0),
     storeDue: Number(row.store_due ?? 0),
+    delivery: Number(row.delivery ?? 0),
   }));
 }
 
@@ -93,7 +100,13 @@ async function fetchBranchAddresses(
 export type CurrencyGroup = {
   currencyCode: string;
   rows: EarningsRow[];
-  totals: { orders: number; sales: number; earning: number; storeDue: number };
+  totals: {
+    orders: number;
+    sales: number;
+    earning: number;
+    storeDue: number;
+    delivery: number;
+  };
 };
 
 /**
@@ -110,7 +123,7 @@ export function groupByCurrency(rows: readonly EarningsRow[]): CurrencyGroup[] {
       group = {
         currencyCode: row.currencyCode,
         rows: [],
-        totals: { orders: 0, sales: 0, earning: 0, storeDue: 0 },
+        totals: { orders: 0, sales: 0, earning: 0, storeDue: 0, delivery: 0 },
       };
       groups.set(row.currencyCode, group);
     }
@@ -119,6 +132,7 @@ export function groupByCurrency(rows: readonly EarningsRow[]): CurrencyGroup[] {
     group.totals.sales += row.sales;
     group.totals.earning += row.earning;
     group.totals.storeDue += row.storeDue;
+    group.totals.delivery += row.delivery;
   }
   return [...groups.values()].sort((a, b) => b.totals.orders - a.totals.orders);
 }

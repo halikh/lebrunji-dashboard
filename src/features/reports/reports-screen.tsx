@@ -13,7 +13,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -32,11 +31,9 @@ import {
   Tr,
   cx,
 } from "@/components/ui";
-import { Select } from "@/components/ui/select";
 import { BarChart, HBarList, HeatGrid } from "@/components/ui/chart";
 import { DateRangeField } from "@/components/ui/date-field";
 import { useToasts } from "@/components/ui/toast";
-import { Price } from "@/features/reference/price";
 import { useMoney } from "@/features/reference/use-currencies";
 import { pickLocalized } from "@/i18n/db-text";
 import { t } from "@/i18n/translations";
@@ -49,6 +46,7 @@ import {
   fromWallClock,
 } from "@/lib/time";
 
+import type { EarningsRow } from "@/features/earnings/api";
 import { useEarningsReport } from "@/features/earnings/use-earnings-report";
 import {
   earnedByStore,
@@ -187,12 +185,17 @@ export function ReportsScreen() {
     before.to,
     compare !== "none",
   );
-  const earnedNow = earnedTotals(earnings.data ?? []);
+  // Only the report's currency, like every other figure here: with LBP picked
+  // the page says lira, with USD dollars — never both side by side.
+  const inCode = (rows: readonly EarningsRow[] | undefined) =>
+    (rows ?? []).filter((row) => row.currencyCode === code);
+  const earnedRows = inCode(earnings.data);
+  const earnedNow = earnedTotals(earnedRows);
   const earnedBefore =
     compare !== "none" && !priorEarnings.isPlaceholderData && priorEarnings.data
-      ? earnedTotals(priorEarnings.data)
+      ? earnedTotals(inCode(priorEarnings.data))
       : undefined;
-  const earnedPerStore = earnedByStore(earnings.data ?? []);
+  const earnedPerStore = earnedByStore(earnedRows);
   /** The Earnings page, at this range — it reads the same `days` / `from` / `to`. */
   const earningsHref = (() => {
     const query = new URLSearchParams();
@@ -283,7 +286,7 @@ export function ReportsScreen() {
         currencies?.find((one) => one.code === code),
         { from: toDayKey(current.from), to: toDayKey(lastDay) },
         {
-          rows: earnings.data ?? [],
+          rows: earnedRows,
           currencyOf: (one) => currencies?.find((c) => c.code === one),
         },
       );
@@ -359,18 +362,9 @@ export function ReportsScreen() {
               </Button>
             )}
           </div>
-          <Select
-            aria-label={t("reports.compareLabel")}
-            value={compare}
-            onChange={(next) => setParam("compare", next, "previous")}
-            options={COMPARES.map((option) => ({
-              value: option,
-              label: t(`reports.compare.${option}` as const),
-            }))}
-            className="w-full sm:ms-auto sm:w-56"
-          />
           {currencyChoices.length > 1 && (
             <Segmented
+              className="sm:ms-auto"
               items={currencyChoices.map((one) => ({ key: one, label: one }))}
               value={code}
               onChange={(next) => setParam("currency", next, "")}
@@ -434,7 +428,7 @@ export function ReportsScreen() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
             <Tile
               label={t("reports.tileRevenue")}
-              value={<Price value={data.totals.revenue} code={code} />}
+              value={<Money value={data.totals.revenue} code={code} />}
               change={change(data.totals.revenue, priorData?.totals.revenue)}
               was={priorData && format(priorData.totals.revenue, code)}
             />
@@ -453,7 +447,7 @@ export function ReportsScreen() {
             />
             <Tile
               label={t("reports.tileAverage")}
-              value={<Price value={data.totals.averageOrder} code={code} />}
+              value={<Money value={data.totals.averageOrder} code={code} />}
               change={change(
                 data.totals.averageOrder,
                 priorData?.totals.averageOrder,
@@ -462,30 +456,13 @@ export function ReportsScreen() {
             />
             <Tile
               label={t("reports.tileDelivery")}
-              value={<Price value={data.totals.deliveryFees} code={code} />}
+              value={<Money value={data.totals.deliveryFees} code={code} />}
               change={change(
                 data.totals.deliveryFees,
                 priorData?.totals.deliveryFees,
               )}
               was={priorData && format(priorData.totals.deliveryFees, code)}
             />
-          </div>
-
-          {/* Two figures that are not revenue and would be lost among the
-              tiles: what promotions cost, and what was cancelled. */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-ink-3">
-            <span className="font-medium text-ink-2">
-              {t("reports.otherFigures")}
-            </span>
-            <span className="flex items-baseline gap-2">
-              {t("reports.discountsGiven")}
-              <span className="font-semibold text-ink tabular-nums">
-                {format(data.totals.discounts, code)}
-              </span>
-            </span>
-            <Badge tone={data.totals.cancelled > 0 ? "danger" : "neutral"}>
-              {t("reports.cancelled", { count: data.totals.cancelled })}
-            </Badge>
           </div>
 
           <TrendChart
@@ -640,7 +617,7 @@ function EarnedTile({
   ) : (
     <span className="flex flex-col">
       {lines.map((one) => (
-        <Price
+        <Money
           key={one.currencyCode}
           value={one.amount}
           code={one.currencyCode}
@@ -997,4 +974,13 @@ function valueOf(bucket: Bucket, metric: Metric): number {
   if (metric === "revenue") return bucket.revenue;
   if (metric === "orders") return bucket.orders;
   return bucket.orders > 0 ? Math.round(bucket.revenue / bucket.orders) : 0;
+}
+
+/**
+ * One figure in the report's currency, and only that — no converted second
+ * line under it. With LBP picked the page reads lira, with USD dollars.
+ */
+function Money({ value, code }: { value: number; code: string }) {
+  const { format } = useMoney();
+  return <span className="tabular-nums">{format(value, code)}</span>;
 }

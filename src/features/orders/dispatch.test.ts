@@ -178,11 +178,52 @@ describe("dispatchMessage", () => {
     const lines = text.split("\n");
 
     expect(text).toContain("الأصناف $10.00 + التوصيل $3.00 − الخصم $2.00");
-    // $11.00 is 984,500 lira; nobody hands over a 500, so 985,000.
-    expect(lines.at(-2)).toBe("*اقبض من الزبون: $11.00* أو 985,000 ل.ل");
+    // As the app adds it: the dishes' 896,000, and delivery less the
+    // discount — $1.00, 89,500, so 90,000 in cash.
+    expect(lines.at(-2)).toBe("*اقبض من الزبون: $11.00* أو 986,000 ل.ل");
     // Less the shop's 896,000.
     expect(lines.at(-1)).toBe(
-      say("dispatch.cashLeft", { amount: "$1.00 أو 89,000 ل.ل" }),
+      say("dispatch.cashLeft", { amount: "$1.00 أو 90,000 ل.ل" }),
+    );
+  });
+
+  it("adds the total's lira up from its lines, as the customer saw it", () => {
+    // DL-261110-00238: $3.93 + $1.12 at 89,000, 10% commission, delivery
+    // taken off in full. The total converted in one go is 449,000; the
+    // lines are 350,000 + 100,000, and the app showed 450,000.
+    const text = dispatchMessage(
+      order({
+        subtotal: 505,
+        deliveryFee: 200,
+        discount: 200,
+        total: 505,
+        stores: [
+          store("os-1", "Abu Ghraib", null, null, {
+            shopRate: 89_000,
+            earnings: {
+              model: "commission",
+              commissionPercent: 10,
+              sales: 505,
+              storeDue: 454,
+              earning: 51,
+            },
+          }),
+        ],
+        lines: [
+          line({ id: "a", name: "Qamhiyeh", unitPrice: 393 }),
+          line({ id: "b", name: "Oat bread", unitPrice: 112 }),
+        ],
+      }),
+      USD,
+      true,
+      BOTH,
+    );
+    const lines = text.split("\n");
+
+    expect(text).toContain("*ادفع للمحل: $4.54* أو 405,000 ل.ل");
+    expect(lines.at(-2)).toBe("*اقبض من الزبون: $5.05* أو 450,000 ل.ل");
+    expect(lines.at(-1)).toBe(
+      say("dispatch.cashLeft", { amount: "$0.51 أو 45,000 ل.ل" }),
     );
   });
 
