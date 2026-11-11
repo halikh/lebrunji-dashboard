@@ -143,12 +143,14 @@ function Loaded({
   /**
    * Counts answer "what has happened"; averages answer "is this normal", which
    * a count cannot. Both windows are **trading days** — `startOfBusinessDay`
-   * cuts at the business opening hour — so a hand-over after midnight counts
-   * towards the evening it belonged to.
+   * cuts at our closing hour — and a hand-over counts towards the day its
+   * order was placed, so one made after we close stays with its evening.
    */
   const dayStart = startOfBusinessDay().getTime();
   const weekStart = startOfBusinessDayPlus(-6).getTime();
-  const at = (one: Dispatch) => new Date(one.dispatchedAt).getTime();
+  // The day a hand-over counts towards is its order's: one placed at 23:55
+  // and handed over after we close is still that night's.
+  const at = (one: Dispatch) => new Date(one.placedAt).getTime();
   // Counted only while the order is still theirs. One handed on to somebody
   // else stays in the list, so who had it first can be read, but it is the
   // other driver's run, not theirs.
@@ -164,7 +166,7 @@ function Loaded({
   const earliest = carried.length
     ? Math.min(
         ...carried.map((one) =>
-          startOfBusinessDay(new Date(one.dispatchedAt)).getTime(),
+          startOfBusinessDay(new Date(one.placedAt)).getTime(),
         ),
       )
     : dayStart;

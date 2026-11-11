@@ -22,10 +22,10 @@ export type AppSettings = {
   /**
    * When orders are taken, on the business clock.
    *
-   * The opening hour is also where the **trading day** begins:
-   * `business_day_starts_at()` reads this column (0093), so the day the reports
-   * cut and the hours the shop takes orders are the same number rather than two
-   * that can drift apart.
+   * The closing hour is also where the **trading day** ends and the next
+   * begins: `business_day_starts_at()` reads it (0275; the opening hour before
+   * that), so the day the reports cut and the hours the shop takes orders are
+   * the same numbers rather than two that can drift apart.
    *
    * Closing after midnight is ordinary — 08:00 to 02:00 — so `closeHour` below
    * `openHour` is not a mistake to correct.
@@ -79,7 +79,9 @@ export async function fetchAppSettings(): Promise<AppSettings> {
   // Here rather than in a hook, so the zone and the trading day's start are
   // in place for every formatter the moment the row lands — including the
   // ones `dispatchMessage` calls outside React.
-  setBusinessClock({ timezone, dayStartsAt: row.orders_open_hour as number });
+  // The day ends when we close (0275): after closing, "Today" is the next
+  // day, still empty, rather than the night that has finished.
+  setBusinessClock({ timezone, dayStartsAt: row.orders_close_hour as number });
 
   return {
     clock24h: row.clock_24h as boolean,

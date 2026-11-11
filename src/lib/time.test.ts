@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   DEFAULT_BUSINESS_DAY_STARTS_AT,
@@ -29,7 +29,14 @@ import {
  *
  * Beirut is UTC+2 in winter and UTC+3 in summer, switching on the last Sunday of
  * March and October. In 2026 that is 29 March and 25 October.
+ *
+ * The shift arithmetic below is written for a day that turns at 08:00, so each
+ * test starts there. The default is the closing hour (2, 0275); which hour is
+ * picked does not change the arithmetic being proved.
  */
+beforeEach(() => {
+  setBusinessClock({ dayStartsAt: 8 });
+});
 describe("toWallClock", () => {
   it("reads winter as UTC+2", () => {
     expect(toWallClock(new Date("2026-01-15T12:00:00Z"))).toMatchObject({

@@ -204,8 +204,8 @@ export function GeneralTab() {
 
       <SettingsGroup
         title={t("general.shiftTitle")}
-        // The consequence, before the control: the opening hour is also where
-        // "today" begins on the queue and in every report.
+        // The consequence, before the control: the closing hour is also where
+        // "today" ends on the queue and in every report (0275).
         description={t("general.shiftBlurb")}
       >
         <SettingRow

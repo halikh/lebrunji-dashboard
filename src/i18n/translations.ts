@@ -783,7 +783,7 @@ const en = {
   /**
    * The settings that belong to the business rather than to a row.
    *
-   * Each one says its *consequence*, not just its name. Moving the opening hour
+   * Each one says its *consequence*, not just its name. Moving the closing hour
    * moves what "today" means on the queue and in every report, and a label
    * reading "Opens at" alone would hide that behind a dropdown that looks like
    * a preference.
@@ -821,7 +821,7 @@ const en = {
     shiftTitle: "When you take orders",
     // The consequence, before the control rather than after it.
     shiftBlurb:
-      "The opening hour is also where a day begins. “Today” on the queue and every day in the reports run from it — so a night that ends at 02:00 counts as one day’s trade rather than two half-nights.",
+      "The closing hour is also where a day ends. “Today” on the queue and every day in the reports end there — so a night that closes at 02:00 counts as one day’s trade rather than two half-nights, and once you close, “Today” starts fresh.",
     opensAt: "Opens at",
     closesAt: "Closes at",
     saveShift: "Save hours",
@@ -1005,7 +1005,7 @@ const en = {
     liveEmptyBody:
       "Every order has been delivered or cancelled. New ones appear here the moment they are placed, and the dashboard chimes.",
     todayEmptyTitle: "Nothing today yet",
-    todayEmptyBody: "No orders have been placed since midnight.",
+    todayEmptyBody: "No orders have been placed today.",
     allEmptyTitle: "No orders",
     allEmptyBody: "Nothing has ever been placed.",
     emptyTitle: "Nothing waiting",
