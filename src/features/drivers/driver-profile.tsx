@@ -13,7 +13,6 @@ import {
 import { useState } from "react";
 
 import {
-  Badge,
   Button,
   Card,
   ConfirmDialog,
@@ -549,10 +548,10 @@ function HoursSheet({
 }
 
 /**
- * A delivery a promotion made free: the quoted fee struck through above a
- * "Free" tag. The fee stays visible because it is what the promotion cost us;
- * it is struck because the customer paid none of it and the driver collected
- * none of it.
+ * A delivery a promotion made free: the quoted fee, struck through. It stays
+ * visible because it is what the promotion cost us; it is struck because the
+ * customer paid none of it and the driver collected none of it. The tooltip
+ * says so in words.
  */
 function FreeDelivery({ row }: { row: Dispatch }) {
   const { format } = useMoney();
@@ -562,11 +561,8 @@ function FreeDelivery({ row }: { row: Dispatch }) {
         fee: format(row.deliveryWaived, row.currencyCode),
       })}
     >
-      <span className="relative z-10 inline-flex flex-col items-end gap-0.5">
-        <span className="text-[12.5px] text-ink-4 line-through">
-          {format(row.deliveryFee, row.currencyCode)}
-        </span>
-        <Badge tone="info">{t("drivers.freeDelivery")}</Badge>
+      <span className="relative z-10 whitespace-nowrap text-ink-4 line-through">
+        {format(row.deliveryFee, row.currencyCode)}
       </span>
     </Tooltip>
   );
@@ -601,8 +597,8 @@ function StatTile({
  * - **It adds up what the table shows** — the latest hand-overs, not every one
  *   ever — so the totals and the rows above them always agree.
  * - **Delivery is what customers paid.** A delivery a promotion made free is
- *   not in the fee sum — the driver collected none of it — and is counted on
- *   its own line instead, so what the promotion cost is still in sight.
+ *   not in the fee sum: the driver collected none of it. Its struck-through
+ *   fee on the row is where the promotion's cost is read (user, 2026-11-11).
  */
 function HandoverTotals({ rows }: { rows: Dispatch[] }) {
   const { format } = useMoney();
@@ -615,7 +611,6 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
     string,
     {
       fee: number;
-      waived: number;
       net: number;
       commission: number;
       rates: Set<number | null>;
@@ -624,20 +619,17 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
   for (const row of counted) {
     const sum = byCurrency.get(row.currencyCode) ?? {
       fee: 0,
-      waived: 0,
       net: 0,
       commission: 0,
       rates: new Set<number | null>(),
     };
     sum.fee += row.deliveryFee - row.deliveryWaived;
-    sum.waived += row.deliveryWaived;
     sum.net += row.orderTotal - row.commission;
     sum.commission += row.commission;
     sum.rates.add(row.shopRate);
     byCurrency.set(row.currencyCode, sum);
   }
   const sums = [...byCurrency.entries()];
-  const freeCount = counted.filter((row) => row.deliveryWaived > 0).length;
 
   const amount = (value: number, code: string, rates: Set<number | null>) =>
     rates.size === 1 ? (
@@ -657,11 +649,6 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
                 {t("drivers.totalsSkipped")}
               </span>
             )}
-            {freeCount > 0 && (
-              <span className="text-[12px] font-normal text-ink-4">
-                {t("drivers.totalsFree", { count: freeCount })}
-              </span>
-            )}
           </span>
         </Td>
         <Td className="py-2 text-end">
@@ -669,16 +656,7 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
             {sums.length === 0
               ? "—"
               : sums.map(([code, sum]) => (
-                  <span key={code} className="flex flex-col items-end">
-                    {amount(sum.fee, code, sum.rates)}
-                    {sum.waived > 0 && (
-                      <span className="text-[12px] font-normal text-ink-4">
-                        {t("drivers.totalsWaived", {
-                          amount: format(sum.waived, code),
-                        })}
-                      </span>
-                    )}
-                  </span>
+                  <span key={code}>{amount(sum.fee, code, sum.rates)}</span>
                 ))}
           </span>
         </Td>

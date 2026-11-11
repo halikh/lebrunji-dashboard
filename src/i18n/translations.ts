@@ -677,11 +677,8 @@ const en = {
     // Free delivery from a promotion (0203): the customer paid no fee, so the
     // driver collected none and hands none in. The fee stays on screen, struck
     // through, because it is what the promotion cost us.
-    freeDelivery: "Free",
     freeDeliveryHint:
       "A promotion made delivery free. The customer paid none of the {fee} fee, so it is not in Total to collect.",
-    totalsFree: "Free delivery on: {count}",
-    totalsWaived: "{amount} free",
     // A row kept on the first driver's page after the order was reassigned.
     movedTo: "Handed on to {name}",
     rangeToday: "Today ({count})",
