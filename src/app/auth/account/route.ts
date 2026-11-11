@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { REFRESH_COOKIE } from "@/lib/auth/cookies";
+import { publicOrigin } from "@/lib/auth/public-origin";
 import {
   anonymousClient,
   readRemember,
@@ -117,10 +118,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Without `emailRedirectTo` the confirmation link falls back to the
-  // project's Site URL, which is the customer app's `deliveryapp://`.
+  // project's Site URL, which is the customer app's `deliveryapp://`. Built
+  // from APP_PUBLIC_URL, not the request's Host, as the recovery link is.
   const { error } = await supabase.auth.updateUser(
     password ? { password } : { email: email as string },
-    { emailRedirectTo: `${request.nextUrl.origin}/auth/confirm` },
+    { emailRedirectTo: `${publicOrigin(request)}/auth/confirm` },
   );
 
   if (error) {
