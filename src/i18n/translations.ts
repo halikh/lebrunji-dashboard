@@ -4430,6 +4430,11 @@ const en = {
     soundLocked:
       "Sound is off: the browser keeps the page silent until you click on it, so new orders won't chime.",
     soundTurnOn: "Turn on sound",
+    // The browser's rule is per load; only its own site setting lifts it for
+    // good, and then `soundLocked` reads the context as running and the bar
+    // never shows on that computer.
+    soundForGood:
+      "To stop this for good: click the icon left of the address, open Site settings, and set Sound to Allow (Media autoplay in Edge).",
     live: "Live",
   },
 
