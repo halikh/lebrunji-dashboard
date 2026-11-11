@@ -680,8 +680,10 @@ const en = {
     // A row kept on the first driver's page after the order was reassigned.
     movedTo: "Handed on to {name}",
     rangeToday: "Today ({count})",
+    rangeYesterday: "Yesterday ({count})",
     rangeAll: "All ({count})",
     noneToday: "Nothing handed to them today yet.",
+    noneYesterday: "Nothing was handed to them yesterday.",
     timeLabel: "{day}, {which}",
     inactiveNote:
       "Deactivated: they are not offered on orders. Bring them back to put them on the rota again.",

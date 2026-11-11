@@ -139,7 +139,7 @@ function Loaded({
   const [editingHours, setEditingHours] = useState(false);
   // Today is the trading day, cut where the stat tiles cut it, so the
   // "Today" tile and the "Today" list always say the same number.
-  const [range, setRange] = useState<"today" | "all">("today");
+  const [range, setRange] = useState<"today" | "yesterday" | "all">("today");
 
   /**
    * Counts answer "what has happened"; averages answer "is this normal", which
@@ -148,6 +148,7 @@ function Loaded({
    * order was placed, so one made after we close stays with its evening.
    */
   const dayStart = startOfBusinessDay().getTime();
+  const yesterdayStart = startOfBusinessDayPlus(-1).getTime();
   const weekStart = startOfBusinessDayPlus(-6).getTime();
   // The day a hand-over counts towards is its order's: one placed at 23:55
   // and handed over after we close is still that night's.
@@ -176,8 +177,17 @@ function Loaded({
     Math.round((dayStart - earliest) / 86_400_000) + 1,
   );
   const perDay = carried.length / daysActive;
+  // The rows each range shows, handed-on ones too — as "All" counts them.
+  const todayRows = rows.filter((one) => at(one) >= dayStart);
+  const yesterdayRows = rows.filter(
+    (one) => at(one) >= yesterdayStart && at(one) < dayStart,
+  );
   const shown =
-    range === "today" ? rows.filter((one) => at(one) >= dayStart) : rows;
+    range === "today"
+      ? todayRows
+      : range === "yesterday"
+        ? yesterdayRows
+        : rows;
 
   return (
     <Page>
@@ -298,10 +308,14 @@ function Loaded({
                   items={[
                     {
                       key: "today",
-                      // The rows the list will show, handed-on ones too —
-                      // as "All" counts them.
                       label: t("drivers.rangeToday", {
-                        count: rows.filter((one) => at(one) >= dayStart).length,
+                        count: todayRows.length,
+                      }),
+                    },
+                    {
+                      key: "yesterday",
+                      label: t("drivers.rangeYesterday", {
+                        count: yesterdayRows.length,
                       }),
                     },
                     {
@@ -335,7 +349,9 @@ function Loaded({
               </p>
             ) : shown.length === 0 ? (
               <p className="px-5 py-8 text-center text-[13.5px] text-ink-3">
-                {t("drivers.noneToday")}
+                {range === "yesterday"
+                  ? t("drivers.noneYesterday")
+                  : t("drivers.noneToday")}
               </p>
             ) : (
               <Table>
@@ -596,9 +612,10 @@ function StatTile({
  *   converted figure would be a rate nobody quoted, so it is left off.
  * - **It adds up what the table shows** — the latest hand-overs, not every one
  *   ever — so the totals and the rows above them always agree.
- * - **Delivery is what customers paid.** A delivery a promotion made free is
- *   not in the fee sum: the driver collected none of it. Its struck-through
- *   fee on the row is where the promotion's cost is read (user, 2026-11-11).
+ * - **The Delivery sum counts every delivery made**, free ones too — it is the
+ *   driver's work, whoever paid for it (user, 2026-11-11, reversing the same
+ *   day's "paid only"). **To collect** still takes only what customers paid:
+ *   the driver collected nothing on a delivery a promotion made free.
  */
 function HandoverTotals({ rows }: { rows: Dispatch[] }) {
   const { format } = useMoney();
@@ -611,6 +628,7 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
     string,
     {
       fee: number;
+      paidFee: number;
       net: number;
       commission: number;
       rates: Set<number | null>;
@@ -619,11 +637,13 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
   for (const row of counted) {
     const sum = byCurrency.get(row.currencyCode) ?? {
       fee: 0,
+      paidFee: 0,
       net: 0,
       commission: 0,
       rates: new Set<number | null>(),
     };
-    sum.fee += row.deliveryFee - row.deliveryWaived;
+    sum.fee += row.deliveryFee;
+    sum.paidFee += row.deliveryFee - row.deliveryWaived;
     sum.net += row.orderTotal - row.commission;
     sum.commission += row.commission;
     sum.rates.add(row.shopRate);
@@ -686,7 +706,7 @@ function HandoverTotals({ rows }: { rows: Dispatch[] }) {
               ? "—"
               : sums.map(([code, sum]) => (
                   <span key={code}>
-                    {amount(sum.commission + sum.fee, code, sum.rates)}
+                    {amount(sum.commission + sum.paidFee, code, sum.rates)}
                   </span>
                 ))}
           </span>
