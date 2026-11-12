@@ -3,6 +3,7 @@ import { whatsappOf } from "@/features/catalog/api/branches";
 import { oneShopRate } from "@/features/reference/shop-rate";
 import { getClient } from "@/lib/supabase/client";
 import {
+  isCourierLeg,
   isFinishedSlug,
   ORDER_STATUS_SLUGS,
   statusName,
@@ -73,8 +74,14 @@ export type OrderStore = {
    * asking.
    */
   storeWhatsapp: string | null;
+  /** The step on the path (`order_stores.step`) — see `order-status.ts`. */
   statusSlug: string;
   statusName: string;
+  /**
+   * `order_stores.status`. `driverSent` here is what locks an order against an
+   * amend, however the step reads — it can still say `confirmed`.
+   */
+  rawStatus: string;
   /** Position on the path. `null` is terminal and off it — cancelled. */
   progress: number | null;
   subtotal: number;
@@ -203,6 +210,8 @@ export type Order = {
    * an amended order without fetching them.
    */
   amendedAt: string | null;
+  /** The driver it was last handed to, or null if it never was. */
+  driverName: string | null;
   /**
    * Who placed it, so a receipt can lead to their profile.
    *
@@ -347,10 +356,10 @@ export async function fetchOrders(options: {
   // is, because `toOrder` resolves the rate its figures are read at and the
   // queue and the panel must not disagree about that.
   const embed = filterSlugs
-    ? `order_stores!inner ( id, store_id, subtotal, status,
+    ? `order_stores!inner ( id, store_id, subtotal, status, step,
          branches ( id, name, address ),
          stores ( name, exchange_rate, branches ( id, deleted_at ) ) )`
-    : `order_stores ( id, store_id, subtotal, status,
+    : `order_stores ( id, store_id, subtotal, status, step,
          branches ( id, name, address ),
          stores ( name, exchange_rate, branches ( id, deleted_at ) ) )`;
 
@@ -363,6 +372,7 @@ export async function fetchOrders(options: {
        user_id,
        contact_phone,
        users:user_id ( name, phone ),
+       order_dispatches ( dispatched_at, couriers ( name ) ),
        ${embed}`,
     )
     .is("deleted_at", null)
@@ -372,7 +382,7 @@ export async function fetchOrders(options: {
   if (before) query = query.lt("placed_at", before);
 
   if (filterSlugs) {
-    query = query.in("order_stores.status", filterSlugs);
+    query = query.in("order_stores.step", filterSlugs);
   }
 
   // Today and Yesterday are cut on Beirut's clock — not UTC's, and not the
@@ -419,7 +429,8 @@ export async function fetchOrder(
        latitude, longitude,
        users:user_id ( name, phone ),
        addresses:address_id ( latitude, longitude ),
-       order_stores ( id, store_id, subtotal, status,
+       order_dispatches ( dispatched_at, couriers ( name ) ),
+       order_stores ( id, store_id, subtotal, status, step,
          order_store_earnings ( model, commission_percent, sales, store_due, earning ),
          branches ( id, name, address, latitude, longitude, branch_contacts ( whatsapp_phone ) ),
          stores ( name, image_url, exchange_rate,
@@ -515,12 +526,12 @@ export async function fetchStatusCounts(
     ORDER_STATUS_SLUGS.map(async (slug) => {
       let query = getClient()
         .from("orders")
-        .select("id, order_stores!inner(status)", {
+        .select("id, order_stores!inner(step)", {
           count: "exact",
           head: true,
         })
         .is("deleted_at", null)
-        .eq("order_stores.status", slug);
+        .eq("order_stores.step", slug);
 
       if (since) query = query.gte("placed_at", since);
       if (until) query = query.lt("placed_at", until);
@@ -561,6 +572,22 @@ export async function advanceOrder(
    */
   expectedFrom: string | null,
 ): Promise<number> {
+  // A courier's two steps live in their own column (`0267`), and a step back
+  // from one of them clears it.
+  if (
+    isCourierLeg(statusSlug) ||
+    (statusSlug === "confirmed" && isCourierLeg(expectedFrom))
+  ) {
+    const { data, error } = await getClient().rpc("api_v1_set_courier_stage", {
+      p_order_id: orderId,
+      p_stage: isCourierLeg(statusSlug) ? statusSlug : null,
+      p_expected_from: expectedFrom,
+    });
+
+    if (error) throw orderRefusal(error, "advance");
+    return (data as number | null) ?? 0;
+  }
+
   const { data, error } = await getClient().rpc("api_v1_advance_order", {
     p_order_id: orderId,
     p_status_slug: statusSlug,
@@ -609,8 +636,8 @@ export async function reopenOrder(
  * target's name and position with it, because the receipt reads those off the
  * portion rather than looking the slug up again.
  *
- * `api_v1_dispatch_order` moves the same portions to `driverSent`, so a
- * hand-over is this with that target.
+ * `driverSent` is the hand-over (`api_v1_dispatch_order`): the portion becomes
+ * locked and its step stays where it is, a placed one reading Confirmed.
  *
  * The same object back when nothing moved, so a cache that holds it does not
  * re-render for a move that changed nothing.
@@ -619,20 +646,54 @@ export function withOrderMoved<T extends Pick<Order, "stores">>(
   order: T,
   toSlug: string,
 ): T {
+  const handOver = toSlug === "driverSent";
   let moved = false;
   const stores = order.stores.map((store) => {
-    if (isFinishedSlug(store.statusSlug) || store.statusSlug === toSlug) {
+    if (
+      isFinishedSlug(store.statusSlug) ||
+      store.statusSlug === toSlug ||
+      (handOver && store.rawStatus === "driverSent")
+    ) {
       return store;
     }
     moved = true;
+    const step = !handOver
+      ? toSlug
+      : store.statusSlug === "ordered"
+        ? "confirmed"
+        : store.statusSlug;
+    // Back to Confirmed keeps the lock of a driver who still has it; the
+    // refetch settles the rarer order that never had one.
+    const keepsDriver =
+      toSlug === "confirmed" && store.rawStatus === "driverSent";
     return {
       ...store,
-      statusSlug: toSlug,
-      statusName: statusName(toSlug),
-      progress: statusProgress(toSlug),
+      statusSlug: step,
+      statusName: statusName(step),
+      rawStatus:
+        handOver || isCourierLeg(toSlug) || keepsDriver ? "driverSent" : toSlug,
+      progress: statusProgress(step),
     };
   });
   return moved ? { ...order, stores } : order;
+}
+
+/** Handed to a driver and nothing heard yet, so the customer reads Confirmed. */
+export function isWaitingOnDriver(order: Pick<Order, "stores">): boolean {
+  return order.stores.some(
+    (store) =>
+      store.rawStatus === "driverSent" && store.statusSlug === "confirmed",
+  );
+}
+
+/** The driver last handed this order, from its `order_dispatches` embed. */
+function lastDriverName(row: Record<string, unknown>): string | null {
+  const latest = asArray(row.order_dispatches)
+    .slice()
+    .sort((a, b) =>
+      String(b.dispatched_at).localeCompare(String(a.dispatched_at)),
+    )[0];
+  return (asRecord(latest?.couriers)?.name as string | undefined) ?? null;
 }
 
 /** The cash step, from `@/lib/money` where `convertPrice` uses it too. */
@@ -854,6 +915,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     id: row.id as string,
     code: row.code as string,
     amendedAt: (row.amended_at as string | null) ?? null,
+    driverName: lastDriverName(row),
     placedAt: row.placed_at as string,
     // An account that never finished setup has an empty name — that is the flag
     // the app routes on. Rendering it blank would read as a data fault.
@@ -879,7 +941,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
     secondCurrency: (row.second_currency as string | null) ?? null,
     secondBill: (row.second_bill as number | null) ?? null,
     stores: asArray(row.order_stores).map((store) => {
-      const slug = (store.status as string | null) ?? "";
+      const slug = (store.step as string | null) ?? "";
       return {
         id: store.id as string,
         storeId: store.store_id as string,
@@ -893,6 +955,7 @@ function toOrder(row: Record<string, unknown>, locale: string): Order {
           (asRecord(store.stores)?.image_url as string | null) ?? null,
         statusSlug: slug,
         statusName: statusName(slug),
+        rawStatus: (store.status as string | null) ?? "",
         progress: statusProgress(slug),
         subtotal: store.subtotal as number,
         earnings: earningsOf(asRecord(store.order_store_earnings)),
@@ -960,12 +1023,12 @@ function storePricesOf(row: Record<string, unknown> | null): {
 export async function fetchLiveOrderCount(): Promise<number> {
   const { count, error } = await getClient()
     .from("orders")
-    .select("id, order_stores!inner(status)", {
+    .select("id, order_stores!inner(step)", {
       count: "exact",
       head: true,
     })
     .is("deleted_at", null)
-    .in("order_stores.status", liveStatusSlugs());
+    .in("order_stores.step", liveStatusSlugs());
 
   if (error) throw new Error(`Could not count live orders: ${error.message}`);
   return count ?? 0;

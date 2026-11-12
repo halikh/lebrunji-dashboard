@@ -507,14 +507,11 @@ export function OrderActions({
   });
   const holder = wasCancelled ? (handovers.data?.[0] ?? null) : null;
 
-  // Amending needs room for at least one more step after it.
-  const here = status?.progress ?? null;
-  const movesLeft =
-    here === null
-      ? 0
-      : statuses.filter((one) => one.progress !== null && one.progress > here)
-          .length;
-  const amendable = movesLeft > 1;
+  // Not once a driver has it: `api_v1_amend_order` refuses `driverSent`, and
+  // the message they were sent would no longer match the bag.
+  const amendable =
+    (status?.slug === "ordered" || status?.slug === "confirmed") &&
+    !order.stores.some((portion) => portion.rawStatus === "driverSent");
 
   // Delivered or cancelled by mistake: the way back (0259).
   const reopenable = finished && status ? status : null;

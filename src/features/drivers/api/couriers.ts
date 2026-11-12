@@ -251,7 +251,7 @@ export async function fetchDispatches(
     .select(
       `id, dispatched_at,
        orders ( id, code, placed_at, delivery_fee, discount, total, currency_code,
-         order_stores ( store_id, status, stores ( exchange_rate ),
+         order_stores ( store_id, step, stores ( exchange_rate ),
            order_store_earnings ( earning ) ),
          order_dispatches ( id, courier_id, dispatched_at, couriers ( name ) ) )`,
     )
@@ -294,7 +294,7 @@ export async function fetchDispatches(
     // delivered is not delivered.
     const slug =
       asArray(order.order_stores)
-        .map((portion) => portion.status as string | null)
+        .map((portion) => portion.step as string | null)
         .find(Boolean) ?? "";
 
     return [
@@ -313,7 +313,7 @@ export async function fetchDispatches(
         // A cancelled portion keeps its figures (0262) but was not sold, so
         // its commission is not ours.
         commission: asArray(order.order_stores)
-          .filter((portion) => portion.status !== "cancelled")
+          .filter((portion) => portion.step !== "cancelled")
           .reduce(
             (sum, portion) =>
               sum +

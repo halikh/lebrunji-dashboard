@@ -403,7 +403,7 @@ export async function fetchCustomerOrders(options: {
     .from("orders")
     .select(
       `id, code, placed_at, total, currency_code, address_line,
-       order_stores ( store_id, status, stores ( exchange_rate ) )`,
+       order_stores ( store_id, step, stores ( exchange_rate ) )`,
     )
     .eq("user_id", id)
     .is("deleted_at", null)
@@ -428,7 +428,7 @@ export async function fetchCustomerOrders(options: {
     statuses: [
       ...new Map(
         asArray(row.order_stores).flatMap((portion) => {
-          const slug = portion.status as string | null;
+          const slug = portion.step as string | null;
           if (!slug) return [];
           return [[slug, { slug, name: statusName(slug) }] as const];
         }),
