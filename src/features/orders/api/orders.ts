@@ -9,7 +9,7 @@ import {
   statusProgress,
 } from "@/lib/order-status";
 import { CASH_STEP } from "@/lib/money";
-import { startOfBusinessDay } from "@/lib/time";
+import { startOfBusinessDay, startOfBusinessDayPlus } from "@/lib/time";
 import { asSizeUnit, unitNumber, type SizeUnit } from "@/lib/units";
 
 import { orderRefusal } from "./refusal";
@@ -266,7 +266,28 @@ export type { OrderStatus } from "@/lib/order-status";
  * the screen, and a date filter is precisely what would hide it. So the primary
  * split is by whether an order still needs somebody.
  */
-export type Scope = "live" | "today" | "all";
+export type Scope = "live" | "today" | "yesterday" | "all";
+
+/**
+ * The trading-day window a dated scope covers, as `[since, until)` ISO bounds.
+ * Yesterday is the shift before today's, cut at the same 08:00 Beirut, so an
+ * order placed after we close stays with its evening.
+ */
+function scopeWindow(scope: Scope): {
+  since: string | null;
+  until: string | null;
+} {
+  if (scope === "today") {
+    return { since: startOfBusinessDay().toISOString(), until: null };
+  }
+  if (scope === "yesterday") {
+    return {
+      since: startOfBusinessDayPlus(-1).toISOString(),
+      until: startOfBusinessDay().toISOString(),
+    };
+  }
+  return { since: null, until: null };
+}
 
 export type OrderPage = {
   orders: Order[];
@@ -354,12 +375,12 @@ export async function fetchOrders(options: {
     query = query.in("order_stores.status", filterSlugs);
   }
 
-  if (scope === "today") {
-    // Since our last closing, on Beirut's clock — not UTC's, and not the
-    // machine's. A laptop still set to another timezone would otherwise show a
-    // different day's orders from the one beside it.
-    query = query.gte("placed_at", startOfBusinessDay().toISOString());
-  }
+  // Today and Yesterday are cut on Beirut's clock — not UTC's, and not the
+  // machine's. A laptop still set to another timezone would otherwise show a
+  // different day's orders from the one beside it.
+  const bounds = scopeWindow(scope);
+  if (bounds.since) query = query.gte("placed_at", bounds.since);
+  if (bounds.until) query = query.lt("placed_at", bounds.until);
 
   if (search) {
     // The code is what a customer reads out over the phone, and they read out
@@ -488,7 +509,7 @@ export async function fetchOrder(
 export async function fetchStatusCounts(
   scope: Scope = "all",
 ): Promise<Record<string, number>> {
-  const since = scope === "today" ? startOfBusinessDay().toISOString() : null;
+  const { since, until } = scopeWindow(scope);
 
   const results = await Promise.all(
     ORDER_STATUS_SLUGS.map(async (slug) => {
@@ -502,6 +523,7 @@ export async function fetchStatusCounts(
         .eq("order_stores.status", slug);
 
       if (since) query = query.gte("placed_at", since);
+      if (until) query = query.lt("placed_at", until);
 
       const { count, error } = await query;
       if (error) throw new Error(`Could not count ${slug}: ${error.message}`);

@@ -1021,6 +1021,7 @@ const en = {
     all: "All",
     scopeLive: "Live",
     scopeToday: "Today",
+    scopeYesterday: "Yesterday",
     scopeAll: "All orders",
     // Says what the scope *is*, because "no orders" on a filtered view is
     // ambiguous — it could mean the shop is quiet or the filter is wrong.
@@ -1029,6 +1030,8 @@ const en = {
       "Every order has been delivered or cancelled. New ones appear here the moment they are placed, and the dashboard chimes.",
     todayEmptyTitle: "Nothing today yet",
     todayEmptyBody: "No orders have been placed today.",
+    yesterdayEmptyTitle: "Nothing yesterday",
+    yesterdayEmptyBody: "No orders were placed yesterday.",
     allEmptyTitle: "No orders",
     allEmptyBody: "Nothing has ever been placed.",
     emptyTitle: "Nothing waiting",

@@ -91,7 +91,7 @@ export function useStatusCounts(scope: Scope) {
     queryKey: orderKeys.counts(scope),
     // `live` and `all` count the same rows — the live tabs *are* the
     // non-terminal statuses, so there is nothing extra to filter.
-    queryFn: () => fetchStatusCounts(scope === "today" ? "today" : "all"),
+    queryFn: () => fetchStatusCounts(scope === "live" ? "all" : scope),
   });
 }
 
