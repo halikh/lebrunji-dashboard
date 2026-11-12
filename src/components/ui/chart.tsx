@@ -412,6 +412,7 @@ export function DonutChart({
   rows,
   title,
   totalLabel,
+  fill = false,
   className,
 }: {
   rows: readonly {
@@ -424,6 +425,12 @@ export function DonutChart({
   title: string;
   /** Under the total in the hole, e.g. "orders". */
   totalLabel: string;
+  /**
+   * Grow the ring to the height it is given (a card stretched to match its
+   * neighbour) instead of a fixed size. On phones, where nothing sets a
+   * height, it keeps a fixed size.
+   */
+  fill?: boolean;
   className?: string;
 }) {
   const total = rows.reduce((sum, row) => sum + Math.max(row.value, 0), 0);
@@ -439,10 +446,18 @@ export function DonutChart({
       aria-label={title}
       className={cx(
         "flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-10",
+        fill && "sm:h-full",
         className,
       )}
     >
-      <div className="relative size-44 shrink-0">
+      <div
+        className={cx(
+          "relative shrink-0",
+          fill
+            ? "size-56 sm:aspect-square sm:h-full sm:max-h-96 sm:min-h-56 sm:w-auto"
+            : "size-44",
+        )}
+      >
         <svg viewBox="0 0 100 100" className="size-full -rotate-90" aria-hidden>
           <circle
             cx="50"
@@ -476,10 +491,19 @@ export function DonutChart({
             })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[22px] font-semibold text-ink tabular-nums">
+          <span
+            className={cx(
+              "font-semibold text-ink tabular-nums",
+              fill ? "text-[30px]" : "text-[22px]",
+            )}
+          >
             {total}
           </span>
-          <span className="text-[12.5px] text-ink-3">{totalLabel}</span>
+          <span
+            className={cx("text-ink-3", fill ? "text-[13px]" : "text-[12.5px]")}
+          >
+            {totalLabel}
+          </span>
         </div>
       </div>
       <ul className="flex w-full min-w-0 flex-col gap-2.5 sm:w-auto sm:min-w-44">

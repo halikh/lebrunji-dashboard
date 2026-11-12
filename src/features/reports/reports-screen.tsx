@@ -518,11 +518,17 @@ export function ReportsScreen() {
           </Section>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Section title={t("reports.chartFunnel")}>
+            <Section
+              title={t("reports.chartFunnel")}
+              className="flex flex-col"
+              bodyClassName="flex flex-1 flex-col justify-center"
+            >
               {data.funnel.length === 0 ? (
                 <Empty />
               ) : (
                 <DonutChart
+                  fill
+                  className="flex-1"
                   title={t("reports.chartFunnelAria")}
                   totalLabel={t("reports.funnelTotal")}
                   // The one chart where a colour per slice is information:
