@@ -124,3 +124,31 @@ export async function fetchStats(
   // map. The cast is the whole of it.
   return data as unknown as Stats;
 }
+
+/**
+ * The shop each of these dishes belongs to, by item id — for "What sells".
+ *
+ * `api_v1_admin_stats` names a dish but not its shop, so the shop is read
+ * here from `menu_items` (RLS lets staff read every item, deleted ones too:
+ * a dish sold last month and removed since still has a shop). The current
+ * shop name, not a snapshot — a shop's rename is a rename, not a new shop.
+ */
+export async function fetchItemStores(
+  ids: readonly string[],
+): Promise<Map<string, Localized>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await getClient()
+    .from("menu_items")
+    .select("id, stores ( name )")
+    .in("id", [...ids]);
+  if (error) throw new Error(`Could not read the shops: ${error.message}`);
+  const out = new Map<string, Localized>();
+  for (const row of data ?? []) {
+    // A to-one embed, which the generated types still call an array.
+    const joined = row.stores as unknown as
+      { name: Localized } | { name: Localized }[] | null;
+    const store = Array.isArray(joined) ? joined[0] : joined;
+    if (store) out.set(row.id, store.name);
+  }
+  return out;
+}

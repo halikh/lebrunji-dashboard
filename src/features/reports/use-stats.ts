@@ -10,7 +10,7 @@ import {
   toWallClock,
 } from "@/lib/time";
 
-import { fetchStats } from "./api/stats";
+import { fetchItemStores, fetchStats } from "./api/stats";
 
 export const statsKeys = {
   all: ["stats"] as const,
@@ -174,4 +174,18 @@ export function useStats(
 /** Today, for the "needs you now" block — which is never date-filtered. */
 export function today(): Date {
   return startOfBusinessDay();
+}
+
+/**
+ * The shop of each dish in "What sells", by item id. Keyed by the sorted ids,
+ * so the same ten dishes over another range are not read again.
+ */
+export function useItemStores(ids: readonly string[]) {
+  const key = [...ids].sort();
+  return useQuery({
+    queryKey: [...statsKeys.all, "item-stores", key] as const,
+    queryFn: () => fetchItemStores(key),
+    enabled: key.length > 0,
+    staleTime: 5 * 60_000,
+  });
 }

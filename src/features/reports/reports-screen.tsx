@@ -31,7 +31,12 @@ import {
   Tr,
   cx,
 } from "@/components/ui";
-import { BarChart, HBarList, HeatGrid } from "@/components/ui/chart";
+import {
+  BarChart,
+  DonutChart,
+  HBarList,
+  HeatGrid,
+} from "@/components/ui/chart";
 import { DateRangeField } from "@/components/ui/date-field";
 import { useToasts } from "@/components/ui/toast";
 import { useMoney } from "@/features/reference/use-currencies";
@@ -48,12 +53,7 @@ import {
 
 import type { EarningsRow } from "@/features/earnings/api";
 import { useEarningsReport } from "@/features/earnings/use-earnings-report";
-import {
-  earnedByStore,
-  earnedIn,
-  earnedText,
-  earnedTotals,
-} from "@/features/earnings/summary";
+import { earnedByStore, earnedText } from "@/features/earnings/summary";
 
 import type { Stats } from "./api/stats";
 import { exportReport, type ExportFormat } from "./export";
@@ -62,6 +62,7 @@ import {
   customRange,
   previousOf,
   previousRange,
+  useItemStores,
   useStats,
   yearBefore,
 } from "./use-stats";
@@ -91,7 +92,9 @@ import {
  *   "+50%" is 2 → 3 or 2,000 → 3,000.
  * - **One chart, the figure chosen**: revenue, orders or the average order.
  *   Delivery fees are not offered — the payload has no daily series for
- *   them, and a chart of zeros would be a claim.
+ *   them, and a chart of zeros would be a claim. Nor is there a delivery
+ *   tile (removed at the owner's request, 2026-11-12); the CSV export still
+ *   carries the figure.
  * - **Granularity follows the range**: past three months the bars are
  *   months, because 365 daily bars are a texture, not a chart.
  * - **Drill-down where a row is a thing**: a shop in the ranking opens the
@@ -178,36 +181,17 @@ export function ReportsScreen() {
     compare !== "none" && !prior.isPlaceholderData ? prior.data : undefined;
 
   // What we earned (`0262`), from the Earnings feature's reader, for the
-  // same range and the same comparison. Commission and markup together.
+  // shops table's Earned column and the export. Commission and markup together.
   const earnings = useEarningsReport(current.from, current.to);
-  const priorEarnings = useEarningsReport(
-    before.from,
-    before.to,
-    compare !== "none",
-  );
   // Only the report's currency, like every other figure here: with LBP picked
   // the page says lira, with USD dollars — never both side by side.
   const inCode = (rows: readonly EarningsRow[] | undefined) =>
     (rows ?? []).filter((row) => row.currencyCode === code);
   const earnedRows = inCode(earnings.data);
-  const earnedNow = earnedTotals(earnedRows);
-  const earnedBefore =
-    compare !== "none" && !priorEarnings.isPlaceholderData && priorEarnings.data
-      ? earnedTotals(inCode(priorEarnings.data))
-      : undefined;
   const earnedPerStore = earnedByStore(earnedRows);
-  /** The Earnings page, at this range — it reads the same `days` / `from` / `to`. */
-  const earningsHref = (() => {
-    const query = new URLSearchParams();
-    if (picked) {
-      query.set("from", from as string);
-      query.set("to", to as string);
-    } else if (days !== "30") {
-      query.set("days", days);
-    }
-    const search = query.toString();
-    return search ? `/earnings?${search}` : "/earnings";
-  })();
+  const itemStores = useItemStores(
+    (stats.data?.topItems ?? []).map((item) => item.menuItemId),
+  );
 
   const toast = useToasts();
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
@@ -425,19 +409,12 @@ export function ReportsScreen() {
           {/* No `shopRate` on any figure: these are sums across shops, and
               include the platform's own money — a total read at one shop's
               rate would be a number in no shop's currency. */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-3">
             <Tile
               label={t("reports.tileRevenue")}
               value={<Money value={data.totals.revenue} code={code} />}
               change={change(data.totals.revenue, priorData?.totals.revenue)}
               was={priorData && format(priorData.totals.revenue, code)}
-            />
-            <EarnedTile
-              now={earnedNow}
-              before={earnedBefore}
-              fallbackCode={code}
-              href={earningsHref}
-              loading={earnings.isPending}
             />
             <Tile
               label={t("reports.tileOrders")}
@@ -453,15 +430,6 @@ export function ReportsScreen() {
                 priorData?.totals.averageOrder,
               )}
               was={priorData && format(priorData.totals.averageOrder, code)}
-            />
-            <Tile
-              label={t("reports.tileDelivery")}
-              value={<Money value={data.totals.deliveryFees} code={code} />}
-              change={change(
-                data.totals.deliveryFees,
-                priorData?.totals.deliveryFees,
-              )}
-              was={priorData && format(priorData.totals.deliveryFees, code)}
             />
           </div>
 
@@ -515,12 +483,16 @@ export function ReportsScreen() {
                 <RankTable
                   nameHeader={t("reports.colItem")}
                   countHeader={t("reports.colQuantity")}
-                  // Not linked: the payload names the dish but not its shop,
-                  // and a dish's page lives under its shop.
+                  // Not linked: a dish's page lives under its shop, and the
+                  // shop arrives a moment after the figures.
                   rows={data.topItems.map((item) => ({
                     key: item.menuItemId,
                     // jsonb, not text: `0054` localised the line's snapshot.
                     name: pickLocalized(item.name),
+                    sub: (() => {
+                      const shop = itemStores.data?.get(item.menuItemId);
+                      return shop ? pickLocalized(shop) : undefined;
+                    })(),
                     count: item.quantity,
                     revenue: item.revenue,
                   }))}
@@ -550,15 +522,15 @@ export function ReportsScreen() {
               {data.funnel.length === 0 ? (
                 <Empty />
               ) : (
-                <HBarList
+                <DonutChart
                   title={t("reports.chartFunnelAria")}
-                  // The one chart where a colour per row is information: these
-                  // bars *are* statuses, so each wears its queue colour.
+                  totalLabel={t("reports.funnelTotal")}
+                  // The one chart where a colour per slice is information:
+                  // these *are* statuses, so each wears its queue colour.
                   rows={data.funnel.map((step) => ({
                     key: step.slug,
                     label: statusName(step.slug),
                     value: step.count,
-                    note: String(step.count),
                     fill: statusTone(step.slug).dot,
                   }))}
                 />
@@ -585,69 +557,6 @@ export function ReportsScreen() {
         </div>
       )}
     </Page>
-  );
-}
-
-/**
- * What we earned over the range — commission and markup as one figure, one
- * line per currency and never added across them. Compared like the others,
- * when the range is in one currency: two currencies have no single change.
- * It opens the Earnings page at the same range, for the breakdown.
- */
-function EarnedTile({
-  now,
-  before,
-  fallbackCode,
-  href,
-  loading,
-}: {
-  now: ReturnType<typeof earnedTotals>;
-  before: ReturnType<typeof earnedTotals> | undefined;
-  /** The report's currency, for a range that earned nothing. */
-  fallbackCode: string;
-  href: string;
-  loading: boolean;
-}) {
-  const { format } = useMoney();
-  const lines =
-    now.length > 0 ? now : [{ currencyCode: fallbackCode, amount: 0 }];
-  const only = lines.length === 1 ? lines[0] : undefined;
-  const value = loading ? (
-    <Skeleton className="h-7 w-24" />
-  ) : (
-    <span className="flex flex-col">
-      {lines.map((one) => (
-        <Money
-          key={one.currencyCode}
-          value={one.amount}
-          code={one.currencyCode}
-        />
-      ))}
-    </span>
-  );
-  return (
-    <Tile
-      label={t("reports.earned")}
-      value={value}
-      caption={
-        <Link
-          href={href}
-          className="text-[12.5px] text-ink-3 hover:text-accent-ink hover:underline"
-        >
-          {t("reports.earnedHint")}
-        </Link>
-      }
-      change={
-        only && before && !loading
-          ? change(only.amount, earnedIn(before, only.currencyCode))
-          : undefined
-      }
-      was={
-        only && before && !loading
-          ? format(earnedIn(before, only.currencyCode), only.currencyCode)
-          : undefined
-      }
-    />
   );
 }
 
@@ -800,6 +709,8 @@ function RankTable({
     /** Where the row's thing is opened, when it has a page. */
     href?: string;
     name: string;
+    /** A second line under the name — the shop a dish is from. */
+    sub?: string;
     count: number;
     revenue: number;
     /** What we earned on it, formatted — or "—". */
@@ -838,6 +749,11 @@ function RankTable({
                   </Link>
                 ) : (
                   <span className="truncate font-medium">{row.name}</span>
+                )}
+                {row.sub && (
+                  <span className="-mt-1 truncate text-[12.5px] text-ink-3">
+                    {row.sub}
+                  </span>
                 )}
                 <span aria-hidden className="block h-1 rounded-full bg-hover">
                   <span
