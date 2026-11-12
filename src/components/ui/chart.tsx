@@ -401,3 +401,107 @@ export function HeatGrid({
     </figure>
   );
 }
+
+/**
+ * Parts of a whole, as a ring — "where orders stand". Only for a few slices
+ * that add up to something (statuses of one set of orders); the total sits in
+ * the hole, and the legend beside it carries each count and share as text, so
+ * the ring is never the only place a number lives.
+ */
+export function DonutChart({
+  rows,
+  title,
+  totalLabel,
+  className,
+}: {
+  rows: readonly {
+    key: string;
+    label: string;
+    value: number;
+    /** The slice's colour, as a CSS value. */
+    fill: string;
+  }[];
+  title: string;
+  /** Under the total in the hole, e.g. "orders". */
+  totalLabel: string;
+  className?: string;
+}) {
+  const total = rows.reduce((sum, row) => sum + Math.max(row.value, 0), 0);
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  // A hairline of surface between slices, unless one slice is the whole ring.
+  const drawn = rows.filter((row) => row.value > 0);
+  const gap = drawn.length > 1 ? 1.5 : 0;
+  let offset = 0;
+
+  return (
+    <figure
+      aria-label={title}
+      className={cx(
+        "flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-10",
+        className,
+      )}
+    >
+      <div className="relative size-44 shrink-0">
+        <svg viewBox="0 0 100 100" className="size-full -rotate-90" aria-hidden>
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            strokeWidth="12"
+            style={{ stroke: "var(--color-hover)" }}
+          />
+          {total > 0 &&
+            drawn.map((row) => {
+              const length = (row.value / total) * circumference;
+              const dash = Math.max(length - gap, 0.5);
+              const slice = (
+                <circle
+                  key={row.key}
+                  cx="50"
+                  cy="50"
+                  r={radius}
+                  fill="none"
+                  strokeWidth="12"
+                  strokeDasharray={`${dash} ${circumference - dash}`}
+                  strokeDashoffset={-offset}
+                  style={{ stroke: row.fill }}
+                >
+                  <title>{describeCell(row)}</title>
+                </circle>
+              );
+              offset += length;
+              return slice;
+            })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[22px] font-semibold text-ink tabular-nums">
+            {total}
+          </span>
+          <span className="text-[12.5px] text-ink-3">{totalLabel}</span>
+        </div>
+      </div>
+      <ul className="flex w-full min-w-0 flex-col gap-2.5 sm:w-auto sm:min-w-44">
+        {rows.map((row) => (
+          <li key={row.key} className="flex items-center gap-2.5 text-[13px]">
+            <span
+              aria-hidden
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: row.fill }}
+            />
+            <span className="min-w-0 flex-1 truncate text-ink-2">
+              {row.label}
+            </span>
+            <span className="font-medium text-ink tabular-nums">
+              {row.value}
+            </span>
+            <span className="w-11 text-end text-ink-4 tabular-nums">
+              {total > 0 ? `${Math.round((row.value / total) * 100)}%` : "—"}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </figure>
+  );
+}

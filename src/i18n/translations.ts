@@ -3526,7 +3526,6 @@ const en = {
     // What we earned (`0262`): commission and markup as one figure, per
     // currency, with the breakdown on the Earnings page.
     earned: "We earned",
-    earnedHint: "Commission and markup. Breakdown on Earnings.",
     earnedColumn: "Earned",
     earnedIn: "We earned ({code})",
     title: "Reports",
@@ -3626,6 +3625,7 @@ const en = {
     chartFunnel: "Where orders stand",
     chartFunnelAria:
       "How many shop portions are at each step, including cancelled ones.",
+    funnelTotal: "total",
 
     chartBands: "What each delivery band collected",
     chartBandsAria: "Delivery fees collected, by distance band.",
