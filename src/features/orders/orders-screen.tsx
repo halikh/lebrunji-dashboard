@@ -49,7 +49,7 @@ import {
   useStatusCounts,
 } from "./use-orders";
 
-const SCOPES: Scope[] = ["live", "today", "all"];
+const SCOPES: Scope[] = ["live", "today", "yesterday", "all"];
 type View = "list" | "board";
 const VIEW_KEY = "orders.view";
 const DEFAULT_STATUS = "ordered";
@@ -58,6 +58,10 @@ const ALL_STATUSES = "all";
 const EMPTY: Record<Scope, { title: TranslationKey; body: TranslationKey }> = {
   live: { title: "orders.liveEmptyTitle", body: "orders.liveEmptyBody" },
   today: { title: "orders.todayEmptyTitle", body: "orders.todayEmptyBody" },
+  yesterday: {
+    title: "orders.yesterdayEmptyTitle",
+    body: "orders.yesterdayEmptyBody",
+  },
   all: { title: "orders.allEmptyTitle", body: "orders.allEmptyBody" },
 };
 
@@ -128,7 +132,7 @@ function usePreferredView() {
  *
  * Live orders are worked **oldest first**, like a ticket rail: the order that
  * has waited longest is at the top, and its waiting time turns amber, then red
- * (`order-age.tsx`). Today and All orders are history, newest first.
+ * (`order-age.tsx`). Today, Yesterday and All orders are history, newest first.
  *
  * Everything that defines the view lives in the URL (`scope`, `status`,
  * `order`, `q`, `view`), so a view can be shared, reloaded or opened from
@@ -363,6 +367,7 @@ export function OrdersScreen() {
               items={[
                 { key: "live", label: t("orders.scopeLive") },
                 { key: "today", label: t("orders.scopeToday") },
+                { key: "yesterday", label: t("orders.scopeYesterday") },
                 { key: "all", label: t("orders.scopeAll") },
               ]}
             />
