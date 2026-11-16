@@ -362,8 +362,8 @@ function CurrencyTable({
             <Th>{t("earningsReport.colModel")}</Th>
             <Th align="end">{t("earningsReport.colOrders")}</Th>
             <Th align="end">{t("earningsReport.colSales")}</Th>
-            <Th align="end">{t("earningsReport.colEarned")}</Th>
             <Th align="end">{t("earningsReport.colPaid")}</Th>
+            <Th align="end">{t("earningsReport.colEarned")}</Th>
             <Th align="end">{t("earningsReport.colDelivery")}</Th>
             <Th align="end">{t("earningsReport.colFreeDelivery")}</Th>
             <Th align="end">{t("earningsReport.colTotalEarned")}</Th>
@@ -402,10 +402,10 @@ function CurrencyTable({
                 {money(row.sales)}
               </Td>
               <Td className="text-end whitespace-nowrap tabular-nums">
-                {money(row.earning)}
+                {money(row.storeDue)}
               </Td>
               <Td className="text-end whitespace-nowrap tabular-nums">
-                {money(row.storeDue)}
+                {money(row.earning)}
               </Td>
               <Td className="text-end whitespace-nowrap tabular-nums">
                 {money(row.delivery)}
@@ -432,10 +432,10 @@ function CurrencyTable({
               {money(group.totals.sales)}
             </Td>
             <Td className="text-end whitespace-nowrap tabular-nums">
-              {money(group.totals.earning)}
+              {money(group.totals.storeDue)}
             </Td>
             <Td className="text-end whitespace-nowrap tabular-nums">
-              {money(group.totals.storeDue)}
+              {money(group.totals.earning)}
             </Td>
             <Td className="text-end whitespace-nowrap tabular-nums">
               {money(group.totals.delivery)}

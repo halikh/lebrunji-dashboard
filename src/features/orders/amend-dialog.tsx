@@ -1,14 +1,22 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, Info } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Ban,
+  Info,
+  Minus,
+  Plus,
+  Undo2,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
   Button,
-  ConfirmDialog,
   Dialog,
   Field,
+  Segmented,
   Textarea,
   Thumb,
   cx,
@@ -50,12 +58,18 @@ import { orderKeys } from "./use-orders";
  * item. The operator rings, the customer agrees to go without it or take
  * something else, and this is where that conversation is recorded.
  *
- * ## Everything is a quantity
+ * ## One click for the common case
  *
- * No "remove" button: removing is bringing zero. One control per line counting
- * down from what was ordered, and the reason follows from the number — fewer
- * is **short**, none is **out of stock**. Nothing counts *up*: adding to an
- * order is a different act with different consent, and migration 0082 says so.
+ * Almost every call is "they are out of the kibbeh". So each line starts as a
+ * plain receipt row with one button, **Can't send**, and that click alone
+ * records the line as not coming. Only a line that has been marked opens up
+ * for more: "only some of it" with a stepper, and an optional dish to send
+ * instead. Untouched lines stay out of the way.
+ *
+ * Underneath it is still a quantity, and the reason follows from the number —
+ * fewer is **short**, none is **out of stock**. Nothing counts *up*: adding to
+ * an order is a different act with different consent, and migration 0082 says
+ * so.
  *
  * ## The new total is the database's, and it is on screen before Save
  *
@@ -65,8 +79,10 @@ import { orderKeys } from "./use-orders";
  * shop's rate and `line_price` all live there. Working it out here was QA-012:
  * a substitute at the brand's price in the wrong currency, read down the phone.
  *
- * Save then asks once more, with the before and after side by side and the
- * changes listed — the customer is charged the new figure.
+ * The changes, in words, and the before → after sit right above Save, so
+ * what the operator reads out is what they are looking at when they press it.
+ * There is no second "are you sure" dialog: it repeated the same summary one
+ * click later, and was the step operators found most tedious.
  */
 export function AmendDialog({
   order,
@@ -94,7 +110,6 @@ export function AmendDialog({
    */
   const [swapOptions, setSwapOptions] = useState<Record<string, string[]>>({});
   const [note, setNote] = useState("");
-  const [confirming, setConfirming] = useState(false);
 
   /**
    * The total this form was opened against, held for the life of the form.
@@ -264,6 +279,15 @@ export function AmendDialog({
       footer={
         <>
           <div className="flex basis-full flex-col gap-2 pb-1">
+            {summary.length > 0 && (
+              // What is being changed, in the words the operator says down
+              // the phone — right above the total and Save.
+              <ul className="flex list-disc flex-col gap-0.5 ps-5 text-[13px] text-ink-2">
+                {summary.map((one) => (
+                  <li key={one}>{one}</li>
+                ))}
+              </ul>
+            )}
             <Totals
               order={order}
               before={order.total}
@@ -307,9 +331,9 @@ export function AmendDialog({
             variant="primary"
             disabled={!canSave}
             pending={amend.isPending}
-            onClick={() => setConfirming(true)}
+            onClick={() => amend.mutate()}
           >
-            {t("amend.review")}
+            {t("amend.confirm")}
           </Button>
         </>
       }
@@ -395,7 +419,7 @@ export function AmendDialog({
           );
         })}
 
-        {editable.length > 0 && (
+        {touched && (
           <Field
             label={t("amend.note")}
             hint={t("amend.noteHint")}
@@ -414,39 +438,6 @@ export function AmendDialog({
           </Field>
         )}
       </div>
-
-      <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        title={t("amend.confirmTitle", { code: order.code })}
-        description={t("amend.confirmBody")}
-        confirmLabel={t("amend.confirm")}
-        cancelLabel={t("amend.keepEditing")}
-        onConfirm={async () => {
-          try {
-            await amend.mutateAsync();
-          } catch {
-            // Said by the mutation's own toast; a stale form has closed.
-          }
-        }}
-      >
-        <div className="flex flex-col gap-3">
-          {summary.length > 0 && (
-            <ul className="flex list-disc flex-col gap-1 ps-5 text-[13.5px] text-ink">
-              {summary.map((one) => (
-                <li key={one}>{one}</li>
-              ))}
-            </ul>
-          )}
-          <Totals
-            order={order}
-            before={order.total}
-            after={total}
-            stale={false}
-            pending={false}
-          />
-        </div>
-      </ConfirmDialog>
     </Dialog>
   );
 }
@@ -533,9 +524,10 @@ function Totals({
 /**
  * One line, and what is happening to it.
  *
- * The substitute picker appears only once the count is reduced: offering to
- * replace a line coming in full is the sort of control used by accident
- * precisely because it is always there.
+ * Untouched, it is a receipt row with one button. Marked, it opens a panel:
+ * none or only some, and what to send instead. The substitute picker lives
+ * only there — offering to replace a line coming in full is the sort of
+ * control used by accident precisely because it is always there.
  */
 function AmendLine({
   line,
@@ -566,6 +558,8 @@ function AmendLine({
   const groups = useItemOptionGroups(swap);
   const short = count < line.quantity;
   const counted = itemUnit(line)?.step == null;
+  // "Only some" means nothing when one was ordered: it is all or none.
+  const canSplit = line.quantity > 1;
 
   // Flattened across sections — the operator is looking for a dish, not a
   // heading — without the dish being replaced, which is no substitute.
@@ -577,11 +571,11 @@ function AmendLine({
   return (
     <div
       className={cx(
-        "flex flex-col gap-3 rounded-lg border p-3.5 transition-colors",
+        "flex flex-col rounded-lg border transition-colors",
         short ? "border-warning/40 bg-warning-soft/60" : "border-line",
       )}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 p-3">
         {/* The picture, because a dish is recognised by it faster than by its
             name. It dims when the line goes to zero. */}
         <Thumb
@@ -597,12 +591,26 @@ function AmendLine({
               count === 0 && "text-ink-4 line-through",
             )}
           >
+            <span className="tabular-nums text-ink-3">
+              {unitLabel(line, line.quantity)}
+            </span>{" "}
             {line.name}
           </span>
-          {(line.options.length > 0 || line.note) && (
-            <span className="truncate text-[12.5px] text-ink-3">
-              {[...line.options, line.note].filter(Boolean).join(", ")}
+          {short ? (
+            <span className="truncate text-[12.5px] font-medium text-warning-ink">
+              {count === 0
+                ? t("amend.notComing")
+                : t("amend.partComing", {
+                    count: unitLabel(line, count),
+                    ordered: unitLabel(line, line.quantity),
+                  })}
             </span>
+          ) : (
+            (line.options.length > 0 || line.note) && (
+              <span className="truncate text-[12.5px] text-ink-3">
+                {[...line.options, line.note].filter(Boolean).join(", ")}
+              </span>
+            )
           )}
         </div>
         <Price
@@ -622,51 +630,83 @@ function AmendLine({
           align="end"
           className="text-[13.5px] font-medium text-ink"
         />
+        {/* The one decision most calls need, one click away. Marking a line
+            means none of it is coming; the panel below refines that. */}
+        {short ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onCount(line.quantity)}
+          >
+            <Undo2 />
+            {t("amend.undo")}
+          </Button>
+        ) : (
+          <Button size="sm" variant="secondary" onClick={() => onCount(0)}>
+            <Ban />
+            {t("amend.cantSend")}
+          </Button>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-medium text-ink-2">
-            {t("amend.coming")}
-          </span>
-          {/* Buttons rather than a number field: the numbers are 0 to a
-              handful, the operator is holding a phone, and a spinner that can
-              be scrolled past is the one input this screen must not have. */}
-          <div
-            role="radiogroup"
-            aria-label={t("amend.coming")}
-            className="inline-flex flex-wrap rounded-md border border-line bg-hover p-0.5"
-          >
-            {Array.from({ length: line.quantity + 1 }, (_, value) => (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={count === value}
-                onClick={() => onCount(value)}
-                className={cx(
-                  "h-7 rounded-[5px] text-[13px] font-medium tabular-nums transition-colors",
-                  // A square for a count, wider for an amount (0122).
-                  counted ? "w-8" : "min-w-8 px-2",
-                  count === value
-                    ? value < line.quantity
-                      ? "bg-surface text-warning-ink shadow-xs"
-                      : "bg-surface text-ink shadow-xs"
-                    : "text-ink-3 hover:text-ink",
-                )}
-              >
-                {/* Zero is none of it, whatever the unit. */}
-                {value === 0 ? 0 : unitLabel(line, value)}
-              </button>
-            ))}
-          </div>
-          <span className="text-[12.5px] text-ink-3">
-            {t("amend.ordered", { count: unitLabel(line, line.quantity) })}
-          </span>
-        </div>
+      {short && (
+        <div className="flex flex-col gap-3 border-t border-warning/30 px-3 pt-3 pb-3.5">
+          {canSplit && (
+            <div className="flex flex-wrap items-center gap-3">
+              <Segmented
+                size="sm"
+                value={count === 0 ? "none" : "some"}
+                onChange={(key) =>
+                  onCount(key === "none" ? 0 : line.quantity - 1)
+                }
+                items={[
+                  { key: "none", label: t("amend.noneLeft") },
+                  { key: "some", label: t("amend.someLeft") },
+                ]}
+              />
+              {count > 0 && (
+                // A stepper, not a number field: the numbers are a handful,
+                // the operator is holding a phone, and a field that scrolls
+                // past a value is the one input this screen must not have.
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="icon-sm"
+                    variant="secondary"
+                    aria-label={t("amend.fewer")}
+                    disabled={count <= 1}
+                    onClick={() => onCount(count - 1)}
+                  >
+                    <Minus />
+                  </Button>
+                  <span
+                    className={cx(
+                      "text-center text-[13.5px] font-medium tabular-nums text-ink",
+                      counted ? "min-w-6" : "min-w-12",
+                    )}
+                    aria-live="polite"
+                  >
+                    {unitLabel(line, count)}
+                  </span>
+                  <Button
+                    size="icon-sm"
+                    variant="secondary"
+                    aria-label={t("amend.more")}
+                    disabled={count >= line.quantity - 1}
+                    onClick={() => onCount(count + 1)}
+                  >
+                    <Plus />
+                  </Button>
+                  <span className="text-[12.5px] text-ink-3">
+                    {t("amend.ordered", {
+                      count: unitLabel(line, line.quantity),
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
-        {short && (
-          <div className="flex min-w-[220px] flex-1 items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="shrink-0 text-[13px] font-medium text-ink-2">
               {t("amend.instead")}
             </span>
@@ -674,7 +714,7 @@ function AmendLine({
                 clear button goes back to. */}
             <Select
               aria-label={t("amend.instead")}
-              className="min-w-0 flex-1"
+              className="min-w-[220px] flex-1"
               value={swap ?? ""}
               disabled={menu.isPending}
               isClearable
@@ -688,9 +728,8 @@ function AmendLine({
               options={dishes}
             />
           </div>
-        )}
-      </div>
-
+        </div>
+      )}
       {/* The chosen dish's own questions. They matter for money as well as the
           kitchen: an option carries a price, so a substitute recorded without
           its extras is a total the customer never agreed to. Every group is
@@ -699,7 +738,7 @@ function AmendLine({
         (groups.data ?? [])
           .filter((group) => group.isActive)
           .map((group) => (
-            <div key={group.id} className="flex flex-col gap-1.5">
+            <div key={group.id} className="flex flex-col gap-1.5 px-3 pb-3.5">
               <span className="text-[13px] font-medium text-ink">
                 {pickLocalized(group.title)}
                 {group.minSelections > 0 && (
