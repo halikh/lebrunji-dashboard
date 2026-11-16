@@ -718,11 +718,18 @@ const en = {
     open: "Something missing?",
     title: "Change {code}",
     blurb:
-      "Ring the customer first. What you record here is what they agreed to — the order keeps its place and its delivery.",
-    coming: "Coming",
+      "Click Can't send on what the shop doesn't have, then ring the customer. They are charged the new total — the order keeps its place and its delivery.",
+    cantSend: "Can't send",
+    undo: "Undo",
+    noneLeft: "None of it",
+    someLeft: "Only some",
+    fewer: "One fewer",
+    more: "One more",
+    notComing: "Not coming",
+    partComing: "Only {count} of {ordered} coming",
     ordered: "of {count} ordered",
-    instead: "Instead send",
-    nothing: "Nothing",
+    instead: "Send instead",
+    nothing: "Nothing — just leave it out",
     // Marked on the group rather than enforced here: the operator is reading
     // the questions down a phone, and a form that refused to save until every
     // required one was answered would stop them mid-call.
@@ -737,7 +744,7 @@ const en = {
     // Said before it is committed, because it is the surprising part: the
     // customer's order shrank and their delivery fee did not.
     feesStand: "Delivery and any discount stay as they were.",
-    confirm: "Save the change",
+    confirm: "Customer agreed — save",
     done: "{code} updated",
 
     // On the receipt, once it has happened.
@@ -763,12 +770,7 @@ const en = {
 
     // The before/after under the form, and the question Save asks.
     before: "Was",
-    unchanged: "Set what is coming",
-    review: "Review the change",
-    keepEditing: "Keep editing",
-    confirmTitle: "Save the change to {code}?",
-    confirmBody:
-      "The customer is charged the new total. Make sure they agreed to it on the phone.",
+    unchanged: "Mark what can't be sent",
     summaryNone: "{name} — not coming",
     summaryShort: "{name} — {to} instead of {from}",
     summarySwap: "{name} sent instead of {original}",
